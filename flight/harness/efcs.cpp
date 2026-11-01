@@ -226,9 +226,9 @@ void Efcs::updateFac(const World& w, int i, double dt) {
   d.elac_2_healthy = tx_.elacDiscrete[1].digital_output_validated;
   d.engine_1_stopped = true;  // the driver hard-codes these true
   d.engine_2_stopped = true;
-  d.rudder_trim_switch_left = false;
-  d.rudder_trim_switch_right = false;
-  d.rudder_trim_reset_button = false;
+  d.rudder_trim_switch_left = w.crew.rudderTrimLeft;  // the driver reads the sim's trim input here
+  d.rudder_trim_switch_right = w.crew.rudderTrimRight;
+  d.rudder_trim_reset_button = w.crew.rudderTrimReset;
   d.fac_engaged_from_switch = w.crew.facOn[i];
   d.fac_opp_healthy = tx_.facDiscrete[opp].fac_healthy;
   d.is_unit_1 = i == 0;
@@ -242,6 +242,8 @@ void Efcs::updateFac(const World& w, int i, double dt) {
 
   auto& a = in.analog_inputs;
   a.yaw_damper_position_deg = 0;  // the driver feeds zero
+  // Not negated, unlike the driver (:2464): the driver negates because the hydraulics hold the trim in
+  // their frame, having negated its order on the way in. The world holds it in the computers' frame.
   a.rudder_trim_position_deg = w.surfaces.rudderTrim;
   a.rudder_travel_lim_position_deg = w.surfaces.travelLimiter;
 

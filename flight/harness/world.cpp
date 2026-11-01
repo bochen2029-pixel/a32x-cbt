@@ -355,6 +355,17 @@ void World::fly(double dt) {
     c.pitch = stickOverride.pitch;
     c.roll = stickOverride.roll;
   }
+
+  c.rudderTrimLeft = c.rudderTrimRight = c.rudderTrimReset = false;
+  if (trimTest.direction != 0 && phase_ == Phase::Cruise) {
+    const double s = t_ - phaseStart_;
+    if (s >= trimTest.from && s < trimTest.to) {
+      c.rudderTrimLeft = trimTest.direction > 0;
+      c.rudderTrimRight = trimTest.direction < 0;
+    }
+    if (s >= trimTest.from && s < trimTest.handsOffTo) c.pitch = c.roll = 0;
+    c.rudderTrimReset = s >= trimTest.handsOffTo && s < trimTest.handsOffTo + 1;
+  }
 }
 
 // Servos follow the computers. A surface follows its active servo; with two active it follows their
@@ -389,11 +400,12 @@ void World::actuate(double dt, const Orders& o) {
   }
 
   // The rudder, as a320_systems' rudder mechanical assembly sums it: pedals, trim and yaw damper,
-  // inside the travel limiter. Its frame is the hydraulics' (+ right): pedals arrive there negated
-  // from the computers' frame, the yaw damper order is negated on the way in, and the trim order is
-  // not — so in the computers' frame the trim counts against. The trim stays at zero here: nothing
-  // moves it without a trim switch or an autopilot.
-  const double rudder = clamp(crew.pedals * kRudderPedalDeg - surfaces.rudderTrim + surfaces.yawDamper,
+  // inside the travel limiter. Its frame is the hydraulics' (+ right), and all three arrive there
+  // negated from the computers' frame: the pedals by the driver, the yaw damper order and the trim
+  // order by the hydraulics on the way in (hydraulic/mod.rs: A320YawDamperController::angle_request,
+  // "FBW negative is right"; A320RudderTrimTravelLimiterController::read, "Trim commands from FBW is
+  // negative for right positive for left"). So in the computers' frame all three count the same way.
+  const double rudder = clamp(crew.pedals * kRudderPedalDeg + surfaces.rudderTrim + surfaces.yawDamper,
                               -surfaces.travelLimiter, surfaces.travelLimiter);
   surfaces.rudder = follow(surfaces.rudder, rudder, 40, dt);
 

@@ -31,6 +31,8 @@ struct Crew {
   double brakes = 1;      // toe brakes, both feet, 0..1; parked on them at the start
   bool gearDown = true;   // gear lever
   int flapLever = 0;      // 0, 1, 2, 3, 4 = FULL
+  bool rudderTrimLeft = false, rudderTrimRight = false;  // RUD TRIM switch, momentary
+  bool rudderTrimReset = false;                          // RUD TRIM RESET pushbutton
 };
 
 // What the computers tell the actuators, as FlyByWireInterface::updateServoSolenoidStatus hands it
@@ -130,6 +132,15 @@ class World {
 
   // From this time on, all three ADRs transmit FailureWarning, as failed ADRs do. Negative: never.
   double adrFailAt = -1;
+
+  // A property test's hand on the RUD TRIM switch, in seconds after the start of cruise: the switch
+  // held from `from` to `to` (+1 left, -1 right), the stick neutral from `from` to `handsOffTo` so that
+  // the crew's heading hold does not fight the trim, then the RESET pushbutton pressed for a second.
+  // Off when direction is 0.
+  struct TrimTest {
+    double from = 0, to = 0, handsOffTo = 0;
+    int direction = 0;
+  } trimTest;
 
  private:
   static constexpr double kDownlocked = 0.999;

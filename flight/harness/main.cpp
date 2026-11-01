@@ -32,6 +32,10 @@ namespace {
 
 constexpr double kDt = 0.02;  // 50 Hz, the rate the computers are built for
 
+// The RUD TRIM test, in seconds after the start of cruise: after the doublet and before the turn, the
+// switch held left for six seconds, the stick neutral until the hands come back, then RESET.
+constexpr double kTrimFrom = 26, kTrimTo = 32, kTrimHandsOffTo = 40;
+
 enum class PitchLawState { Normal, Alternate1, Alternate2, Direct, None };
 enum class LateralLawState { Normal, Direct, None };
 
@@ -215,11 +219,15 @@ struct Results {
   Range ths1g;
   // the cruise pedal kick: the sideslip it raised, and what was left of it four to seven seconds after
   double kickBeta = 0, kickResidualR = -1, kickResidualBeta = -1;
+  // the RUD TRIM test, at the end of its hands-off window: what the engaged FAC ordered (+ left) and read
+  // back, the rudder (+ left) and the sideslip (+ nose left of the flight path); then the trim after RESET
+  double trimOrder = NAN, trimReadBack = NAN, trimRudder = NAN, trimBeta = NAN, trimAfterReset = NAN;
 };
 
 Results run(const Options& opt, FILE* trace) {
   World world;
   world.adrFailAt = opt.failAdrAt;
+  if (opt.expect == "rudder-trim") world.trimTest = {kTrimFrom, kTrimTo, kTrimHandsOffTo, +1};
   Efcs& efcs = Efcs::instance();
   Results r;
   Digest digest;
@@ -329,6 +337,16 @@ Results run(const Options& opt, FILE* trace) {
         r.kickResidualR = std::max(r.kickResidualR, std::abs(world.yawRateDegS()));
         r.kickResidualBeta = std::max(r.kickResidualBeta, std::abs(world.betaDeg()));
       }
+      if (world.trimTest.direction != 0) {
+        const int f = tx.facDiscrete[0].rudder_trim_engaged ? 0 : 1;
+        if (c < kTrimHandsOffTo) {  // the last values written are the window's end
+          r.trimOrder = tx.facAnalog[f].rudder_trim_order_deg;
+          r.trimReadBack = tx.facBus[f].rudder_trim_pos_deg.Data;
+          r.trimRudder = s.rudder;
+          r.trimBeta = world.betaDeg();
+        }
+        if (c < kTrimHandsOffTo + 15) r.trimAfterReset = s.rudderTrim;
+      }
     }
 
     if (settledInFlight && std::abs(world.pitchRateDegS()) < 0.2 && std::abs(world.loadFactor() - 1) < 0.03 &&
@@ -416,6 +434,19 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
                       fmt("yaw rate at most %.2f deg/s", r.kickResidualR));
     failed += verdict("and so is the sideslip", r.kickResidualBeta >= 0 && r.kickResidualBeta < 0.5,
                       fmt("sideslip at most %.2f deg", r.kickResidualBeta));
+  } else if (which == "rudder-trim") {
+    // The RUD TRIM switch held left for six seconds in cruise, the stick left alone: the FAC orders left
+    // trim and reads back the trim it ordered, the rudder trails left and the nose swings left of the
+    // flight path; RESET centres it. Sideslip, not heading, because the window can open mid-turn and
+    // normal law holds whatever bank the hands left. A sign wrong anywhere fails one of these.
+    failed += verdict("the FAC orders left trim", r.trimOrder > 0.5, fmt("%.2f deg ordered (+ left)", r.trimOrder));
+    failed += verdict("and reads back the trim it ordered", std::abs(r.trimReadBack - r.trimOrder) < 0.3,
+                      fmt("read back %.2f deg against %.2f ordered", r.trimReadBack, r.trimOrder));
+    failed += verdict("the rudder trails left", r.trimRudder > 0.5, fmt("rudder %.2f deg (+ left)", r.trimRudder));
+    failed += verdict("and the nose swings left of the flight path", r.trimBeta > 1.0,
+                      fmt("sideslip %.2f deg (+ nose left)", r.trimBeta));
+    failed += verdict("RESET centres the trim", std::abs(r.trimAfterReset) < 0.2,
+                      fmt("trim %.2f deg 15 s after RESET", r.trimAfterReset));
   } else if (which == "landing") {
     // The first landing of the run, against the A320's limits: 600 fpm and 2.6 g are its hard-landing
     // thresholds and 11.7 deg of pitch touches its tail. 360 fpm, 6 ft/s, is this harness's bar for
@@ -506,7 +537,7 @@ bool childDigest(const char* argv0, double minutes, std::string& out) {
 void usage() {
   std::printf(
       "law_harness [--minutes N] [--gate] [--check-determinism] [--trace file.csv] [--digest]\n"
-      "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|landing|\n"
+      "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|rudder-trim|landing|\n"
       "                      law-degrades|scanner-catches-nan]\n"
       "            [--fail-adr-at SECONDS]\n");
 }

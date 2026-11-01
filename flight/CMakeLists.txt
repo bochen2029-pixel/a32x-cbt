@@ -152,6 +152,7 @@ add_test(NAME stick_flies_the_aircraft COMMAND law_harness --minutes 8 --expect 
 # What a real airframe adds: the laws trim it, damp it, and land it.
 add_test(NAME stabiliser_takes_the_trim COMMAND law_harness --minutes 8 --expect autotrim)
 add_test(NAME yaw_damper_takes_out_a_pedal_kick COMMAND law_harness --minutes 8 --expect pedal-kick)
+add_test(NAME rudder_trim_moves_the_nose_the_way_it_is_set COMMAND law_harness --minutes 8 --expect rudder-trim)
 # Eighteen minutes: our A320 descends at idle at about 1,030 fpm against the 737's 1,700 and lands later.
 add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 18 --expect landing)
 
