@@ -10,6 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { unzip } from '../../../app/tools/zip.mjs';
+import { guideHtml, guideImages } from '../tools/guide-html.mjs';
 import { bareWindowsProblems, readPe } from '../tools/pe.mjs';
 import {
   BINARY, BINARY_FILES, BINARY_NOTICES, DISCLAIMER, SOURCE, UPSTREAM, archive, checkBinary, checkSource, cmakePins,
@@ -18,6 +19,7 @@ import {
 } from '../tools/release-contents.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const GUIDE = read('../../../docs/pilots-guide.md');
 const values = templateValues({ commit: 'f'.repeat(40), commitDate: '2026-11-01', epoch: 1793500000, three: '0.186.1', esbuild: '0.28.2' });
 const GPL3 = 'GNU GENERAL PUBLIC LICENSE\n                       Version 3, 29 June 2007\n';
 const APACHE = 'Apache License\n Version 2.0, January 2004\n...\n---- LLVM Exceptions to the Apache 2.0 License ----\n';
@@ -63,6 +65,8 @@ function binary() {
     ['web/index.html', `<!doctype html><div id="notice">${DISCLAIMER}</div><script src="core.js"></script><script src="flight.js"></script>`],
     ['web/flight.js', '(() => {})();\n/*! Bundled license information:\n  (**\n   * @license\n   * Copyright 2010-2026 Three.js Authors\n   * SPDX-License-Identifier: MIT\n   *)\n*/\n'],
     ['web/core.js', 'globalThis.FLIGHT_CORE_SOURCE = "";\n'],
+    ['guide/index.html', guideHtml(GUIDE, { disclaimer: DISCLAIMER })],
+    ...guideImages(GUIDE).map((n) => [`guide/${n}`, 'JPEG']),
     ['notices/A32NX.txt', notice(`A32NX, ${UPSTREAM.a32nx.commit}.`, GPL3)],
     ['notices/JSBSim.txt', notice(`JSBSim, ${UPSTREAM.jsbsim.commit}.`, 'GNU LESSER GENERAL PUBLIC LICENSE\n Version 2.1, February 1999', 'Jon S. Berndt')],
     ['notices/aircraft-data.txt', '<fileheader>\n<author> Dave Culp </author>\n</fileheader>\n<!--\n  File:     CFM56_5.xml\n-->\n'],
@@ -103,6 +107,18 @@ test('each file of the list missing refuses the release, by name', () => {
     files.delete(name);
     assert.throws(() => check(files), new RegExp(`${name.replace(/[.+]/g, '\\$&')}.*missing`), name);
   }
+});
+
+test('the Windows archive refuses to ship without the pilot\'s guide, its disclaimer or its pictures', () => {
+  const noGuide = binary();
+  noGuide.delete('guide/index.html');
+  assert.throws(() => check(noGuide), /guide\/index\.html is missing/);
+  const unsaid = binary();
+  unsaid.set('guide/index.html', Buffer.from(guideHtml(GUIDE)));
+  assert.throws(() => check(unsaid), /guide\/index\.html does not carry the disclaimer on the pilot's guide/);
+  const picture = binary(), first = guideImages(GUIDE)[0];
+  picture.delete(`guide/${first}`);
+  assert.throws(() => check(picture), new RegExp(`guide/index\\.html points at "${first.replace('.', '\\.')}", which does not ship`));
 });
 
 test('a notice that does not say what it must refuses the release', () => {

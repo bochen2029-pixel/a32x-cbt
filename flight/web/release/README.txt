@@ -13,6 +13,9 @@ RUN IT
   Edge. Nothing is installed, no administrator is needed, and nothing is fetched from the internet.
   You can also open web\index.html in Edge or Chrome yourself. Other browsers have not been tried.
 
+  The pilot's guide, guide\index.html, opens in the same browser: the controls and the cameras, flying
+  the ILS to 17C by hand, how an approach is judged, the debrief, and saving a flight to hand in.
+
   A32X.exe is not code-signed, so Windows may say it protected your PC from an unrecognised app. Choose
   "More info", then "Run anyway", or open web\index.html instead.
 
@@ -39,6 +42,7 @@ WHAT IS IN THIS FOLDER
   A32X.exe      the launcher: it opens web\index.html
   web\          the simulator: index.html, flight.js (the page, with three.js) and core.js (the flight
                 computers and the airframe, as WebAssembly)
+  guide\        the pilot's guide: index.html and its pictures
   trainer\      the systems trainer, MIT
   notices\      the licence or notice of everything else this build contains, one file each
   LICENSE.txt   the GNU General Public License, version 3

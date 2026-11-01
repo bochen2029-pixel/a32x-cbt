@@ -86,6 +86,15 @@ export const BINARY_FILES = [
   'notices/dlmalloc.txt',
   'notices/three.js.txt',
   'notices/airport-data.txt',
+  // the pilot's guide, made a page from docs/pilots-guide.md (guide-html.mjs), and its pictures
+  'guide/index.html',
+  'guide/floor-tier.jpg',
+  'guide/approach-eye.jpg',
+  'guide/approach-cockpit.jpg',
+  'guide/skyline.jpg',
+  'guide/night-chase.jpg',
+  'guide/verdict.jpg',
+  'guide/debrief.jpg',
 ];
 
 const GPL3 = /GNU GENERAL PUBLIC LICENSE\s+Version 3, 29 June 2007/;
@@ -98,6 +107,7 @@ export const BINARY_NOTICES = [
   ['LICENSE.txt', GPL3, 'the GNU GPL, version 3'],
   ['README.txt', DISCLAIMER, 'the disclaimer'],
   ['web/index.html', DISCLAIMER, 'the disclaimer on the flight page, as the trainer page carries it'],
+  ['guide/index.html', DISCLAIMER, 'the disclaimer on the pilot\'s guide'],
   ['README.txt', /NO WARRANTY/, 'that it comes with no warranty'],
   ['README.txt', /Corresponding Source is a32x-sim-\S+-source\.zip/, 'where its Corresponding Source is'],
   ['README.txt', /"Airbus", "A320" and "A32NX" belong to their owners/, 'the trademarks'],
@@ -322,6 +332,10 @@ export function checkBinary(files, { trainer, owed, paths = [] }) {
   for (const n of owed) if (!files.has(`notices/${n}.txt`)) problems.push(`the module links code under ${n}'s licence, and notices/${n}.txt does not ship`);
   for (const ref of pageReferences(files.get('web/index.html')?.toString('utf8') ?? '')) {
     if (!files.has(`web/${ref}`)) problems.push(`web/index.html points at "${ref}", which does not ship`);
+  }
+  // the guide's page points only at its own pictures, and at places in itself
+  for (const ref of pageReferences(files.get('guide/index.html')?.toString('utf8') ?? '')) {
+    if (!ref.startsWith('#') && !files.has(`guide/${ref}`)) problems.push(`guide/index.html points at "${ref}", which does not ship`);
   }
   for (const name of ['web/flight.js', 'web/core.js']) {
     if (/\bvar __(?:defProp|publicField|export|toESM|commonJS|require|async)\s*=/.test(files.get(name)?.toString('latin1') ?? '')) {

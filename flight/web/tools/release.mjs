@@ -32,9 +32,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { unzip, ZIP_EPOCH } from '../../../app/tools/zip.mjs';
 import {
-  BINARY, EMSCRIPTEN, SOURCE, UPSTREAM, VERSION, archive, checkBinary, checkSource, cmakePins, embeddedFiles, fill,
+  BINARY, DISCLAIMER, EMSCRIPTEN, SOURCE, UPSTREAM, VERSION, archive, checkBinary, checkSource, cmakePins, embeddedFiles, fill,
   firstParagraph, libraryNotices, linkedLibraries, notice, templateValues, wrap, xmlHeader,
 } from './release-contents.mjs';
+import { GUIDE_SOURCE, guideHtml, guideImages } from './guide-html.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const WEB = resolve(here, '..');
@@ -392,6 +393,7 @@ async function main() {
     const dlmalloc = /This is a version \(aka dlmalloc\)[\s\S]*?\* Version [^\n]*/.exec(module.licence('dlmalloc.c'))?.[0]
       ?? refuse('dlmalloc.c no longer says how it is licensed');
     const emscriptenAbout = (what) => `${what} It is part of web\\core.js, which Emscripten ${EMSCRIPTEN.version} compiled and linked; its licence, as Emscripten ${EMSCRIPTEN.version} ships it, follows.`;
+    const guide = ours.get(GUIDE_SOURCE)?.toString('utf8') ?? refuse(`${GUIDE_SOURCE} is missing`);
     const binary = new Map([
       ['A32X.exe', exe],
       ['README.txt', Buffer.from(fill(template('README.txt'), values, 'README.txt'))],
@@ -399,6 +401,8 @@ async function main() {
       ['web/index.html', page['index.html']],
       ['web/flight.js', page['flight.js']],
       ['web/core.js', page['core.js']],
+      ['guide/index.html', Buffer.from(guideHtml(guide, { disclaimer: DISCLAIMER, version: VERSION }))],
+      ...guideImages(guide).map((n) => [`guide/${n}`, ours.get(`docs/guide/${n}`) ?? refuse(`docs/guide/${n} is missing`)]),
       ...[...trainer].map(([name, data]) => [`trainer/${name}`, data]),
       ['notices/A32NX.txt', notice(
         `FlyByWire A32NX. The flight-control computers in web\\core.js, the ELACs, SECs, FACs and FCDCs with their laws, are compiled unmodified from FlyByWire Simulations' A32NX: ${UPSTREAM.a32nx.repository}, commit ${UPSTREAM.a32nx.commit} (${UPSTREAM.a32nx.date}), fbw-a32nx/src/wasm/fbw_a320/. Copyright the A32NX contributors. Licensed under the GNU General Public License, version 3, whose text, as the repository carries it, follows. Their source is in ${SOURCE}.zip, upstream/a32nx/.`,
