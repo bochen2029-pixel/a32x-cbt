@@ -142,6 +142,13 @@ double bankFor(double phiTarget, double phi, double p) {
   return clamp(0.05 * (phiTarget - phi) - 0.02 * p, -0.5, 0.5);
 }
 
+// The thrust levers on the landing roll, as Airbus's procedure has them: MAX REV with the main gear down,
+// reverse idle from 70 kt, and idle, the reversers stowed, by taxi speed. An airframe without reversers
+// takes below idle as idle (airframe.cpp).
+double rolloutTla(double casKn, double groundSpeedKn) {
+  return casKn > 70 ? -20 : groundSpeedKn > 20 ? -6 : 0;
+}
+
 double rollFor(double headingTarget, double heading, double phi, double p, double bankLimit = 25) {
   return bankFor(clamp(2.0 * wrap180(headingTarget - heading), -bankLimit, bankLimit), phi, p);
 }
@@ -532,13 +539,13 @@ void World::fly(double dt) {
     }
 
     case Phase::Rollout:
-      if (ilsCrew_) {  // idle, the brakes once the nose is down, the feet on the centreline; then stop
-        tla_ = 0;
+      if (ilsCrew_) {  // reverse, the brakes once the nose is down, the feet on the centreline; then stop
+        tla_ = rolloutTla(a.casKn, a.groundSpeedKn);
         c.brakes = a.groundSpeedKn < 1 ? 1 : a.noseWow ? 0.3 : 0;
         steerOnGround(runway_.headingDeg - clamp(0.5 * ils().rightM, -4, 4));
         break;
       }
-      tla_ = 0;
+      tla_ = rolloutTla(a.casKn, a.groundSpeedKn);
       c.brakes = a.noseWow ? 0.3 : 0;
       steerOnGround(runway_.headingDeg);
       if (a.groundSpeedKn < 30) {
