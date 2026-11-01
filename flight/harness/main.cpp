@@ -134,6 +134,9 @@ struct Range {
 
 struct Options {
   double minutes = 30;
+  bool minutesGiven = false;               // a replay otherwise runs as long as its recording
+  std::vector<std::string> repeatable;     // recordings to judge as the gate's five approaches
+  bool repeatableCheck = false;
   bool gate = false;
   bool digestOnly = false;
   bool determinism = false;
@@ -212,21 +215,51 @@ struct Results {
 // A crew recording: a line of input values per tick, the columns named by the first line in the flight
 // core's order (core.h), every value written so that it reads back as the same double. A run recorded
 // from the scripted crew and replayed through the core as an outside crew must give the same bytes.
+// A recording: what flew it, then a row of the core's inputs a step. Lines that begin with '#' come
+// first and say where it was flown from - "# scenario: <text>" (core.h) and "# airframe: <a320|737>" -
+// so that it replays by itself; the page's recordings carry the same lines. A recording without them
+// replays from --scenario and FLIGHT_AIRFRAME, as before.
 class Recording {
  public:
-  bool open(const std::string& path, bool write) {
+  bool open(const std::string& path, bool write, const std::string& scenario = "") {
     f_ = std::fopen(path.c_str(), write ? "w" : "r");
     if (!f_) return fail("cannot " + std::string(write ? "write " : "read ") + path);
     std::string names;
     for (const char* n : FlightCore::inputNames()) names += (names.empty() ? "" : ",") + std::string(n);
     if (write) {
-      std::fprintf(f_, "%s\n", names.c_str());
+      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n%s\n", scenario.c_str(), Airframe::selected().c_str(), names.c_str());
       return true;
     }
-    char line[4096];
-    if (!std::fgets(line, sizeof line, f_) || std::string(line, std::strcspn(line, "\r\n")) != names) {
+    char line[4096] = "";
+    while (std::fgets(line, sizeof line, f_) && line[0] == '#') {
+    }
+    if (std::string(line, std::strcspn(line, "\r\n")) != names) {
       return fail(path + ": its columns are not this core's inputs (" + names + ")");
     }
+    return true;
+  }
+  // A recording's header, read before the run is built: its scenario and airframe, when it says, and
+  // how many steps it holds.
+  static bool header(const std::string& path, std::string& scenario, bool& hasScenario, std::string& airframe,
+                     long long& rows) {
+    FILE* f = std::fopen(path.c_str(), "r");
+    if (!f) return false;
+    hasScenario = false;
+    airframe.clear();
+    rows = -1;  // the column names
+    char line[4096];
+    while (std::fgets(line, sizeof line, f)) {
+      const std::string l(line, std::strcspn(line, "\r\n"));
+      if (rows < 0 && l.rfind("# scenario: ", 0) == 0) {
+        scenario = l.substr(12);
+        hasScenario = true;
+      } else if (rows < 0 && l.rfind("# airframe: ", 0) == 0) {
+        airframe = l.substr(12);
+      } else if (rows >= 0 || l[0] != '#') {
+        ++rows;
+      }
+    }
+    std::fclose(f);
     return true;
   }
   void write(const std::vector<double>& v) {
@@ -279,7 +312,7 @@ Results run(const Options& opt, FILE* trace) {
   Recording recording;
   const bool replaying = !opt.replay.empty();
   if (replaying || !opt.record.empty()) {
-    if (!recording.open(replaying ? opt.replay : opt.record, !replaying)) {
+    if (!recording.open(replaying ? opt.replay : opt.record, !replaying, opt.scenario)) {
       std::printf("%s\n", recording.error().c_str());
       std::exit(2);
     }
@@ -778,7 +811,7 @@ long long processId() {
 // A fresh process's digest, and its first touchdown when it had one. `extra` is appended to its
 // command line.
 bool childDigest(const char* argv0, double minutes, std::string& out, std::string* touchdown = nullptr,
-                 const std::string& extra = "") {
+                 const std::string& extra = "", std::string* judge = nullptr) {
   std::string cmd = self(argv0) + " --digest --minutes " + fmt("%.3f", minutes) + extra;
 #ifdef _WIN32
   // cmd /c strips the first and the last quote of a line that holds more than two: give it a pair of
@@ -793,8 +826,101 @@ bool childDigest(const char* argv0, double minutes, std::string& out, std::strin
     if (touchdown && std::strncmp(line, "touchdown ", 10) == 0 && touchdown->empty()) {
       *touchdown = std::string(line, std::strcspn(line, "\r\n"));
     }
+    if (judge && std::strncmp(line, "judge: ", 7) == 0) *judge = std::string(line, std::strcspn(line, "\r\n"));
   }
   return pclose(p) == 0 && !out.empty();
+}
+
+// The judge's verdict in a line, with the touchdown point: what a replay of an approach is compared by.
+std::string judgeLine(const ApproachJudge& j) {
+  const double m = j.touchdown().pastM;
+  return "judge: " + j.summary() + (std::isnan(m) ? std::string() : fmt(", touchdown %.1f m past the threshold", m));
+}
+
+// The gate's repeatability (ROADMAP.md, P7: how a hand-flown ILS is judged): five consecutive approaches,
+// each replayed from its recording in a fresh process and judged, each of them stable, with their
+// touchdown points within 150 m of their mean.
+int repeatable(const char* argv0, const std::vector<std::string>& files) {
+  struct Approach {
+    std::string file, judge;
+    double touchdownM = NAN;
+    bool stable = false;
+  };
+  std::vector<Approach> flown;
+  for (const std::string& f : files) {
+    Approach a;
+    a.file = f;
+    std::string cmd = self(argv0) + " --replay \"" + f + "\"";
+#ifdef _WIN32
+    cmd = "\"" + cmd + "\"";  // childDigest says why
+#endif
+    if (FILE* p = popen(cmd.c_str(), "r")) {
+      char line[512];
+      while (std::fgets(line, sizeof line, p)) {
+        if (std::strncmp(line, "judge: ", 7) != 0) continue;
+        a.judge = std::string(line + 7, std::strcspn(line + 7, "\r\n"));
+        a.stable = a.judge.rfind("STABLE", 0) == 0;
+        const size_t at = a.judge.find("touchdown ");
+        if (at != std::string::npos) a.touchdownM = std::atof(a.judge.c_str() + at + 10);
+      }
+      pclose(p);
+    }
+    flown.push_back(a);
+  }
+  std::printf("%.0f approaches replayed from their recordings and judged\n", static_cast<double>(flown.size()));
+  int failed = 0, stable = 0;
+  double sum = 0;
+  int landed = 0;
+  for (const Approach& a : flown) {
+    failed += verdict(a.file.c_str(), a.stable, a.judge.empty() ? std::string("did not replay") : a.judge);
+    stable += a.stable;
+    if (!std::isnan(a.touchdownM)) {
+      sum += a.touchdownM;
+      ++landed;
+    }
+  }
+  failed += verdict("five consecutive approaches, as the gate asks", flown.size() == 5, fmt("%.0f of them", static_cast<double>(flown.size())));
+  failed += verdict("each of them stable", stable == static_cast<int>(flown.size()), fmt("%.0f of %.0f", stable, static_cast<double>(flown.size())));
+  const double mean = landed ? sum / landed : NAN;
+  double worst = NAN;
+  std::string where;
+  for (const Approach& a : flown) {
+    const double d = std::abs(a.touchdownM - mean);
+    if (std::isnan(worst) || std::isnan(d) || d > worst) {
+      worst = std::isnan(d) ? INFINITY : d;
+      where = a.file;
+    }
+  }
+  failed += verdict("touchdown points within 150 m of their mean", landed == static_cast<int>(flown.size()) && worst <= 150,
+                    landed ? fmt("mean %.0f m past the threshold, worst %.0f m from it, ", mean, worst) + where
+                           : std::string("no touchdowns"));
+  std::printf("%s\n", failed ? "FAILED" : "PASSED");
+  return failed ? 1 : 0;
+}
+
+// The repeatability check on the scripted crew: five approaches from varied starts recorded in fresh
+// processes, then judged as five hand-flown ones would be. The crew passes before anyone is asked to.
+int checkRepeatable(const char* argv0) {
+  const char* starts[] = {"approach", "approach;loc=1", "approach;loc=-1", "approach;gs=1", "approach;gs=-1"};
+  std::vector<std::string> files;
+  bool recorded = true;
+  for (int k = 0; k < 5; ++k) {
+    files.push_back("repeatable-" + std::to_string(processId()) + "-" + std::to_string(k + 1) + ".csv");
+    std::string digest;
+    recorded = recorded && childDigest(argv0, 6, digest, nullptr,
+                                       std::string(" --scenario \"") + starts[k] + "\" --record " + files.back());
+  }
+  if (!recorded) {
+    std::printf("a recording run failed\nFAILED\n");
+    return 1;
+  }
+  const int result = repeatable(argv0, files);
+  if (result == 0) {
+    for (const std::string& f : files) std::remove(f.c_str());
+  } else {
+    std::printf("the recordings are kept\n");
+  }
+  return result;
 }
 
 void usage() {
@@ -803,6 +929,7 @@ void usage() {
       "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|rudder-trim|landing|\n"
       "                      law-degrades|ils|turbulence|scanner-catches-nan]\n"
       "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv]\n"
+      "            [--repeatable approach1.csv ... approach5.csv] [--check-repeatable]\n"
       "            [--scenario \"runway;runway=LSZH14\" | \"approach;distance=10;loc=0;gs=0;cas=140;wind=270/15\" | \"reference\"]\n");
 }
 
@@ -819,7 +946,14 @@ int main(int argc, char** argv) {
       }
       return argv[++i];
     };
-    if (a == "--minutes") opt.minutes = std::atof(next("--minutes").c_str());
+    if (a == "--minutes") {
+      opt.minutes = std::atof(next("--minutes").c_str());
+      opt.minutesGiven = true;
+    }
+    else if (a == "--repeatable") {
+      while (i + 1 < argc) opt.repeatable.push_back(argv[++i]);
+    }
+    else if (a == "--check-repeatable") opt.repeatableCheck = true;
     else if (a == "--gate") opt.gate = true;
     else if (a == "--digest") opt.digestOnly = true;
     else if (a == "--check-determinism") opt.determinism = true;
@@ -860,6 +994,32 @@ int main(int argc, char** argv) {
     std::printf("--record writes what the scripted crew does, --replay flies a recording: one or the other\n");
     return 2;
   }
+  if (!opt.repeatable.empty()) return repeatable(argv[0], opt.repeatable);
+  if (opt.repeatableCheck) return checkRepeatable(argv[0]);
+  if (!opt.replay.empty()) {
+    std::string scenario, airframe;
+    bool hasScenario = false;
+    long long rows = 0;
+    if (!Recording::header(opt.replay, scenario, hasScenario, airframe, rows)) {
+      std::printf("cannot read %s\n", opt.replay.c_str());
+      return 2;
+    }
+    if (hasScenario && opt.scenario.empty()) {
+      opt.scenario = scenario;
+    } else if (hasScenario && scenario != opt.scenario) {
+      std::printf("%s was flown from scenario '%s', not '%s'\n", opt.replay.c_str(), scenario.c_str(), opt.scenario.c_str());
+      return 2;
+    }
+    if (!airframe.empty()) {
+      const char* env = std::getenv("FLIGHT_AIRFRAME");
+      if (env && *env && airframe != env) {
+        std::printf("%s was flown on the %s; FLIGHT_AIRFRAME says %s\n", opt.replay.c_str(), airframe.c_str(), env);
+        return 2;
+      }
+      Airframe::select(airframe);
+    }
+    if (!opt.minutesGiven) opt.minutes = rows * kDt / 60;
+  }
 
   if (opt.determinism) {
     std::string a, b;
@@ -874,14 +1034,18 @@ int main(int argc, char** argv) {
     // A recording of this process's own: checks run side by side (ctest -j) write different files.
     const std::string file = "replay-check-" + std::to_string(processId()) + ".csv";
     const std::string scenario = opt.scenario.empty() ? "" : " --scenario \"" + opt.scenario + "\"";
-    std::string a, b, ta, tb;
-    const bool ran = childDigest(argv[0], opt.minutes, a, &ta, scenario + " --record " + file) &&
-                     childDigest(argv[0], opt.minutes, b, &tb, scenario + " --replay " + file);
+    std::string a, b, ta, tb, ja, jb;
+    // the replay is given only the file: its scenario and airframe come from the recording
+    const bool ran = childDigest(argv[0], opt.minutes, a, &ta, scenario + " --record " + file, &ja) &&
+                     childDigest(argv[0], opt.minutes, b, &tb, " --replay " + file, &jb);
     std::printf("A32NX %s, %s, %.1f simulated minutes recorded and replayed in fresh processes\n", A32NX_COMMIT,
                 Airframe::model(), opt.minutes);
     int failed = verdict("the replay gives the same bytes", ran && a == b, ran ? "digests " + a + " and " + b : "a child run failed");
     failed += verdict("and the same touchdown", ran && !ta.empty() && ta == tb,
                       ta.empty() ? std::string("no touchdown recorded") : ta + (ta == tb ? "" : "; replayed: " + tb));
+    if (!ja.empty() || !jb.empty()) {
+      failed += verdict("and the same verdict from the gate's judge", ja == jb, ja + (ja == jb ? "" : "; replayed: " + jb));
+    }
     if (failed) {
       std::printf("the recording is kept: %s\n", file.c_str());
     } else {
@@ -909,6 +1073,7 @@ int main(int argc, char** argv) {
       std::printf("touchdown at %.2f s: sink %.1f fpm, pitch %.2f deg, bank %.2f deg, %.1f kt, peak %.3f g\n", l.at,
                   l.sinkFpm, l.pitch, l.bank, l.cas, l.peakG);
     }
+    if (r.judge.active()) std::printf("%s\n", judgeLine(r.judge).c_str());
     return r.scan.bad == 0 && r.crashedAt < 0 ? 0 : 1;
   }
 
@@ -925,6 +1090,7 @@ int main(int argc, char** argv) {
     std::printf("touchdown at %.1f s: sink %.0f fpm, pitch %.1f deg, bank %.1f deg, %.0f kt, peak %.2f g\n", l.at, l.sinkFpm,
                 l.pitch, l.bank, l.cas, l.peakG);
   }
+  if (r.judge.active()) std::printf("%s\n", judgeLine(r.judge).c_str());
   std::printf("phases first entered:");
   for (const auto& [phase, at] : r.firstEntered) std::printf(" %s %.0fs", phase.c_str(), at);
   std::printf("\nlaws in settled flight (%.0f s):", r.flightTicks * kDt);

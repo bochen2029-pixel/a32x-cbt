@@ -43,6 +43,9 @@ class ApproachJudge {
   std::vector<Band> verdict() const;
   // The debrief: what was flown, a line a band, then the verdict.
   std::string debrief() const;
+  // The verdict in a line: STABLE, NOT STABLE (with how many bands broke, "so far" until the stop),
+  // flying, or no approach.
+  std::string summary() const;
 
   bool active() const { return active_; }        // an approach start: there is an approach to judge
   bool inWindow() const { return inWindow_; }    // this step inside the window, 1,000 ft to 50 ft

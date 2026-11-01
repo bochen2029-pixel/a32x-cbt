@@ -267,10 +267,13 @@ foreach(start IN ITEMS
 endforeach()
 add_test(NAME ils_in_light_turbulence_reaches_the_runway
          COMMAND law_harness --scenario "approach$<SEMICOLON>wind=270/15$<SEMICOLON>turbulence=1" --minutes 6 --expect turbulence)
-# A recorded approach replays to the same bytes and touchdown (every hand-flown approach must too).
+# A recorded approach replays from its file alone to the same bytes, touchdown and verdict (every
+# hand-flown approach must too); and five of the scripted crew's, from varied starts, pass the gate's
+# repeatability as five hand-flown ones would be asked to.
 if(NOT EMSCRIPTEN)
   add_test(NAME ils_approach_replays_to_the_same_touchdown
            COMMAND law_harness --scenario "approach$<SEMICOLON>wind=270/15$<SEMICOLON>turbulence=1" --minutes 6 --check-replay)
+  add_test(NAME five_scripted_approaches_are_repeatable COMMAND law_harness --check-repeatable)
 endif()
 
 # The parts of a flight the gate leans on, each checked on its own.

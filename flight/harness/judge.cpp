@@ -155,18 +155,20 @@ bool ApproachJudge::stable() const {
   return true;
 }
 
+std::string ApproachJudge::summary() const {
+  if (!active_) return "no approach";
+  int broken = 0;
+  for (const Band& b : verdict()) broken += b.judged && !b.pass;
+  const std::string bands = fmt("NOT STABLE: %.0f band", broken) + (broken == 1 ? "" : "s") + " broken";
+  if (!finished()) return broken ? bands + " so far" : std::string("flying");
+  return stable() ? std::string("STABLE") : bands;
+}
+
 std::string ApproachJudge::debrief() const {
   if (!active_) return "no approach to judge: the gate's judge watches an approach start\n";
   std::string text = "an ILS approach to " + runwayName_ + ", judged from 1,000 ft above the threshold to the stop\n";
-  int broken = 0;
   for (const Band& b : verdict()) {
     text += std::string("  ") + (!b.judged ? "...." : b.pass ? "pass" : "FAIL") + "  " + b.name + " - " + b.detail + "\n";
-    if (b.judged && !b.pass) ++broken;
   }
-  if (!finished()) {
-    text += broken ? fmt("NOT STABLE: %.0f band", broken) + (broken == 1 ? "" : "s") + " broken so far\n" : std::string("flying\n");
-  } else {
-    text += stable() ? std::string("STABLE\n") : fmt("NOT STABLE: %.0f band", broken) + (broken == 1 ? "" : "s") + " broken\n";
-  }
-  return text;
+  return text + summary() + "\n";
 }
