@@ -497,8 +497,9 @@ trainer's debrief does.
 
 ### The airframe, where it is still unfitted — a plan
 
-Not started: a plan for the operator, written when our A320 came inside all 69 of its targets
-(`3e1c191`). Each part starts on the operator's word and lands as a merge of its own under the swap rule
+A plan for the operator, written when our A320 came inside all 69 of its targets (`3e1c191`); its
+decisions are taken below, and parts 1 to 3 started on them. Each part starts on the operator's word and
+lands as a merge of its own under the swap rule
 (P7, *Decisions*), with its own re-baseline; where a flight moves, the gate's five recordings are
 re-judged on the new build (`law_harness --rejudge`) or flown again.
 
@@ -542,10 +543,14 @@ source might come from, and an order, the parts whose sources are in hand first.
    would bound MAX REV's N1. Turning N1 into thrust needs the CFM56-5A1's own curve, which is not public;
    and the report is on DTIC, a download not yet allowed.
 
-**Decisions for the operator.** (a) Which parts to start, and when against the gate: 6 and 7 move its
-flights. (b) Downloads: 4 and 5 need NASA's and Airbus's documents, 8 DTIC's; the rule so far allows
-EASA's and EUROCONTROL's official pages. (c) CFD, which the operator has named for much later, could
-answer 4 to 6 from the A320's public geometry: a phase of its own.
+**Decisions**, taken by fbw-parent under the operator's standing delegation ("go with your own best
+recommendation for all") on 2026-11-02. (a) Order: 1, 2 and 3 start now, in that order, each a merge
+of its own under the swap rule with its own re-baseline; 4 and 5 follow them once their sources are
+in; 6 and 7 wait until the operator has flown the gate, since they move its flare. (b) Downloads:
+NASA's technical reports server (ntrs.nasa.gov; NASA's works are public domain) and Airbus's own
+public pages, beside EASA's and EUROCONTROL's, each file's URL, version or date, SHA-256 and terms
+recorded in `docs/provenance.md` before it is used, read as untrusted data and copied by value; not
+DTIC, by any route, so 8 stays provisional. (c) CFD stays much later, the operator's own word.
 
 ---
 
