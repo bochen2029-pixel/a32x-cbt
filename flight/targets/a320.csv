@@ -161,8 +161,9 @@
 #                       seconds, from a stabilized static condition. A limit every certified engine meets,
 #                       not CFM56-5A1 data: no public source found gives the -5A1's own time. Rated thrust
 #                       is taken as our engine's steady TOGA at sea level, which is inside its rating's
-#                       band. The only row on the pace of spool-up, so its fit row; the fitter aims a unit
-#                       clear of a one-sided limit, here 1 s
+#                       band. The only row on the pace of spool-up, so its fit row. It bounds the spool from
+#                       one side, and the fitter aims a unit clear of a one-sided limit, here 1 s. A
+#                       published CFM56-5A acceleration time would replace it
 #   wrap                OpenAP WRAP A320, ADS-B: the range of its fitted distribution (to_acc_tof,
 #                       to_v_lof, cl_vs_avg_pre_cas, de_vs_avg_after_cas). What airlines fly, and so not a
 #                       pass mark for capability. Take-off thrust is mostly reduced, toward the weight's share

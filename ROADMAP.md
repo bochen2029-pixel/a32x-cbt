@@ -107,7 +107,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside 68 of 69 A320 targets, all but its engine's spool-up, its engines' 24, the 5 past its stall and the 3 for its flaps' and gear's drag among them, where the 737 it replaced is inside 21 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate ready to fly: its judge, recordings, repeatability and the page's half built [M]; five hand-flown approaches to come, the operator's (flight/README.md, *Flying the gate*) |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 69 A320 targets, its engines' 24, the 5 past its stall, the 3 for its flaps' and gear's drag and its engines' spool-up among them, where the 737 it replaced is inside 21 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate ready to fly: its judge, recordings, repeatability and the page's half built [M]; five hand-flown approaches to come, the operator's (flight/README.md, *Flying the gate*) |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started; planned (*P8 in detail*), to begin after P7's gate |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -254,7 +254,8 @@ Known limits of slice 1, all of them the airframe's or the crew's:
   acts as 1.8 times its angle in elevator, and spoilers and speedbrakes act through the 737's coarse
   steps. Its engines are JSBSim's CFM56 on a thrust lever schedule of ours; our A320's are its own,
   fitted. Neither has FADEC or autothrust. Our A320 has reverse thrust and a ground idle, after 0.1.1,
-  on provisional data, and the scripted crews use reverse on the landing roll (`flight/README.md`). The
+  its data cited where a source allows, MAX REV still provisional, and the scripted crews use reverse on
+  the landing roll (`flight/README.md`). The
   FMGC is a stub that reports weight and CG.
 - The crew flies on truth, not instruments. No wind, ISA, and a sea-level runway that is everywhere.
   The position is real: JSBSim moves the aircraft over a WGS84 earth and the IRs report it.
@@ -458,9 +459,18 @@ trainer's debrief does.
   before but the take-off's context rows; the 737 inside 21; every `ctest` case passes with either
   airframe, on MSVC, GCC and under node. Ground idle and reverse thrust, also on the thrust session's
   list, are the world's and the crew's (`flight/harness`), not the airframe's, and wait for them.
-  Spool-up has a row now, held out: 14 CFR 33.73(b)'s 5 s from idle to 95 % of take-off thrust. Ours
-  takes 5.80 s on JSBSim's generic spool, as the 737 does, and is outside it; a spool rate with a source
-  is still to choose.
+  Spool-up has a row: 14 CFR 33.73(b)'s 5 s from idle to 95 % of take-off thrust. Ours took 5.80 s on
+  JSBSim's generic spool, as the 737 does.
+- **The spool-up fit and the engine data cited, 2026-11-01, under the same rule.** No public source gives
+  the CFM56-5A1's own spool-up time, so, as fbw-parent ruled, the rule's limit became the fit row of one
+  number scaling JSBSim's own rate (`airframe_fit --spool`): 1.431, 4.05 s, a second inside the limit,
+  where the fitter aims a one-sided row; at 5 s ours would be the slowest engine the rule allows.
+  fbw-parent kept the margin: the row bounds the spool from one side, and a published CFM56-5A
+  acceleration time would replace it. Ground
+  idle is cited at 0.04 of the rating (NASA's APEX, other CFM56s) and the reverser's efficiency at 0.31
+  (NASA's static tests of a cascade reverser); MAX REV stays provisional at 0.7, above the 32 % of rated
+  thrust Volpe found A320 engines average while reversing. Inside 69 of 69, the 737 inside 21; the
+  A320's flights re-baselined once (`flight/README.md`), the 737's unchanged.
 - The harness keeps the airframe to one adapter (`harness/airframe.cpp`) and one aircraft file, so
   the swap stays small. Either airframe can fly: `FLIGHT_AIRFRAME=737|a320`.
 - **Taken 2026-11-01: packaging.** The operator left it to the recommendation: *"go with your own
