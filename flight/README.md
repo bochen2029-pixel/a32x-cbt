@@ -907,8 +907,11 @@ skyline, Reunion Tower's 259 lights among it (`web/data/dfw-region.json`, `dalla
 `docs/provenance.md` §1g). `tier=low|high` overrides the choice; `time=` names an hour (dawn, day,
 golden, dusk, night), `hour=` sets one, `[` and `]` move it. Both tiers draw the A320 outside
 (`web/data/a320.json`, its points the airframe file's own, so its wheels touch where `ra_ft` reads zero,
-every surface, the gear and the fans moved from the core's state), its flight deck at the file's
-EYEPOINT with placeholder tubes until P8, ten cameras on keys 1 to 9 and 0 (V steps through them; the
+every surface, the gear and the fans moved from the core's state, each fan on its own engine's N1, and
+each CFM56's four pivoting reverser doors swinging out with `reverser_1` and `reverser_2`, `web/src/reverse.js`),
+its flight deck at the file's EYEPOINT with placeholder tubes until P8 (REV boxed in each N1 dial of the EWD,
+amber in transit and green deployed, as on the overlay; the upper row of tubes low enough that the glareshield
+hides none of them from the eye), ten cameras on keys 1 to 9 and 0 (V steps through them; the
 overlay is drawn in the pilot's eye only), and a debrief on K: the flown path coloured by the gate's
 bands, the ILS as a tunnel, every runway's outline and the aircraft in vectors, on black; L draws the
 path in the normal view, and `trail=1`, `debrief=1` and `cam=` open the page on them. The floor builds the
@@ -936,6 +939,16 @@ As measured, 2026-11-01, headless Chrome at 1440 × 900, with the desktop's CPU 
 `web/tools/measure.mjs [--software | --warp]` repeats the frame measurements; WARP is what Chrome on
 Windows now falls back to with no usable GPU. The 2014 reference laptop has not
 been measured.
+
+**Seeing the page do something, with nobody at it.** `node web/tools/drive.mjs <steps.json> [--page <folder>]
+[--query "..."] [--out <folder>]` opens the built page in a throwaway headless Chrome and runs a JSON list of
+steps: `wait`, `until` an expression is true, `keydown`/`keyup`/`press` by key code, `pose` the camera, `eval`, and
+`shot` a PNG. The page's `globalThis.flightDebug` gives a tool the core's state by name (`state()`) and poses the
+camera exactly (`pose({ camera: 'orbit', yaw, pitch, dist })`, the head on the flight deck with `lookYaw` and
+`lookPitch`); it reads the flight and moves only the view. The view's reverse thrust was checked that way: Shift and
+PgDn held from the runway start, the reversers read from the state as they moved (0.3 at 0.6 s, 0.74 at 1.2 s,
+deployed by 1.8 s), REV photographed amber then green on the overlay and the EWD, and the doors from the orbit
+camera at 17 m. The idea is the Booster Lander's (`tools/cockpit_verify` there), at its smallest.
 
 The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach_the_controls`,
 `the_view_puts_the_eye_where_the_flight_is`, `kdfw_is_laid_out_as_ourairports_and_the_faa_have_it`,

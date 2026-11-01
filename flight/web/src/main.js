@@ -12,7 +12,7 @@
 import { Clock } from './clock.js';
 import { apply, controlsFromInputs, coreInputs, initialControls } from './controls.js';
 import { FlightLog } from './events.js';
-import { Flight, recordingName } from './flight.js';
+import { buildNote, Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { centre, drag, wheel } from './pointer.js';
@@ -148,6 +148,7 @@ function report() {
     airframe: airframe || 'default',
     crew: scripted ? 'script' : 'hands',
     scenario: scenario || 'runway',
+    build: flight.build || '',
     airport: drawn,
     simulatedS: value('t_s'),
     stepsDue: clock.steps,
@@ -179,6 +180,25 @@ function report() {
 }
 globalThis.flightReport = report;
 
+// For a tool or a test driving the page (tools/drive.mjs): the core's state by name as the page last had it, and the
+// view's camera posed exactly. It reads the flight and moves only the view: nothing here reaches the core.
+//   pose({ camera: 'orbit', yaw, pitch, dist })   radians and metres round the CG (view.js, the orbit camera)
+//   pose({ camera: 'cockpit', lookYaw, lookPitch }) degrees, the head on the flight deck; zoom: any camera
+globalThis.flightDebug = {
+  state: () => (latest && flight.field ? Object.fromEntries(Object.entries(flight.field).map(([n, i]) => [n, latest.state[i]])) : null),
+  pose({ camera, yaw, pitch, dist, lookYaw, lookPitch, zoom } = {}) {
+    if (camera) view.setCamera(camera);
+    const set = (o, k, v) => { if (Number.isFinite(v)) o[k] = v; };
+    set(view.orbit, 'yaw', yaw);
+    set(view.orbit, 'pitch', pitch);
+    set(view.orbit, 'dist', dist);
+    set(view.look, 'yaw', lookYaw);
+    set(view.look, 'pitch', lookPitch);
+    set(view, 'zoom', zoom);
+    return view.mode;
+  },
+};
+
 const FLAPS = ['0', '1', '2', '3', 'FULL'];
 const DETENT_NAMES = { 0: 'IDLE', 25: 'CL', 35: 'FLX/MCT', 45: 'TOGA' };
 
@@ -205,7 +225,10 @@ function show() {
     `${hands.prompt()}` + (hands.help ? `\n\n${[...KEY_HELP, ...VIEW_KEYS, 'Ctrl+S  save the recording'].join('\n')}` : '');
   const r = report();
   const cls = r.stepsDropped ? 'warn' : '';
-  status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n${view.describe()}\n` +
+  // the build on a line of its own, clear of the disclaimer centred above (buildNote: amber where the gate refuses it)
+  const build = buildNote(r.build);
+  status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n` +
+    (build.text ? `${build.warn ? `<span class="warn">${build.text}</span>` : build.text}\n` : '') + `${view.describe()}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
     `<span class="${cls}">${r.stepsDropped} steps dropped</span>` + (saved ? `\n${saved}` : '');
   // the gate's verdict once the core has stopped judging, as the core words it (flight_debrief())

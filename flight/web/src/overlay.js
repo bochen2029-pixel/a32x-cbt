@@ -2,6 +2,8 @@
 // localizer and glideslope scales, flaps and gear. The horizon and the pitch ladder are conformal: drawn
 // with the camera's own projection, they lie on the horizon the view draws. GPLv3.
 
+import { reversers } from './reverse.js';
+
 const DEG = Math.PI / 180;
 const GREEN = '#40ff70', AMBER = '#ffb000', WHITE = '#e8f0e8', DIM = 'rgba(232,240,232,0.35)';
 const FLAPS = ['0', '1', '2', '3', 'FULL'];
@@ -143,5 +145,12 @@ export class Overlay {
     const locked = s.gear_pos >= 0.999, up = s.gear_pos <= 0.001;
     g.fillStyle = locked ? GREEN : up ? DIM : AMBER;
     g.fillText(locked ? 'LDG GEAR DN' : up ? 'GEAR UP' : 'GEAR IN TRANSIT', W - 14 * r, H - 28 * r);
+    // reverse thrust, above them: REV for each engine whose reverser is out, amber while its doors move and
+    // green once they are open, as the A320's engine display shows it
+    const rev = reversers(s);
+    rev.forEach(({ engine, state }, k) => {
+      g.fillStyle = state === 'deployed' ? GREEN : AMBER;
+      g.fillText(`REV ${engine}`, W - 14 * r - (rev.length - 1 - k) * 74 * r, H - 76 * r);
+    });
   }
 }

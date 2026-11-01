@@ -7,6 +7,7 @@
 // product each tube's canvas is P8's renderer, fed from law state, and this module only hangs it.
 
 import * as THREE from 'three';
+import { reverserState } from './reverse.js';
 
 const DEG = Math.PI / 180;
 
@@ -98,13 +99,16 @@ export class Cockpit {
     this.add([mp], panel);
     const du = (y, z, x = 1.995, tilt = lean) => this.screen(512, 512, [x, y, z], 0.19, 0.19, tilt);
     const eye = A.eye;
+    // The upper row, the PFDs, NDs and EWD in line, low enough that the glareshield's lip and the FCU hide none of
+    // them from the EYEPOINT (2.54, -0.51, 1.27): at 0.85 m the lip cut off the EWD's N1 row and the PFDs' top.
+    const row = 0.8;
     this.tubes = {
-      pfd: du(eye[1] - 0.125, 0.85),
-      nd: du(eye[1] + 0.125, 0.85),
-      ewd: du(0, 0.87),
+      pfd: du(eye[1] - 0.125, row),
+      nd: du(eye[1] + 0.125, row),
+      ewd: du(0, row),
       sd: du(0, 0.6, 2.13, 52),
-      fopfd: du(-eye[1] + 0.125, 0.85),
-      fond: du(-eye[1] - 0.125, 0.85),
+      fopfd: du(-eye[1] + 0.125, row),
+      fond: du(-eye[1] - 0.125, row),
     };
     // pedestal, side consoles, sidesticks, thrust levers
     const ped = new THREE.BoxGeometry(1.05, 0.5, 0.36).translate(2.75, 0, 0.32);
@@ -374,6 +378,14 @@ function ewd({ g }, s, f) {
   for (const [k, x] of [[1, 120], [2, 360]]) {
     const n1 = s[`n1_${k}`] || 0;
     gauge(g, x, 100, 70, n1, 104, 'N1 %', n1.toFixed(1));
+    // REV in the N1 dial, boxed: amber while the reverser moves, green once it is deployed
+    const rev = reverserState(s[`reverser_${k}`]);
+    if (rev !== 'stowed') {
+      const colour = rev === 'deployed' ? GREEN : AMBER;
+      g.strokeStyle = colour; g.lineWidth = 2;
+      g.strokeRect(x - 66, 110, 56, 28);
+      text(g, 'REV', x - 38, 124, colour, 20);
+    }
     gauge(g, x, 240, 52, 0, 1000, 'EGT °C', '---');
   }
   text(g, 'FOB :  ---', 256, 330, GREEN, 22);

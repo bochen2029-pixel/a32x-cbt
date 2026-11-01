@@ -17,6 +17,16 @@ export function recordingName(text, scenario, seconds, airframe = 'a320', flown 
   return `a32x-${key}-${safe(scenario) || 'flight'}${when}-${String(t).padStart(4, '0')}s.csv`;
 }
 
+// The build a page flies, as its status line says it: the commit the flight core was made from (core.h,
+// flight_build). The gate judges a recording by the law_harness of the same build and refuses a build made from
+// uncommitted changes (+dirty) or one that cannot name its commit (unknown): such a build is marked. A core
+// older than the build line names none, and nothing is said.
+export function buildNote(build) {
+  if (typeof build !== 'string' || !build) return { text: '', warn: false };
+  const text = `build ${build.replace(/[^A-Za-z0-9.+_-]/g, '')}`;
+  return /\+dirty$|^unknown$/.test(build) ? { text: `${text}: not for the gate`, warn: true } : { text, warn: false };
+}
+
 export class Flight {
   // onState(message) is called with each state the worker sends back.
   constructor(onState, onError) {
@@ -63,6 +73,7 @@ export class Flight {
     if (m.type === 'ready') {
       this.inputNames = m.inputNames;
       this.stateNames = m.stateNames;
+      this.build = m.build || '';   // the commit the core was made from (buildNote)
       this.field = Object.fromEntries(m.stateNames.map((n, i) => [n, i]));
       this.input = Object.fromEntries(m.inputNames.map((n, i) => [n, i]));
       this.started.resolve(m);

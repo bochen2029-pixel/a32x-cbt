@@ -8,6 +8,7 @@
 
 export const GATES_FT = [1000, 500, 100, 50];
 const MOST_BAND_CHANGES = 12;   // a pilot hunting at a band's edge would fill the log; past this, a note
+const MOST_REVERSE = 6;         // the reversers deployed and stowed: a landing has two, a rejected one more
 const SETTLE_S = 3;            // the computers power up in a start's first seconds: their laws then are not the flight's
 
 const fmt = (v, digits = 0) => Number(v).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
@@ -65,6 +66,8 @@ export class FlightLog {
     this.stopped = false;
     this.judged = false;
     this.bandChanges = 0;
+    this.reverseEvents = 0;
+    this.reversersOut = new Set();   // the reversers out since they were last all stowed
     this.lawsSettled = false;
     this.startT = 0;
     this.version = (this.version || 0) + 1;   // changes whenever the list does
@@ -163,6 +166,26 @@ export class FlightLog {
       this.add(s.t_s, 'verdict', `the gate's judge: ${s.judge_stable > 0.5 ? 'STABLE' : 'NOT STABLE'}`, s);
     }
     if (q.crashed < 0.5 && s.crashed > 0.5) this.add(s.t_s, 'crash', 'crashed', s, 'crash');
+
+    // the reversers (reverser_1, reverser_2: 0 stowed .. 1 deployed): deployed once every one that is out is fully
+    // open, stowed once none is out, naming every one that was out since they last were all stowed; each with the
+    // speed and how far past the threshold
+    const out = (x) => [1, 2].filter((k) => x[`reverser_${k}`] > 0.001);
+    const open = (x) => [1, 2].filter((k) => x[`reverser_${k}`] >= 0.999);
+    const full = (x) => open(x).length > 0 && open(x).length === out(x).length;
+    const which = (ks) => (ks.length === 2 ? 'reversers' : `reverser ${ks[0]}`);
+    const at = () => `${finite(s.cas_kn) ? `, ${fmt(s.cas_kn)} kt` : ''}${finite(s.thr_along_m) ? `, ${past(s.thr_along_m)} m past the threshold` : ''}`;
+    if (this.reverseEvents < MOST_REVERSE) {
+      if (!full(q) && full(s)) {
+        ++this.reverseEvents;
+        this.add(s.t_s, 'reverse', `${which(open(s))} deployed${at()}`, s, 'REV');
+      } else if (out(q).length && !out(s).length) {
+        ++this.reverseEvents;
+        this.add(s.t_s, 'reverse', `${which([...this.reversersOut].sort())} stowed${at()}`, s);
+      }
+    }
+    if (!out(s).length) this.reversersOut.clear();
+    for (const k of out(s)) this.reversersOut.add(k);
   }
 
   // The log as a panel prints it: the simulated time, then the moment.

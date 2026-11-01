@@ -79,6 +79,25 @@ test('leaving the bands and regaining them is logged as the core judged it, with
   assert.equal(hunting.at(-1).text, 'more changes in and out of the bands, not listed');
 });
 
+test('the reversers are logged as they deploy and stow, both or one, with the speed and the distance', () => {
+  // on the rollout, 40 m and 4 kt a second; the reversers out over two seconds from 1 s, stowed from 20 s
+  const ground = (t, r1, r2) => ({ t_s: t, on_ground: 1, ra_ft: 0, thr_height_ft: 0, thr_along_m: -(300 + 40 * t),
+    cas_kn: 130 - 4 * t, gs_kn: 130 - 4 * t, gear_pos: 1, crashed: 0, reverser_1: r1, reverser_2: r2 });
+  const pos = (t) => (t < 1 ? 0 : t < 3 ? (t - 1) / 2 : t < 20 ? 1 : t < 22 ? 1 - (t - 20) / 2 : 0);
+  const both = of(fly(Array.from({ length: 26 }, (_, t) => ground(t, pos(t), pos(t)))), 'reverse');
+  assert.deepEqual(both.map((e) => [e.t, e.text]), [
+    [3, 'reversers deployed, 118 kt, 420 m past the threshold'],
+    [22, 'reversers stowed, 42 kt, 1,180 m past the threshold'],
+  ]);
+  assert.equal(both[0].tag, 'REV');
+  // engine 2's lags a second behind: deployed once both are open, and said once
+  const lag = of(fly(Array.from({ length: 26 }, (_, t) => ground(t, pos(t), pos(t - 1)))), 'reverse');
+  assert.deepEqual(lag.map((e) => [e.t, e.text.split(',')[0]]), [[4, 'reversers deployed'], [23, 'reversers stowed']]);
+  // one reverser only, as with the other inoperative
+  const one = of(fly(Array.from({ length: 26 }, (_, t) => ground(t, pos(t), 0))), 'reverse');
+  assert.deepEqual(one.map((e) => e.text.split(',')[0]), ['reverser 1 deployed', 'reverser 1 stowed']);
+});
+
 test('a bounce is logged as one, after a single touchdown', () => {
   const base = { thr_height_ft: 10, ra_ft: 3, thr_along_m: -300, thr_right_m: -1.2, vs_fpm: -400, cas_kn: 130, gs_kn: 130, pitch_deg: 5 };
   const log = fly([0, 1, 0, 1].map((g, k) => ({ ...base, t_s: k, on_ground: g })));

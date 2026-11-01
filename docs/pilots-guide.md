@@ -25,8 +25,10 @@ screens are placeholders until the next phase draws the real ones.
 
 Open `index.html` from the page's folder in Chrome or Edge: `flight/build-web/` when you build it
 yourself, or the release's own folder. The page loads the flight core, draws the airport, and starts
-the flight. Its top-right corner says which airport and runway it drew, which airframe is flying, and
-who is flying it; under that, how it draws, and how much each step of the flight costs.
+the flight. Its top-right corner says which airport and runway it drew, which airframe is flying, who
+is flying it, and which build of the simulator this is, the commit it was made from (a build made from
+uncommitted changes, `+dirty`, is marked in amber: the gate does not take it); under that, how it
+draws, and how much each step of the flight costs.
 
 To build it, `flight/README.md` ("The browser simulator") has the steps: the flight core through
 Emscripten, then `node tools/build.mjs --core <flight_core.js>` in `flight/web`.
@@ -131,7 +133,9 @@ selectable speed (VLS) plus 5 kt. From the normal 10 nm start it is fixed at 134
 gentle, growing pull, and at 20 ft close the thrust levers (where the real A320 calls RETARD). The
 scripted crew flares that way and touches down at about 160 fpm, the nose 5.8° up, 330 m past the
 threshold. Keep straight on the centreline with the rudder; on the ground, Shift + PgDn pulls the
-levers into reverse thrust, and the brakes stop you.
+levers into reverse thrust, and the brakes stop you. REV shows at the overlay's bottom right and in each
+N1 dial on the flight deck's engine display, as the A320's does: amber while a reverser's doors move,
+green once they are open; outside, the four doors on each engine's cowl swing out.
 
 **Flare progressively.** A normal approach and flare reach about 8° of angle of attack, some 2° short
 of where the protection begins. An abrupt pull to full back stick near the ground, in CONF FULL, can
@@ -179,8 +183,8 @@ dots where it could not judge, each with its worst value and where it happened; 
 Under it, the flight's moments in order, each with its simulated time: the start; each gate — 1,000,
 500, 100 and 50 ft above the threshold — with the speed against Vapp, the sink, where you were on the
 beams and the bank; every time you left the gate's bands and came back; the gear and the flight laws
-when they change; the touchdown, a bounce, 80 kt and the stop, each with how far past the threshold;
-and the verdict.
+when they change; the touchdown, a bounce, the reversers deployed and stowed, 80 kt and the stop, each
+with how far past the threshold; and the verdict.
 
 ![After the stop: the verdict, band by band, and the flight's moments under it.](guide/verdict.jpg)
 

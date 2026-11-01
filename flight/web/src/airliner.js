@@ -4,6 +4,7 @@
 // stabiliser, rudder, gear, fans — is set from the flight core's own state slots. GPLv3.
 
 import * as THREE from 'three';
+import { doorAngle } from './reverse.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { COLOURS } from './airport-layout.js';
 import { LightSet } from './lights.js';
@@ -523,6 +524,14 @@ export class Airliner {
   engines(cowlMat, metal, dark, white) {
     const A = this.A, n = A.nacelle;
     this.fans = [];
+    this.reverserDoors = {};
+    // the reversers' doors are the cowl's paint; the opening under each is the duct's dark, drawn just proud of the
+    // cowl (polygon offset) so that it shows where a door has swung out
+    const doorMat = cowlMat.clone();
+    doorMat.side = THREE.DoubleSide;
+    const holeMat = new THREE.MeshStandardMaterial({ color: 0x14171b, roughness: 0.9, metalness: 0.1, side: THREE.DoubleSide,
+      polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
+    this.materials.push(doorMat, holeMat);
     const lathe = (pts, segs = this.n(28, 10)) => new THREE.LatheGeometry(pts.map(([r, x]) => new THREE.Vector2(r, x)), segs).rotateZ(-Math.PI / 2);
     for (const side of [1, -1]) {
       const g = new THREE.Group();
@@ -571,7 +580,10 @@ export class Airliner {
       const spinner = new THREE.Mesh(new THREE.ConeGeometry(0.27, 0.5, 20).rotateZ(Math.PI / 2).translate(-0.25, 0, 0), new THREE.MeshStandardMaterial({ map: swirlTex, roughness: 0.3, metalness: 0.3 }));
       fan.add(spinner);
       g.add(fan);
-      this.fans.push(fan);
+      // engine 1 is the left one: JSBSim's structural frame has y out of the right wing
+      const engine = side > 0 ? 2 : 1;
+      this.fans.push({ fan, engine });
+      this.reverserDoors[engine] = this.reverser(g, doorMat, holeMat);
       this.structure.add(g);
       // the pylon: a slab from the cowl's top up and back under the wing
       const pylon = liftingSurface([
@@ -580,6 +592,45 @@ export class Airliner {
       ], [0, 1], { n: 5 });
       this.structure.add(new THREE.Mesh(pylon, white));
     }
+  }
+
+  // One engine's thrust reverser, the CFM56-5's: four doors in the fan cowl's aft half, two either side, clear of
+  // the pylon and the lower bifurcation. Each is a patch of the cowl (whose radius tapers there, 1.055 m at 1.7 m to
+  // 0.98 m at 2.7 m behind the lip) pivoting about its middle, so that its forward edge swings out and its aft edge
+  // into the fan stream (doorAngle, reverse.js). Doors and openings are shown only while the reverser is out.
+  reverser(g, doorMat, holeMat) {
+    const x0 = 1.75, x1 = 2.65, xh = (x0 + x1) / 2, half = 32 * DEG, N = 8;
+    const radius = (x) => 1.055 - 0.075 * (x - 1.7);
+    // a patch of the cowl centred on its top (+z), lifted off it, its vertices relative to origin
+    const patch = (lift, origin) => {
+      const pos = [], idx = [];
+      for (const x of [x0, x1]) {
+        for (let j = 0; j <= N; ++j) {
+          const a = -half + (2 * half * j) / N, rr = radius(x) + lift;
+          pos.push(x - origin[0], rr * Math.sin(a) - origin[1], rr * Math.cos(a) - origin[2]);
+        }
+      }
+      for (let j = 0; j < N; ++j) idx.push(j, N + 1 + j, j + 1, j + 1, N + 1 + j, N + 2 + j);
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setIndex(idx);
+      geo.computeVertexNormals();
+      return geo;
+    };
+    const doors = [];
+    for (const at of [50, 130, 230, 310]) {   // degrees round the nacelle from its top
+      const frame = new THREE.Group();
+      frame.rotation.x = at * DEG;
+      const hinge = new THREE.Group();
+      const pivot = [xh, 0, radius(xh) + 0.012];
+      hinge.position.set(...pivot);
+      hinge.add(new THREE.Mesh(patch(0.012, pivot), doorMat));
+      frame.add(new THREE.Mesh(patch(0.004, [0, 0, 0]), holeMat), hinge);
+      frame.visible = false;
+      g.add(frame);
+      doors.push({ frame, hinge });
+    }
+    return doors;
   }
 
   // The gear: twin wheels on each leg; the mains swing in under the body, the nose forward into its bay.
@@ -706,9 +757,17 @@ export class Airliner {
     this.wheelTurn += ((s.gs_kn || 0) * 0.5144 * dt) / this.A.wheels.main;
     for (const m of this.mains) for (const w of m.wheels.children) w.rotation.y = this.wheelTurn;
     for (const w of this.nose.wheels.children) w.rotation.y = this.wheelTurn * (this.A.wheels.main / this.A.wheels.nose);
-    this.fans.forEach((fan, k) => {
-      const n1 = (k ? s.n1_2 : s.n1_1) || 0;
+    this.fans.forEach(({ fan, engine }) => {
+      const n1 = s[`n1_${engine}`] || 0;
       fan.rotation.x += (n1 / 100) * (5000 / 60) * 2 * Math.PI * dt * 0.15;
     });
+    // the reversers' doors, out by doorAngle; a forward edge rises from the cowl as the door turns about its hinge
+    for (const [engine, doors] of Object.entries(this.reverserDoors)) {
+      const a = doorAngle(s[`reverser_${engine}`]);
+      for (const d of doors) {
+        d.frame.visible = a > 0;
+        d.hinge.rotation.y = a;
+      }
+    }
   }
 }

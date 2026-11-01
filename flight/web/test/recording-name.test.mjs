@@ -3,9 +3,17 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { recordingName } from '../src/flight.js';
+import { buildNote, recordingName } from '../src/flight.js';
 
 const header = (airframe) => `# scenario: approach;wind=270/15\n# airframe: ${airframe}\npitch,roll\n0,0\n`;
+
+test('the status line names the build a page flies, and marks one the gate would refuse', () => {
+  assert.deepEqual(buildNote('edf90dd'), { text: 'build edf90dd', warn: false });
+  assert.deepEqual(buildNote('edf90dd+dirty'), { text: 'build edf90dd+dirty: not for the gate', warn: true });
+  assert.deepEqual(buildNote('unknown'), { text: 'build unknown: not for the gate', warn: true });
+  assert.deepEqual(buildNote(undefined), { text: '', warn: false }, 'a core older than the build line');
+  assert.equal(buildNote('<b>x</b>').text, 'build bxb', 'nothing but a build id reaches the page');
+});
 
 test('a recording is named for its airframe, its scenario and its seconds', () => {
   assert.equal(recordingName(header('a320'), 'approach', 412.4), 'a32x-a320-approach-0412s.csv');

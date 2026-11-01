@@ -30,7 +30,7 @@ self.onmessage = async (event) => {
     if (m.type === 'start') {
       if (session) throw new Error('this worker has flown its flight; start a new worker');
       session = new CoreSession(await createFlightCore(), m.airframe, m.scripted, m.scenario);
-      report('ready', { inputNames: session.inputNames, stateNames: session.stateNames });
+      report('ready', { inputNames: session.inputNames, stateNames: session.stateNames, build: session.build });
     } else if (m.type === 'step') {
       const t0 = performance.now();
       session.step(m.ticks, m.inputs);
