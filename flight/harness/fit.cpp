@@ -15,8 +15,10 @@
 // The held-out rows are never measured here. A coefficient no fit row responds to is found first, by
 // moving each one by its prior's width, and is held at its seed: the optimiser could only wander it.
 //
-// Reproducible: the random numbers are drawn from a fixed seed by code of our own, not the standard
-// library's distributions, whose output differs between compilers.
+// Reproducible on one compiler, to the last digit: the random numbers are drawn from a fixed seed by
+// code of our own, not the standard library's distributions, whose output differs between compilers.
+// Across compilers JSBSim's own arithmetic differs in the last bits, and so the path the search takes:
+// GCC 13.3 ends at the same fit rows by another route.
 
 #include <algorithm>
 #include <chrono>

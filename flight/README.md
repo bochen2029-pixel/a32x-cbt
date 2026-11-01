@@ -69,9 +69,9 @@ shown able to fail by hand: reverse the yaw damper's sign and the aircraft depar
 ground 40 s after liftoff; reverse the THS's and the stabiliser runs to its stop while the elevator
 holds 24° against it. The scorer's instruments and the fitter's optimiser were shown able to fail the
 same way (their rows below). All fifteen pass on MSVC 19.44 with the 737 flying; with our A320 flying,
-fourteen pass and `lands_inside_the_limits` does not ([below](#the-swap-not-made-yet)). The first
-twelve also pass on GCC 13.3; the three added with the A320 have not been run on it. The numbers in
-the table are the 737's.
+fourteen pass and `lands_inside_the_limits` does not ([below](#the-swap-not-made-yet)). GCC 13.3 on
+Ubuntu 24.04 (WSL) gives the same: fifteen with the 737, the same fourteen with the A320, the same
+scores, no warning in our code. The numbers in the table are the 737's.
 
 | case | what it shows |
 |---|---|
@@ -234,8 +234,10 @@ edge, growing as the square beyond — plus a prior: 0.02 times the square of ea
 from its seed, in widths of its prior. Before
 searching it moves each coefficient by its prior's width: 21 of the 69 answer to a fit row, and the
 other 48 are held at their seeds, since the optimiser could only wander them. The search is CMA-ES as
-Hansen's tutorial sets it, written here, with random numbers of our own from a fixed seed so that a fit
-reproduces on any compiler.
+Hansen's tutorial sets it, written here, with random numbers of our own from a fixed seed: on one
+compiler a fit repeats to the last digit. On GCC 13.3 JSBSim's arithmetic differs in the last bits,
+the search takes another path, and it ends at the same 13 of 13 with an objective of 0.02685 against
+MSVC's 0.02676.
 
 The fit that is committed: 300 generations, 4,870 evaluations, 79 s on the i9-9900K, the desktop 10 %
 busy before it and 89 % during, the fit included. Three runs gave the same coefficients to the last
