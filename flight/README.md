@@ -1192,6 +1192,34 @@ New `ctest` cases: nine `laws_` cases — `--expect laws=PITCH/LATERAL[,PITCH]`,
 seconds after the failure until the crew configures to land, and once the gear is down, then the
 landing — and `laws_three_irs_replays_to_the_same_touchdown`. The suite's count is in the next section.
 
+**The radio altimeters.** Either can be failed like any other unit — `fail=ra1@300`, `fail=ra1+ra2` —
+and either can be made to read wrong: `ra_bias=FT` for both, `ra1_bias=` or `ra2_bias=` for one, on any
+start; each then reads the true height plus its bias, and a failed one transmits FailureWarning on every
+word, as a failed ADR does. The computers are given what the radio altimeters read, and so is the
+scripted crew: it flies by RA 1, or by RA 2 when RA 1 has failed, for its gear, its flare and its retard,
+as a crew flies by its instruments, while the crash check and the ILS's geometry keep the truth. The
+state reports `ra_ft` as RA 1 reads, `ra2_ft` as RA 2 reads, each NaN once failed, and `height_true_ft`,
+the truth they measure, for a judge and never for the crew. None of it acts unless a scenario asks for
+it: every scripted flight, digest and ILS line is as it was. It exists for the Jev landing experiment
+(the operator's idea; owned by the Jev Park session, agreed with fbw-parent): a flare triggered by a
+formula on the radio height is fooled by an altimeter that lies, and a camera is not.
+
+Measured from KDFW 17C's ILS (MSVC 19.44), the scripted crew's flare as the radio altimeters move it:
+
+| radio altimeters | the flare began, true height | touchdown | the judge |
+|---|---|---|---|
+| reading 15 ft high | 17.7 ft | 722 fpm | NOT STABLE |
+| reading 15 ft low | 47.7 ft | 457 fpm, 404 m past the threshold | NOT STABLE |
+| RA 1 failed: the crew flies by RA 2 | 32.5 ft | 148 fpm, 328 m past the threshold | STABLE |
+
+With both failed a minute into the approach, gear down, A32NX's computers go to direct law in pitch and
+roll, and the flight goes on.
+
+New `ctest` cases (`ra_test.c`, natively and under node): `radio_altimeters_reading_high_make_the_crew_flare_late`,
+`radio_altimeters_reading_low_make_the_crew_flare_early`,
+`with_radio_altimeter_1_failed_the_crew_flies_by_radio_altimeter_2` and
+`with_both_radio_altimeters_failed_the_flight_goes_on`.
+
 ## The protections (P7, step 4)
 
 **A start in the air** — `air;alt=FT;cas=KT;lever=N;manoeuvre=NAME`, 10,000 ft and 250 kt clean unless

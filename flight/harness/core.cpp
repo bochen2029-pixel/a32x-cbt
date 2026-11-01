@@ -32,7 +32,7 @@ const std::vector<const char*> kInputs = {
     "pitch_trim"};
 
 // State slots. Air data in ISA with the standard setting; attitude and rates in degrees; heading and
-// track true; ra_ft zero standing on the runway. Surfaces in the computers' frame, except the
+// track true; ra_ft, RA 1 as it reads (ra2_ft, height_true_ft below), zero standing on the runway. Surfaces in the computers' frame, except the
 // spoilers, given as extension (+ out). pitch_law, lateral_law and phase are codes; flight_state_text
 // names them.
 const std::vector<const char*> kState = {
@@ -62,7 +62,10 @@ const std::vector<const char*> kState = {
     "eye_fwd_m",    "eye_right_m",  "eye_up_m",      "cg_height_m",
     // the engines, where the airframe has them (airframe.h): 0 approach idle .. 1 ground idle; each
     // reverser 0 stowed .. 1 deployed
-    "ground_idle",  "reverser_1",   "reverser_2"};
+    "ground_idle",  "reverser_1",   "reverser_2",
+    // the radio altimeters (world.h, raFt): ra_ft is RA 1 as it reads, ra2_ft RA 2, each the true height plus its
+    // bias and NaN once failed; height_true_ft is the truth they measure, for a judge, never for the crew
+    "ra2_ft",       "height_true_ft"};
 
 int slot(const std::vector<const char*>& names, const char* name) {
   for (size_t k = 0; k < names.size(); ++k) {
@@ -82,7 +85,8 @@ double* failureSlot(Failures& f, const std::string& unit) {
     double* times;
     int count;
   };
-  for (const Indexed& u : {Indexed{"adr", f.adr, 3}, Indexed{"ir", f.ir, 3}, Indexed{"elac", f.elac, 2}, Indexed{"sec", f.sec, 3}}) {
+  for (const Indexed& u : {Indexed{"adr", f.adr, 3}, Indexed{"ir", f.ir, 3}, Indexed{"elac", f.elac, 2}, Indexed{"sec", f.sec, 3},
+                           Indexed{"ra", f.ra, 2}}) {
     const std::string prefix = u.prefix;
     if (unit.size() == prefix.size() + 1 && unit.compare(0, prefix.size(), prefix) == 0) {
       const int k = unit.back() - '1';
@@ -245,7 +249,7 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            a.latitudeDeg,
                            a.longitudeDeg,
                            a.pressureAltitudeFt,
-                           a.radioHeightFt,
+                           w.raFt(0),
                            a.casKn,
                            a.tasKn,
                            a.groundSpeedKn,
@@ -307,8 +311,10 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            a.cgHeightM,
                            a.groundIdle,
                            a.reverser[0],
-                           a.reverser[1]};
-  static_assert(sizeof values / sizeof values[0] == 67, "one value per state slot");
+                           a.reverser[1],
+                           w.raFt(1),
+                           a.radioHeightFt};
+  static_assert(sizeof values / sizeof values[0] == 69, "one value per state slot");
   s.assign(std::begin(values), std::end(values));
 }
 
@@ -370,8 +376,19 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       }
       continue;
     }
+    if (key == "ra_bias" || key == "ra1_bias" || key == "ra2_bias") {  // on any start: world.h, raBiasFt
+      char* end = nullptr;
+      const double v = std::strtod(value.c_str(), &end);
+      if (value.empty() || !end || *end != '\0' || !(std::abs(v) <= 1000)) {
+        error = "'" + parts[k] + "': a radio altimeter's bias is in feet, from -1000 to 1000";
+        return false;
+      }
+      if (key != "ra2_bias") start.raBiasFt[0] = v;
+      if (key != "ra1_bias") start.raBiasFt[1] = v;
+      continue;
+    }
     if (kind == "runway") {
-      error = "the runway start takes only runway= and fail=";
+      error = "the runway start takes only runway=, fail= and the radio altimeters' bias";
       return false;
     }
     char* end = nullptr;
@@ -382,7 +399,7 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       return false;
     }
     if (air && (key == "distance" || key == "loc" || key == "gs")) {
-      error = "an air start takes alt=, cas=, lever=, manoeuvre=, wind=, turbulence=, runway= and fail=";
+      error = "an air start takes alt=, cas=, lever=, manoeuvre=, wind=, turbulence=, runway=, fail= and ra_bias=";
       return false;
     }
     if (key == "distance") distance = v;

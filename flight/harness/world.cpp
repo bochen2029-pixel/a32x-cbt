@@ -205,6 +205,8 @@ World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(con
   runway_ = start.runway.name.empty() ? runwayAtStart(air()) : start.runway;
   headingTarget_ = runway_.headingDeg;  // the circuit's turns are flown relative to the runway
   failures = start.failures;
+  raBiasFt_[0] = start.raBiasFt[0];
+  raBiasFt_[1] = start.raBiasFt[1];
   if (start.airframe.airborne) {
     // In the air: the levers and the surfaces where the trim left them, the brakes off, the flight
     // controls on, and the scripted crew established on the final approach.
@@ -386,8 +388,20 @@ void World::flyIls(double dt) {
 
 // The scripted crew: a circuit, flown through the laws, repeated until the run ends; or, from an
 // approach start, the ILS to a landing and a stop.
+double World::raFt(int k) const {
+  if (failed(failures.ra[k])) return NAN;
+  const double h = air().radioHeightFt;
+  return raBiasFt_[k] != 0 ? h + raBiasFt_[k] : h;
+}
+
+double World::crewRadioHeightFt() const {
+  const double ra1 = raFt(0);
+  return std::isnan(ra1) ? raFt(1) : ra1;
+}
+
 void World::fly(double dt) {
   const AirframeState& a = air();
+  const double radio = crewRadioHeightFt();  // the radio height, as the crew reads it: the instrument
   casRate_ += ((a.casKn - lastCas_) / dt - casRate_) * std::min(1.0, dt / 1.0);  // read over about a second
   lastCas_ = a.casKn;
 
@@ -455,7 +469,7 @@ void World::fly(double dt) {
         const double pitchTarget = std::min(kRotateToDeg, kRotateDegS * (t_ - rotateAt_));
         c.pitch = clamp(0.12 * (pitchTarget - a.pitchDeg) + 0.1 * (kRotateDegS - q), -0.2, 0.9);
       }
-      if (!onGround() && a.radioHeightFt > 5) {
+      if (!onGround() && radio > 5) {
         c.spoilersArmed = false;
         rotateAt_ = -1;
         gammaCmd_ = gammaSpeed_ = gamma;
@@ -464,7 +478,7 @@ void World::fly(double dt) {
       break;
 
     case Phase::Climb: {  // gear up, take-off thrust to 1500 ft, then accelerate and clean up
-      if (a.radioHeightFt > 100) c.gearDown = false;
+      if (radio > 100) c.gearDown = false;
       if (c.flapLever == 1 && h > kAccelerationFt && a.casKn > kVFlapsUp - 5) c.flapLever = 0;
       double v = h > kAccelerationFt ? kVFlapsUp : kV2;
       if (c.flapLever == 0) v = slatFppu_ < 1 && flapFppu_ < 1 ? kVClean : kVSlatsIn;
@@ -495,7 +509,7 @@ void World::fly(double dt) {
     case Phase::Approach: {  // down to 2000 ft, configure as the speed comes back, then three degrees
       if (ilsCrew_) {
         flyIls(dt);
-        if (a.radioHeightFt < kFlareFt) enter(Phase::Flare);
+        if (radio < kFlareFt) enter(Phase::Flare);
         break;
       }
       if (stage_ < 4 && a.casKn < kVNextStage[stage_] && (stage_ > 0 || h < kPatternFt + 150)) {
@@ -511,12 +525,12 @@ void World::fly(double dt) {
         holdPath(-3.0, kVApp, dt);
       }
       c.roll = rollFor(runway_.headingDeg, psi, phi, p);
-      if (stage_ == 5 && a.radioHeightFt < kFlareFt) enter(Phase::Flare);
+      if (stage_ == 5 && radio < kFlareFt) enter(Phase::Flare);
       break;
     }
 
     case Phase::Flare: {  // sink rate down exponentially, to two feet a second at the wheels
-      const double height = std::max(0.0, a.radioHeightFt);
+      const double height = std::max(0.0, radio);
       const double sinkTarget = height / kFlareTauS + 2.0;  // ft/s
       const double sink = -a.verticalSpeedFpm / 60;
       c.pitch = clamp(kFlareGain * (sink - sinkTarget) - kFlarePitchRate * q - kFlareLoad * (a.nz - 1), -0.3, 0.8);
@@ -740,8 +754,16 @@ void World::sense() {
     r.inertial_vertical_speed_ft_s = word(a.verticalSpeedFpm);  // fed ft/min, as the producer does (contract/12)
   }
 
-  // radio altimeter: valid below 2500 ft, out of range above it the way ala52b.rs reports it
-  for (auto& r : ra) r.radio_height_ft = a.radioHeightFt < 2500 ? word(a.radioHeightFt) : word(8192, kNcd);
+  // radio altimeter: valid below 2500 ft, out of range above it the way ala52b.rs reports it; what each one
+  // reads, its bias in it (raFt); a failed one's bus all zero, FailureWarning on every word, as a failed ADR's
+  for (int k = 0; k < 2; ++k) {
+    if (failed(failures.ra[k])) {
+      ra[k] = base_ra_bus{};
+      continue;
+    }
+    const double h = raFt(k);
+    ra[k].radio_height_ft = h < 2500 ? word(h) : word(8192, kNcd);
+  }
 
   const bool compressed = mainGearCompressed();
   const bool noseCompressed = noseGearCompressed();

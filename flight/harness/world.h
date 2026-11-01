@@ -86,6 +86,7 @@ struct Failures {
   double hyd[3] = {-1, -1, -1};  // green, blue, yellow
   double elac[2] = {-1, -1};
   double sec[3] = {-1, -1, -1};
+  double ra[2] = {-1, -1};       // the radio altimeters
 };
 
 // Where the world begins: the airframe's start, the runway it is judged against, the levers the crew
@@ -97,6 +98,9 @@ struct WorldStart {
   int flapLever = 0;
   bool gearDown = true;
   Failures failures;
+  // Each radio altimeter's error, feet: it reads the true height plus this (0: true). Off unless asked for, as
+  // a failure is: the instructor's lie, for a crew or a judge to catch.
+  double raBiasFt[2] = {0, 0};
   // In the air, a test pilot's manoeuvre (core.h, "air"): hold, bank, pull, push, alpha or speed. Empty:
   // the scripted circuit, or the ILS from an approach start.
   std::string manoeuvre;
@@ -142,7 +146,11 @@ class World {
   const char* testStage() const;
   int circuit() const { return circuit_; }
   double altitudeFt() const { return air().pressureAltitudeFt; }
-  double radioHeightFt() const { return air().radioHeightFt; }
+  double radioHeightFt() const { return air().radioHeightFt; }  // the truth
+  // A radio altimeter as it reads (k = 0, 1): the true height plus its bias, NaN once it has failed. And the
+  // height the crew flies by: RA 1, or RA 2 when RA 1 has failed, NaN when both have.
+  double raFt(int k) const;
+  double crewRadioHeightFt() const;
   double tasKn() const { return air().tasKn; }
   double casKn() const { return air().casKn; }
   double groundSpeedKn() const { return air().groundSpeedKn; }
@@ -196,6 +204,7 @@ class World {
   static constexpr double kCrashFt = 3;  // radio height below which the airframe is in the ground
 
   double crashedAt_ = -1;
+  double raBiasFt_[2] = {0, 0};  // WorldStart::raBiasFt
 
   const AirframeState& air() const { return airframe_->state(); }
 

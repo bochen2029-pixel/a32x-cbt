@@ -187,6 +187,13 @@ set_target_properties(reverse_test PROPERTIES LINKER_LANGUAGE CXX)
 flight_warnings(reverse_test)
 flight_node_program(reverse_test)
 
+# The radio altimeters through the C API: their bias and their failures, and the crew flying by them.
+add_executable(ra_test harness/ra_test.c)
+target_link_libraries(ra_test PRIVATE flight_world)
+set_target_properties(ra_test PROPERTIES LINKER_LANGUAGE CXX)
+flight_warnings(ra_test)
+flight_node_program(ra_test)
+
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
 target_link_libraries(airframe_score PRIVATE flight_world)
@@ -290,6 +297,13 @@ add_test(NAME the_a320_reverses_on_the_ground COMMAND reverse_test ground)
 add_test(NAME the_a320_deploys_nothing_in_flight COMMAND reverse_test air)
 set_tests_properties(the_a320_reverses_on_the_ground the_a320_deploys_nothing_in_flight
                      PROPERTIES ENVIRONMENT "FLIGHT_AIRFRAME=a320")
+# The radio altimeters (world.h, raFt), off unless a scenario asks: each reads the true height plus its bias, or
+# nothing once failed, and the scripted crew flies by them, RA 1 or else RA 2, so that a bias moves its flare by
+# as much in true height; with both failed the flight goes on under the computers. height_true_ft stays the truth.
+add_test(NAME radio_altimeters_reading_high_make_the_crew_flare_late COMMAND ra_test bias 15)
+add_test(NAME radio_altimeters_reading_low_make_the_crew_flare_early COMMAND ra_test bias -15)
+add_test(NAME with_radio_altimeter_1_failed_the_crew_flies_by_radio_altimeter_2 COMMAND ra_test one)
+add_test(NAME with_both_radio_altimeters_failed_the_flight_goes_on COMMAND ra_test both)
 
 # The scripted crew flies KDFW 17C's ILS from 10 nm to a stop, judged by the hand-flown ILS's bands
 # (ROADMAP.md, P7): on the beams, a dot off each of them either way, 10 kt fast and slow, a 15 kt
