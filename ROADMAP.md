@@ -106,7 +106,7 @@ A phase is done when its gate passes, not when the code exists.
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
 | P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate in progress: its judge, recordings and repeatability built [M], the page's half and five hand-flown approaches to come |
-| P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
+| P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started; planned (*P8 in detail*), to begin after P7's gate |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
 
@@ -435,6 +435,59 @@ trainer's debrief does.
 - Not changed: P8's displays come after this gate. Step 8's overlay is not a PFD.
 
 ---
+
+### P8 in detail — the displays, a plan
+
+Not started: P7's gate comes first, and the phase starts on the operator's word (CLAUDE.md §10). A plan
+written at the end of P7, its decisions taken below, so that the phase can begin the day the gate passes.
+
+**What it is.** The A320's six display units — the captain's and the first officer's PFD and ND, the
+E/WD (the upper ECAM) and the SD (the lower) — drawn from the flight core's state, so that the aircraft
+is flown on its instruments rather than on P7's overlay, and its laws and failures are read where a crew
+reads them. The gate, *six tubes render from real law output at 20 Hz*, read concretely:
+
+- *Real law output*: every value on every tube comes from the flight core — a state slot, or a
+  computer's word the core passes on — and none is made up in the page. A test lists each one and the
+  slot it reads.
+- *Render*: each tube draws its symbology for the state it is given. The laws and failures P7's step 3
+  reaches show as a crew sees them — the protections' marks turning to amber crosses in alternate and
+  direct law, USE MAN PITCH TRIM in direct, red SPD, ALT and ATT flags when the ADRs and IRs fail — each
+  checked from step 3's failure cases.
+- *Six tubes at 20 Hz*: all six redrawn twenty times a second, on the 3D flight deck and in a 2D layout,
+  measured on a GPU and on the software floor (SwiftShader) with the desktop's load beside the number,
+  and on the 2014 laptop when there is one.
+
+**The plan.** Ordered; each step is done when its test passes, and the gate is last.
+
+| step | what | done when |
+|---|---|---|
+| 1 | What the tubes need, from the core | the FAC's speeds beside its VLS (α prot, α max, VMAX, the speed trend), the engines' N1, N2, EGT and fuel flow and the fuel on board from JSBSim, the three hydraulic pressures from the world, each ADR's and IR's validity: state slots by name, each with a C-API test |
+| 2 | A display model | what each tube shows — values, bands, colours, flags, messages — computed from the state as data, without drawing, in node as `scene-math.js` is; its tests state the A320's rules: the speed bands, the protections' marks by law, the flags by failure |
+| 3 | PFD | attitude with the bank and pitch protections' marks, the speed tape with its bands and trend, altitude and vertical speed, heading, the ILS scales, radio height, the laws' and the failures' flags; the FMA's columns blank until P9's FMGC. Done when each of step 3's laws shows as it should, from its failure case |
+| 4 | ND | ROSE ILS with the localizer and its deviation, ARC and ROSE NAV with the runway and its airport, wind, ground speed and true airspeed, heading and track; no flight plan until P9 |
+| 5 | E/WD | the engines (N1, EGT, N2, fuel flow), the fuel on board, the slats and flaps; and the memo and the warnings from a small FWC on the flight side: the laws (F/CTL ALTN LAW, DIRECT LAW) and the failures step 3 injects |
+| 6 | SD | the pages the core can feed — F/CTL (the surfaces, the ELACs and SECs, the hydraulic letters), HYD, WHEEL, ENG — and the rest by decision (b) |
+| 7 | The tubes in the cockpit | the six as textures on fbw-desktop's 3D flight deck, in place of its placeholders, and a 2D layout of four for the floor tier and small screens; the ND's mode and range and the SD's page on keys and joystick buttons |
+| 8 | The gate | six tubes at 20 Hz, measured as above |
+
+**Decisions.** Taken on the P7 lane's recommendation under the operator's delegation of 2026-11-01 —
+*"go with your own best decision for all, or report it up and defer to the parent (let it decide
+finally)"* — and agreed by the parent the same day. They do not start the phase: P8 begins only after
+P7's gate passes.
+
+- (a) *Sources.* A32NX's displays are TypeScript (GPL-3.0) for MSFS's instrument framework, and P8 does
+  not port them (CLAUDE.md §0). The symbology comes from public descriptions only, each named in
+  `docs/provenance.md` before anything relies on it, and each approved by the parent; Airbus's FCOM is
+  not public and is not a source.
+- (b) *The lower ECAM's systems.* `app/` (MIT) already has ELEC, HYD, FUEL, BLEED and PRESS pages as data,
+  their renderer, 23 ECAM messages with their warnings logic, and the systems behind them on its own
+  50 ms clock. Carrying them in the flight page, joined to the flight core, would give more of the
+  aircraft sooner, but two simulations of one aircraft on two clocks. P8 draws only what the flight core
+  simulates and marks the rest; the join is a phase of its own, because a join across two clocks is what
+  house rule 1's one state guards against.
+- (c) *Who draws.* P7's split continues: the core's slots and the display model in the flight lane, the
+  drawing on the deck and on the page with fbw-desktop.
+- (d) *The 2014 laptop.* P5's open box; P8's 20 Hz floor is measured on it as well.
 
 ## 5 · The problems that decide it
 
