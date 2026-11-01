@@ -11,10 +11,6 @@
 
 namespace {
 
-constexpr double kPi = 3.14159265358979323846;
-constexpr double kDeg = kPi / 180.0;
-constexpr double kFtsPerKt = 1.687810;  // ft/s per knot
-
 constexpr unsigned kNo = 3, kNcd = 1;  // SSM: NormalOperation, NoComputedData
 
 base_arinc_429 word(double value, unsigned ssm = kNo) {

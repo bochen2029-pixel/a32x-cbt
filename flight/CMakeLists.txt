@@ -59,6 +59,24 @@ if(MSVC)
   add_compile_options(/MP)  # JSBSim is some two hundred files; compile them in parallel
 endif()
 
+# --- WebAssembly: the same sources through Emscripten (P7 step 6) --------------------------------
+#
+#   emcmake cmake -S flight -B flight/build-wasm -G Ninja -DCMAKE_BUILD_TYPE=Release \
+#     -DA32NX_DIR=<clone> -DJSBSIM_DIR=<clone>
+#   cmake --build flight/build-wasm && ctest --test-dir flight/build-wasm
+#
+# Native WebAssembly exceptions throughout, upstream included: JSBSim throws and our code catches.
+# The test programs run under node on the real file system; the browser's module is at the end.
+if(EMSCRIPTEN)
+  add_compile_options(-fwasm-exceptions)
+  add_link_options(-fwasm-exceptions -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=4MB)
+endif()
+function(flight_node_program target)
+  if(EMSCRIPTEN)
+    target_link_options(${target} PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1)
+  endif()
+endfunction()
+
 # --- upstream: the flight control computers and what they need, compiled as they are -------------
 file(GLOB FBW_MODEL CONFIGURE_DEPENDS "${FBW}/model/*.cpp")
 list(FILTER FBW_MODEL EXCLUDE REGEX "/(Fmgc|Fcu|Fadec)[^/]*\\.cpp$")
@@ -102,10 +120,9 @@ function(flight_warnings target)
   endif()
 endfunction()
 
+set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp)
 add_library(flight_world STATIC
-  harness/efcs.cpp
-  harness/world.cpp
-  harness/airframe.cpp
+  ${FLIGHT_WORLD}
   harness/core.cpp)  # the step loop behind a C API: start, inputs, step, state
 target_link_libraries(flight_world PUBLIC a32nx_efcs libJSBSim)
 target_include_directories(flight_world PUBLIC harness)
@@ -119,12 +136,14 @@ add_executable(law_harness harness/main.cpp)
 target_link_libraries(law_harness PRIVATE flight_world)
 target_compile_definitions(law_harness PRIVATE A32NX_COMMIT="${A32NX_COMMIT}" JSBSIM_COMMIT="${JSBSIM_COMMIT}")
 flight_warnings(law_harness)
+flight_node_program(law_harness)
 
 # The flight core's C API, called from C.
 add_executable(core_test harness/core_test.c)
 target_link_libraries(core_test PRIVATE flight_world)
 set_target_properties(core_test PROPERTIES LINKER_LANGUAGE CXX)
 flight_warnings(core_test)
+flight_node_program(core_test)
 
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
@@ -133,13 +152,54 @@ target_compile_definitions(airframe_score PRIVATE
   JSBSIM_COMMIT="${JSBSIM_COMMIT}"
   FLIGHT_TARGETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/targets")
 flight_warnings(airframe_score)
+flight_node_program(airframe_score)
 
 # The fitter: CMA-ES over our A320's coefficients, each candidate scored by airframe_score in a process
 # of its own. It links nothing of JSBSim's or A32NX's: it reads the seeds and writes the aircraft file.
-add_executable(airframe_fit harness/fit.cpp)
-target_compile_definitions(airframe_fit PRIVATE FLIGHT_JSBSIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jsbsim")
-add_dependencies(airframe_fit airframe_score)
-flight_warnings(airframe_fit)
+# A desktop tool: it starts processes, which WebAssembly cannot.
+if(NOT EMSCRIPTEN)
+  add_executable(airframe_fit harness/fit.cpp)
+  target_compile_definitions(airframe_fit PRIVATE FLIGHT_JSBSIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jsbsim")
+  add_dependencies(airframe_fit airframe_score)
+  flight_warnings(airframe_fit)
+endif()
+
+# --- the browser's module (P7 step 6) ------------------------------------------------------------
+# The flight core and every file it reads, as one JavaScript file with the WebAssembly inside it, for a
+# worker (or node, which the module's own test uses). The airframes' files are embedded at /jsbsim and
+# /flight, the paths this build of the world is compiled to read.
+if(EMSCRIPTEN)
+  add_library(flight_world_web STATIC ${FLIGHT_WORLD})
+  target_link_libraries(flight_world_web PUBLIC a32nx_efcs libJSBSim)
+  target_include_directories(flight_world_web PUBLIC harness)
+  target_compile_definitions(flight_world_web PRIVATE JSBSIM_ROOT="/jsbsim" FLIGHT_JSBSIM_DIR="/flight")
+  flight_warnings(flight_world_web)
+
+  set(FLIGHT_EMBED
+    "${JSBSIM_DIR}/aircraft/737/737.xml@/jsbsim/aircraft/737/737.xml"
+    "${JSBSIM_DIR}/engine/CFM56.xml@/jsbsim/engine/CFM56.xml"
+    "${JSBSIM_DIR}/engine/CFM56_5.xml@/jsbsim/engine/CFM56_5.xml"
+    "${JSBSIM_DIR}/engine/direct.xml@/jsbsim/engine/direct.xml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/jsbsim/a32nx-surfaces.xml@/flight/a32nx-surfaces.xml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/jsbsim/aircraft/A320-fit/A320-fit.xml@/flight/aircraft/A320-fit/A320-fit.xml")
+  set(FLIGHT_EMBED_OPTIONS "")
+  set(FLIGHT_EMBED_FILES "")
+  foreach(pair IN LISTS FLIGHT_EMBED)
+    list(APPEND FLIGHT_EMBED_OPTIONS "SHELL:--embed-file ${pair}")
+    string(REGEX REPLACE "@.*$" "" file "${pair}")
+    list(APPEND FLIGHT_EMBED_FILES "${file}")
+  endforeach()
+
+  add_executable(flight_core harness/core.cpp)
+  target_link_libraries(flight_core PRIVATE flight_world_web)
+  flight_warnings(flight_core)
+  target_link_options(flight_core PRIVATE
+    --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createFlightCore -sENVIRONMENT=worker,node -sSINGLE_FILE=1
+    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text"
+    "SHELL:-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPF64"
+    ${FLIGHT_EMBED_OPTIONS})
+  set_target_properties(flight_core PROPERTIES LINK_DEPENDS "${FLIGHT_EMBED_FILES}")
+endif()
 
 # --- the gate and the properties it rests on -------------------------------------------------------
 enable_testing()
@@ -148,11 +208,13 @@ enable_testing()
 add_test(NAME p6_gate_30_minutes COMMAND law_harness --minutes 30 --gate)
 
 # The same run twice gives the same bytes: nothing reads a wall clock or an uninitialised value.
-add_test(NAME deterministic COMMAND law_harness --minutes 3 --check-determinism)
-
 # The flight core takes its crew from outside: the scripted crew's inputs, recorded and flown back
-# through it, give the same bytes and the same touchdown.
-add_test(NAME replay_reaches_the_same_touchdown COMMAND law_harness --minutes 18 --check-replay)
+# through it, give the same bytes and the same touchdown. Both start fresh processes of their own, which
+# WebAssembly cannot; the browser module's test replays in one (flight/web).
+if(NOT EMSCRIPTEN)
+  add_test(NAME deterministic COMMAND law_harness --minutes 3 --check-determinism)
+  add_test(NAME replay_reaches_the_same_touchdown COMMAND law_harness --minutes 18 --check-replay)
+endif()
 add_test(NAME the_c_api_flies COMMAND core_test)
 
 # The parts of a flight the gate leans on, each checked on its own.
@@ -184,7 +246,9 @@ add_test(NAME the_737_lands_inside_the_limits COMMAND law_harness --minutes 18 -
 set_tests_properties(the_737_flies_the_gate the_737_lands_inside_the_limits PROPERTIES ENVIRONMENT "FLIGHT_AIRFRAME=737")
 
 # The fitter's optimiser finds known minima: a sphere, a rotated ellipsoid of condition 1e6, Rosenbrock.
-add_test(NAME cma_es_finds_known_minima COMMAND airframe_fit --selftest)
+if(NOT EMSCRIPTEN)
+  add_test(NAME cma_es_finds_known_minima COMMAND airframe_fit --selftest)
+endif()
 
 # Negative controls: the gate's two checks are shown able to fail.
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)
