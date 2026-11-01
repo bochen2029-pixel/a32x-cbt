@@ -493,7 +493,8 @@ damping, −40 per rad, moves the static moment by 0.00001; 10° of elevator mov
 `cm-de` and `cl-de` say, to 0.1 %, and past the fade's onset by the share the file leaves; and on the
 737's clean pulse the two short-period readings agree, damping 0.55 and 0.51, 1.69 and 1.66 rad/s. It
 was shown able to fail: with the alpha-rate in the moment, and with the tail's share left out of the
-elevator's term.
+elevator's term. With it, sixty native cases pass with either airframe on MSVC 19.44 and on GCC 13.3,
+and fifty-five under node.
 
 ## The swap: made, 2026-11-01
 

@@ -436,9 +436,10 @@ trainer's debrief does.
   `airframe_fit --poststall` on those rows alone, the pitch of normal flight held, since none of them
   measures it. Fitted, the A320 is **inside 65 of 65 — 27 of 27 fit rows, 38 of 38 held out** — and
   inside every row it was inside before; the 737, untouched, inside 21; every `ctest` case passes with
-  either airframe, on MSVC and GCC. It does not stop the ring: the fast pull in CONF FULL peaks at 20.0°
-  of alpha on its third swing, against 20.3° before. What the targets pin acts above 11°, the ring swings
-  alpha from 1° to 20°, and over most of that swing the pitch of normal flight decides it, which is inside
+  either airframe, on MSVC and GCC. It does not stop the ring: flown as step 4 flew it, from 8,000 ft,
+  the fast pull in CONF FULL still passes its lift peak on its third swing, 18.1° of alpha against 20.4°
+  before (from 10,000 ft, 20.0° against 20.3°). What the targets pin acts above 11°, the ring swings
+  alpha from 0° to 18°, and over most of that swing the pitch of normal flight decides it, which is inside
   MIL-F-8785C's Level 1 and inside what NASA CR-2144 gives the 747 and the Convair 880M on landing. So the
   airframe cannot both meet its targets and stop the ring; what is left is A32NX's protection flying an
   alpha lagged by 2 s (`flight/README.md`, step 4).
