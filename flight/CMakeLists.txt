@@ -1,15 +1,16 @@
 # The P6 law harness: the A32NX flight control computers, unmodified, stepped at 50 Hz against a stub
 # world. GPLv3, like everything in flight/.
 #
-# The upstream sources are compiled straight out of a clone of flybywiresim/aircraft; nothing from it
-# is copied into this repository. Point A32NX_DIR at the clone (flight/README.md says how to get it):
+# The upstream sources are compiled straight out of clones of flybywiresim/aircraft and
+# JSBSim-Team/jsbsim; nothing from either is copied into this repository. Point A32NX_DIR and
+# JSBSIM_DIR at the clones (flight/README.md and docs/provenance.md say how to get them):
 #
-#   cmake -S flight -B flight/build -DA32NX_DIR=<clone>
+#   cmake -S flight -B flight/build -DA32NX_DIR=<clone> -DJSBSIM_DIR=<clone>
 #   cmake --build flight/build --config Release
 #   ctest --test-dir flight/build -C Release --output-on-failure
 
-cmake_minimum_required(VERSION 3.20)
-project(a32nx_law_harness LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.25)
+project(a32nx_law_harness LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,6 +37,28 @@ if(NOT A32NX_COMMIT STREQUAL A32NX_COMMIT_EXPECTED)
     "Check out ${A32NX_COMMIT_EXPECTED}, or re-derive flight/contract/ before moving the pin.")
 endif()
 
+set(JSBSIM_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../jsbsim" CACHE PATH "clone of JSBSim-Team/jsbsim at 66f7faf (v1.3.3)")
+set(JSBSIM_COMMIT_EXPECTED "66f7faf")
+
+if(NOT EXISTS "${JSBSIM_DIR}/src/FGFDMExec.cpp")
+  message(FATAL_ERROR
+    "No JSBSim sources under ${JSBSIM_DIR}.\n"
+    "Clone them as docs/provenance.md says, or pass -DJSBSIM_DIR=<path to the clone>.")
+endif()
+if(GIT_FOUND)
+  execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${JSBSIM_DIR}" rev-parse --short=7 HEAD
+                  OUTPUT_VARIABLE JSBSIM_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+endif()
+if(NOT JSBSIM_COMMIT STREQUAL JSBSIM_COMMIT_EXPECTED)
+  message(FATAL_ERROR
+    "The JSBSim clone is at '${JSBSIM_COMMIT}'; the airframe was measured against ${JSBSIM_COMMIT_EXPECTED}.\n"
+    "Check out ${JSBSIM_COMMIT_EXPECTED}, or re-measure the airframe (docs/provenance.md) before moving the pin.")
+endif()
+
+if(MSVC)
+  add_compile_options(/MP)  # JSBSim is some two hundred files; compile them in parallel
+endif()
+
 # --- upstream: the flight control computers and what they need, compiled as they are -------------
 file(GLOB FBW_MODEL CONFIGURE_DEPENDS "${FBW}/model/*.cpp")
 list(FILTER FBW_MODEL EXCLUDE REGEX "/(Fmgc|Fcu|Fadec)[^/]*\\.cpp$")
@@ -60,13 +83,22 @@ else()
   target_compile_options(a32nx_efcs PRIVATE -w)
 endif()
 
-# --- ours: the world adapter, the stub world, the runner -----------------------------------------
+# --- upstream: JSBSim, the airframe, built out of its clone into this build tree -------------------
+# Its documentation, Python module, unit tests and packaging stay off, its utilities stay unbuilt,
+# and nothing is written into the clone. SYSTEM: its headers are not ours to warn about.
+set(BUILD_DOCS OFF)
+set(BUILD_PYTHON_MODULE OFF)
+set(CMAKE_DISABLE_FIND_PACKAGE_CxxTest ON)
+set(CMAKE_DISABLE_FIND_PACKAGE_PkgConfig ON)
+add_subdirectory("${JSBSIM_DIR}" jsbsim EXCLUDE_FROM_ALL SYSTEM)
+
+# --- ours: the world adapter, the world, the runner ------------------------------------------------
 add_executable(law_harness
   harness/main.cpp
   harness/efcs.cpp
   harness/world.cpp)
-target_link_libraries(law_harness PRIVATE a32nx_efcs)
-target_compile_definitions(law_harness PRIVATE A32NX_COMMIT="${A32NX_COMMIT}")
+target_link_libraries(law_harness PRIVATE a32nx_efcs libJSBSim)
+target_compile_definitions(law_harness PRIVATE A32NX_COMMIT="${A32NX_COMMIT}" JSBSIM_COMMIT="${JSBSIM_COMMIT}")
 if(MSVC)
   target_compile_options(law_harness PRIVATE /W4 /EHsc /permissive-)
   target_compile_definitions(law_harness PRIVATE _CRT_SECURE_NO_WARNINGS)  # plain fopen, as on every other platform
