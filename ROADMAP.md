@@ -230,3 +230,32 @@ Kill criteria, agreed in advance [B]:
 3. Grow content: the message set toward 60, the panel toward the full overhead.
 4. A scenario picker so a drill starts from a saved `.situ` rather than `setup.ts` code.
 5. Then P6 again, deliberately, with the harness and a 30-minute run as its gate.
+
+---
+
+## 9 · Recorded requirements — flyable, runway to runway
+
+From the operator, 2026-11-01, in their words: *"this is not just a panels simulator it must
+actually be fully flyable from runway to runway, takeoff to landing"* — on an average PC, with
+rudimentary graphics *"like back to airliner full motion sims of the 1980s"* in Three.js, and
+joystick support, because *"flying with keyboard arrow keys"* is not acceptable.
+
+That sharpens §3: B is not optional decoration on A. §3's "A to completion first" was written before
+this and has not been re-decided here.
+
+- [ ] **Joystick, first-class.** The Gamepad API: pitch and roll to the sidestick, twist or pedals
+      to the rudder, a throttle axis to the thrust levers; buttons for takeover / autopilot
+      disconnect, brakes, speedbrake, flaps, gear. Per-device mapping, deadzones and calibration,
+      kept between sessions. Keyboard is a fallback, never the way to fly. Lands with **P7**: its gate
+      is a hand-flown ILS, and hands need a stick.
+- [ ] **An out-the-window view in Three.js**, at 1980s full-flight-simulator fidelity: a runway with
+      edge, centreline and approach lights, a horizon, a ground plane, a few buildings, dusk and
+      night lighting — enough to take off and land by eye, within an integrated-graphics budget. A
+      minimal runway and horizon land with **P7** for the same reason; the cockpit displays stay
+      **P8**.
+- [ ] **Done means runway to runway**: takeoff, climb, cruise, approach, landing and rollout, hand
+      flown with a joystick in the browser through the real A32NX laws, with no install.
+
+What that implies, for whoever plans P7: the computers and JSBSim reach the browser as WebAssembly
+(the A32NX computers are already built for wasm in MSFS); Three.js (MIT) and the Gamepad API are
+browser-native; and the browser product links A32NX, so it is GPLv3 like `flight/`.
