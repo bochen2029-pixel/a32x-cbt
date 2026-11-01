@@ -110,12 +110,15 @@ since they run the base constructor first).
 
 ---
 
-## 4 · The ELAC's high-AoA protection flies an alpha lagged by 2 s
+## 4 · The ELAC's high-AoA protection acts on an alpha lagged by 2 s, and keeps swinging after a fast entry
 
 Drafted 2026-11-01 by the P7 session, **not filed**: it waits for the operator's word. Our condition for
-writing it was that the overshoot persist on an airframe fitted where it happens; it did (below).
+writing it was that the overshoot persist on an airframe fitted where it happens; it did. The lag was
+then tested directly, before the operator's decision, in a throwaway copy of the sources (the table
+below), and the test narrowed the report: the lag keeps the protection swinging; it does not make the
+first overshoot.
 
-**Title:** ELAC: the high angle-of-attack protection engages on, and holds, an alpha lagged by 2 s
+**Title:** ELAC: the high-AoA protection acts on an alpha lagged by 2 s, and keeps swinging after a fast entry
 
 **Body:**
 
@@ -127,45 +130,56 @@ ElacComputer_LagFilter(static_cast<real_T>(rtb_alpha), ElacComputer_P.LagFilter_
   &rtb_Y, &ElacComputer_DWork.sf_LagFilter_a);
 ```
 
-(lines 545–546). `LagFilter_C1` is 0.5 (`ElacComputer_data.cpp`), and `ElacComputer_LagFilter`
-(lines 132–149) is the bilinear form of C1 / (s + C1), so `rtb_Y` follows alpha with a time constant
-of 2 s. That lagged alpha is the one the high-AoA protection uses throughout: it engages when `rtb_Y`
-exceeds α prot (line 1161) and stays engaged while `rtb_Y` is within 2° of it (line 1164), and the
-pitch normal law receives it as `In_alpha_deg` (the `LawMDLOBJ5.step` call from line 1435, `&rtb_Y` on
-line 1438), the alpha its protection regulates. It is also the alpha the ELAC reports
-(`adr_computation_data.alpha_deg`, line 1749).
+(lines 545–546). `LagFilter_C1` is 0.5 (`ElacComputer_data.cpp`, line 103), and `ElacComputer_LagFilter`
+(lines 132–149) is the bilinear form of C1 / (s + C1), so `rtb_Y` follows alpha with a time constant of
+2 s. The high-AoA protection acts on that lagged alpha. It engages when `rtb_Y` exceeds α prot (line 1161),
+and stays engaged until the stick is pushed forward — past about 3 % of its travel for half a second while
+`rtb_Y` is under α max, or past half its travel at once — or, below 200 ft radio height, until `rtb_Y`
+falls 2° under α prot (lines 1157–1165). The pitch normal law receives `rtb_Y` as `In_alpha_deg` (the
+`LawMDLOBJ5.step` call from line 1435, `&rtb_Y` on line 1438), lags it again by 0.625 s
+(`PitchNormalLaw.cpp`, line 1874, `LagFilter1_C1` = 1.6), and regulates the difference between that and
+the alpha the stick asks for, with the difference's rate.
 
-On a fast entry the protection therefore engages late, and then acts on where the aircraft was. We run
-the ELAC, SEC, FAC and FCDC unmodified, outside MSFS, against JSBSim airframes — an A320 model of our
-own and JSBSim's 737 — and log the ELAC's own outputs every step. From level flight at 150 kt and
-8,000 ft in CONF FULL (α prot 10.6°, α max 13.0°), full back stick held for 20 s, on our A320:
+We run the ELAC, SEC, FAC and FCDC unmodified, outside MSFS, against JSBSim airframes — an A320 model of
+our own and JSBSim's 737 — and log the ELAC's own outputs every step. From level flight at 150 kt and
+8,000 ft in CONF FULL (α prot 10.6°, α max 13.0°), with full back stick held for 20 s, our A320's true
+alpha passes α prot 1.6 s before the lagged one does, and the protection engages only then, with the
+true alpha at 17°. It pushes on a lagged alpha still near 11° while the true alpha falls to −4°, then
+pulls on a lagged alpha near 1° while the true alpha rises to 20°; the swing repeats about every 9 s,
+and is still between 5° and 17° when the stick is let go. JSBSim's 737 overshoots to 19.5°, swings down
+to 2.7° and back to 14.3°, and settles at α max.
 
-- the true alpha passes α prot about 1.5 s before the lagged one does, and the protection engages
-  only then, with the true alpha already at 16–17°;
-- it pushes, on a lagged alpha still near 11°, while the true alpha falls to −4°; then pulls, on a
-  lagged alpha near 1°, while the true alpha rises to 20°;
-- the cycle repeats about every 8 s, the true alpha between −4.1° and 20.4°, for as long as the stick
-  is held.
+Whether an airframe keeps swinging is partly its own: its short period and its pitch response near the
+stall. Fitting our A320's pitch response to cited data — MIL-F-8785C's short-period limits, published
+elevator-hold measurements and NASA's GTM post-stall data — every setting inside those bands still
+swings back to 16° to 20°, the first overshoot 15.3° to 16.7°, wherever the fit puts the airframe. So we
+changed `LagFilter_C1` alone, to 5 (a 0.2 s lag), in a copy of the same sources, and flew the same
+manoeuvres:
 
-JSBSim's 737 under the same computers overshoots as far on the first swing, to 19.1°, and then settles
-at α max within a cycle. Entered slowly — idle from 150 kt into the protection, then full back stick —
-our A320 holds 12.1° to 13.8° without ringing.
+| full back stick from 150 kt, CONF FULL | lag 2 s, as it is | lag 0.2 s |
+|---|---|---|
+| our A320: true alpha when the protection engages | 17.0° | 12.0° |
+| our A320: the true alpha's swings | 17.1° → −4.1° → 20.4° → 5.3° | 16.9° → −3.6° → 14.2° → 9.1° → 13.5° |
+| our A320: the last 5 s of the hold | 5.3° to 16.5° | 10.5° to 13.5° |
+| JSBSim's 737: the true alpha's swings | 19.5° → 2.7° → 14.3°, then settled | 16.6° → 6.7° → 11.3° → 7.2° → 15.2° |
+| entered slowly, idle into the protection: highest alpha, A320 / 737 | 13.8° / 13.9° | 13.3° / 13.1° |
 
-Whether an airframe keeps ringing is the airframe's: its short period and its pitch response near the
-stall. But the size of the first overshoot did not move with the airframe. Fitting our A320's pitch
-response to cited data — MIL-F-8785C's short-period limits, published elevator-hold measurements and
-NASA's GTM post-stall data — every setting inside those bands still swings back to 16° to 20°, the
-first overshoot 15.3° to 16.7°, wherever the fit puts the airframe. That points us at the lag rather
-than the airframe, though we cannot rule out that MSFS's flight model, which the laws are tuned
-against, behaves differently.
+On our A320, then, the lag is what keeps the protection swinging: with it at 0.2 s the same pull settles
+toward α max within the hold, where with 2 s it still swings between 5° and 17° when the stick is let
+go. The lag is not what makes the first overshoot, which stays near 17° though the protection engages
+1.4 s sooner — the fit found it at 15.3° to 16.7° whatever the airframe — and a shorter lag is not free:
+on the 737 it lowered the first overshoot and drew out the swings after it. Entered slowly, the
+protection holds α max more closely with the shorter lag on both.
 
-We don't know whether the lag is meant to be this long — the vanes' noise may call for a filter — and
-we have not changed the computers to try alternatives. Two directions we would look at: engaging the
-protection on an alpha with less lag, and giving the regulated alpha some phase advance (an alpha-rate
-or pitch-rate term), so that the protection does not act on where the aircraft was two seconds before.
+We don't know whether the lag is meant to be this long — the vanes' noise may call for a filter — nor
+whether MSFS's flight model, which the laws are tuned against, swings as ours does; 0.2 s was a
+diagnostic, not a proposal. What we would ask: whether the protection should engage on, and regulate,
+an alpha with less lag, or with some phase advance — an alpha-rate or pitch-rate term — so that after a
+fast entry it does not keep acting on where the aircraft was.
 
 ---
 
 §1 to §3 came out of `flight/`'s A320 targets (`flight/targets/a320-speeds.csv`, which corrects the
 three points and says so) and its law harness; see `flight/README.md`, Findings. §4 came out of P7's
-step 4, the protections, and the airframe fit after it; see `flight/README.md`, the protections.
+step 4, the protections, the airframe fit after it, and a direct test of the lag in a copy of the
+sources, deleted after; see `flight/README.md`, the protections.
