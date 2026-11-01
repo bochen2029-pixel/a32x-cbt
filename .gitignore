@@ -1,6 +1,7 @@
 # build output — web/app.js is committed so a zip runs with no Node
 *.tsbuildinfo
 app/dist/
+flight/build/
 
 # deps
 node_modules/
