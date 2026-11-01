@@ -5,16 +5,19 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { COLOURS, layoutBuildings, layoutRunway, papiShowsWhite, runwayExtent, runwayFrame, Y } from './airport-layout.js';
+import {
+  COLOURS, GROUND_CELL_M, layoutBuildings, layoutRunway, papiShowsWhite, runwayExtent, runwayFrame, subdivide, Y,
+} from './airport-layout.js';
 import { LightSet, lightMaterial } from './lights.js';
 
 const DEG = Math.PI / 180;
 
-// A flat rectangle on the ground, in cells no longer than 150 m, so that a curved earth, if one comes,
-// bends it rather than buries it.
+// A flat rectangle on the ground, in cells no longer than GROUND_CELL_M, so that a curved earth bends it
+// rather than buries it.
 function quad(x0, z0, x1, z1, y) {
   const w = Math.abs(x1 - x0), l = Math.abs(z1 - z0);
-  const g = new THREE.PlaneGeometry(w, l, Math.max(1, Math.ceil(w / 150)), Math.max(1, Math.ceil(l / 150))).rotateX(-Math.PI / 2);
+  const cells = (d) => Math.max(1, Math.ceil(d / GROUND_CELL_M));
+  const g = new THREE.PlaneGeometry(w, l, cells(w), cells(l)).rotateX(-Math.PI / 2);
   return g.translate((x0 + x1) / 2, y, (z0 + z1) / 2);
 }
 
@@ -109,7 +112,12 @@ export class Airport {
       L.asphalt.push(quad(b.spine.x0 - 16, b.spine.z0, b.spine.x0 + 16, b.spine.z1, Y.asphalt));
       for (let z = b.spine.z0; z < b.spine.z1; z += 45) for (const s of [-1, 1]) this.lights.add(b.spine.x0 + s * 20, 12, z, sodium, { size: 1.6 });
     }
-    for (const ramp of b.ramps) L.apron.push(new THREE.ShapeGeometry(shape(ramp)).rotateX(-Math.PI / 2).translate(0, Y.asphalt - 0.02, 0));
+    for (const ramp of b.ramps) {  // the ramps' triangles cut as the quads' cells are (subdivide)
+      const flat = new THREE.ShapeGeometry(shape(ramp)).rotateX(-Math.PI / 2).translate(0, Y.asphalt - 0.02, 0).toNonIndexed();
+      const cut = new THREE.BufferGeometry();
+      cut.setAttribute('position', new THREE.BufferAttribute(subdivide(flat.attributes.position.array), 3));
+      L.apron.push(cut);
+    }
     for (const t of b.terminals) {
       L.concrete.push(new THREE.ExtrudeGeometry(shape(t.points), { depth: t.height, bevelEnabled: false }).rotateX(-Math.PI / 2));
       // along each face, outward: windows every 40 m, a mast every 160 m, 70 m out over the ramp

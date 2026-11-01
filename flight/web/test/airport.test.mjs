@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import {
-  airportFromRunway, COLOURS, FAA, findRunwayEnd, GLIDE, layoutBuildings, layoutRunway, papiShowsWhite, ringArea, runwayExtent,
-  runwayFrame, toWorld, validateAirport,
+  airportFromRunway, COLOURS, FAA, findRunwayEnd, GLIDE, GROUND_CELL_M, layoutBuildings, layoutRunway, papiShowsWhite, ringArea,
+  runwayExtent, runwayFrame, subdivide, toWorld, validateAirport,
 } from '../src/airport-layout.js';
 import { localMetres, origin } from '../src/scene-math.js';
 
@@ -174,4 +174,26 @@ test('a runway no airport file holds becomes an airport of one: LSZH 14 from the
   const f = runwayFrame(origin(47.482085, 8.536049), a.runways[0]);
   assert.ok(Math.hypot(f.x, f.z) < 0.05, 'its landing threshold at the origin');
   assert.ok(Math.abs(runwayExtent(a.runways[0]).start - 150) < 1e-6, 'its displaced 150 m before it');
+});
+
+test('the ground is cut into pieces no longer than 150 m, so a curved earth bends it: a ramp-sized sliver', () => {
+  // a triangle 2.3 km long and 40 m wide at its widest, as an earcut ramp gives, on the ground at y = 0.4
+  const t = [0, 0.4, 0, 2300, 0.4, -40, 1100, 0.4, 25];
+  const out = subdivide(t);
+  const area = (p, i) => {  // signed, by the y component of the normal: + turns one way, - the other
+    const ux = p[i + 3] - p[i], uz = p[i + 5] - p[i + 2], vx = p[i + 6] - p[i], vz = p[i + 8] - p[i + 2];
+    return (uz * vx - ux * vz) / 2;
+  };
+  let total = 0, longest = 0;
+  for (let i = 0; i < out.length; i += 9) {
+    for (const [a, b] of [[0, 3], [3, 6], [6, 0]]) {
+      longest = Math.max(longest, Math.hypot(out[i + a] - out[i + b], out[i + a + 2] - out[i + b + 2]));
+    }
+    assert.ok(Math.sign(area(out, i)) === Math.sign(area(t, 0)), 'each piece turns the way the triangle did');
+    assert.ok([1, 4, 7].every((k) => Math.abs(out[i + k] - 0.4) < 1e-6), 'and stays on its plane');
+    total += area(out, i);
+  }
+  assert.ok(longest <= GROUND_CELL_M, `no edge longer than ${GROUND_CELL_M} m: ${longest.toFixed(1)} m`);
+  assert.ok(Math.abs(total - area(t, 0)) < 1, `the same area: ${total.toFixed(0)} and ${area(t, 0).toFixed(0)} m2`);
+  assert.equal(subdivide([0, 0, 0, 100, 0, 0, 0, 0, 100]).length, 9, 'a triangle short enough is kept as it is');
 });

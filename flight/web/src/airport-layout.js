@@ -329,6 +329,36 @@ export function layoutBuildings(a, o) {
   return out;
 }
 
+// The longest a piece of the ground may be, metres: a curved earth (the GPU tier bends the world by the
+// distance from the eye) moves only vertices, so a longer piece would keep its middle on the chord, above
+// the ground bent under it, burying what is laid across it. 150 m keeps the chord within 0.5 mm.
+export const GROUND_CELL_M = 150;
+
+// Triangles, a flat array of x, y, z, three vertices a triangle, cut until no edge is longer than maxEdge:
+// a triangle too long is split at the middle of its longest edge into two, each turning the same way.
+// The surface, its area and its winding are as they were.
+export function subdivide(positions, maxEdge = GROUND_CELL_M) {
+  const out = [];
+  const pending = [];
+  for (let i = 0; i + 9 <= positions.length; i += 9) pending.push(Array.prototype.slice.call(positions, i, i + 9));
+  const most = maxEdge * maxEdge;
+  while (pending.length) {
+    const t = pending.pop();
+    const d = (a, b) => (t[3 * a] - t[3 * b]) ** 2 + (t[3 * a + 1] - t[3 * b + 1]) ** 2 + (t[3 * a + 2] - t[3 * b + 2]) ** 2;
+    const edges = [d(0, 1), d(1, 2), d(2, 0)];
+    const k = edges.indexOf(Math.max(...edges));
+    if (edges[k] <= most) {
+      out.push(...t);
+      continue;
+    }
+    const a = k, b = (k + 1) % 3, c = (k + 2) % 3;
+    const v = (i) => t.slice(3 * i, 3 * i + 3);
+    const m = [0, 1, 2].map((j) => (t[3 * a + j] + t[3 * b + j]) / 2);
+    pending.push([...v(a), ...m, ...v(c)], [...m, ...v(b), ...v(c)]);
+  }
+  return Float32Array.from(out);
+}
+
 // The area of a ring of [x, z] points, square metres.
 export function ringArea(points) {
   let s = 0;
