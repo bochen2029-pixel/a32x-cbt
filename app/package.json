@@ -1,0 +1,41 @@
+{
+  "name": "a32x-cbt",
+  "private": true,
+  "type": "module",
+  "description": "A320 FBW computer-based training: B1 foundation (no aero, no law)",
+  "scripts": {
+    "test": "node --test tests/b1.test.ts tests/bluepump.test.ts tests/curriculum.test.ts tests/ecam.test.ts tests/faults.test.ts tests/instructor.test.ts tests/messages.test.ts tests/packsfail.test.ts tests/pageschema.test.ts tests/panel.test.ts tests/panelschema.test.ts tests/power.test.ts tests/press.test.ts tests/replay.test.ts tests/scenario.test.ts tests/session.test.ts tests/soak.test.ts tests/startengine.test.ts tests/systems.test.ts tests/training.test.ts",
+    "demo": "node src/demo.ts",
+    "test:systems": "node --test tests/systems.test.ts",
+    "test:training": "node --test tests/training.test.ts",
+    "demo:flow": "node src/demo-flow.ts",
+    "test:power": "node --test tests/power.test.ts",
+    "test:all": "node --test tests/b1.test.ts tests/bluepump.test.ts tests/curriculum.test.ts tests/ecam.test.ts tests/faults.test.ts tests/instructor.test.ts tests/messages.test.ts tests/packsfail.test.ts tests/pageschema.test.ts tests/panel.test.ts tests/panelschema.test.ts tests/power.test.ts tests/press.test.ts tests/replay.test.ts tests/scenario.test.ts tests/session.test.ts tests/soak.test.ts tests/startengine.test.ts tests/systems.test.ts tests/training.test.ts",
+    "demo:panel": "node src/demo-panel.ts",
+    "test:panel": "node --test tests/panel.test.ts",
+    "demo:ecam": "node src/demo-ecam.ts",
+    "test:ecam": "node --test tests/ecam.test.ts",
+    "demo:scenario": "node src/demo-scenario.ts",
+    "test:scenario": "node --test tests/scenario.test.ts",
+    "test:press": "node --test tests/press.test.ts",
+    "test:start": "node --test tests/startengine.test.ts",
+    "test:faults": "node --test tests/faults.test.ts",
+    "test:drill": "node --test tests/bluepump.test.ts",
+    "test:soak": "node --test tests/soak.test.ts",
+    "demo:drill": "node src/demo-drill.ts",
+    "test:packs": "node --test tests/packsfail.test.ts",
+    "demo:depress": "node src/demo-depress.ts",
+    "build:web": "node node_modules/typescript/bin/tsc -p tsconfig.web.json",
+    "serve": "node tools/serve.mjs web 8130",
+    "test:session": "node --test tests/session.test.ts",
+    "test:replay": "node --test tests/replay.test.ts",
+    "test:messages": "node --test tests/messages.test.ts",
+    "test:panelschema": "node --test tests/panelschema.test.ts",
+    "test:pageschema": "node --test tests/pageschema.test.ts",
+    "test:curriculum": "node --test tests/curriculum.test.ts",
+    "test:instructor": "node --test tests/instructor.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

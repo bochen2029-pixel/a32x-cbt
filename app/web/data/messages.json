@@ -1,0 +1,378 @@
+[
+  {
+    "id": "elec-emer-config",
+    "level": "warning",
+    "text": "ELEC EMER CONFIG",
+    "when": {
+      "all": [
+        {
+          "not": {
+            "var": "bus.ac1"
+          }
+        },
+        {
+          "not": {
+            "var": "bus.ac2"
+          }
+        },
+        {
+          "var": "bus.dcEss"
+        }
+      ]
+    },
+    "chapter": "24-20"
+  },
+  {
+    "id": "excess-cabin-alt",
+    "level": "warning",
+    "text": "EXCESS CABIN ALT",
+    "when": {
+      "gt": {
+        "var": "press.cabinAlt",
+        "value": 14000
+      }
+    },
+    "chapter": "21-30"
+  },
+  {
+    "id": "eng1-fail",
+    "level": "warning",
+    "text": "ENG 1 FAIL",
+    "when": {
+      "all": [
+        {
+          "var": "sw.eng1Master"
+        },
+        {
+          "eq": {
+            "var": "sw.eng1Start",
+            "value": 0
+          }
+        },
+        {
+          "not": {
+            "var": "sys.eng1Burning"
+          }
+        },
+        {
+          "lt": {
+            "var": "eng1.n2",
+            "value": 45
+          }
+        }
+      ]
+    },
+    "chapter": "70-00"
+  },
+  {
+    "id": "eng2-fail",
+    "level": "warning",
+    "text": "ENG 2 FAIL",
+    "when": {
+      "all": [
+        {
+          "var": "sw.eng2Master"
+        },
+        {
+          "eq": {
+            "var": "sw.eng2Start",
+            "value": 0
+          }
+        },
+        {
+          "not": {
+            "var": "sys.eng2Burning"
+          }
+        },
+        {
+          "lt": {
+            "var": "eng2.n2",
+            "value": 45
+          }
+        }
+      ]
+    },
+    "chapter": "70-00"
+  },
+  {
+    "id": "cabin-alt",
+    "level": "caution",
+    "text": "CABIN ALT",
+    "when": {
+      "gt": {
+        "var": "press.cabinAlt",
+        "value": 9550
+      }
+    },
+    "chapter": "21-30"
+  },
+  {
+    "id": "hyd-g-lo-pr",
+    "level": "caution",
+    "text": "HYD G LO PR",
+    "when": {
+      "lt": {
+        "var": "hyd.green",
+        "value": 1450
+      }
+    },
+    "chapter": "29-10"
+  },
+  {
+    "id": "hyd-b-lo-pr",
+    "level": "caution",
+    "text": "HYD B LO PR",
+    "when": {
+      "lt": {
+        "var": "hyd.blue",
+        "value": 1450
+      }
+    },
+    "chapter": "29-10"
+  },
+  {
+    "id": "hyd-y-lo-pr",
+    "level": "caution",
+    "text": "HYD Y LO PR",
+    "when": {
+      "lt": {
+        "var": "hyd.yellow",
+        "value": 1450
+      }
+    },
+    "chapter": "29-10"
+  },
+  {
+    "id": "fuel-l-lo-pr",
+    "level": "caution",
+    "text": "FUEL L LO PR",
+    "when": {
+      "all": [
+        {
+          "var": "sw.fuelEng1LpValve"
+        },
+        {
+          "not": {
+            "var": "sys.fuelToEng1"
+          }
+        }
+      ]
+    },
+    "chapter": "28-20"
+  },
+  {
+    "id": "fuel-r-lo-pr",
+    "level": "caution",
+    "text": "FUEL R LO PR",
+    "when": {
+      "all": [
+        {
+          "var": "sw.fuelEng2LpValve"
+        },
+        {
+          "not": {
+            "var": "sys.fuelToEng2"
+          }
+        }
+      ]
+    },
+    "chapter": "28-20"
+  },
+  {
+    "id": "bleed-l-lo-pr",
+    "level": "caution",
+    "text": "BLEED L LO PR",
+    "when": {
+      "all": [
+        {
+          "var": "sw.pack1"
+        },
+        {
+          "not": {
+            "var": "sys.bleedDuctL"
+          }
+        }
+      ]
+    },
+    "chapter": "36-10"
+  },
+  {
+    "id": "apu-fault",
+    "level": "warning",
+    "text": "APU FAULT",
+    "chapter": "49-00",
+    "when": {
+      "gt": {
+        "var": "apu.egt",
+        "value": 800
+      }
+    }
+  },
+  {
+    "id": "eng1-hot-start",
+    "level": "warning",
+    "text": "ENG 1 HOT START",
+    "chapter": "70-00",
+    "when": {
+      "var": "sys.eng1HotStartLatched"
+    }
+  },
+  {
+    "id": "ac1-fault",
+    "level": "caution",
+    "text": "AC BUS 1 FAULT",
+    "chapter": "24-20",
+    "when": {
+      "all": [
+        {
+          "var": "bus.dcBat"
+        },
+        {
+          "not": {
+            "var": "bus.ac1"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "ac2-fault",
+    "level": "caution",
+    "text": "AC BUS 2 FAULT",
+    "chapter": "24-20",
+    "when": {
+      "all": [
+        {
+          "var": "bus.dcBat"
+        },
+        {
+          "not": {
+            "var": "bus.ac2"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "pack1-fault",
+    "level": "caution",
+    "text": "PACK 1 FAULT",
+    "chapter": "21-20",
+    "when": {
+      "all": [
+        {
+          "var": "sw.pack1"
+        },
+        {
+          "not": {
+            "var": "sys.pack1Running"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "pack2-fault",
+    "level": "caution",
+    "text": "PACK 2 FAULT",
+    "chapter": "21-20",
+    "when": {
+      "all": [
+        {
+          "var": "sw.pack2"
+        },
+        {
+          "not": {
+            "var": "sys.pack2Running"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "bleed1-fault",
+    "level": "caution",
+    "text": "BLEED 1 FAULT",
+    "chapter": "36-10",
+    "when": {
+      "all": [
+        {
+          "var": "sw.eng1Bleed"
+        },
+        {
+          "var": "sys.eng1Running"
+        },
+        {
+          "not": {
+            "var": "sys.bleedSrc1"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "eng1-start-valve",
+    "level": "advisory",
+    "text": "ENG 1 START VALVE OPEN",
+    "chapter": "70-00",
+    "when": {
+      "var": "sys.eng1StartValve"
+    }
+  },
+  {
+    "id": "fuel-xfeed-open",
+    "level": "advisory",
+    "text": "FUEL XFEED OPEN",
+    "chapter": "28-20",
+    "when": {
+      "var": "sys.fuelXfeedOpen"
+    }
+  },
+  {
+    "id": "fuel-l-pumps-off",
+    "level": "advisory",
+    "text": "FUEL L PUMPS OFF",
+    "chapter": "28-20",
+    "when": {
+      "all": [
+        {
+          "not": {
+            "var": "sw.fuelPumpL1"
+          }
+        },
+        {
+          "not": {
+            "var": "sw.fuelPumpL2"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "id": "cab-manual",
+    "level": "advisory",
+    "text": "CAB PR MANUAL",
+    "chapter": "21-30",
+    "when": {
+      "not": {
+        "var": "sys.pressAuto"
+      }
+    }
+  },
+  {
+    "id": "apu-bleed-on",
+    "level": "advisory",
+    "text": "APU BLEED ON",
+    "chapter": "49-00",
+    "when": {
+      "all": [
+        {
+          "var": "sw.apuBleed"
+        },
+        {
+          "var": "sys.apuBleedAvail"
+        }
+      ]
+    }
+  }
+]

@@ -1,0 +1,346 @@
+{
+  "id": "overhead",
+  "title": "OVERHEAD",
+  "cols": 66,
+  "rows": 30,
+  "controls": [
+    {
+      "id": "bat1",
+      "label": "BAT 1",
+      "x": 2,
+      "y": 1,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.bat1"
+    },
+    {
+      "id": "bat2",
+      "label": "BAT 2",
+      "x": 18,
+      "y": 1,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.bat2"
+    },
+    {
+      "id": "ext-pwr",
+      "label": "EXT PWR",
+      "x": 34,
+      "y": 1,
+      "w": 14,
+      "h": 2,
+      "form": "guarded",
+      "var": "sw.extPwr",
+      "guard": "guard.extPwr",
+      "note": "ground power: guard, then press"
+    },
+    {
+      "id": "gen1",
+      "label": "GEN 1",
+      "x": 2,
+      "y": 4,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.gen1"
+    },
+    {
+      "id": "gen2",
+      "label": "GEN 2",
+      "x": 18,
+      "y": 4,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.gen2"
+    },
+    {
+      "id": "apu-gen",
+      "label": "APU GEN",
+      "x": 34,
+      "y": 4,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.apuGen"
+    },
+    {
+      "id": "bus-tie",
+      "label": "BUS TIE",
+      "x": 50,
+      "y": 4,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.busTie"
+    },
+    {
+      "id": "apu-master",
+      "label": "APU MASTER",
+      "x": 2,
+      "y": 7,
+      "w": 14,
+      "h": 2,
+      "form": "guarded",
+      "var": "sw.apuMaster",
+      "guard": "guard.apuMaster",
+      "note": "APU master: guard, then press"
+    },
+    {
+      "id": "apu-start",
+      "label": "APU START",
+      "x": 18,
+      "y": 7,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.apuStart"
+    },
+    {
+      "id": "apu-bleed",
+      "label": "APU BLEED",
+      "x": 34,
+      "y": 7,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.apuBleed"
+    },
+    {
+      "id": "eng1-master",
+      "label": "ENG1 MASTER",
+      "x": 50,
+      "y": 1,
+      "w": 14,
+      "h": 2,
+      "form": "guarded",
+      "var": "sw.eng1Master",
+      "guard": "guard.eng1"
+    },
+    {
+      "id": "eng1-start",
+      "label": "ENG1 START",
+      "x": 50,
+      "y": 7,
+      "w": 14,
+      "h": 2,
+      "form": "selector",
+      "var": "sw.eng1Start",
+      "positions": 2
+    },
+    {
+      "id": "eng2-master",
+      "label": "ENG2 MASTER",
+      "x": 50,
+      "y": 10,
+      "w": 14,
+      "h": 2,
+      "form": "guarded",
+      "var": "sw.eng2Master",
+      "guard": "guard.eng2"
+    },
+    {
+      "id": "eng2-start",
+      "label": "ENG2 START",
+      "x": 50,
+      "y": 13,
+      "w": 14,
+      "h": 2,
+      "form": "selector",
+      "var": "sw.eng2Start",
+      "positions": 2
+    },
+    {
+      "id": "eng1-bleed",
+      "label": "ENG1 BLEED",
+      "x": 2,
+      "y": 10,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.eng1Bleed"
+    },
+    {
+      "id": "eng2-bleed",
+      "label": "ENG2 BLEED",
+      "x": 18,
+      "y": 10,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.eng2Bleed"
+    },
+    {
+      "id": "xbleed",
+      "label": "XBLEED",
+      "x": 34,
+      "y": 10,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.xbleed"
+    },
+    {
+      "id": "pack1",
+      "label": "PACK 1",
+      "x": 2,
+      "y": 13,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.pack1"
+    },
+    {
+      "id": "pack2",
+      "label": "PACK 2",
+      "x": 18,
+      "y": 13,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.pack2"
+    },
+    {
+      "id": "fuel-l1",
+      "label": "PUMP L1",
+      "x": 2,
+      "y": 16,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.fuelPumpL1"
+    },
+    {
+      "id": "fuel-l2",
+      "label": "PUMP L2",
+      "x": 18,
+      "y": 16,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.fuelPumpL2"
+    },
+    {
+      "id": "fuel-r1",
+      "label": "PUMP R1",
+      "x": 34,
+      "y": 16,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.fuelPumpR1"
+    },
+    {
+      "id": "fuel-r2",
+      "label": "PUMP R2",
+      "x": 50,
+      "y": 16,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.fuelPumpR2"
+    },
+    {
+      "id": "xfeed",
+      "label": "XFEED",
+      "x": 2,
+      "y": 19,
+      "w": 14,
+      "h": 2,
+      "form": "guarded",
+      "var": "sw.fuelXfeed",
+      "guard": "guard.xfeed"
+    },
+    {
+      "id": "lp1",
+      "label": "LP VALVE 1",
+      "x": 18,
+      "y": 19,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.fuelEng1LpValve"
+    },
+    {
+      "id": "lp2",
+      "label": "LP VALVE 2",
+      "x": 34,
+      "y": 19,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.fuelEng2LpValve"
+    },
+    {
+      "id": "press-mode",
+      "label": "PRESS MODE",
+      "x": 2,
+      "y": 25,
+      "w": 14,
+      "h": 2,
+      "form": "selector",
+      "var": "sw.pressMode",
+      "positions": 2
+    },
+    {
+      "id": "press-outflow",
+      "label": "OUTFLOW",
+      "x": 34,
+      "y": 25,
+      "w": 14,
+      "h": 2,
+      "form": "selector",
+      "var": "sw.pressValve",
+      "positions": 5,
+      "table": [
+        0,
+        25,
+        50,
+        75,
+        100
+      ]
+    },
+    {
+      "id": "hyd-green",
+      "label": "GREEN PUMP",
+      "x": 2,
+      "y": 22,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.hydGreenEng1"
+    },
+    {
+      "id": "hyd-blue",
+      "label": "BLUE PUMP",
+      "x": 18,
+      "y": 22,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.hydBlueEpump"
+    },
+    {
+      "id": "hyd-yellow",
+      "label": "YELLOW PUMP",
+      "x": 34,
+      "y": 22,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.hydYellowEpump"
+    },
+    {
+      "id": "ptu",
+      "label": "PTU",
+      "x": 50,
+      "y": 22,
+      "w": 14,
+      "h": 2,
+      "form": "push",
+      "var": "sw.ptu"
+    }
+  ]
+}

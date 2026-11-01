@@ -1,0 +1,481 @@
+[
+  {
+    "id": "elec",
+    "name": "ELEC",
+    "lines": [
+      {
+        "title": "ELEC"
+      },
+      {
+        "label": "AC BUS 1"
+      },
+      {
+        "text": "        VOLT 115  FREQ 400",
+        "when": {
+          "var": "bus.ac1"
+        },
+        "level": "normal",
+        "only": {
+          "var": "bus.ac1"
+        }
+      },
+      {
+        "text": "        VOLT 0  FREQ 0",
+        "when": {
+          "not": {
+            "var": "bus.ac1"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "bus.ac1"
+          }
+        }
+      },
+      {
+        "label": "AC BUS 2"
+      },
+      {
+        "text": "        VOLT 115  FREQ 400",
+        "when": {
+          "var": "bus.ac2"
+        },
+        "level": "normal",
+        "only": {
+          "var": "bus.ac2"
+        }
+      },
+      {
+        "text": "        VOLT 0  FREQ 0",
+        "when": {
+          "not": {
+            "var": "bus.ac2"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "bus.ac2"
+          }
+        }
+      },
+      {
+        "label": "AC ESS"
+      },
+      {
+        "text": "        NOT POWERED",
+        "when": {
+          "not": {
+            "var": "bus.acEss"
+          }
+        },
+        "level": "caution"
+      },
+      {
+        "label": "DC BAT"
+      },
+      {
+        "text": "        NOT POWERED",
+        "when": {
+          "not": {
+            "var": "bus.dcBat"
+          }
+        },
+        "level": "caution"
+      },
+      {
+        "label": "GEN 1"
+      },
+      {
+        "text": "        OFF LINE",
+        "when": {
+          "not": {
+            "var": "ctr.gen1"
+          }
+        },
+        "level": "advisory"
+      },
+      {
+        "label": "GEN 2"
+      },
+      {
+        "text": "        OFF LINE",
+        "when": {
+          "not": {
+            "var": "ctr.gen2"
+          }
+        },
+        "level": "advisory"
+      },
+      {
+        "label": "EXT PWR"
+      },
+      {
+        "text": "        AVAIL",
+        "when": {
+          "not": {
+            "var": "ctr.extPwr"
+          }
+        },
+        "level": "advisory"
+      }
+    ]
+  },
+  {
+    "id": "hyd",
+    "name": "HYD",
+    "lines": [
+      {
+        "title": "HYD"
+      },
+      {
+        "label": "GREEN"
+      },
+      {
+        "text": "        {{hyd.green}} PSI",
+        "when": {
+          "lt": {
+            "var": "hyd.green",
+            "value": 1450
+          }
+        },
+        "level": "caution"
+      },
+      {
+        "label": "BLUE"
+      },
+      {
+        "text": "        {{hyd.blue}} PSI",
+        "when": {
+          "lt": {
+            "var": "hyd.blue",
+            "value": 1450
+          }
+        },
+        "level": "caution"
+      },
+      {
+        "label": "YELLOW"
+      },
+      {
+        "text": "        {{hyd.yellow}} PSI",
+        "when": {
+          "lt": {
+            "var": "hyd.yellow",
+            "value": 1450
+          }
+        },
+        "level": "caution"
+      },
+      {
+        "label": "PTU"
+      },
+      {
+        "text": "        RUNNING",
+        "when": {
+          "var": "sys.ptuRunning"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.ptuRunning"
+        }
+      },
+      {
+        "text": "        OFF",
+        "when": {
+          "not": {
+            "var": "sys.ptuRunning"
+          }
+        },
+        "level": "advisory",
+        "only": {
+          "not": {
+            "var": "sys.ptuRunning"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "fuel",
+    "name": "FUEL",
+    "lines": [
+      {
+        "title": "FUEL"
+      },
+      {
+        "label": "LEFT"
+      },
+      {
+        "text": "        FEED OK",
+        "when": {
+          "var": "sys.fuelToEng1"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.fuelToEng1"
+        }
+      },
+      {
+        "text": "        LO PR",
+        "when": {
+          "not": {
+            "var": "sys.fuelToEng1"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "sys.fuelToEng1"
+          }
+        }
+      },
+      {
+        "label": "RIGHT"
+      },
+      {
+        "text": "        FEED OK",
+        "when": {
+          "var": "sys.fuelToEng2"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.fuelToEng2"
+        }
+      },
+      {
+        "text": "        LO PR",
+        "when": {
+          "not": {
+            "var": "sys.fuelToEng2"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "sys.fuelToEng2"
+          }
+        }
+      },
+      {
+        "label": "CROSSFEED"
+      },
+      {
+        "text": "        OPEN",
+        "when": {
+          "var": "sys.fuelXfeedOpen"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.fuelXfeedOpen"
+        }
+      },
+      {
+        "text": "        SHUT",
+        "when": {
+          "not": {
+            "var": "sys.fuelXfeedOpen"
+          }
+        },
+        "level": "advisory",
+        "only": {
+          "not": {
+            "var": "sys.fuelXfeedOpen"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "bleed",
+    "name": "BLEED",
+    "lines": [
+      {
+        "title": "BLEED"
+      },
+      {
+        "label": "L DUCT"
+      },
+      {
+        "text": "        PRESS",
+        "when": {
+          "var": "sys.bleedDuctL"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.bleedDuctL"
+        }
+      },
+      {
+        "text": "        LO PR",
+        "when": {
+          "not": {
+            "var": "sys.bleedDuctL"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "sys.bleedDuctL"
+          }
+        }
+      },
+      {
+        "label": "R DUCT"
+      },
+      {
+        "text": "        PRESS",
+        "when": {
+          "var": "sys.bleedDuctR"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.bleedDuctR"
+        }
+      },
+      {
+        "text": "        LO PR",
+        "when": {
+          "not": {
+            "var": "sys.bleedDuctR"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "sys.bleedDuctR"
+          }
+        }
+      },
+      {
+        "label": "PACK 1"
+      },
+      {
+        "text": "        ON",
+        "when": {
+          "var": "sys.pack1Running"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.pack1Running"
+        }
+      },
+      {
+        "text": "        OFF",
+        "when": {
+          "not": {
+            "var": "sys.pack1Running"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "sys.pack1Running"
+          }
+        }
+      },
+      {
+        "label": "PACK 2"
+      },
+      {
+        "text": "        ON",
+        "when": {
+          "var": "sys.pack2Running"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.pack2Running"
+        }
+      },
+      {
+        "text": "        OFF",
+        "when": {
+          "not": {
+            "var": "sys.pack2Running"
+          }
+        },
+        "level": "caution",
+        "only": {
+          "not": {
+            "var": "sys.pack2Running"
+          }
+        }
+      }
+    ]
+  },
+  {
+    "id": "press",
+    "name": "PRESS",
+    "lines": [
+      {
+        "title": "PRESS"
+      },
+      {
+        "label": "CABIN ALT"
+      },
+      {
+        "text": "        {{press.cabinAlt}} FT",
+        "when": {
+          "gt": {
+            "var": "press.cabinAlt",
+            "value": 9550
+          }
+        },
+        "level": "warning"
+      },
+      {
+        "label": "CABIN V/S"
+      },
+      {
+        "text": "        {{press.cabinVs}} FPM"
+      },
+      {
+        "label": "DIFF PR"
+      },
+      {
+        "text": "        {{press.diffPsi:1}} PSI",
+        "when": {
+          "gt": {
+            "var": "press.diffPsi",
+            "value": 8.5
+          }
+        },
+        "level": "warning"
+      },
+      {
+        "label": "OUTFLOW"
+      },
+      {
+        "text": "        {{press.outflow}} %"
+      },
+      {
+        "label": "MODE"
+      },
+      {
+        "text": "        MANUAL",
+        "when": {
+          "not": {
+            "var": "sys.pressAuto"
+          }
+        },
+        "level": "advisory",
+        "only": {
+          "not": {
+            "var": "sys.pressAuto"
+          }
+        }
+      },
+      {
+        "text": "        AUTO",
+        "when": {
+          "var": "sys.pressAuto"
+        },
+        "level": "normal",
+        "only": {
+          "var": "sys.pressAuto"
+        }
+      }
+    ]
+  }
+]

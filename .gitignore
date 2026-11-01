@@ -1,0 +1,28 @@
+# build output
+app/web/js/
+*.tsbuildinfo
+
+# deps
+node_modules/
+
+# native build output
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.o
+
+# per-run artefacts
+app/situations/*.situ
+!app/situations/apu-ready.situ
+*.log
+
+# reference trees, cloned not vendored
+/a32nx/
+/decomp/
+
+# editors and OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
