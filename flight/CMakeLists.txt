@@ -127,6 +127,13 @@ target_compile_definitions(airframe_score PRIVATE
   FLIGHT_TARGETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/targets")
 flight_warnings(airframe_score)
 
+# The fitter: CMA-ES over our A320's coefficients, each candidate scored by airframe_score in a process
+# of its own. It links nothing of JSBSim's or A32NX's: it reads the seeds and writes the aircraft file.
+add_executable(airframe_fit harness/fit.cpp)
+target_compile_definitions(airframe_fit PRIVATE FLIGHT_JSBSIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jsbsim")
+add_dependencies(airframe_fit airframe_score)
+flight_warnings(airframe_fit)
+
 # --- the gate and the properties it rests on -------------------------------------------------------
 enable_testing()
 
@@ -157,6 +164,9 @@ add_test(NAME scorer_instruments_read_the_737_right COMMAND airframe_score --ins
 
 # Our A320 loads, flies the scorer's circuit, and every row is measured on it.
 add_test(NAME a320_is_scored_against_the_a320 COMMAND airframe_score --airframe a320 --check)
+
+# The fitter's optimiser finds known minima: a sphere, a rotated ellipsoid of condition 1e6, Rosenbrock.
+add_test(NAME cma_es_finds_known_minima COMMAND airframe_fit --selftest)
 
 # Negative controls: the gate's two checks are shown able to fail.
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)
