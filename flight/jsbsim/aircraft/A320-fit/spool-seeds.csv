@@ -1,0 +1,15 @@
+# The pace of our A320's engine spool-up, before the fit: where its one number started, how far the
+# fitter may move it, and why it started there. GPLv3, like everything in flight/. The columns are
+# seeds.csv's.
+#
+# Engines/CFM56-5A1-fit.xml spools N1 and N2 up at JSBSim's own rate (FGSpoolUp, FGTurbine.h) times
+# propulsion/fit/spool-up; at 1 the engine is JSBSim's default, bit for bit. `airframe_fit --spool` fits
+# it on the fit row of the spool group of flight/targets/a320.csv, 14 CFR 33.73(b)'s 5 s from flight
+# idle to 95 % of take-off thrust, and on nothing else: the steady thrust the thrust fit found is not
+# its to move.
+#
+# Sources
+#   jsbsim      JSBSim's own spool-up rate for a turbofan of this bypass ratio, unscaled: our engine took
+#               5.80 s on it, from flight idle to 95 %, static at sea level
+property,seed,sigma,lo,hi,source,note
+propulsion/fit/spool-up,1.0,0.25,0.5,3.0,jsbsim,JSBSim's own spool-up rate times this

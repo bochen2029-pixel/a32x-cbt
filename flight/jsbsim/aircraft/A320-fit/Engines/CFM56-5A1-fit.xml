@@ -4,9 +4,10 @@
   flight/targets/a320.csv. GPLv3, like everything in flight/.
 
   Written for this project. It replaces Aeromatic's CFM56_5, from the JSBSim clone, as our A320's
-  engine and keeps everything of it but the thrust: rating, bypass ratio, fuel consumption, spool
-  speeds. CFM56_5's tables are where the fit started; the numbers below were first fitted to them, and
-  those are the seeds (flight/jsbsim/aircraft/A320-fit/thrust-seeds.csv).
+  engine and keeps everything of it but the thrust and the pace of spool-up: rating, bypass ratio, fuel
+  consumption, spool-down. CFM56_5's tables are where the fit started; the numbers below were first
+  fitted to them, and those are the seeds (flight/jsbsim/aircraft/A320-fit/thrust-seeds.csv). Spool-up
+  is JSBSim's own rate times one fitted number (below, and spool-seeds.csv).
 
   JSBSim's turbine makes thrust = milthrust (I + (1 - I) M n^2), where I is the IdleThrust function, M
   the MilThrust function and n runs from 0 at idle to 1 at full throttle. Here, as shares of the rating,
@@ -108,5 +109,57 @@
         <property>propulsion/engine[#]/IdleThrust</property>
       </difference>
     </quotient>
+  </function>
+
+  <!-- The pace of spool-up: JSBSim's own rate, as it spools an engine that names none (FGSpoolUp,
+       FGTurbine.h), times propulsion/fit/spool-up. 90 / (bypass ratio + 3) per cent a second, 5.9 here,
+       slowed near idle and in thin air: / (1 + 3 (1 - n)^3 + (1 - sigma)), n = min(1, N2norm + 0.1), N2norm
+       the share of the way from idle N2 to full, (N2 - 60) / 40. At 1 the engine spools as JSBSim's
+       default does; N1 spools at N2's rate, as there. Spool-down stays JSBSim's own. -->
+  <function name="N2SpoolUp">
+    <description>N2's spool-up rate, per cent a second</description>
+    <product>
+      <property>propulsion/fit/spool-up</property>
+      <quotient>
+        <quotient>
+          <value>90</value>
+          <value>8.9</value>
+        </quotient>
+        <sum>
+          <value>1</value>
+          <product>
+            <value>3</value>
+            <pow>
+              <difference>
+                <value>1</value>
+                <min>
+                  <value>1</value>
+                  <sum>
+                    <quotient>
+                      <difference>
+                        <property>propulsion/engine[#]/n2</property>
+                        <value>60</value>
+                      </difference>
+                      <value>40</value>
+                    </quotient>
+                    <value>0.1</value>
+                  </sum>
+                </min>
+              </difference>
+              <value>3</value>
+            </pow>
+          </product>
+          <difference>
+            <value>1</value>
+            <property>atmosphere/sigma</property>
+          </difference>
+        </sum>
+      </quotient>
+    </product>
+  </function>
+
+  <function name="N1SpoolUp">
+    <description>N1's spool-up rate, per cent a second: N2's, as JSBSim's default has it</description>
+    <property>propulsion/engine[#]/N2SpoolUp</property>
   </function>
 </turbine_engine>

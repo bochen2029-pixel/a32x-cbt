@@ -349,6 +349,9 @@ add_test(NAME scorer_instruments_read_the_737_right COMMAND airframe_score --ins
 # in it, the elevator's power and its fade with alpha as the file has them; and two readings of a short
 # period, by its extrema and by equation error, agree on the 737's clean pulse.
 add_test(NAME scorer_instruments_read_pitch_as_the_files_have_it COMMAND airframe_score --instruments-pitch)
+# And our A320's engine spools up at JSBSim's own rate times its one fitted number: at 1 in JSBSim's
+# default 5.80 s, from flight idle to 95 % of take-off thrust, and at 2 in half the time.
+add_test(NAME scorer_instruments_spool_our_engine_as_jsbsim_does COMMAND airframe_score --instruments-spool)
 
 # Our fitted A320 flies by default since 2026-11-01. The 737 it replaced stays selectable and keeps its
 # own cases, so the swap rule can always score both: it is scored, flies the gate, and lands.

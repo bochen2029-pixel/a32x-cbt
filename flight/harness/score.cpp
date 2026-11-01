@@ -6,7 +6,7 @@
 //   airframe_score --check            exit 1 unless every target and context row was measured
 //   airframe_score --only-group thrust, --skip-group thrust [--skip-group poststall]
 //                                     one group of rows, or every group but those skipped
-//   airframe_score --instruments, --instruments-pitch
+//   airframe_score --instruments, --instruments-pitch, --instruments-spool
 //                                     the instruments checked against what the aircraft files say
 //
 // It scores; it does not gate. Outside a band is a fact about the airframe, not a failed build.
@@ -865,6 +865,27 @@ int pitchInstruments() {
   return failed ? 1 : 0;
 }
 
+// Our A320's engine spools up at JSBSim's own rate times propulsion/fit/spool-up: at 1 as JSBSim's default
+// spooled it, 5.80 s from flight idle to 95 % of take-off thrust before the engine named a rate of its own
+// (the P6 gate's digests then the same, bit for bit); at 2 in half the time.
+int spoolInstruments() {
+  int failed = 0;
+  Airframe::select("a320");
+  double seconds[2] = {};
+  for (int k = 0; k < 2; ++k) {
+    Airframe::setCoefficients({{"propulsion/fit/spool-up", k ? 2.0 : 1.0}});
+    Airframe a;
+    seconds[k] = a.spoolUp(0, 0.95).seconds;
+  }
+  Airframe::setCoefficients({});
+  failed += verdict("at 1, our engine spools up as JSBSim's default spooled it", std::abs(seconds[0] - 5.80) < 0.01,
+                    fmt("%.2f s from flight idle to 95 %% of take-off thrust; JSBSim's default 5.80 s", seconds[0]));
+  failed += verdict("and at 2 in half the time", std::abs(seconds[1] - seconds[0] / 2) < 0.02,
+                    fmt("%.2f s, ", seconds[1]) + fmt("against %.2f s", seconds[0] / 2));
+  std::printf("%s\n", failed ? "FAILED" : "PASSED");
+  return failed ? 1 : 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -893,11 +914,13 @@ int main(int argc, char** argv) {
       return instruments();
     } else if (a == "--instruments-pitch") {
       return pitchInstruments();
+    } else if (a == "--instruments-spool") {
+      return spoolInstruments();
     } else {
       std::printf(
           "airframe_score [--airframe 737|a320] [--coefficients file] [--targets dir] [--out score.csv]\n"
           "               [--check] [--fit-rows] [--only-group G | --skip-group G ...]\n"
-          "               [--instruments | --instruments-pitch]\n");
+          "               [--instruments | --instruments-pitch | --instruments-spool]\n");
       return 2;
     }
   }

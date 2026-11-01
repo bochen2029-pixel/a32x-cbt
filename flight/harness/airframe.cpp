@@ -816,7 +816,8 @@ SpoolUp Airframe::spoolUp(double altitudeFt, double share) {
   Impl& m = *impl_;
   SpoolUp s;
   s.togaLbs = engineThrustLbs(altitudeFt, 0, 0, 45);
-  // and this leaves the aircraft placed static at the altitude, its engines steady at idle
+  // and this leaves the aircraft placed static at the altitude, its engines steady at flight idle: a
+  // placement sets the ground-idle selector, where the aircraft has one, to 0
   s.idleLbs = engineThrustLbs(altitudeFt, 0, 0, 0);
   // the airframe held where it is: JSBSim's integrators set to none, 0, so that in time only the engines
   // move; their old settings restored after

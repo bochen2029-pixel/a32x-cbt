@@ -7,19 +7,21 @@
 //   airframe_fit --poststall      past the stall instead: the pitch break, the tail's fade with alpha
 //                                 and the lift beyond the peak
 //   airframe_fit --drag           the drag of the landing flaps and of the gear instead
+//   airframe_fit --spool          the pace of the engine's spool-up instead
 //   airframe_fit --from-file      start from the aircraft file's values, the last fit, not the seeds;
 //                                 the prior stays on the seeds, and what no fit row answers to keeps
 //                                 the file's value
 //   airframe_fit --selftest       the optimiser alone, on functions whose minima are known
 //
-// The aerodynamics, the engines, what lies past the stall and the drag of the flaps and the gear are
-// fitted apart, each on its own rows (the thrust, poststall or drag group, or every group but those) and
-// from its own seeds (seeds.csv, or GROUP-seeds.csv). A candidate carries only the numbers being fitted:
-// the rest are the aircraft file's, as the last fit of them left it. No fit row of the aerodynamics
-// answers to the others' numbers. The rows past the stall answer to the aerodynamics' pitch numbers as
-// well, and the drag rows to its profile and induced drag, which their fits hold where they are: what
-// happens beyond the stall is not to move the pitch of normal flight, nor the drag of two configurations
-// the clean polar, which none of those rows measures.
+// The aerodynamics, the engines, what lies past the stall, the drag of the flaps and the gear, and the
+// engine's spool-up are fitted apart, each on its own rows (the thrust, poststall, drag or spool group, or
+// every group but those) and from its own seeds (seeds.csv, or GROUP-seeds.csv). A candidate carries only
+// the numbers being fitted: the rest are the aircraft file's, as the last fit of them left it. No fit row
+// of the aerodynamics answers to the others' numbers. The rows past the stall answer to the
+// aerodynamics' pitch numbers as well, the drag rows to its profile and induced drag, and the spool row
+// to the engines' idle and take-off thrust, which their fits hold where they are: what happens beyond the
+// stall is not to move the pitch of normal flight, nor the drag of two configurations the clean polar,
+// nor the pace of spool-up the steady thrust, which none of those rows measures.
 //
 // Parameter identification, not controller learning: the controller stays the A32NX computers. A
 // candidate is a full set of coefficients, handed to `airframe_score --airframe a320 --coefficients FILE
@@ -512,7 +514,10 @@ int main(int argc, char** argv) {
     const char *group, *what;
   };
   static const Apart kApart[] = {
-      {"thrust", "the engines"}, {"poststall", "past the stall"}, {"drag", "the drag of the flaps and the gear"}};
+      {"thrust", "the engines"},
+      {"poststall", "past the stall"},
+      {"drag", "the drag of the flaps and the gear"},
+      {"spool", "the engine's spool-up"}};
   int generations = 200, lambda = 16;
   bool write = false, fromFile = false;
   const Apart* apart = nullptr;
@@ -539,7 +544,8 @@ int main(int argc, char** argv) {
     } else if (a == "--population" && i + 1 < argc) {
       lambda = std::atoi(argv[++i]);
     } else {
-      std::printf("airframe_fit [--thrust | --poststall | --drag] [--from-file] [--generations N] [--population N] [--write]\n"
+      std::printf("airframe_fit [--thrust | --poststall | --drag | --spool] [--from-file] [--generations N] [--population N]\n"
+                  "             [--write]\n"
                   "             | --selftest\n");
       return 2;
     }

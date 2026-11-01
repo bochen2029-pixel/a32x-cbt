@@ -199,6 +199,8 @@
          of the way from idle to take-off thrust at the flight condition -->
     <property value="0.8309924" persistent="true">propulsion/fit/climb-fraction</property>
     <property value="0.94281725" persistent="true">propulsion/fit/mct-fraction</property>
+    <!-- the pace of spool-up, JSBSim's own rate times this (Engines/CFM56-5A1-fit.xml); see spool-seeds.csv -->
+    <property value="1.4311835" persistent="true">propulsion/fit/spool-up</property>
 
     <engine file="CFM56-5A1-fit">
       <feed>0</feed>
