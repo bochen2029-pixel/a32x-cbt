@@ -22,7 +22,8 @@ The flight simulator is the product now, and it is mid-build (`ROADMAP.md`, P7):
   50 Hz with no NaN or infinity on any output (the P6 gate).
 - The airframe is inside all 57 of its targets: stall speeds and alphas by configuration, approach
   attitudes, the drag rise, roll and damping, and its engines' thrust against the type certificate and
-  Airbus's own data. `flight/README.md` has every row, its source, and the fit.
+  the public ANP noise-and-performance database, whose A320 entry Airbus developed. Public numbers,
+  not Airbus's flight-test data. `flight/README.md` has every row, its source, and the fit.
 - In the browser: the flight core as WebAssembly, a joystick mapped from the pilot's own hands, a view
   of KDFW drawn as a 1980s full-flight simulator drew it, real runways with an ILS, wind and
   turbulence.
@@ -63,8 +64,8 @@ Two artefacts, as `ROADMAP.md` sets them (*Decisions*, packaging):
   its Corresponding Source — our source and build scripts, the exact A32NX and JSBSim sources compiled
   into it, and every licence and notice. Not released yet.
 
-Neither needs an installer. Unzip, then open its `index.html` in a current browser, on Windows, macOS
-or Linux.
+Neither needs an installer. Unzip, then open its `index.html`. Tested in Chrome and Edge on Windows;
+other browsers and systems have not been tried.
 
 ## Layout
 
