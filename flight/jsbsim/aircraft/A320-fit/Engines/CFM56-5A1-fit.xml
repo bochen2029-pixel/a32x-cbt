@@ -13,7 +13,10 @@
   with delta the pressure ratio and Mach the flight Mach number:
 
     take-off thrust  T = delta^x (1 + a1 Mach + a2 Mach^2) (1 + c Mach (1 - delta))
-    idle thrust      I = delta (i0 + i1 Mach)
+    idle thrust      I = delta ((1 - g) (i0 + i1 Mach) + g ground-idle)
+
+  where g, propulsion/a320/ground-idle, is 0 for the flight idle the fit found and 1 for ground idle,
+  the harness's to write; A320-fit.xml declares it at 0, so that left alone the idle is the fit's.
 
   and MilThrust is (T - I) / (1 - I), so that take-off thrust is the rating times T. Their six numbers
   are properties declared in A320-fit.xml under propulsion/fit/, beside the thrust lever schedule the
@@ -40,14 +43,26 @@
   <injected>          0 </injected>
 
   <function name="IdleThrust">
-    <description>idle thrust as a share of the rating: delta (i0 + i1 Mach)</description>
+    <description>idle thrust as a share of the rating: delta ((1 - g) (i0 + i1 Mach) + g ground-idle)</description>
     <product>
       <property>atmosphere/delta</property>
       <sum>
-        <property>propulsion/fit/idle</property>
         <product>
-          <property>propulsion/fit/idle-mach</property>
-          <property>velocities/mach</property>
+          <difference>
+            <value>1</value>
+            <property>propulsion/a320/ground-idle</property>
+          </difference>
+          <sum>
+            <property>propulsion/fit/idle</property>
+            <product>
+              <property>propulsion/fit/idle-mach</property>
+              <property>velocities/mach</property>
+            </product>
+          </sum>
+        </product>
+        <product>
+          <property>propulsion/a320/ground-idle</property>
+          <property>propulsion/fit/ground-idle</property>
         </product>
       </sum>
     </product>
