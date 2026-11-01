@@ -4,8 +4,8 @@
 # Columns
 #   property  the coefficient, a property the aircraft file declares under aero/fit/
 #   seed      its value before the fit; the fitter's prior is centred here
-#   sigma     the prior's width: a move of one sigma costs the fit as much as 0.02 of a fit row's
-#             half-band. The fitter searches in units of sigma
+#   sigma     the prior's width: a move of one sigma costs the fit 0.02, two sigma 0.08, where a fit
+#             row at the edge of its band costs 1. The fitter searches in units of sigma
 #   lo, hi    hard limits: outside them the coefficient is not physical
 #   source    where the seed comes from:
 #               datcom      our estimate by the textbook methods (DATCOM's lift-curve slope; tail volume

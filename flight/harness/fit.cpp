@@ -9,8 +9,8 @@
 // candidate is a full set of coefficients, handed to `airframe_score --airframe a320 --coefficients FILE
 // --fit-rows`, a process of its own, as many at once as the population (sixteen, the desktop's
 // threads). What CMA-ES minimises is the scorer's cost (0 at a fit row's centre, 1 at its edge) plus a
-// prior that holds each coefficient near its seed (jsbsim/aircraft/A320-fit/seeds.csv), 0.02 for each
-// prior width moved.
+// prior that holds each coefficient near its seed (jsbsim/aircraft/A320-fit/seeds.csv): 0.02 times the
+// square of the move, in widths of the prior.
 //
 // The held-out rows are never measured here. A coefficient no fit row responds to is found first, by
 // moving each one by its prior's width, and is held at its seed: the optimiser could only wander it.
