@@ -137,8 +137,8 @@ names one of these sources.
 | EASA type-certificate data sheet E.067, issue 02, 17 April 2018, CFM56-5 series | a public certification document | the CFM56-5-A1's ratings: 11,120 daN take-off, 10,540 daN maximum continuous, static, sea level, ISA, no air bled | cited by value |
 | The Aircraft Noise and Performance (ANP) database, version 2.3, A320-211 / CFM56-5A1 (EUROCONTROL and ECAC; the archive tables EASA publishes) | public: EASA's notice, "Reproduction is authorised, provided the source is acknowledged, save where otherwise stated"; EASA's ANP page names its users under Regulation (EU) No 598/2014, Art. 7(6) and 7(3), "other parties that can demonstrate a need for modelling purposes" among them, and links the legacy archive tables for download; its data are developed by the manufacturer and reviewed by the FAA, EASA, the Volpe Center and EUROCONTROL | Airbus's thrust coefficients for the MaxTakeoff, MaxClimb and IdleApproach ratings; its drag-to-lift ratios for clean, CONF 1+F, CONF 1 and CONF 2 (with the gear up and down), and for CONF 3 and FULL with the gear down; its take-off speed coefficient for CONF 1+F, its approach speed coefficients for CONF 3 and FULL, and its default departure's speeds in CONF 1 at its stage-3 weight | cited by value; thrust and gradients computed with the equations below; no file copied |
 | Commission Directive (EU) 2015/996, Annex II, Appendix B: ECAC Doc 29's flight-performance method | EU law, public | equation B-1, corrected net thrust from the ANP coefficients; B-12, the climb gradient; B-15, the take-off speed; its guidance on reduced take-off and climb thrust, read for the WRAP rows | cited |
-| OpenAP's engine table (`junzis/openap`, `openap/data/engine/engines.csv`, from Svoboda's turbofan database, *Aircraft Design* 3, 2000, and ICAO's engine emissions databank) and its thrust model (`openap/thrust.py`) | LGPL-3.0 | the CFM56-5A3's thrust at Mach 0.8 and 35,000 ft, and the model's fallback for an engine without it, the CFM56-5A1; the CFM56-5A1's bypass ratio, 6.0 | cited by value; no file copied |
-| Bartel and Young, "Simplified Thrust and Fuel Consumption Models for Modern Two-Shaft Turbofan Engines", *Journal of Aircraft* 45(4), 2008, as OpenAP implements it | the paper's equations | take-off thrust against Mach for a bypass ratio of 6.0 | computed from the published equations; no code copied |
+| OpenAP's engine table (`junzis/openap`, `openap/data/engine/engines.csv`, from Svoboda's turbofan database, *Aircraft Design* 3, 2000, and ICAO's engine emissions databank) and its thrust model (`openap/thrust.py`) | LGPL-3.0 | the CFM56-5A3's thrust at Mach 0.8 and 35,000 ft, and the model's fallback for an engine without it, the CFM56-5A1; the CFM56-5A1's bypass ratio, 6.0; its climb thrust (Bartel and Young's equations 15 to 19), compared with ANP's MaxClimb below 10,000 ft and not used, falling 14 to 28 % short of it | cited by value; no file copied |
+| Bartel and Young, "Simplified Thrust and Fuel Consumption Models for Modern Two-Shaft Turbofan Engines", *Journal of Aircraft* 45(4), 2008, as OpenAP implements it | the paper's equations | take-off thrust against Mach for a bypass ratio of 6.0, and with the runway's pressure ratio at a high airfield (equations 12 to 14) | computed from the published equations; no code copied |
 | pilot literature | — | cruise attitude; the approach attitude it gave first is now inside the recorded one above | a wide band, marked in the file as not confirmed against Airbus's FCTM. To confirm |
 
 The margins and the bands' widths that no source gives — ±3 kt on a stall speed, 1° above α max,
@@ -183,15 +183,17 @@ spool-up is JSBSim's own rate, written out in the file and scaled by one fitted 
 The fit is `flight/harness/fit.cpp`: CMA-ES as Hansen's tutorial sets it (arXiv:1604.00772), written
 here, scored by `airframe_score` on the fit rows of §1d only. The method is the tutorial's; the code
 is ours. It fits the aerodynamics on every group of rows but the thrust and post-stall groups; with
-`--thrust`, the engines' eight numbers on the thrust group's fit rows: the rating and Airbus's thrust of
-§1d; with `--poststall` five numbers past the stall (`poststall-seeds.csv`) on the post-stall group's
-fit rows, Foster's alpha with full nose-up elevator in CONF FULL and the TCM's lift past the peak; and
+`--thrust`, the engines' nine numbers on the thrust group's fit rows: the rating, Airbus's thrust of
+§1d and Bartel and Young's static thrust at an 8,000 ft airfield; with `--poststall` five numbers past
+the stall (`poststall-seeds.csv`) on the post-stall group's fit rows, Foster's alpha with full nose-up
+elevator in CONF FULL and the TCM's lift past the peak; and
 with `--drag` the drag of the flaps and the gear (`drag-seeds.csv`) on the drag group's, ANP's
-drag-to-lift ratios for CONF 1+F, CONF 1, CONF 2, CONF 3 and FULL and DLR's gear drag; and with `--spool` the one number that
-scales JSBSim's own spool-up rate (`spool-seeds.csv`, seeded at 1, JSBSim's default) on the spool
-group's fit row, 14 CFR 33.73(b)'s limit. The
-form those numbers sit in, δ^x (1 + a1 M + a2 M²)(1 + c M (1 − δ)) for take-off thrust and δ (i0 + i1 M)
-for idle, is ours, chosen against ANP's points before the fit.
+drag-to-lift ratios for CONF 1+F, CONF 1, CONF 2, CONF 3 and FULL and DLR's gear drag; and with
+`--spool` the one number that scales JSBSim's own spool-up rate (`spool-seeds.csv`, seeded at 1,
+JSBSim's default) on the spool group's fit row, 14 CFR 33.73(b)'s limit. The
+form those numbers sit in, δ^x (1 + a1 M + a2 M²)(1 + (c M + c2 M²)(1 − δ)) for take-off thrust and
+δ (i0 + i1 M) for idle, is ours, chosen against ANP's points before the fit; c2 was added for the fit
+at a high airfield.
 
 ### 1f · The runways, the ILS, and KDFW drawn
 
