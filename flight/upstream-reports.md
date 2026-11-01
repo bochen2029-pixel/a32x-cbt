@@ -75,5 +75,36 @@ In `fbw-a32nx/src/systems/instruments/src/MCDU/legacy/NXSpeeds.ts` (`master`, 66
 
 ---
 
+## 3 · The FCDC's output bus starts from uninitialized words — drafted, not posted
+
+Found 2026-11-01 by the P7 session with GCC's UBSan, after §1 and §2 were filed; it waits for the
+operator's yes on this text.
+
+**Title:** FCDC: `getBusOutputs` builds its bus from uninitialized ARINC 429 words
+
+**Body:**
+
+In `fbw-a32nx/src/wasm/fbw_a320/src/fcdc/Fcdc.cpp` (`master`, 66021c2), `getBusOutputs` starts with
+`FcdcBus output = {};` (line 502). `FcdcBus` is made of `Arinc429DiscreteWord` and
+`Arinc429NumericWord` members, whose default constructors are user-provided and empty
+(`Arinc429.cpp` lines 4, 85 and 103), so `= {}` leaves each word's `rawSsm` and `rawData` holding
+whatever the stack held. `setBit` (`Arinc429.cpp:100`) then converts that float to `uint32_t`, which
+is undefined when the value is out of range or not a number, and every bit the FCDC does not set
+comes from that conversion of whatever was on the stack. So the EFCS status words can carry
+different bits from one call to the next for the same FCDC state. UBSan reports the conversion at
+`Arinc429.cpp:100`.
+
+Initializing the words fixes it for every user of the class, for example:
+
+```cpp
+template <typename T>
+Arinc429Word<T>::Arinc429Word() : rawSsm(0), rawData(0) {}
+```
+
+(with the empty `Arinc429DiscreteWord` and `Arinc429NumericWord` constructors left as they are,
+since they run the base constructor first).
+
+---
+
 These came out of `flight/`'s A320 targets (`flight/targets/a320-speeds.csv`, which corrects the
 three points and says so) and its law harness; see `flight/README.md`, Findings.
