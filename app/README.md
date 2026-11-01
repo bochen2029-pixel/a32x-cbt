@@ -10,7 +10,7 @@ The application. Original TypeScript, MIT, links nothing GPL.
 ```
 npm ci
 npm run build:web   # typecheck, then bundle to web/app.js
-npm run check       # typecheck + the full suite, 160 tests
+npm run check       # typecheck + the full suite, 182 tests
 npm run serve       # optional: http://127.0.0.1:8130
 npm run package     # bundle, then dist/a32x-cbt.zip — the download a user gets
 npm run measure     # cold start, scenario reset, tick rate — headless Chrome on file://

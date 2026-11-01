@@ -11,10 +11,10 @@ Last written: 2026-10-31, at P5 (packaging) — the tree was split into `app/` a
 
 ```
   app\            the trainer
-  ├─ src\         application code, 41 files / 2,787 lines
-  ├─ tests\       20 files / 2,265 lines, 160 tests
+  ├─ src\         application code, 42 files / 2,807 lines
+  ├─ tests\       23 files / 2,550 lines, 182 tests
   ├─ web\         page + web/data\ (panel, messages, pages — content, one copy for both runtimes)
-  ├─ tools\       serve.mjs, a dependency-free static server
+  ├─ tools\       build, serve, package (zip), measure, gate
   └─ situations\  one saved aircraft as a sample
 
   flight\         GPLv3. The A32NX port contract and the headless ELAC proof. Not running yet.
@@ -31,7 +31,7 @@ obligation; `flight/` links it and is GPLv3. Keeping them apart is cheaper than 
 
 ## 2 · What exists, and what it is worth
 
-**Mechanics, tested.** [M] 160 tests green, suite runs in ~2 seconds.
+**Mechanics, tested.** [M] 182 tests green, suite runs in ~3 seconds.
 
 | piece | state |
 |---|---|

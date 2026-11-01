@@ -34,7 +34,7 @@ To rebuild or develop:
 cd app
 npm ci
 npm run build:web
-npm run check      # typecheck + 160 tests
+npm run check      # typecheck + 182 tests
 ```
 
 ## Layout

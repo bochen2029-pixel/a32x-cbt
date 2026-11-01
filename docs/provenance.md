@@ -78,5 +78,5 @@ Every claim in `docs/architecture.md` marked `[R]` was read out of a running sys
 guessed. The PSX notes carry line-level references into a reference tree that is not in this
 repository — `tools/regen-psx-reference.md` explains how to rebuild it if you ever want it.
 
-The trainer's own behaviour is held by 160 tests. That is the evidence that matters day to day:
+The trainer's own behaviour is held by 182 tests. That is the evidence that matters day to day:
 `npm run test:all`.
