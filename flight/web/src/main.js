@@ -12,6 +12,8 @@ import { Clock } from './clock.js';
 import { apply, coreInputs, initialControls } from './controls.js';
 import { Flight } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
+import { Overlay } from './overlay.js';
+import { softwareRendering, View } from './view.js';
 
 const params = new URLSearchParams(location.search);
 const airframe = params.get('airframe') || '';
@@ -21,6 +23,19 @@ const bench = { ticks: 0, ms: 0, wallMs: 0, done: benchTicks <= 0 };
 
 const hud = document.getElementById('hud');
 const status = document.getElementById('status');
+// Antialiasing doubles the cost of a frame drawn in software; on a GPU it is nearly free. aa=0|1 decides.
+const software = softwareRendering();
+const view = new View(document.getElementById('view'), params.get('time') || 'dusk',
+                      params.has('aa') ? params.get('aa') !== '0' : !software);
+const overlay = new Overlay(document.getElementById('overlay'));
+function resize() {
+  const ratio = Math.min(2, window.devicePixelRatio || 1);
+  view.resize(window.innerWidth, window.innerHeight);
+  overlay.resize(window.innerWidth, window.innerHeight, ratio);
+}
+window.addEventListener('resize', resize);
+resize();
+const renderMs = [], frameMs = [];  // the last few thousand frames: what drawing cost, and how often
 
 const clock = new Clock(20, 5);
 const hands = new Hands(window);
@@ -59,6 +74,12 @@ function value(name) {
   return latest ? latest.state[flight.field[name]] : NaN;
 }
 
+function stats(list) {
+  const sorted = [...list].sort((a, b) => a - b);
+  const at = (q) => (sorted.length ? sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] : NaN);
+  return { frames: sorted.length, mean: sorted.reduce((a, b) => a + b, 0) / Math.max(1, sorted.length), p50: at(0.5), p99: at(0.99) };
+}
+
 // What the page has measured, for a person and for a test driving the page.
 function report() {
   const sorted = [...tickUs].sort((a, b) => a - b);
@@ -75,6 +96,15 @@ function report() {
     frames,
     requests,
     tickUs: { mean, p50: at(0.5), p99: at(0.99), max: sorted.length ? sorted[sorted.length - 1] : NaN },
+    view: {
+      renderer: view.rendererName(),
+      software,
+      antialias: view.renderer.getContextAttributes().antialias,
+      eye: view.camera.position.toArray().map((v) => +v.toFixed(2)),
+      drawn: { calls: view.renderer.info.render.calls, triangles: view.renderer.info.render.triangles, points: view.renderer.info.render.points },
+      renderMs: stats(renderMs),
+      frameMs: stats(frameMs),
+    },
     bench: benchTicks > 0 ? {
       done: bench.done,
       ticks: bench.ticks,
@@ -143,12 +173,27 @@ function frame(now) {
     ++requests;
     pending = 0;
   }
+  if (latest) {
+    const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));
+    view.update(s.lat_deg, s.lon_deg, s.ra_ft, s.pitch_deg, s.roll_deg, s.heading_deg);
+    const t0 = performance.now();
+    view.render();
+    keep(renderMs, performance.now() - t0);
+    if (realMs > 0) keep(frameMs, realMs);
+    overlay.draw(s, view.camera.fov, controls, null);
+  }
   show();
   if (!error) requestAnimationFrame(frame);
 }
 
+function keep(list, v) {
+  list.push(v);
+  if (list.length > 3000) list.splice(0, list.length - 3000);
+}
+
 flight.start(airframe, scripted).then((ready) => {
   inputs = Float64Array.from(ready.inputs);  // the core's own start: FLT CTL pushbuttons pressed
+  view.setOrigin(ready.state[flight.field.lat_deg], ready.state[flight.field.lon_deg]);
   status.textContent = bench.done ? 'flying' : 'measuring a tick…';
   if (bench.done) {
     requestAnimationFrame(frame);
