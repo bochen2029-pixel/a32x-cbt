@@ -3,7 +3,7 @@
 // here, so node tests it. GPLv3.
 //
 // Signs are the core's (core.h): pitch +1 full pull, roll +1 full right, pedals +1 full LEFT, thrust
-// lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left.
+// lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left, pitch_trim the wheel turned, + nose up.
 
 // IDLE, CL, FLX/MCT, TOGA: where the A320's thrust levers click in.
 export const DETENTS = [0, 25, 35, 45];
@@ -13,7 +13,8 @@ export const LEVER_RATE = 20;      // deg/s when the levers are driven by button
 // Every action a button or key can be given.
 export const ACTIONS = [
   'brakes', 'parkingBrake', 'speedbrake', 'spoilersArm', 'flapsUp', 'flapsDown', 'gear',
-  'thrustUp', 'thrustDown', 'rudderTrimLeft', 'rudderTrimRight', 'rudderTrimReset', 'takeover',
+  'thrustUp', 'thrustDown', 'rudderTrimLeft', 'rudderTrimRight', 'rudderTrimReset', 'takeover', 'pitchTrimDown',
+  'pitchTrimUp',
 ];
 
 // A raw axis reading made -1..1 by its calibration: the halves either side of the centre are scaled
@@ -44,6 +45,7 @@ export function initialControls() {
   return {
     pitch: 0, roll: 0, pedals: 0, tla: 0, toeBrakes: 0, parkingBrake: true, speedbrake: 0,
     spoilersArmed: false, flapLever: 0, gearDown: true, rudderTrim: 0, rudderTrimReset: false, takeover: false,
+    pitchTrim: 0,
   };
 }
 
@@ -87,6 +89,7 @@ export function apply(previous, axes, held, pressed, dt) {
   c.rudderTrim = (held.has('rudderTrimLeft') ? 1 : 0) - (held.has('rudderTrimRight') ? 1 : 0);
   c.rudderTrimReset = held.has('rudderTrimReset');
   c.takeover = held.has('takeover');
+  c.pitchTrim = (held.has('pitchTrimUp') ? 1 : 0) - (held.has('pitchTrimDown') ? 1 : 0);  // the wheel, + nose up
   return c;
 }
 
@@ -116,5 +119,6 @@ export function coreInputs(c) {
     gear_down: c.gearDown ? 1 : 0,
     rudder_trim: c.rudderTrim,
     rudder_trim_reset: c.rudderTrimReset ? 1 : 0,
+    pitch_trim: c.pitchTrim,
   };
 }

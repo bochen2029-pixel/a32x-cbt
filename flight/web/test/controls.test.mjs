@@ -71,6 +71,15 @@ test('the RUD TRIM switch is momentary and its RESET too', () => {
   assert.equal(coreInputs(c).rudder_trim_reset, 1);
 });
 
+test('the pitch trim wheel turns while it is held, nose up +1, and stops when let go', () => {
+  let c = apply(initialControls(), {}, new Set(['pitchTrimUp']), new Set(['pitchTrimUp']), 0.02);
+  assert.equal(coreInputs(c).pitch_trim, 1);
+  c = apply(c, {}, new Set(['pitchTrimDown']), none, 0.02);
+  assert.equal(coreInputs(c).pitch_trim, -1);
+  c = apply(c, {}, none, none, 0.02);
+  assert.equal(coreInputs(c).pitch_trim, 0);
+});
+
 test('the input slots are the core\'s own names, and both levers move together', () => {
   const inputs = coreInputs(apply(initialControls(), { throttle: 25 / 45 }, none, none, 0.02));
   assert.equal(inputs.tla_1, 25);

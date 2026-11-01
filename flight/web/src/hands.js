@@ -13,7 +13,7 @@ import { calibrate, learn, readAxes, readButtons, standardGamepad, startLearning
 const KEY_ACTIONS = {
   KeyB: 'brakes', KeyP: 'parkingBrake', KeyS: 'speedbrake', KeyA: 'spoilersArm', KeyR: 'flapsUp',
   KeyF: 'flapsDown', KeyG: 'gear', PageUp: 'thrustUp', PageDown: 'thrustDown', KeyT: 'rudderTrimLeft',
-  KeyY: 'rudderTrimRight', KeyU: 'rudderTrimReset',
+  KeyY: 'rudderTrimRight', KeyU: 'rudderTrimReset', Home: 'pitchTrimDown', End: 'pitchTrimUp',
 };
 const KEY_AXES = {
   pitch: { plus: 'ArrowDown', minus: 'ArrowUp' },      // down arrow pulls
@@ -25,7 +25,7 @@ const KEY_RATE = 1.5, KEY_RETURN = 4;  // stick travel per second while held, an
 export const KEY_HELP = [
   'arrows  stick (down pulls)', 'Z X  rudder', 'PgUp PgDn  thrust levers', 'R F  flaps up / down',
   'G  gear', 'B  brakes (held)', 'P  parking brake', 'S  speedbrake', 'A  ground spoilers arm',
-  'T Y  RUD TRIM left / right', 'U  RUD TRIM RESET', 'M  map the joystick', 'C  calibrate it', 'H  hide this',
+  'T Y  RUD TRIM left / right', 'U  RUD TRIM RESET', 'Home End  pitch trim wheel, nose down / up', 'M  map the joystick', 'C  calibrate it', 'H  hide this',
 ];
 
 const STORE = 'a32x.flight.device:';
