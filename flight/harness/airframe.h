@@ -91,6 +91,14 @@ struct TrimPoint {
   double liftLbs = 0, dragLbs = 0;  // the aerodynamic lift and drag at the trim, wind axes, the tail's included
 };
 
+// One engine run in time from a steady idle, the levers moved to TOGA at once, static, the airframe held
+// where it is (JSBSim's integrators stopped, so that only the engines move).
+struct SpoolUp {
+  double seconds = 0;               // to the share of the steady TOGA thrust asked for; NaN if not in 30 s
+  double idleLbs = 0, togaLbs = 0;  // one engine's steady thrust at idle and at TOGA
+  double tasAfterKn = 0;            // the airframe's speed at the end: 0 when it was held
+};
+
 // The airframe's own lift and drag coefficients at a state, from its aerodynamics alone: no trim, pitch
 // controls at neutral, so what the tail lifts at neutral is in them and what a trim would add is not.
 struct AeroPoint {
@@ -181,6 +189,8 @@ class Airframe {
   // seconds after the pulse.
   PitchResponse pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS,
                            const Configuration& c = Configuration{});
+  // From a steady idle to a share of the steady TOGA thrust, static at an altitude: see SpoolUp.
+  SpoolUp spoolUp(double altitudeFt, double share);
   // The thrust of one engine, lbf, with the levers at a thrust lever angle, at an altitude and a CAS or,
   // when mach > 0, a Mach; a CAS of 0 is static. The engine model run to its steady state, as JSBSim's
   // trim runs it, through the thrust lever schedule the aircraft flies with.

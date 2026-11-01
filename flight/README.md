@@ -10,7 +10,7 @@ replaced and which stays selectable. A scripted crew flies either through the co
 runway, round a circuit and back onto the runway, headless, in normal law. The 737 is A320-class, not
 an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6 passed against a point-mass stub;
 the same gate, unchanged, passes against both. The A320's numbers are written down
-(`targets/a320.csv`, 68 targets): our A320 is inside all 68, the 737 inside 21. The A320 replaced the
+(`targets/a320.csv`, 69 targets): our A320 is inside 68, all but its engine's spool-up, the 737 inside 21. The A320 replaced the
 737 under the swap rule ([below](#the-swap-made-2026-11-01)) on its aerodynamics, and its engines
 were fitted after ([below](#its-engines-and-how-they-were-fitted)), and then what lies past its stall
 ([below](#past-the-stall-and-how-it-was-fitted)) and the drag of its landing flaps and gear
@@ -115,7 +115,7 @@ at that instant, so the computers never see what JSBSim makes of an aeroplane un
 ## The A320's targets, and the two airframes against them
 
 The operator chose to fly the 737 for P7 and swap in a fitted A320 later. `targets/a320.csv` is the
-bar for that swap: 68 targets an airframe is counted against and 4 context rows scored but not
+bar for that swap: 69 targets an airframe is counted against and 4 context rows scored but not
 counted. Each row names its source in the file's header: A32NX's VS1g and VLS tables
 (`targets/a320-speeds.csv`, a community reconstruction of Airbus's, sampled on a weight grid), the
 ELAC's own α max and α prot, a recorded A320 approach (VT-WGR's flight data, from AAIB India's
@@ -128,7 +128,7 @@ Transport Model (the Transport Class Model's report); and for the drag of the la
 gear, Airbus's drag-to-lift ratios in ANP again and DLR's gear drag identified from A320 flight data.
 OpenAP WRAP's distributions fitted to ADS-B are the four context rows. Thirty rows are marked *fit*,
 for an optimiser to tune against; thirty-eight are *held out*, so that a fit which only memorises is
-caught.
+caught. The engine's spool-up is held out as well, the thirty-ninth.
 Rows that depend on weight are measured at two: 48.5 t, the weight the 737 is loaded to, and 65 t,
 between an A320-251N's maximum zero-fuel and landing weights. The rule for the swap is in
 `ROADMAP.md`, P7.
@@ -246,6 +246,7 @@ held-out rows, the engines:
 | `thrust-cl-280kt-7000ft` |  | 56.82..60.33 kN | 58.61 | **inside** | 75.63 | outside +15.3 | 58.09 | **inside** |
 | `thrust-idle-180kt-2000ft` |  | 0.54..2.54 kN | 1.99 | **inside** | 3.26 | outside +0.7 | 2.50 | **inside** |
 | `thrust-idle-250kt-5000ft` |  | -2.89..-0.89 kN | -1.14 | **inside** | 0.35 | outside +1.2 | 0.27 | outside +1.2 |
+| `spool-up` |  | ..5.00 s | 5.80 | outside +0.8 | not measured | | 5.80 | outside +0.8 |
 | `thrust-idle-210kt-8000ft` |  | -0.66..1.34 kN | -0.10 | **inside** | 0.92 | **inside** | 0.70 | **inside** |
 | `thrust-lapse-m025` |  | 73.16..80.87 % | 79.79 | **inside** | 93.34 | outside +12.5 | 93.34 | outside +12.5 |
 | `takeoff-gradient` | 65 | 18.44..22.54 % | 19.91 | **inside** | 24.15 | outside +1.6 | none | outside |
@@ -261,10 +262,10 @@ context rows, not counted:
 | `climb-rate` |  | 1500.00..2530.00 ft/min | 3348.63 | (outside +818.6) | 4602.18 | (outside +2072.2) | 3962.64 | (outside +1432.6) |
 | `descent-rate` |  | -1550.00..-840.00 ft/min | -1113.92 | (inside) | -1033.95 | (inside) | -1699.40 | (outside -149.4) |
 
-**Our A320: inside 68 of 68 targets — 30 of 30 fit rows, 38 of 38 held out — the 24 engine rows
-among them, where on JSBSim's CFM56_5 it was inside 3; the 5 past the stall, where before their fit
+**Our A320: inside 68 of 69 targets — 30 of 30 fit rows, 38 of 39 held out, all but its engine's
+spool-up — the 24 engine rows among them, where on JSBSim's CFM56_5 it was inside 3; the 5 past the stall, where before their fit
 it was inside 1; and the 3 for the drag of the landing flaps and the gear, where before theirs it was
-inside 2. The 737: inside 21 of 68 — 7 of 30 fit, 14 of 38 held out.** Our A320 is inside every row
+inside 2. The 737: inside 21 of 69 — 7 of 30 fit, 14 of 39 held out.** Our A320 is inside every row
 the 737 is inside, and every row it was inside before its engines, what lies past its stall or the
 drag of its flaps and gear were fitted. Every row but the five past the stall reads as it did before
 that fit, and every row but the gear's as it did before the drag fit, to the digit printed.
@@ -537,10 +538,15 @@ acceleration falls from 2.36 to 2.33 m/s², the gear being down on the runway.
 What changes in flight: with the gear down in CONF 1 to 3, 0.013 more drag than before; in CONF 3 with
 the gear up, a go-around's configuration, 0.013 less. CONF 2's flaps and CONF 1+F's stay seeds, which
 the take-off gradient tests (held out, above). What this leaves of the thrust session's list: ground
-idle and reverse thrust are the world's and the crew's, not the airframe's; and the engine's spool-up
-has no row yet. 14 CFR 33.73(b) gives its floor, 95 % of rated take-off thrust within 5 s of minimum
-flight idle from a stabilized static condition, which needs the engine run in time; every thrust row
-runs it to its steady state.
+idle and reverse thrust are the world's and the crew's, not the airframe's. The engine's spool-up has
+a row now, held out: 14 CFR 33.73(b)'s floor, 95 % of rated take-off thrust within 5 s of minimum
+flight idle from a stabilized static condition, measured by running one engine in time from a steady
+idle with the airframe held still (JSBSim's integrators stopped), where every other thrust row runs it
+to its steady state. Ours takes 5.80 s, outside it, and so does the 737's: both spool at JSBSim's
+generic turbine rate, which no row had measured. The engines are this branch's as they were; meeting
+the floor needs a spool rate with a source, not chosen here. The instruments' case holds the
+measurement: the airframe still to 0.0000 kt, and the 737's engine slower at 20,000 ft, 7.58 s, as
+JSBSim's spool rate falls with the density.
 
 ## The swap: made, 2026-11-01
 

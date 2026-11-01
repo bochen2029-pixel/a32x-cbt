@@ -477,6 +477,11 @@ class Bare {
                                                  fmt("CL %.2f at alpha %.1f deg", level.liftLbs / (qbar * a_.wingAreaFt2()),
                                                      level.alphaDeg)};
     }
+    if (id == "spool-up") {
+      // 14 CFR 33.73(b): from a steady idle to 95 % of the take-off thrust, static at sea level
+      const SpoolUp s = a_.spoolUp(0, 0.95);
+      return {s.seconds, fmt("one engine: idle %.0f lbf, TOGA %.0f lbf", s.idleLbs, s.togaLbs)};
+    }
     if (family.rfind("gear-drag-", 0) == 0 && config(family.substr(10))) {
       // the drag coefficient the gear adds: the configuration's aerodynamics at 6 deg of alpha, 150 kt at
       // 1,000 ft, the gear down less the gear up
@@ -560,7 +565,7 @@ class Bare {
       if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
     }
     return family == "app-pitch-full" || family == "cruise-pitch" || family == "cruise-tla" || id == "drag-rise" ||
-           id == "short-period" || family.rfind("short-period-", 0) == 0 || family.rfind("lift-past-stall-", 0) == 0 ||
+           id == "short-period" || id == "spool-up" || family.rfind("short-period-", 0) == 0 || family.rfind("lift-past-stall-", 0) == 0 ||
            id.rfind("thrust-", 0) == 0 || endsWith(id, "-gradient");
   }
 
@@ -796,6 +801,15 @@ int instruments() {
                     r.ok && !r.alphaDeg.empty() && *std::min_element(r.alphaDeg.begin(), r.alphaDeg.end()) < -0.1 &&
                         sp.value > 0 && sp.value < 2,
                     fmt("damping %.2f; ", sp.value) + sp.note);
+  // An engine run in time from idle: the airframe held still while it spools, the thrust reaching the
+  // share asked for, and slower in thinner air, as JSBSim's turbine spools at a rate that falls with the
+  // density ratio.
+  const SpoolUp low = a.spoolUp(0, 0.95), high = a.spoolUp(20000, 0.95);
+  failed += verdict("an engine spools up in time, the airframe held still, and slower in thinner air",
+                    low.tasAfterKn < 0.01 && high.tasAfterKn < 0.01 && low.seconds > 0 && high.seconds > low.seconds &&
+                        low.idleLbs < 0.15 * low.togaLbs,
+                    fmt("%.2f s at sea level, %.2f s at 20,000 ft; ", low.seconds, high.seconds) +
+                        fmt("idle %.0f of %.0f lbf; %.4f kt after", low.idleLbs, low.togaLbs, low.tasAfterKn));
   std::printf("%s\n", failed ? "FAILED" : "PASSED");
   return failed ? 1 : 0;
 }

@@ -808,6 +808,39 @@ PitchResponse Airframe::pitchPulse(double altitudeFt, double casKn, double pulse
   return r;
 }
 
+SpoolUp Airframe::spoolUp(double altitudeFt, double share) {
+  Impl& m = *impl_;
+  SpoolUp s;
+  s.togaLbs = engineThrustLbs(altitudeFt, 0, 0, 45);
+  // and this leaves the aircraft placed static at the altitude, its engines steady at idle
+  s.idleLbs = engineThrustLbs(altitudeFt, 0, 0, 0);
+  // the airframe held where it is: JSBSim's integrators set to none, 0, so that in time only the engines
+  // move; their old settings restored after
+  const char* const kIntegrators[] = {"simulation/integrator/rate/rotational", "simulation/integrator/rate/translational",
+                                      "simulation/integrator/position/rotational",
+                                      "simulation/integrator/position/translational"};
+  int saved[4];
+  for (int i = 0; i < 4; ++i) {
+    SGPropertyNode* n = m.node(kIntegrators[i]);
+    saved[i] = n->getIntValue();
+    n->setIntValue(0);
+  }
+  for (SGPropertyNode* t : m.throttle) t->setDoubleValue(throttleFor(m.schedule, 45));
+  s.seconds = std::numeric_limits<double>::quiet_NaN();
+  const double dt = m.fdm.GetDeltaT();
+  for (int k = 1; k * dt <= 30 + 1e-9; ++k) {
+    if (!m.fdm.Run()) die("JSBSim stopped while an engine spooled up");
+    if (m.thrust[0]->getDoubleValue() >= share * s.togaLbs) {
+      s.seconds = k * dt;
+      break;
+    }
+  }
+  m.read();
+  s.tasAfterKn = m.state.tasKn;
+  for (int i = 0; i < 4; ++i) m.node(kIntegrators[i])->setIntValue(saved[i]);
+  return s;
+}
+
 double Airframe::engineThrustLbs(double altitudeFt, double casKn, double mach, double tla) {
   Impl& m = *impl_;
   m.configure(Configuration{});

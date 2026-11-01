@@ -321,7 +321,8 @@ add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 20 --expect 
 add_test(NAME airframe_is_scored_against_the_a320 COMMAND airframe_score --check)
 
 # The scorer's instruments read the 737's own file back: its gear drag, the Mach where its drag table
-# crosses 20 counts, a pitch pulse answered the right way round.
+# crosses 20 counts, a pitch pulse answered the right way round, and an engine spooled up in time with
+# the airframe held still, slower in thinner air.
 add_test(NAME scorer_instruments_read_the_737_right COMMAND airframe_score --instruments)
 # And the ones for pitch past the normal range read our A320's: a static moment with no alpha-rate damping
 # in it, the elevator's power and its fade with alpha as the file has them; and two readings of a short
