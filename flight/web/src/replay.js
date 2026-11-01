@@ -1,11 +1,13 @@
 // A saved recording opened in the page and replayed through the core: chosen with Ctrl+O or the panel's button, or
 // dropped on the page; carried across a reload of the page, which then starts the flight from the recording's own
 // scenario and airframe (the worker's replay, core-session.js) and draws that flight's runway, as it would its own;
-// flown at about ten times its pace, then the debrief over the whole of it. Plain functions: node tests them. GPLv3.
+// flown at a dozen times its pace, then the debrief over the whole of it, the replay's verdict set against the one
+// saved with the recording. Plain functions: node tests them. GPLv3.
 
 export const STORE = 'a32x-replay';      // sessionStorage: the recording, packed (pack), and its file's name
-export const REPLAY_TICKS = 12;           // the ticks a frame asks for in a replay: about ten times the flight's pace,
-                                          // and the view still keeps a sample every quarter second of it
+export const REPLAY_TICKS = 13;           // the ticks a frame asks for in a replay, 0.26 s of the flight: a dozen times
+                                          // its pace at 50 frames a second, and every frame a sample for the view,
+                                          // which keeps one each quarter second of the flight (view.js, record)
 
 // Whether a text is a recording as the page saves one (core-session.js, recording): its header's first line names the
 // scenario, and a line of input names follows the header lines.
@@ -56,21 +58,48 @@ export function replayUrl(href) {
   return url.href;
 }
 
-// The recording's build against the page's: the same, said plainly; another, in amber, since this build's laws and
-// judge fly it now, as law_harness --rejudge judges a recording on a later build.
-export function buildCompare(recorded, page) {
-  if (!recorded) return { text: 'recorded on a build it does not name', warn: true };
-  if (recorded === page) return { text: `recorded on this build, ${recorded}`, warn: false };
-  return { text: `recorded on build ${recorded}, flown here by ${page || 'a build that does not name itself'}`, warn: true };
+// What the status line says of a replay, a line each with whether it is said in amber: the recording's file, who
+// flew it and when (its # crew, # hands and # flown), how far the replay has flown, and the worker's note on the
+// build it was flown on against this one (Replay.info, replayNote), amber where the verdict is not the gate's.
+export function replayStatus(info, progress, name = '') {
+  const lines = [[`replay${name ? `: ${name}` : ''}`, false]];
+  if (!info) return [...lines, ['reading the recording', false]];
+  const when = /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(info.flown || '') ? `flown ${info.flown.slice(0, 16).replace('T', ' ')} UTC` : '';
+  const who = info.crew === 'script' ? 'by the scripted crew' : info.hands ? `by ${info.hands}` : '';
+  if (when || who) lines.push([[when, who].filter(Boolean).join(', '), false]);
+  const steps = progress?.steps ?? info.steps;
+  const s = (n) => `${(n * 0.02).toFixed(1)} s`;   // a step is a fiftieth of a second
+  lines.push([progress?.ended ? `replayed to its end, ${s(steps)}` : `replaying, ${s(progress?.at ?? 0)} of ${s(steps)}`, false]);
+  if (info.note?.text) for (const l of wrap(info.note.text, 60)) lines.push([l, Boolean(info.note.warn)]);
+  return lines;
+}
+
+// A text in lines of at most width characters, broken at spaces.
+export function wrap(text, width) {
+  const out = [];
+  let line = '';
+  for (const word of String(text).split(/\s+/).filter(Boolean)) {
+    if (line && line.length + 1 + word.length > width) {
+      out.push(line);
+      line = word;
+    } else line = line ? `${line} ${word}` : word;
+  }
+  if (line) out.push(line);
+  return out;
+}
+
+// What the panel says of a replay's verdict against the one its recording was saved with, once the replay has ended
+// (Replay.progress, compareVerdicts): the same line for line, as on the build that flew it; else each band whose
+// verdict changed, as law_harness --rejudge names them; nothing to compare with a recording saved before 0.1.1.
+export function replayVerdict(verdict) {
+  if (!verdict) return '';
+  if (!verdict.comparable) return 'the recording was saved without a verdict: nothing to set this one against';
+  if (verdict.same) return 'the same, line for line, as the verdict saved with the recording';
+  if (!verdict.changed?.length) return 'the same bands as when it was saved, their figures otherwise';
+  return ['not as when it was saved:', ...verdict.changed.map((c) => `  ${c}`)].join('\n');
 }
 
 // What a recording's header says, made safe to show in the page's markup: a file's text is never markup.
 export function escapeHtml(text) {
   return String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-}
-
-// The verdict saved with the recording: the last of its "# judged:" lines that gives one (STABLE, NOT STABLE), or none.
-export function savedVerdict(judged) {
-  for (let k = (judged?.length ?? 0) - 1; k >= 0; --k) if (/^(NOT )?STABLE\b/.test(judged[k])) return judged[k];
-  return '';
 }

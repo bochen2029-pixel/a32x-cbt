@@ -16,7 +16,7 @@ import { buildNote, Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { centre, drag, wheel } from './pointer.js';
-import { buildCompare, escapeHtml, looksLikeRecording, pack, REPLAY_TICKS, replayUrl, savedVerdict, STORE, unpack } from './replay.js';
+import { escapeHtml, looksLikeRecording, pack, REPLAY_TICKS, replayStatus, replayUrl, replayVerdict, STORE, unpack } from './replay.js';
 import { runwayFromState } from './scene-math.js';
 import { drawTimeline, momentAt, Playhead, readout, sampleAt, timeAt } from './timeline.js';
 import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
@@ -28,6 +28,13 @@ const scenario = params.get('scenario') || '';
 const replayMode = params.get('replay') === '1';   // a saved recording, flown again (replay.js)
 const driven = scripted || replayMode;             // the crew or the recording flies: the page sends no inputs
 let replayDone = false;                            // the recording's last row has flown: the debrief is open on it
+const replayName = (() => {                        // the opened recording's file name, for the status line
+  try {
+    return replayMode ? sessionStorage.getItem('a32x-replay-name') || '' : '';
+  } catch {
+    return '';
+  }
+})();
 const benchTicks = Math.round(Number(params.get('bench') || 0) * 60 * 50);
 const bench = { ticks: 0, ms: 0, wallMs: 0, done: benchTicks <= 0 };
 
@@ -86,6 +93,7 @@ let shownVerdict = '';   // the verdict the panel shows
 let saved = '';          // what the last save did, for the status line
 let opening = '';        // why a recording could not be opened, for the status line
 document.getElementById('save').addEventListener('click', () => save());
+document.getElementById('save').hidden = replayMode;   // a replay is not saved again (save)
 
 // A recording opened, with Ctrl+O, the panel's button or a file dropped on the page: the page reloads to fly it
 // again, the recording carried across in sessionStorage (replay.js).
@@ -230,10 +238,10 @@ function report() {
   const mean = sorted.length ? sorted.reduce((a, b) => a + b, 0) / sorted.length : NaN;
   return {
     error,
-    airframe: airframe || 'default',
+    airframe: (replayMode ? flight.replayInfo?.airframe : airframe) || 'default',
     crew: replayMode ? 'replay' : scripted ? 'script' : 'hands',
-    replay: replayMode ? { ended: Boolean(flight.ended), header: flight.replay?.header ?? null } : null,
-    scenario: scenario || 'runway',
+    replay: replayMode ? { info: flight.replayInfo, progress: flight.replayProgress } : null,
+    scenario: (replayMode ? flight.replayInfo?.scenario : scenario) || 'runway',
     build: flight.build || '',
     airport: drawn,
     simulatedS: value('t_s'),
@@ -314,7 +322,7 @@ function show() {
     `PITCH ${value('pitch_deg').toFixed(1).padStart(6)}   BANK ${value('roll_deg').toFixed(1).padStart(6)}   ` +
     `HDG ${value('heading_deg').toFixed(0).padStart(4)}\n` +
     `LAW  pitch ${t.pitch_law}  roll ${t.lateral_law}\n` +
-    (scripted ? '' :
+    (driven ? '' :
       `STICK ${c.pitch.toFixed(2).padStart(5)} ${c.roll.toFixed(2).padStart(5)}  RUD ${c.pedals.toFixed(2).padStart(5)}  ` +
       `THR ${lever}  FLAPS ${FLAPS[c.flapLever]}  GEAR ${c.gearDown ? 'DN' : 'UP'}\n` +
       `${c.parkingBrake ? 'PARK BRK  ' : ''}${c.toeBrakes ? 'BRAKES  ' : ''}${c.speedbrake ? 'SPD BRK  ' : ''}` +
@@ -337,10 +345,9 @@ function show() {
   const words = latest.debrief || (judged ? `${value('judge_stable') ? 'STABLE' : 'NOT STABLE'}, the touchdown ` +
     `${value('judge_touchdown_m').toFixed(0)} m past the threshold` : '');
   const open = judged || view.debriefOn;   // once judged; and in the debrief (K) as it flies
-  // a replay's verdict beside the one saved with its recording, once it is judged
-  const saidThen = replayMode && judged ? savedVerdict(flight.replay?.judged) : '';
-  const shown = !saidThen ? words : saidThen === savedVerdict(words.split('\n'))
-    ? `${words}\nas saved with the recording` : `${words}\nsaved with the recording: ${saidThen}`;
+  // a replay's verdict set against the one its recording was saved with, once it has ended (Replay.progress)
+  const against = replayMode ? replayVerdict(flight.replayProgress?.verdict) : '';
+  const shown = against ? `${words}\n\n${against}` : words;
   if (open && shown !== shownVerdict) {
     shownVerdict = shown;
     verdict.textContent = shown;
@@ -370,6 +377,11 @@ function show() {
 // runway the flight started on) and the simulated seconds; only letters, digits, '.', '_' and '-'.
 async function save() {
   if (!latest) return;
+  if (replayMode) {
+    // the worker would hand back the recording as it was opened: a replay is not a new flight to hand in
+    saved = escapeHtml(`a replay is not saved again: its recording is ${replayName || 'the file opened'}`);
+    return;
+  }
   // who flew it and when, as header lines the gate's --repeatable prints (P7's recording contract)
   const extra = { hands: hands.pad ? hands.pad.id : 'keyboard', flown: flownAt || new Date().toISOString() };
   const reply = await Promise.race([flight.recording(extra), new Promise((resolve) => setTimeout(() => resolve(null), 3000))]);
@@ -473,14 +485,11 @@ function keep(list, v) {
   if (list.length > 3000) list.splice(0, list.length - 3000);
 }
 
-// What the status line says of a replay: whose flight and when, and the recording's build against the page's.
+// What the status line says of a replay (replay.js, replayStatus), its text never markup, the build's note in amber
+// where the verdict is not the gate's.
 function replayLines() {
-  const h = flight.replay?.header ?? {};
-  const when = /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(h.flown || '') ? `flown ${h.flown.slice(0, 16).replace('T', ' ')} UTC` : '';
-  const who = [when, h.hands ? `by ${h.hands}` : ''].filter(Boolean).join(' ');
-  const said = escapeHtml(`replay${who ? ` of a flight ${who}` : ''}${flight.ended ? ', to its end' : ''}`);
-  const b = buildCompare(h.build, flight.build);
-  return `${said}\n${b.warn ? `<span class="warn">${escapeHtml(b.text)}</span>` : escapeHtml(b.text)}`;
+  return replayStatus(flight.replayInfo, flight.replayProgress, replayName)
+    .map(([text, warn]) => (warn ? `<span class="warn">${escapeHtml(text)}</span>` : escapeHtml(text))).join('\n');
 }
 
 // A replay starts from the recording carried across the reload (replay.js); without one, the page says so.
@@ -498,7 +507,8 @@ recordingToFly.catch((e) => {
   error = e.message;
   status.innerHTML = `<span class="bad">${escapeHtml(error)}</span>`;
 });
-recordingToFly.then((text) => flight.start(airframe, scripted, scenario, text)).then((ready) => {
+recordingToFly.then((text) => (text === null ? flight.start(airframe, scripted, scenario) : flight.replay(text))).then((ready) => {
+  if (replayMode && flight.replayInfo) view.flying = flight.replayInfo.airframe === '737' ? '737' : 'a320';
   inputs = Float64Array.from(ready.inputs);  // the core's own start: FLT CTL pushbuttons pressed
   controls = controlsFromInputs(inputs, flight.input);
   try {

@@ -44,12 +44,19 @@ export class Flight {
     this.worker.onerror = (e) => onError(e.message || 'the worker failed');
   }
 
-  // replay: a saved recording's text, which the worker flies again (core-session.js): its own scenario and airframe,
-  // its rows the inputs, a row a tick; the page's inputs are not sent (replay.js).
-  start(airframe, scripted, scenario = '', replay = null) {
+  start(airframe, scripted, scenario = '') {
     return new Promise((resolve, reject) => {
       this.started = { resolve, reject };
-      this.worker.postMessage({ type: 'start', airframe, scripted, scenario, ...(replay ? { replay } : {}) });
+      this.worker.postMessage({ type: 'start', airframe, scripted, scenario });
+    });
+  }
+
+  // A saved recording flown again, in place of start (worker.js; core-session.js, Replay): from the scenario and on
+  // the airframe it names, its rows the inputs, a row a tick, whatever inputs the page sends (replay.js).
+  replay(text) {
+    return new Promise((resolve, reject) => {
+      this.started = { resolve, reject };
+      this.worker.postMessage({ type: 'replay', text });
     });
   }
 
@@ -76,14 +83,15 @@ export class Flight {
       this.inputNames = m.inputNames;
       this.stateNames = m.stateNames;
       this.build = m.build || '';   // the commit the core was made from (buildNote)
-      this.replay = m.replay || null;   // a replay's recording as the worker read it: { header, judged, rows }
+      this.replayInfo = m.replay || null;   // a replay: what its recording says of itself (Replay.info)
       this.field = Object.fromEntries(m.stateNames.map((n, i) => [n, i]));
       this.input = Object.fromEntries(m.inputNames.map((n, i) => [n, i]));
       this.started.resolve(m);
       this.onState(m);
     } else if (m.type === 'state') {
       this.busy = false;
-      this.ended = Boolean(m.ended);   // a replay: its recording's last row has flown
+      this.replayProgress = m.replay || null;   // a replay: how far it has flown; at its end, its verdict
+      this.ended = Boolean(m.replay?.ended);    // a replay: the recording's last row has flown
       this.onState(m);
     } else if (m.type === 'recording') {
       this.recordings.shift()(m);
