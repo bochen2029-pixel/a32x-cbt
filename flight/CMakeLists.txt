@@ -91,7 +91,8 @@ add_library(a32nx_efcs STATIC
   "${FBW}/utils/HysteresisNode.cpp"
   "${FBW}/utils/PulseNode.cpp"
   "${FBW}/utils/SRFlipFLop.cpp"
-  "${FBW}/Arinc429.cpp"
+  # our implementation of their Arinc429.h, its words starting at zero (harness/arinc429.cpp)
+  "${CMAKE_CURRENT_SOURCE_DIR}/harness/arinc429.cpp"
   "${FBW}/Arinc429Utils.cpp")
 target_include_directories(a32nx_efcs PUBLIC "${FBW}" "${FBW}/model")
 # Upstream's warnings are upstream's: silence them here rather than edit a line of it.
