@@ -41,8 +41,8 @@ Simulations or Aerowinx, and not suitable for type training.
 
 ## Where it stands
 
-The flight simulator is the product, at its third pre-release,
-[0.1.2](https://github.com/bochen2029-pixel/a32x-cbt/releases/tag/v0.1.2) (`ROADMAP.md`, P7):
+The flight simulator is the product, at its fourth pre-release,
+[0.1.3](https://github.com/bochen2029-pixel/a32x-cbt/releases/tag/v0.1.3) (`ROADMAP.md`, P7):
 
 - The A32NX computers fly our A320 in normal, alternate and direct law. The instructor's failures take
   them there, and the scripted crew lands every degraded case but the double hydraulic losses. In the
@@ -50,14 +50,16 @@ The flight simulator is the product, at its third pre-release,
   limits.
 - The airframe is fitted to cited data: stall speeds and alphas by configuration, approach attitudes,
   the drag rise, roll and damping, the stall and past it, the drag of the flaps and gear, and its
-  engines' thrust against the type certificate and the public ANP noise-and-performance database,
-  whose A320 entry Airbus developed. Public numbers, not Airbus's flight-test data. `flight/README.md`
-  has every row, its source, and the fit.
+  engines' thrust and spool-up against the type certificate, the certification rules and the public
+  ANP noise-and-performance database, whose A320 entry Airbus developed: inside all 69 of its targets.
+  Public numbers, not Airbus's flight-test data. `flight/README.md` has every row, its source, and the
+  fit.
 - In the browser: the flight core as WebAssembly, a joystick mapped from the pilot's own hands, KDFW
   and Dallas drawn as a 1980s full-flight simulator drew them (a GPU tier over a floor that runs on
   software rendering), an ILS on every runway, wind and turbulence, ground idle and reverse thrust.
-- The gate's judge scores a hand-flown ILS against stabilised-approach bands; a saved recording names
-  the build that flew it and replays natively to the same verdict.
+- The gate's judge scores a hand-flown ILS against stabilised-approach bands, from 1,000 ft to the
+  stop; a saved recording names the build that flew it and replays natively to the same verdict. The
+  debrief plays the flight back on a timeline, in the manner of Tacview.
 - Left in P7: the gate itself, five hand-flown approaches, stable and repeatable. Known open: a fast,
   full back-stick pull with full flaps can stall it, A32NX's protection acting on a lagged alpha
   (asked upstream as
@@ -96,10 +98,10 @@ Two artefacts, as `ROADMAP.md` sets them (*Decisions*, packaging):
 
 - **`a32x-cbt.zip`**: the systems trainer alone, MIT. `npm run package` in `app/` builds it and
   `npm run gate` checks it.
-- **`a32x-sim-0.1.2-win64.zip`**: the flight simulator for Windows, GPLv3. `A32X.exe`, a launcher of
+- **`a32x-sim-0.1.3-win64.zip`**: the flight simulator for Windows, GPLv3. `A32X.exe`, a launcher of
   ours, opens the page beside it in Microsoft Edge as an app window, or in the default browser; the
   trainer rides along under its own MIT notice, with every licence and notice. Beside it,
-  **`a32x-sim-0.1.2-source.zip`**, its Corresponding Source: this repository at the commit and the
+  **`a32x-sim-0.1.3-source.zip`**, its Corresponding Source: this repository at the commit and the
   exact A32NX and JSBSim sources compiled into it, with Emscripten 6.0.12 named. `npm run release` in
   `flight/web` builds both, the first from the second, and `npm run release:gate` checks them
   (`flight/README.md`, *The Windows release*). Published on GitHub as pre-releases, each with its
