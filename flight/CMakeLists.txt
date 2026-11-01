@@ -305,8 +305,10 @@ if(FLIGHT_NODE)
   add_test(NAME the_page_clock_keeps_50_hz COMMAND "${FLIGHT_NODE}" --test "${CMAKE_CURRENT_SOURCE_DIR}/web/test/clock.test.mjs")
   add_test(NAME the_hands_reach_the_controls COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/controls.test.mjs" "${CMAKE_CURRENT_SOURCE_DIR}/web/test/mapping.test.mjs")
-  add_test(NAME the_view_puts_the_eye_and_the_papi_right COMMAND "${FLIGHT_NODE}" --test
+  add_test(NAME the_view_puts_the_eye_where_the_flight_is COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/scene.test.mjs")
+  add_test(NAME kdfw_is_laid_out_as_ourairports_and_the_faa_have_it COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/airport.test.mjs")
   if(EMSCRIPTEN)
     add_test(NAME the_browser_module_flies COMMAND "${FLIGHT_NODE}" --test "${CMAKE_CURRENT_SOURCE_DIR}/web/test/module.test.mjs")
     set_tests_properties(the_browser_module_flies PROPERTIES ENVIRONMENT "FLIGHT_CORE_JS=${CMAKE_CURRENT_BINARY_DIR}/flight_core.js")

@@ -1,10 +1,13 @@
 // The out-the-window view, as a full-flight simulator's visual system drew it in the 1980s: flat-shaded
-// polygons, light points that stay sharp at any range, a horizon in haze. The runway the flight core
-// names, where it is, with its lights and a PAPI; a few buildings; dusk, night or day. three.js (MIT),
-// bundled. GPLv3.
+// polygons, light points that stay sharp at any range, a horizon in haze. The airport the flight is at
+// — KDFW, the simulator's home — with its runways' paint and lights, its PAPIs and approach lights, its
+// terminals and tower; dusk, night or day. three.js (MIT), bundled. GPLv3.
 
 import * as THREE from 'three';
-import { eye, origin, papiBoxes, papiWhite } from './scene-math.js';
+import KDFW from '../data/kdfw.json' with { type: 'json' };
+import { Airport } from './airport.js';
+import { airportFromRunway, findRunwayEnd, validateAirport } from './airport-layout.js';
+import { eye, origin } from './scene-math.js';
 
 const DEG = Math.PI / 180;
 
@@ -22,14 +25,6 @@ function rng(seed) {
   return () => ((s = Math.imul(s ^ (s >>> 15), 2246822519) + 0x9e3779b9 >>> 0) / 4294967296);
 }
 
-function points(positions, colors, size) {
-  const g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const m = new THREE.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false });
-  return new THREE.Points(g, m);
-}
-
 // Whether WebGL here is drawn by the CPU (SwiftShader, or another software rasteriser): asked of a
 // scratch canvas, before the view's own context is made, because a canvas gets one context for good.
 export function softwareRendering() {
@@ -45,14 +40,19 @@ export function softwareRendering() {
 }
 
 export class View {
-  constructor(canvas, time = 'dusk', antialias = true) {
+  // software: WebGL is drawn by the CPU here (softwareRendering), so the airport goes without textures
+  // and its lights with smaller halos.
+  constructor(canvas, time = 'dusk', antialias = true, { software = false } = {}) {
     this.t = TIMES[time] || TIMES.dusk;
+    this.software = software;
     const t = this.t;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias });
     this.renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(t.fog, 3000, 28000);
-    this.camera = new THREE.PerspectiveCamera(45, 1, 0.5, 40000);
+    // near at 2 m: the nearest ground the eye sees is 13 m away, and the depth buffer's precision at
+    // range goes as the near plane
+    this.camera = new THREE.PerspectiveCamera(45, 1, 2, 40000);
     this.camera.rotation.order = 'YXZ';
 
     this.scene.add(new THREE.HemisphereLight(t.horizon, t.ground, t.ambient));
@@ -102,91 +102,21 @@ export class View {
     this.scene.add(mesh);
   }
 
-  // The runway the flight names (scene-math.js, runwayFromState): the world's origin at its landing
-  // threshold, the pavement, paint, lights and buildings built in the runway's own frame and turned to its
-  // heading, the PAPI where the glide meets it.
+  // The airport the flight is at, drawn around the runway the flight core names (scene-math.js,
+  // runwayFromState): the world's origin at that runway's landing threshold. An airport file that holds
+  // the runway gives the whole airport, KDFW above all; a runway no file holds is drawn on its own.
+  // Returns what was drawn, for the page to say.
   setRunway(rwy) {
     this.rwy = rwy;
     this.origin = origin(rwy.lat, rwy.lon);
-    const group = new THREE.Group();
-    this.pavement(group, rwy);
-    this.lights(group, rwy);
-    this.buildings(group, rwy);
-    group.rotation.y = -rwy.headingDeg * DEG;
-    this.scene.add(group);
-
-    this.papiAt = papiBoxes(rwy);
-    this.papi = points(this.papiAt.flatMap((b) => [b.x, b.y, b.z]), new Array(12).fill(1), 5);
-    this.scene.add(this.papi);
-  }
-
-  // The pavement, from the start of its displaced part to the far end, and its paint: threshold bars and
-  // line, centreline dashes, the aiming point 400 m in.
-  pavement(group, { lengthM: length, widthM: width, displacedM: displaced }) {
-    const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(width, length + displaced).rotateX(-Math.PI / 2),
-                                   new THREE.MeshLambertMaterial({ color: 0x3c3c40 }));
-    asphalt.position.set(0, 0, (displaced - length) / 2);
-    group.add(asphalt);
-    const paint = [];
-    const box = (x, z, w, l) => paint.push({ x, z, w, l });
-    box(0, -1, width - 2, 1.8);  // the threshold line
-    for (let k = 0; k < 8; ++k) {  // threshold bars, either side of the centreline
-      const x = 3 + k * 2.4;
-      box(x, -30, 1.8, 30);
-      box(-x, -30, 1.8, 30);
-    }
-    for (let z = -80; z > -length + 80; z -= 50) box(0, z, 0.9, 30);  // centreline dashes
-    box(9, -400, 9, 45);
-    box(-9, -400, 9, 45);
-    const geoms = paint.map(({ x, z, w, l }) => new THREE.PlaneGeometry(w, l).rotateX(-Math.PI / 2).translate(x, 0.02, z));
-    group.add(new THREE.Mesh(mergeGeometries(geoms), new THREE.MeshLambertMaterial({ color: 0xd8d8d0 })));
-  }
-
-  lights(group, { lengthM: length, widthM: width, displacedM: displaced }) {
-    const t = this.t;
-    const pos = [], col = [];
-    const add = (x, y, z, c) => {
-      pos.push(x, y, z);
-      col.push(c.r * t.lights, c.g * t.lights, c.b * t.lights);
-    };
-    const white = new THREE.Color(1, 0.95, 0.8), green = new THREE.Color(0.2, 1, 0.3), red = new THREE.Color(1, 0.15, 0.1);
-    for (let z = displaced; z >= -length; z -= 60) {  // edge lights
-      add(-width / 2 - 1, 0.4, z, white);
-      add(width / 2 + 1, 0.4, z, white);
-    }
-    for (let z = -15; z > -length; z -= 15) add(0, 0.1, z, z < -length + 900 ? red : white);  // centreline
-    for (let x = -width / 2; x <= width / 2; x += 3) {
-      add(x, 0.3, 0, green);         // threshold
-      add(x, 0.3, -length, red);     // runway end
-    }
-    for (let d = 30; d <= 900; d += 30) {  // approach lights: a line, and a crossbar at 300 m
-      add(0, 0.5 + d * 0.01, d, white);
-      if (d === 300) for (let x = -15; x <= 15; x += 3) add(x, 3.5, d, white);
-    }
-    group.add(points(pos, col, 3));
-  }
-
-  // A terminal, a tower, hangars and a few others, right of the runway: generic, not the airport's own.
-  buildings(group) {
-    const t = this.t;
-    const r = rng(1983);
-    const geoms = [], windows = [], windowColours = [];
-    const lit = new THREE.Color(1, 0.85, 0.5).multiplyScalar(t.windows);
-    const place = (x, z, w, d, h) => {
-      geoms.push(new THREE.BoxGeometry(w, h, d).translate(x, h / 2, z));
-      for (let k = 0; k < Math.max(2, Math.floor(w / 8)); ++k) {
-        if (r() < 0.6) {
-          windows.push(x - w / 2 + (k + 0.5) * (w / Math.max(2, Math.floor(w / 8))), h * (0.3 + 0.5 * r()), z - d / 2 - 0.2);
-          windowColours.push(lit.r, lit.g, lit.b);
-        }
-      }
-    };
-    place(260, -900, 160, 40, 14);   // terminal
-    place(230, -1150, 12, 12, 34);   // tower
-    for (let k = 0; k < 4; ++k) place(300 + k * 70, -1500 - k * 30, 55, 50, 18 + 6 * r());  // hangars
-    for (let k = 0; k < 6; ++k) place(520 + r() * 300, -600 - r() * 1600, 20 + r() * 30, 20 + r() * 30, 8 + r() * 20);
-    group.add(new THREE.Mesh(mergeGeometries(geoms), new THREE.MeshLambertMaterial({ color: 0x8a8580, flatShading: true })));
-    if (t.windows > 0) group.add(points(windows, windowColours, 2));
+    const airports = [validateAirport(KDFW)];
+    const found = findRunwayEnd(airports, rwy.lat, rwy.lon, rwy.headingDeg);
+    const data = found ? found.airport : airportFromRunway(rwy);
+    this.airport = new Airport(data, this.origin, {
+      software: this.software, gain: this.t.lights, windows: this.t.windows, pixelRatio: this.renderer.getPixelRatio(),
+    });
+    this.scene.add(this.airport.group);
+    return found ? `${found.airport.icao} ${found.end}` : `runway ${data.runways[0].ends[0].id}`;
   }
 
   resize(width, height) {
@@ -195,16 +125,14 @@ export class View {
     this.camera.updateProjectionMatrix();
   }
 
-  // The camera where the pilot's eye is, the sky around it, and the PAPI as that eye sees it.
-  update(lat, lon, radioHeightFt, pitchDeg, rollDeg, headingDeg) {
+  // The camera where the pilot's eye is, the sky around it, the PAPI as that eye sees it and the
+  // flashers at the flight's own time.
+  update(lat, lon, radioHeightFt, pitchDeg, rollDeg, headingDeg, timeS = 0) {
     const e = eye(this.origin, lat, lon, radioHeightFt, pitchDeg, headingDeg);
     this.camera.position.set(e.x, e.y, e.z);
     this.camera.rotation.set(pitchDeg * DEG, -headingDeg * DEG, -rollDeg * DEG);
     this.skyDome.position.copy(this.camera.position);
-    const white = papiWhite(e, this.papiAt);
-    const c = this.papi.geometry.attributes.color;
-    white.forEach((w, k) => c.setXYZ(k, 1, w ? 1 : 0.12, w ? 0.95 : 0.1));
-    c.needsUpdate = true;
+    this.airport.update(e, timeS);
     return e;
   }
 
@@ -217,23 +145,4 @@ export class View {
     const info = gl.getExtension('WEBGL_debug_renderer_info');
     return info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
   }
-}
-
-// Geometries of the same attributes as one, so a hundred boxes of paint are one draw call.
-function mergeGeometries(list) {
-  const nonIndexed = list.map((g) => (g.index ? g.toNonIndexed() : g));
-  const names = Object.keys(nonIndexed[0].attributes);
-  const merged = new THREE.BufferGeometry();
-  for (const name of names) {
-    const size = nonIndexed[0].attributes[name].itemSize;
-    const total = nonIndexed.reduce((n, g) => n + g.attributes[name].array.length, 0);
-    const array = new Float32Array(total);
-    let at = 0;
-    for (const g of nonIndexed) {
-      array.set(g.attributes[name].array, at);
-      at += g.attributes[name].array.length;
-    }
-    merged.setAttribute(name, new THREE.BufferAttribute(array, size));
-  }
-  return merged;
 }

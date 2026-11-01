@@ -1,9 +1,10 @@
 // Opens the built page in a throwaway headless Chrome or Edge, lets it fly, and prints what it measured
 // (globalThis.flightReport): the cost of a tick, the frames, and what drawing them cost. --software
-// renders with SwiftShader, the CPU's rasteriser, as a laptop with no usable GPU would. A tool for the
-// desktop, not part of the page. GPLv3.
+// renders with SwiftShader, the CPU's rasteriser; --warp with WARP, Direct3D's own, which is what Chrome
+// on Windows now falls back to with no usable GPU (found by fbw-desktop). A tool for the desktop, not
+// part of the page. GPLv3.
 //
-//   node tools/measure.mjs [--page <folder>] [--query "crew=script&time=night"] [--seconds 20] [--software]
+//   node tools/measure.mjs [--page <folder>] [--query "crew=script&time=night"] [--seconds 20] [--software | --warp]
 //
 // Chrome is found where Windows installs it, or named by BROWSER. The DevTools protocol is spoken with
 // node's own WebSocket; nothing is installed.
@@ -23,6 +24,7 @@ const page = resolve(option('--page', join(here, '..', '..', 'build-web')), 'ind
 const query = option('--query', '');
 const seconds = Number(option('--seconds', '20'));
 const software = process.argv.includes('--software');
+const warp = process.argv.includes('--warp');
 
 const candidates = [
   process.env.BROWSER,
@@ -44,6 +46,7 @@ const args = [
   '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, '--no-first-run',
   '--no-default-browser-check', '--window-size=1440,900',
   ...(software ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--disable-gpu'] : []),
+  ...(warp ? ['--use-angle=d3d11-warp'] : []),
   `${pathToFileURL(page).href}${query ? `?${query}` : ''}`,
 ];
 const chrome = spawn(browser, args, { stdio: 'ignore' });
@@ -102,5 +105,5 @@ try {
   // the browser may hold a file a moment longer
 }
 const report = result?.result?.value ? JSON.parse(result.result.value) : null;
-console.log(JSON.stringify({ browser, software, query, seconds, report }, null, 1));
+console.log(JSON.stringify({ browser, software, warp, query, seconds, report }, null, 1));
 process.exit(report && !report.error ? 0 : 1);

@@ -29,7 +29,8 @@ const status = document.getElementById('status');
 // Antialiasing doubles the cost of a frame drawn in software; on a GPU it is nearly free. aa=0|1 decides.
 const software = softwareRendering();
 const view = new View(document.getElementById('view'), params.get('time') || 'dusk',
-                      params.has('aa') ? params.get('aa') !== '0' : !software);
+                      params.has('aa') ? params.get('aa') !== '0' : !software, { software });
+let drawn = '';          // the airport the view drew, and the runway end the flight is on
 const overlay = new Overlay(document.getElementById('overlay'));
 function resize() {
   const ratio = Math.min(2, window.devicePixelRatio || 1);
@@ -93,6 +94,7 @@ function report() {
     airframe: airframe || 'default',
     crew: scripted ? 'script' : 'hands',
     scenario: scenario || 'runway',
+    airport: drawn,
     simulatedS: value('t_s'),
     stepsDue: clock.steps,
     stepsDropped: clock.dropped + droppedWaiting,
@@ -147,7 +149,7 @@ function show() {
     `${hands.prompt()}` + (hands.help ? `\n\n${KEY_HELP.join('\n')}` : '');
   const r = report();
   const cls = r.stepsDropped ? 'warn' : '';
-  status.innerHTML = `${r.airframe} · ${r.crew}\n` +
+  status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
     `<span class="${cls}">${r.stepsDropped} steps dropped</span>`;
 }
@@ -181,7 +183,7 @@ function frame(now) {
   }
   if (latest) {
     const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));
-    view.update(s.lat_deg, s.lon_deg, s.ra_ft, s.pitch_deg, s.roll_deg, s.heading_deg);
+    view.update(s.lat_deg, s.lon_deg, s.ra_ft, s.pitch_deg, s.roll_deg, s.heading_deg, s.t_s);
     const t0 = performance.now();
     view.render();
     keep(renderMs, performance.now() - t0);
@@ -201,7 +203,14 @@ function keep(list, v) {
 flight.start(airframe, scripted, scenario).then((ready) => {
   inputs = Float64Array.from(ready.inputs);  // the core's own start: FLT CTL pushbuttons pressed
   controls = controlsFromInputs(inputs, flight.input);
-  view.setRunway(runwayFromState(Object.fromEntries(flight.stateNames.map((n, i) => [n, ready.state[i]]))));
+  try {
+    drawn = view.setRunway(runwayFromState(Object.fromEntries(flight.stateNames.map((n, i) => [n, ready.state[i]]))));
+  } catch (e) {
+    // a bad airport file stops the page, said where it can be seen (CLAUDE.md, 9)
+    error = `the airport could not be drawn: ${e.message}`;
+    status.innerHTML = `<span class="bad">${error}</span>`;
+    return;
+  }
   status.textContent = bench.done ? 'flying' : 'measuring a tick…';
   if (bench.done) {
     requestAnimationFrame(frame);
