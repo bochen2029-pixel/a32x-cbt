@@ -7,14 +7,17 @@
 //
 // It scores; it does not gate. Outside a band is a fact about the airframe, not a failed build.
 //
-// Two kinds of measurement. The bare airframe, with no computers: JSBSim sweeps its lift curve and
-// trims it (airframe.h). The airframe flown: one circuit through the A32NX laws, with a full-stick roll
-// added in cruise, timed as the gate's circuit is.
+// Two kinds of measurement. The bare airframe, with no computers: JSBSim sweeps its lift curve, reads
+// its drag, trims it and pulses its elevator (airframe.h), at the weight the row names. The airframe
+// flown: one circuit through the A32NX laws at the weight it is loaded to, with a full-stick roll added
+// in cruise, timed as the gate's circuit is.
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <fstream>
 #include <limits>
 #include <map>
@@ -127,33 +130,161 @@ struct Config {
   bool gearDown;
 };
 
-// The airframe on its own: lift curve peaks and trims, at the weight it was loaded at.
-void measureBare(const Speeds& speeds, Airframe& a, Measures& m) {
-  const double weight = a.state().weightLbs, tonnes = weight / kLbsPerTonne, area = a.wingAreaFt2();
-  // flap surface angles per configuration; CONF 1 is slats alone, which the 737's tables do not see
-  const Config configs[] = {{"clean", 0, false}, {"conf1", 0, false}, {"conf1f", 10, false},
-                            {"conf2", 15, false}, {"conf3", 20, true},  {"full", 40, true}};
-  for (const Config& c : configs) {
-    const LiftPeak p = a.liftPeak(c.flapDeg, c.gearDown);
-    const double vs1g = std::sqrt(2 * weight / (kRho0 * area * p.clMax)) / kFpsPerKt;
-    m["vs1g-" + c.name] = {vs1g, fmt("CL max %.2f, elevator neutral", p.clMax)};
-    m["stall-alpha-" + c.name] = {p.alphaDeg, fmt("CL max %.2f", p.clMax)};
+// flap surface angles per configuration; CONF 1 is slats alone, which the 737's tables do not see
+const Config kConfigs[] = {{"clean", 0, false}, {"conf1", 0, false}, {"conf1f", 10, false},
+                           {"conf2", 15, false}, {"conf3", 20, true},  {"full", 40, true}};
+
+const Config* config(const std::string& name) {
+  for (const Config& c : kConfigs) {
+    if (c.name == name) return &c;
   }
-  for (const Config& c : {Config{"clean", 0, false}, Config{"conf2", 15, false}, Config{"full", 40, true}}) {
-    const double vls = speeds.at("vls:" + c.name, tonnes);
-    const TrimPoint t = a.trim(1000, vls, 0, 0, c.flapDeg, c.gearDown);
-    m["vls-alpha-" + c.name] = t.ok ? Measured{t.alphaDeg, fmt("at the A320's VLS, %.0f kt", vls)}
-                                    : Measured{kNaN, fmt("no trim at the A320's VLS, %.0f kt", vls)};
-  }
-  const double vapp = speeds.at("vls:full", tonnes) + 5;
-  const TrimPoint app = a.trim(1000, vapp, 0, -3, 40, true);
-  m["app-pitch-full"] = app.ok ? Measured{app.pitchDeg, fmt("%.0f kt; alpha %.1f; THS %.1f deg", vapp, app.alphaDeg, app.thsDeg)}
-                               : Measured{kNaN, fmt("no trim at %.0f kt", vapp)};
-  const TrimPoint cruise = a.trim(35000, 0, 0.78, 0, 0, false);
-  m["cruise-pitch"] = cruise.ok ? Measured{cruise.pitchDeg, fmt("alpha %.1f; THS %.1f deg", cruise.alphaDeg, cruise.thsDeg)}
-                                : Measured{kNaN, "no trim"};
-  m["cruise-tla"] = cruise.ok ? Measured{cruise.tla, ""} : Measured{kNaN, "no trim"};
+  return nullptr;
 }
+
+// "vls-alpha-full-65t" is "vls-alpha-full" measured at the weight its row names.
+std::string family(const std::string& id) {
+  const size_t dash = id.rfind('-');
+  if (dash == std::string::npos || id.size() < dash + 3 || id.back() != 't') return id;
+  for (size_t k = dash + 1; k + 1 < id.size(); ++k) {
+    if (!std::isdigit(static_cast<unsigned char>(id[k]))) return id;
+  }
+  return id.substr(0, dash);
+}
+
+// The Mach at which the drag of the clean airframe, held at a lift coefficient of 0.5, has risen 20
+// counts above its drag at Mach 0.6: Boeing's definition of drag divergence, at the lift of an A320
+// cruising near its typical weight.
+Measured dragRise(Airframe& a) {
+  constexpr double kCl = 0.5, kRise = 0.0020, kAltitudeFt = 35000;
+  double alpha = 2;
+  // the alpha for the lift coefficient, by secant from the last one found; NaN if it does not converge
+  auto cdAt = [&](double mach) {
+    double a0 = alpha, a1 = alpha + 0.5;
+    AeroPoint p0 = a.aero(kAltitudeFt, mach, a0, 0, false), p1 = a.aero(kAltitudeFt, mach, a1, 0, false);
+    for (int k = 0; k < 12 && std::abs(p1.cl - kCl) > 1e-6; ++k) {
+      if (p1.cl == p0.cl) return kNaN;
+      const double a2 = a1 + (kCl - p1.cl) * (a1 - a0) / (p1.cl - p0.cl);
+      a0 = a1;
+      p0 = p1;
+      a1 = a2;
+      p1 = a.aero(kAltitudeFt, mach, a1, 0, false);
+    }
+    if (std::abs(p1.cl - kCl) > 1e-4) return kNaN;
+    alpha = a1;
+    return p1.cd;
+  };
+  const double base = cdAt(0.60);
+  if (std::isnan(base)) return {kNaN, "no lift coefficient of 0.5 at Mach 0.6"};
+  double lastMach = 0.60, lastRise = 0;
+  for (int k = 1; k <= 70; ++k) {
+    const double mach = 0.60 + 0.005 * k;
+    const double rise = cdAt(mach) - base;
+    if (std::isnan(rise)) return {kNaN, fmt("no lift coefficient of 0.5 at Mach %.3f", mach)};
+    if (rise >= kRise) {
+      const double at = lastMach + (mach - lastMach) * (kRise - lastRise) / (rise - lastRise);
+      return {at, fmt("CD %.4f at Mach 0.6; alpha %.1f deg at the rise", base, alpha)};
+    }
+    lastMach = mach;
+    lastRise = rise;
+  }
+  return {kNaN, fmt("under 20 counts of rise up to Mach %.3f", lastMach)};
+}
+
+// The pitch short period of the bare airframe: the alpha response after a pulse of elevator, controls
+// otherwise fixed, from its first extremum and the next of opposite sign. Their ratio is
+// exp(-pi zeta / sqrt(1 - zeta^2)) for half a cycle.
+Measured shortPeriod(Airframe& a) {
+  constexpr double kAltitudeFt = 8000, kCasKn = 250, kPulseDeg = 2, kPulseS = 1, kRecordS = 12;
+  const PitchResponse r = a.pitchPulse(kAltitudeFt, kCasKn, kPulseDeg, kPulseS, kRecordS);
+  if (!r.ok) return {kNaN, "no trim at 8000 ft and 250 kt"};
+  const std::vector<double>& x = r.alphaDeg;
+  std::vector<size_t> extrema;
+  for (size_t k = 1; k + 1 < x.size(); ++k) {
+    if ((x[k] - x[k - 1]) * (x[k + 1] - x[k]) < 0) extrema.push_back(k);
+  }
+  if (extrema.empty()) return {kNaN, "alpha did not turn after the pulse"};
+  const size_t first = extrema.front();
+  for (size_t e : extrema) {
+    if (e > first && x[e] * x[first] < 0) {
+      const double decrement = std::log(std::abs(x[first] / x[e]));
+      const double zeta = decrement / std::sqrt(kPi * kPi + decrement * decrement);
+      const double wn = kPi / (r.t[e] - r.t[first]) / std::sqrt(1 - zeta * zeta);
+      return {zeta, fmt("alpha %+.2f then %+.2f deg; natural frequency %.2f rad/s", x[first], x[e], wn)};
+    }
+  }
+  // No overshoot: the half-cycle ratio would be under 1/100 of the first excursion, so zeta is at least 0.83.
+  return {0.83, fmt("a lower bound: no overshoot within %.0f s of %+.2f deg of alpha", kRecordS, x[first])};
+}
+
+// The bare airframe, measured row by row at the weight each row names: lift peaks once per
+// configuration, everything else on demand.
+class Bare {
+ public:
+  Bare(Airframe& a, const Speeds& speeds) : a_(a), speeds_(speeds), loadedLbs_(a.state().weightLbs) {}
+
+  double loadedLbs() const { return loadedLbs_; }
+
+  Measured measure(const std::string& id, const std::string& family, const std::string& measure, double lbs) {
+    if (std::abs(a_.state().weightLbs - lbs) > 0.5) a_.setWeightLbs(lbs);
+    const double tonnes = lbs / kLbsPerTonne;
+    if (family.rfind("vs1g-", 0) == 0 && config(family.substr(5))) {
+      const LiftPeak& p = peak(*config(family.substr(5)));
+      const double vs1g = std::sqrt(2 * lbs / (kRho0 * a_.wingAreaFt2() * p.clMax)) / kFpsPerKt;
+      return {vs1g, fmt("CL max %.2f, elevator neutral", p.clMax)};
+    }
+    if (family.rfind("stall-alpha-", 0) == 0 && config(family.substr(12))) {
+      const LiftPeak& p = peak(*config(family.substr(12)));
+      return {p.alphaDeg, fmt("CL max %.2f", p.clMax)};
+    }
+    if (family.rfind("vls-alpha-", 0) == 0 && config(family.substr(10))) {
+      const Config& c = *config(family.substr(10));
+      const double vls = speeds_.at("vls:" + c.name, tonnes);
+      const TrimPoint t = a_.trim(1000, vls, 0, 0, c.flapDeg, c.gearDown);
+      return t.ok ? Measured{t.alphaDeg, fmt("at the A320's VLS, %.0f kt", vls)}
+                  : Measured{kNaN, fmt("no trim at the A320's VLS, %.0f kt", vls)};
+    }
+    if (family == "app-pitch-full") {
+      // the speed is in the row: "at VLS + 5 kt"
+      const size_t at = measure.find("VLS + ");
+      if (at == std::string::npos) return {kNaN, "the row names no speed above VLS"};
+      const double vapp = speeds_.at("vls:full", tonnes) + std::atof(measure.c_str() + at + 6);
+      const TrimPoint t = a_.trim(1000, vapp, 0, -3, 40, true);
+      return t.ok ? Measured{t.pitchDeg, fmt("%.0f kt; alpha %.1f; THS %.1f deg", vapp, t.alphaDeg, t.thsDeg)}
+                  : Measured{kNaN, fmt("no trim at %.0f kt", vapp)};
+    }
+    if (family == "cruise-pitch" || family == "cruise-tla") {
+      const TrimPoint t = a_.trim(35000, 0, 0.78, 0, 0, false);
+      if (!t.ok) return {kNaN, "no trim"};
+      return family == "cruise-pitch" ? Measured{t.pitchDeg, fmt("alpha %.1f; THS %.1f deg", t.alphaDeg, t.thsDeg)}
+                                      : Measured{t.tla, ""};
+    }
+    if (id == "drag-rise") return dragRise(a_);
+    if (id == "short-period") return shortPeriod(a_);
+    return {kNaN, "?"};
+  }
+
+  // Whether a row is measured on the bare airframe rather than flown.
+  static bool measures(const std::string& id, const std::string& family) {
+    for (const char* prefix : {"vs1g-", "stall-alpha-", "vls-alpha-"}) {
+      const size_t n = std::strlen(prefix);
+      if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
+    }
+    return family == "app-pitch-full" || family == "cruise-pitch" || family == "cruise-tla" || id == "drag-rise" ||
+           id == "short-period";
+  }
+
+ private:
+  const LiftPeak& peak(const Config& c) {
+    const auto it = peaks_.find(c.name);
+    if (it != peaks_.end()) return it->second;
+    return peaks_[c.name] = a_.liftPeak(c.flapDeg, c.gearDown);
+  }
+
+  Airframe& a_;
+  const Speeds& speeds_;
+  const double loadedLbs_;
+  std::map<std::string, LiftPeak> peaks_;
+};
 
 // The airframe flown through the laws: the gate's circuit, to the approach, with one extra roll.
 void measureFlown(Measures& m) {
@@ -265,6 +396,39 @@ void measureFlown(Measures& m) {
   }
 }
 
+int verdict(const char* what, bool ok, const std::string& detail) {
+  std::printf("  %s  %s - %s\n", ok ? "pass" : "FAIL", what, detail.c_str());
+  return ok ? 0 : 1;
+}
+
+// The instruments checked against answers the 737's own file gives, so that a number the scorer prints
+// is the airframe's and not the instrument's. Run on the 737.
+int instruments() {
+  Airframe a;
+  int failed = 0;
+  // 737.xml: CDgear = 0.015 times the gear position. Down, up, down: a gear left in transit by one
+  // measurement shows in the next.
+  const double down = a.aero(10000, 0.5, 2, 0, true).cd, up = a.aero(10000, 0.5, 2, 0, false).cd,
+               again = a.aero(10000, 0.5, 2, 0, true).cd;
+  failed += verdict("a measurement puts the gear where it asks",
+                    std::abs(down - up - 0.015) < 1e-5 && std::abs(down - again) < 1e-9,
+                    fmt("gear drag %.5f, the file's 0.015; down twice %.5f and %.5f", down - up, down, again));
+  // 737.xml: CDmach is 0 to Mach 0.79 and 0.023 at 1.10, linear between, whatever the lift: 20 counts at
+  // 0.79 + 0.31 * 0.002 / 0.023.
+  const Measured rise = dragRise(a);
+  failed += verdict("the drag rise is where the 737's Mach table puts it", std::abs(rise.value - 0.81696) < 5e-4,
+                    fmt("Mach %.4f, the table's 0.8170", rise.value));
+  // Elevator trailing edge down pitches the nose down: the first excursion of alpha is negative.
+  const PitchResponse r = a.pitchPulse(8000, 250, 2, 1, 12);
+  const Measured sp = shortPeriod(a);
+  failed += verdict("a nose-down pulse lowers alpha, and the response is damped",
+                    r.ok && !r.alphaDeg.empty() && *std::min_element(r.alphaDeg.begin(), r.alphaDeg.end()) < -0.1 &&
+                        sp.value > 0 && sp.value < 2,
+                    fmt("damping %.2f; ", sp.value) + sp.note);
+  std::printf("%s\n", failed ? "FAILED" : "PASSED");
+  return failed ? 1 : 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -278,8 +442,10 @@ int main(int argc, char** argv) {
       targetsDir = argv[++i];
     } else if (a == "--check") {
       check = true;
+    } else if (a == "--instruments") {
+      return instruments();
     } else {
-      std::printf("airframe_score [--targets dir] [--out score.csv] [--check]\n");
+      std::printf("airframe_score [--targets dir] [--out score.csv] [--check] [--instruments]\n");
       return 2;
     }
   }
@@ -288,33 +454,54 @@ int main(int argc, char** argv) {
 
   Airframe bare;
   const double weight = bare.state().weightLbs, tonnes = weight / kLbsPerTonne, cg = bare.state().cgPercentMac;
+  // A row's weight: its own, in tonnes, or the airframe as loaded. A row with a speed reference needs one.
+  auto rowLbs = [&](const std::map<std::string, std::string>& row) {
+    const double t = number(row.at("weight"));
+    return std::isnan(t) ? weight : t * kLbsPerTonne;
+  };
   Measures m;
-  measureBare(speeds, bare, m);
+  Bare b(bare, speeds);
+  for (const auto& row : rows) {
+    const std::string& id = row.at("id");
+    if (row.at("kind") != "pending" && Bare::measures(id, family(id))) {
+      m[id] = b.measure(id, family(id), row.at("measure"), rowLbs(row));
+    }
+  }
   measureFlown(m);
 
-  std::printf("A320 targets (%s/a320.csv) against JSBSim %s's %s at %.0f lb (%.1f t), CG %.1f %% MAC\n\n",
-              targetsDir.c_str(), JSBSIM_COMMIT, Airframe::model(), weight, tonnes, cg);
-  std::printf("%-19s %-7s %-5s %-21s %9s  %-15s %s\n", "id", "kind", "use", "band", "measured", "verdict", "note");
+  std::printf("A320 targets (%s/a320.csv) against JSBSim %s's %s\n", targetsDir.c_str(), JSBSIM_COMMIT,
+              Airframe::model());
+  std::printf("loaded to %.0f lb (%.1f t), CG %.1f %% MAC, and flown so; the bare airframe is measured at each row's weight\n\n",
+              weight, tonnes, cg);
+  std::printf("%-19s %-7s %-5s %5s %-21s %9s  %-15s %s\n", "id", "kind", "use", "t", "band", "measured", "verdict",
+              "note");
 
   FILE* csv = out.empty() ? nullptr : std::fopen(out.c_str(), "w");
   if (!out.empty() && !csv) {
     std::printf("cannot write %s\n", out.c_str());
     return 2;
   }
-  if (csv) std::fprintf(csv, "id,kind,use,lo,hi,unit,measured,verdict,note\n");
+  if (csv) std::fprintf(csv, "id,kind,use,weight,lo,hi,unit,measured,verdict,note\n");
 
   int counted = 0, inside = 0, fitRows = 0, fitInside = 0, unmeasured = 0;
   for (const auto& row : rows) {
     const std::string& id = row.at("id");
     const std::string& kind = row.at("kind");
+    const std::string& unit = row.at("unit");
+    const std::string t = row.at("weight");
     double lo = number(row.at("lo")), hi = number(row.at("hi"));
     if (!row.at("ref").empty()) {
-      const double base = speeds.at(row.at("ref"), tonnes);
+      if (t.empty()) {
+        std::fprintf(stderr, "a320.csv: %s has a speed reference and no weight\n", id.c_str());
+        return 2;
+      }
+      const double base = speeds.at(row.at("ref"), number(t));
       lo += base;
       hi += base;
     }
-    const std::string band = (std::isnan(lo) ? std::string("") : fmt("%.4g", lo)) + ".." +
-                             (std::isnan(hi) ? std::string("") : fmt("%.4g", hi)) + " " + row.at("unit");
+    const char* digits = unit == "Mach" ? "%.3f" : "%.4g";
+    const std::string band = (std::isnan(lo) ? std::string("") : fmt(digits, lo)) + ".." +
+                             (std::isnan(hi) ? std::string("") : fmt(digits, hi)) + " " + unit;
     const auto found = m.find(id);
     std::string verdict, note, value = "-";
     if (kind == "pending") {
@@ -325,14 +512,14 @@ int main(int argc, char** argv) {
     } else {
       const double v = found->second.value;
       note = found->second.note;
-      value = std::isnan(v) ? "none" : fmt("%.2f", v);
+      value = std::isnan(v) ? "none" : fmt(unit == "Mach" ? "%.3f" : "%.2f", v);
       const bool in = !std::isnan(v) && (std::isnan(lo) || v >= lo) && (std::isnan(hi) || v <= hi);
       if (in) {
         verdict = "inside";
       } else if (std::isnan(v)) {
         verdict = "outside";
       } else {
-        verdict = fmt("outside %+.1f", !std::isnan(lo) && v < lo ? v - lo : v - hi);
+        verdict = fmt(unit == "Mach" ? "outside %+.3f" : "outside %+.1f", !std::isnan(lo) && v < lo ? v - lo : v - hi);
       }
       if (kind == "target") {
         ++counted;
@@ -345,12 +532,13 @@ int main(int argc, char** argv) {
         verdict = "(" + verdict + ")";
       }
     }
-    std::printf("%-19s %-7s %-5s %-21s %9s  %-15s %s\n", id.c_str(), kind.c_str(), row.at("use").c_str(), band.c_str(),
-                value.c_str(), verdict.c_str(), note.c_str());
+    std::printf("%-19s %-7s %-5s %5s %-21s %9s  %-15s %s\n", id.c_str(), kind.c_str(), row.at("use").c_str(), t.c_str(),
+                band.c_str(), value.c_str(), verdict.c_str(), note.c_str());
     if (csv) {
-      std::fprintf(csv, "%s,%s,%s,%s,%s,%s,%s,%s,%s\n", id.c_str(), kind.c_str(), row.at("use").c_str(),
-                   std::isnan(lo) ? "" : fmt("%.2f", lo).c_str(), std::isnan(hi) ? "" : fmt("%.2f", hi).c_str(),
-                   row.at("unit").c_str(), value.c_str(), verdict.c_str(), note.c_str());
+      std::fprintf(csv, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", id.c_str(), kind.c_str(), row.at("use").c_str(), t.c_str(),
+                   std::isnan(lo) ? "" : fmt(unit == "Mach" ? "%.3f" : "%.2f", lo).c_str(),
+                   std::isnan(hi) ? "" : fmt(unit == "Mach" ? "%.3f" : "%.2f", hi).c_str(), unit.c_str(), value.c_str(),
+                   verdict.c_str(), note.c_str());
     }
   }
   if (csv) std::fclose(csv);

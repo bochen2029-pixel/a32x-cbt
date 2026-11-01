@@ -5,19 +5,28 @@
 # row and prints where it lands; it scores, it does not gate.
 #
 # Columns
-#   id         stable name of the row
+#   id         stable name of the row; "-65t" names a row repeated at the second weight
 #   kind       target  - scored inside or outside its band, and counted
 #              context - scored beside its band, not counted: operational data, not capability
 #              pending - named, not yet measured
 #   group      stall, alpha, attitude, dynamics, performance
 #   condition  what the airframe is doing when measured (semicolons, not commas)
+#   weight     tonnes the bare airframe is measured at. Empty: the airframe as loaded, which is how the
+#              flown rows and the short period are measured, or a row that does not depend on weight
 #   ref        empty: the band is lo..hi. vs1g:<config> or vls:<config>: the band is that speed at the
-#              airframe's weight, from a320-speeds.csv, plus lo..hi
+#              row's weight, from a320-speeds.csv, plus lo..hi
 #   lo, hi     band; either may be empty for a one-sided limit
 #   use        fit   - a fitted model may be tuned against this row
 #              check - held out: a fit must meet it without being tuned to it, so a fit that only
 #                      memorises the fit rows is caught
 #   source     key, explained below
+#
+# Two weights, both an A320's. 48.5 t is the weight the 737 is loaded to (106,989 lb), at which this
+# table was first scored. 65 t lies between the maximum zero-fuel weight, 64.3 t, and the maximum landing
+# weight, 67.4 t, of the A320-251N whose weight and balance A32NX's flight model carries (flight_model.cfg,
+# an airline's configuration), and it is the weight of the recorded approach below (vt-wgr). Stall
+# speeds scale with the square root of weight at a fixed lift coefficient, and VLS does not quite, so
+# the second weight is a check on the lift curve, not a repeat of it.
 #
 # Sources
 #   a32nx-speeds        a320-speeds.csv: A32NX's VS1g tables, a community reconstruction of Airbus's;
@@ -28,44 +37,75 @@
 #   elac-alpha-prot     the ELAC's alpha prot (clean 6.5, CONF 1 and 1+F 11.7, CONF 2 11.9, CONF 3 11.0,
 #                       FULL 10.6 deg). VLS lies above the alpha-prot speed by design, so at VLS the
 #                       airframe must fly below alpha prot
+#   vt-wgr              A recorded A320 approach: AAIB India's final report on the serious incident to
+#                       A320-271N VT-WGR at Bengaluru on 11 November 2019, which quotes Airbus's analysis of
+#                       the flight data recorder. On the ILS glide slope at 1000 ft, autopilot on: 65.2 t,
+#                       CG 30.6 % MAC, CONF FULL (slats 27, flaps 40), gear down, 136 kt = VLS + 8 kt,
+#                       700 ft/min down, pitch +2.5 deg; +2.5 to +3.5 deg from there to 220 ft. The 65 t
+#                       row's band adds 0.5 deg either way (ours) for CG, weight and the recording's
+#                       resolution. At 48.5 t VLS sits on its 116 kt floor, 1.27 VS1g rather than 1.23, so
+#                       the attitude there is a little lower; that row keeps its wider band, first taken
+#                       from pilot literature and now inside a recorded one
 #   pilot-literature    pitch attitudes quoted in pilot material, not confirmed here against Airbus's FCTM;
 #                       the band is wide on purpose. To confirm
 #   wrap-cruise         OpenAP WRAP (LGPL-3.0; Sun, Ellerbroek and Hoekstra, Transportation Research C 2019),
 #                       fitted to ADS-B: A320 cruise is typically Mach 0.78 near FL350. That it holds there
 #                       within climb thrust is our requirement
+#   korn-lock           The drag rise OpenAP models (junzis/openap, LGPL-3.0, openap/drag.py; Sun, Hoekstra
+#                       and Ellerbroek, Aerospace 7(8) 104, 2020), from Gur, Mason and Schetz (J. Aircraft
+#                       47(4), 2010): Korn's drag-divergence Mach with an airfoil technology factor of 0.95,
+#                       the A320's 25 deg of sweep (OpenAP's a320.yml) and OpenAP's default thickness of
+#                       0.12; Lock's fourth-power rise above a critical Mach 0.108 below it. At a lift
+#                       coefficient of 0.5 the rise reaches 20 counts at Mach 0.827, Boeing's definition of
+#                       drag divergence, against an MMO of 0.82. The band, 0.02 either way, is ours: it is
+#                       what 0.01 of thickness or 0.02 of technology factor moves the answer. A model, not a
+#                       measurement, and marked fit because nothing else in the table reaches past Mach 0.78
 #   a32nx-lateral-law   A32NX's lateral normal law limits commanded roll rate to 15 deg/s, and full stick
 #                       asks for it; the airframe needs the roll authority to deliver it. Band ours
 #   mil-f-8785c         US military flying-qualities specification, public domain: Level 1, Class III
-#                       (large aircraft) - roll mode time constant at most 1.4 s; Dutch roll damping at
-#                       least 0.08 (flight phase category B). Floors for handling, not A320 data
+#                       (large aircraft), flight phase category B - roll mode time constant at most 1.4 s;
+#                       Dutch roll damping at least 0.08; short-period damping 0.30 to 2.00. Floors for
+#                       handling, not A320 data. The short period is the bare airframe's: in direct law the
+#                       pilot flies it as it is
 #   wrap                OpenAP WRAP A320, ADS-B: the range of its fitted distribution (to_acc_tof,
 #                       to_v_lof, cl_vs_avg_pre_cas, de_vs_avg_after_cas). What airlines fly, mostly at
 #                       reduced thrust and mixed weights: context for an airframe flown at full climb
 #                       thrust and one weight, never a pass mark
-id,kind,group,measure,condition,ref,lo,hi,unit,use,source
-vs1g-clean,target,stall,1-g stall speed,clean; gear up,vs1g:clean,-3,3,kt,fit,a32nx-speeds
-vs1g-conf1,target,stall,1-g stall speed,CONF 1 (slats only); gear up,vs1g:conf1,-3,3,kt,fit,a32nx-speeds
-vs1g-conf1f,target,stall,1-g stall speed,CONF 1+F; gear up,vs1g:conf1f,-3,3,kt,fit,a32nx-speeds
-vs1g-conf2,target,stall,1-g stall speed,CONF 2; gear up,vs1g:conf2,-3,3,kt,fit,a32nx-speeds
-vs1g-conf3,target,stall,1-g stall speed,CONF 3; gear down,vs1g:conf3,-3,3,kt,fit,a32nx-speeds
-vs1g-full,target,stall,1-g stall speed,CONF FULL; gear down,vs1g:full,-3,3,kt,fit,a32nx-speeds
-stall-alpha-clean,target,alpha,alpha of maximum lift,clean,,9.7,,deg,fit,elac-alpha-max+1
-stall-alpha-conf1,target,alpha,alpha of maximum lift,CONF 1 (slats only),,14.6,,deg,fit,elac-alpha-max+1
-stall-alpha-conf1f,target,alpha,alpha of maximum lift,CONF 1+F,,14.6,,deg,fit,elac-alpha-max+1
-stall-alpha-conf2,target,alpha,alpha of maximum lift,CONF 2,,15.2,,deg,fit,elac-alpha-max+1
-stall-alpha-conf3,target,alpha,alpha of maximum lift,CONF 3,,14.1,,deg,fit,elac-alpha-max+1
-stall-alpha-full,target,alpha,alpha of maximum lift,CONF FULL,,14.0,,deg,fit,elac-alpha-max+1
-vls-alpha-clean,target,alpha,alpha in level flight at VLS,clean; gear up; 1000 ft,,,6.5,deg,check,elac-alpha-prot
-vls-alpha-conf2,target,alpha,alpha in level flight at VLS,CONF 2; gear up; 1000 ft,,,11.9,deg,check,elac-alpha-prot
-vls-alpha-full,target,alpha,alpha in level flight at VLS,CONF FULL; gear down; 1000 ft,,,10.6,deg,check,elac-alpha-prot
-app-pitch-full,target,attitude,pitch attitude on a 3 deg path at VLS + 5 kt,CONF FULL; gear down; 1000 ft,,1.0,4.0,deg,check,pilot-literature
-cruise-pitch,target,attitude,pitch attitude in level flight,FL350; Mach 0.78; clean,,0.0,4.0,deg,check,pilot-literature
-cruise-tla,target,attitude,thrust lever angle for level flight,FL350; Mach 0.78; clean,,0,25,deg,check,wrap-cruise
-roll-rate,target,dynamics,steady roll rate at full lateral stick,normal law; 8000 ft; 250 kt,,13.5,16.5,deg/s,check,a32nx-lateral-law
-roll-tau,target,dynamics,roll mode time constant,full lateral stick step; normal law; 8000 ft; 250 kt,,,1.4,s,check,mil-f-8785c
-dutch-roll-zeta,target,dynamics,Dutch roll damping with the yaw damper,released after 3 s of 0.3 pedal; normal law; 8000 ft; 250 kt,,0.08,,ratio,check,mil-f-8785c
-short-period,pending,dynamics,pitch short period,normal law,,,,,check,mil-f-8785c
-to-accel,context,performance,mean acceleration from brake release to liftoff,TOGA; CONF 1+F; sea level,,1.50,2.37,m/s2,check,wrap
-lof-speed,context,performance,ground speed at liftoff,CONF 1+F; sea level; no wind,,145,187,kt,check,wrap
-climb-rate,context,performance,rate of climb at climb thrust,4000 to 7500 ft; up to 250 kt,,1500,2530,ft/min,check,wrap
-descent-rate,context,performance,rate of descent at idle,7000 to 3000 ft; 210 kt,,-1550,-840,ft/min,check,wrap
+id,kind,group,measure,condition,weight,ref,lo,hi,unit,use,source
+vs1g-clean,target,stall,1-g stall speed,clean; gear up,48.5,vs1g:clean,-3,3,kt,fit,a32nx-speeds
+vs1g-conf1,target,stall,1-g stall speed,CONF 1 (slats only); gear up,48.5,vs1g:conf1,-3,3,kt,fit,a32nx-speeds
+vs1g-conf1f,target,stall,1-g stall speed,CONF 1+F; gear up,48.5,vs1g:conf1f,-3,3,kt,fit,a32nx-speeds
+vs1g-conf2,target,stall,1-g stall speed,CONF 2; gear up,48.5,vs1g:conf2,-3,3,kt,fit,a32nx-speeds
+vs1g-conf3,target,stall,1-g stall speed,CONF 3; gear down,48.5,vs1g:conf3,-3,3,kt,fit,a32nx-speeds
+vs1g-full,target,stall,1-g stall speed,CONF FULL; gear down,48.5,vs1g:full,-3,3,kt,fit,a32nx-speeds
+stall-alpha-clean,target,alpha,alpha of maximum lift,clean,,,9.7,,deg,fit,elac-alpha-max+1
+stall-alpha-conf1,target,alpha,alpha of maximum lift,CONF 1 (slats only),,,14.6,,deg,fit,elac-alpha-max+1
+stall-alpha-conf1f,target,alpha,alpha of maximum lift,CONF 1+F,,,14.6,,deg,fit,elac-alpha-max+1
+stall-alpha-conf2,target,alpha,alpha of maximum lift,CONF 2,,,15.2,,deg,fit,elac-alpha-max+1
+stall-alpha-conf3,target,alpha,alpha of maximum lift,CONF 3,,,14.1,,deg,fit,elac-alpha-max+1
+stall-alpha-full,target,alpha,alpha of maximum lift,CONF FULL,,,14.0,,deg,fit,elac-alpha-max+1
+drag-rise,target,performance,Mach at which drag has risen 20 counts,clean; lift coefficient 0.5; FL350; against Mach 0.6,,,0.81,0.85,Mach,fit,korn-lock
+vls-alpha-clean,target,alpha,alpha in level flight at VLS,clean; gear up; 1000 ft,48.5,,,6.5,deg,check,elac-alpha-prot
+vls-alpha-conf2,target,alpha,alpha in level flight at VLS,CONF 2; gear up; 1000 ft,48.5,,,11.9,deg,check,elac-alpha-prot
+vls-alpha-full,target,alpha,alpha in level flight at VLS,CONF FULL; gear down; 1000 ft,48.5,,,10.6,deg,check,elac-alpha-prot
+app-pitch-full,target,attitude,pitch attitude on a 3 deg path at VLS + 5 kt,CONF FULL; gear down; 1000 ft,48.5,,1.0,4.0,deg,check,vt-wgr
+cruise-pitch,target,attitude,pitch attitude in level flight,FL350; Mach 0.78; clean,48.5,,0.0,4.0,deg,check,pilot-literature
+cruise-tla,target,attitude,thrust lever angle for level flight,FL350; Mach 0.78; clean,48.5,,0,25,deg,check,wrap-cruise
+vs1g-clean-65t,target,stall,1-g stall speed,clean; gear up,65,vs1g:clean,-3,3,kt,check,a32nx-speeds
+vs1g-conf1-65t,target,stall,1-g stall speed,CONF 1 (slats only); gear up,65,vs1g:conf1,-3,3,kt,check,a32nx-speeds
+vs1g-conf1f-65t,target,stall,1-g stall speed,CONF 1+F; gear up,65,vs1g:conf1f,-3,3,kt,check,a32nx-speeds
+vs1g-conf2-65t,target,stall,1-g stall speed,CONF 2; gear up,65,vs1g:conf2,-3,3,kt,check,a32nx-speeds
+vs1g-conf3-65t,target,stall,1-g stall speed,CONF 3; gear down,65,vs1g:conf3,-3,3,kt,check,a32nx-speeds
+vs1g-full-65t,target,stall,1-g stall speed,CONF FULL; gear down,65,vs1g:full,-3,3,kt,check,a32nx-speeds
+vls-alpha-clean-65t,target,alpha,alpha in level flight at VLS,clean; gear up; 1000 ft,65,,,6.5,deg,check,elac-alpha-prot
+vls-alpha-conf2-65t,target,alpha,alpha in level flight at VLS,CONF 2; gear up; 1000 ft,65,,,11.9,deg,check,elac-alpha-prot
+vls-alpha-full-65t,target,alpha,alpha in level flight at VLS,CONF FULL; gear down; 1000 ft,65,,,10.6,deg,check,elac-alpha-prot
+app-pitch-full-65t,target,attitude,pitch attitude on a 3 deg path at VLS + 8 kt,CONF FULL; gear down; 1000 ft,65,,2.0,4.0,deg,check,vt-wgr
+roll-rate,target,dynamics,steady roll rate at full lateral stick,normal law; 8000 ft; 250 kt,,,13.5,16.5,deg/s,check,a32nx-lateral-law
+roll-tau,target,dynamics,roll mode time constant,full lateral stick step; normal law; 8000 ft; 250 kt,,,,1.4,s,check,mil-f-8785c
+dutch-roll-zeta,target,dynamics,Dutch roll damping with the yaw damper,released after 3 s of 0.3 pedal; normal law; 8000 ft; 250 kt,,,0.08,,ratio,check,mil-f-8785c
+short-period,target,dynamics,short-period damping ratio,bare airframe trimmed then 2 deg of elevator for 1 s; controls otherwise fixed; clean; 8000 ft; 250 kt,,,0.30,2.00,ratio,check,mil-f-8785c
+to-accel,context,performance,mean acceleration from brake release to liftoff,TOGA; CONF 1+F; sea level,,,1.50,2.37,m/s2,check,wrap
+lof-speed,context,performance,ground speed at liftoff,CONF 1+F; sea level; no wind,,,145,187,kt,check,wrap
+climb-rate,context,performance,rate of climb at climb thrust,4000 to 7500 ft; up to 250 kt,,,1500,2530,ft/min,check,wrap
+descent-rate,context,performance,rate of descent at idle,7000 to 3000 ft; 210 kt,,,-1550,-840,ft/min,check,wrap

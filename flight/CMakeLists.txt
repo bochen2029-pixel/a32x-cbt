@@ -151,6 +151,10 @@ add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 16 --expect 
 # its band is information, not a failure.
 add_test(NAME airframe_is_scored_against_the_a320 COMMAND airframe_score --check)
 
+# The scorer's instruments read the 737's own file back: its gear drag, the Mach where its drag table
+# crosses 20 counts, a pitch pulse answered the right way round.
+add_test(NAME scorer_instruments_read_the_737_right COMMAND airframe_score --instruments)
+
 # Negative controls: the gate's two checks are shown able to fail.
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)
 add_test(NAME losing_all_air_data_ends_normal_law COMMAND law_harness --minutes 8 --fail-adr-at 240 --expect law-degrades)

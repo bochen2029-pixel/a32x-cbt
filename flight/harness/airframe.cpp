@@ -17,6 +17,7 @@
 #include "input_output/FGXMLFileRead.h"
 #include "models/FGFCS.h"
 #include "models/FGInput.h"
+#include "models/FGMassBalance.h"
 #include "models/FGOutput.h"
 #include "models/FGPropulsion.h"
 #include "simgear/misc/sg_path.hxx"
@@ -143,7 +144,8 @@ struct Airframe::Impl {
                  *gear = nullptr;
   // for measuring
   SGPropertyNode *trimAuthority = nullptr, *pitchTrim = nullptr, *elevatorPos = nullptr, *clSquared = nullptr,
-                 *wingArea = nullptr, *alphaMax = nullptr, *alphaMin = nullptr;
+                 *wingArea = nullptr, *alphaMax = nullptr, *alphaMin = nullptr, *lift = nullptr, *drag = nullptr,
+                 *qbar = nullptr;
   // read each tick
   SGPropertyNode *pressureAltitude = nullptr, *cas = nullptr, *tas = nullptr, *mach = nullptr, *hDot = nullptr,
                  *alpha = nullptr, *beta = nullptr, *pressure = nullptr, *theta = nullptr, *phi = nullptr,
@@ -176,6 +178,9 @@ struct Airframe::Impl {
     wingArea = node("metrics/Sw-sqft");
     alphaMax = node("aero/alpha-max-rad");
     alphaMin = node("aero/alpha-min-rad");
+    lift = node("forces/fwz-aero-lbs");  // wind axes, lift and drag both reported positive
+    drag = node("forces/fwx-aero-lbs");
+    qbar = node("aero/qbar-psf");
 
     pressureAltitude = node("atmosphere/pressure-altitude");
     cas = node("velocities/vc-kts");
@@ -268,12 +273,14 @@ struct Airframe::Impl {
     }
   }
 
-  // Surfaces neutral, flaps and gear where asked, for a measurement.
+  // Surfaces neutral, flaps and gear where asked, for a measurement. The gear is put there, not just
+  // commanded: it is a kinematic of the aircraft's own, and RunIC moves it by a frame's travel each call.
   void configure(double flap, bool gearDown) {
     for (SGPropertyNode* n : {elevator, aileron[0], aileron[1], rudder, speedbrake, groundSpoiler}) n->setDoubleValue(0);
     flapDeg->setDoubleValue(flap);
     flapNorm->setDoubleValue(flap / kFlapFullDeg);
     gear->setDoubleValue(gearDown ? 1 : 0);
+    gearPos->setDoubleValue(gearDown ? 1 : 0);
     trimAuthority->setDoubleValue(0);
     pitchTrim->setDoubleValue(0);
   }
@@ -291,6 +298,33 @@ struct Airframe::Impl {
     ic->SetAlphaDegIC(alphaDeg);
     ic->SetBetaDegIC(0);
     ic->SetPhiDegIC(0);
+  }
+
+  // JSBSim's longitudinal trim on a configured airframe, left in place for whatever is measured next;
+  // untrim() takes it out. JSBSim's trim searches alpha from -5 to 20 deg unless the aircraft names its
+  // own limits, and the 737 does not. Past the lift peak the search can lose the solution it
+  // straddles; keep it on the attached-flow side, where a trim means something.
+  bool trimHere(double altitudeFt, double casKn, double machNumber, double gammaDeg, double alphaPeakDeg) {
+    trimAuthority->setDoubleValue(kTrimAuthorityRad);
+    place(altitudeFt, casKn, machNumber, gammaDeg, 4);
+    if (!fdm.RunIC()) die("JSBSim could not initialise for a trim");
+    alphaMax->setDoubleValue(alphaPeakDeg * kRad);  // after RunIC, which resets them; before DoTrim reads them
+    alphaMin->setDoubleValue(-5 * kRad);
+    bool ok = true;
+    try {
+      fdm.DoTrim(JSBSim::tLongitudinal);
+    } catch (const std::exception&) {
+      ok = false;  // JSBSim's trim found no solution: reported, not fatal
+    }
+    read();
+    return ok;
+  }
+
+  void untrim() {
+    trimAuthority->setDoubleValue(0);
+    pitchTrim->setDoubleValue(0);
+    alphaMax->setDoubleValue(0);
+    alphaMin->setDoubleValue(0);
   }
 };
 
@@ -403,34 +437,58 @@ LiftPeak Airframe::liftPeak(double flapDeg, bool gearDown) {
   return peak;
 }
 
+void Airframe::setWeightLbs(double lbs) {
+  Impl& m = *impl_;
+  const auto mass = m.fdm.GetMassBalance();
+  mass->SetEmptyWeight(mass->GetEmptyWeight() + lbs - m.weight->getDoubleValue());
+  if (!m.fdm.RunIC()) die("JSBSim could not initialise after a change of weight");
+  m.read();
+}
+
+AeroPoint Airframe::aero(double altitudeFt, double mach, double alphaDeg, double flapDeg, bool gearDown) {
+  Impl& m = *impl_;
+  m.configure(flapDeg, gearDown);
+  m.place(altitudeFt, 0, mach, 0, alphaDeg);
+  // Twice, as for the lift sweep: a coefficient read from aero/cl-squared is a frame late.
+  if (!m.fdm.RunIC() || !m.fdm.RunIC()) die("JSBSim could not initialise for an aerodynamic point");
+  const double qs = m.qbar->getDoubleValue() * m.wingArea->getDoubleValue();
+  return {m.lift->getDoubleValue() / qs, m.drag->getDoubleValue() / qs};
+}
+
 TrimPoint Airframe::trim(double altitudeFt, double casKn, double mach, double gammaDeg, double flapDeg, bool gearDown) {
   Impl& m = *impl_;
-  // JSBSim's trim searches alpha from -5 to 20 deg unless the aircraft names its own limits, and the
-  // 737 does not. Past the lift peak the search can lose the solution it straddles; keep it on the
-  // attached-flow side, where a trim means something.
   const LiftPeak peak = liftPeak(flapDeg, gearDown);
   m.configure(flapDeg, gearDown);
-  m.trimAuthority->setDoubleValue(kTrimAuthorityRad);
-  m.place(altitudeFt, casKn, mach, gammaDeg, 4);
-  if (!m.fdm.RunIC()) die("JSBSim could not initialise for a trim");
-  m.alphaMax->setDoubleValue(peak.alphaDeg * kRad);  // after RunIC, which resets them; before DoTrim reads them
-  m.alphaMin->setDoubleValue(-5 * kRad);
   TrimPoint t;
-  try {
-    m.fdm.DoTrim(JSBSim::tLongitudinal);
-    t.ok = true;
-  } catch (const std::exception&) {
-    t.ok = false;  // JSBSim's trim found no solution: reported, not fatal
-  }
-  m.read();
+  t.ok = m.trimHere(altitudeFt, casKn, mach, gammaDeg, peak.alphaDeg);
   t.alphaDeg = m.state.alphaDeg;
   t.pitchDeg = m.state.pitchDeg;
   t.pitchControlDeg = m.elevatorPos->getDoubleValue() / kRad;
   t.thsDeg = t.pitchControlDeg / kThsAsElevator;
   t.tla = tlaFor(m.throttle[0]->getDoubleValue());
-  m.trimAuthority->setDoubleValue(0);
-  m.pitchTrim->setDoubleValue(0);
-  m.alphaMax->setDoubleValue(0);
-  m.alphaMin->setDoubleValue(0);
+  m.untrim();
   return t;
+}
+
+PitchResponse Airframe::pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS) {
+  Impl& m = *impl_;
+  const LiftPeak peak = liftPeak(0, false);
+  m.configure(0, false);
+  PitchResponse r;
+  r.ok = m.trimHere(altitudeFt, casKn, 0, 0, peak.alphaDeg);
+  if (r.ok) {
+    const double trimmedAlpha = m.state.alphaDeg;
+    m.elevator->setDoubleValue(pulseDeg * kRad);  // on top of the pitch control the trim holds
+    m.run(pulseS);
+    m.elevator->setDoubleValue(0);
+    constexpr double kSample = 0.02;
+    for (int k = 1; k * kSample <= recordS + 1e-9; ++k) {
+      m.run(kSample);
+      m.read();
+      r.t.push_back(k * kSample);
+      r.alphaDeg.push_back(m.state.alphaDeg - trimmedAlpha);
+    }
+  }
+  m.untrim();
+  return r;
 }

@@ -13,6 +13,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 // What the world hands the airframe for one tick.
 struct AirframeControls {
@@ -67,6 +68,18 @@ struct TrimPoint {
   double tla = 0;              // thrust lever angle for the thrust the trim needed
 };
 
+// The airframe's own lift and drag coefficients at a state, from its aerodynamics alone: no trim, pitch
+// controls at neutral, so what the tail lifts at neutral is in them and what a trim would add is not.
+struct AeroPoint {
+  double cl = 0, cd = 0;
+};
+
+// The free response after a pulse of pitch control, everything else held where the trim left it.
+struct PitchResponse {
+  bool ok = false;                  // the trim before the pulse converged
+  std::vector<double> t, alphaDeg;  // from the end of the pulse: seconds, alpha less its trimmed value
+};
+
 class Airframe {
  public:
   // Loads the aircraft, puts it on a sea-level runway at 47 N 8 E heading 360 with engines at idle
@@ -83,11 +96,20 @@ class Airframe {
   double wingAreaFt2() const;
 
   // Measurements. Each one re-initialises JSBSim: use them on an airframe that is not flying.
+  // The weight they are made at: the total brought to this by changing the empty weight, which keeps
+  // its centre of gravity, so the loaded CG moves a little toward it. The inertia is not changed.
+  void setWeightLbs(double lbs);
   // The lift coefficient against alpha at 1,000 ft and 150 kt, elevator at neutral, swept from 0 to
   // 25 deg in quarter degrees: where it peaks.
   LiftPeak liftPeak(double flapDeg, bool gearDown);
+  // Lift and drag coefficients, wings level, no sideslip, at an altitude, Mach and alpha.
+  AeroPoint aero(double altitudeFt, double mach, double alphaDeg, double flapDeg, bool gearDown);
   // JSBSim's longitudinal trim, wings level, on a flight path, at a CAS or, when mach > 0, a Mach.
   TrimPoint trim(double altitudeFt, double casKn, double mach, double gammaDeg, double flapDeg, bool gearDown);
+  // Trimmed clean in level flight, then the elevator moved by pulseDeg for pulseS seconds and returned,
+  // the stabiliser and the thrust left where the trim put them: the airframe's own pitch response, as
+  // direct law would show it. Alpha is sampled every 20 ms for recordS seconds after the pulse.
+  PitchResponse pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS);
 
   Airframe(const Airframe&) = delete;
   Airframe& operator=(const Airframe&) = delete;
