@@ -6,7 +6,7 @@
 //   airframe_fit --thrust         the engines instead: their lapse and the thrust lever schedule
 //   airframe_fit --poststall      past the stall instead: the pitch break, the tail's fade with alpha
 //                                 and the lift beyond the peak
-//   airframe_fit --drag           the drag of the landing flaps and of the gear instead
+//   airframe_fit --drag           the drag of the flaps and of the gear instead
 //   airframe_fit --spool          the pace of the engine's spool-up instead
 //   airframe_fit --from-file      start from the aircraft file's values, the last fit, not the seeds;
 //                                 the prior stays on the seeds, and what no fit row answers to keeps

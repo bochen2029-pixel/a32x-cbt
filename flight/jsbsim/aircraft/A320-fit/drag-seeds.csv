@@ -1,14 +1,17 @@
-# The drag of the landing flaps and of the gear in A320-fit.xml, before the fit: where each coefficient
+# The drag of the flaps and of the gear in A320-fit.xml, before the fit: where each coefficient
 # started, how far the fitter may move it, and why it started there. GPLv3, like everything in flight/.
-# The columns and the source keys are seeds.csv's, and so are these three seeds: they were moved here
-# from it unchanged.
+# The columns and the source keys are seeds.csv's, and so are these seeds: they were moved here from it
+# unchanged, CONF 3's, FULL's and the gear's first, CONF 1's, 1+F's and 2's after.
 #
 # `airframe_fit --drag` fits them on the fit rows of the drag group of flight/targets/a320.csv and on
-# nothing else: Airbus's drag-to-lift ratios for CONF 3 and CONF FULL with the gear down (ANP), and the
-# drag of the gear identified from A320 flight data (DLR). The profile and induced drag of the clean
-# polar, which those rows answer to as well, are held where the aerodynamic fit left them; the held-out
-# gradient rows test them.
+# nothing else: Airbus's drag-to-lift ratios for CONF 1+F, CONF 1 and CONF 2 with the gear up and for
+# CONF 3 and CONF FULL with it down (ANP), and the drag of the gear identified from A320 flight data
+# (DLR). The profile and induced drag of the clean polar, which those rows answer to as well, are held
+# where the aerodynamic fit left them; the held-out gradient rows test them.
 property,seed,sigma,lo,hi,source,note
+aero/fit/cd-conf1,0.004,0.003,0.0,0.03,estimate,slats out
+aero/fit/cd-conf1f,0.012,0.005,0.0,0.05,estimate,flaps 10 deg
+aero/fit/cd-conf2,0.020,0.006,0.0,0.06,estimate,flaps 15 deg
 aero/fit/cd-conf3,0.030,0.008,0.0,0.08,estimate,flaps 20 deg
 aero/fit/cd-full,0.050,0.010,0.01,0.12,estimate,flaps 40 deg; A32NX drag_coef_flaps 0.13 in MSFS's terms
 aero/fit/cd-gear,0.017,0.004,0.005,0.04,openap,A32NX drag_coef_gear 0.037 in MSFS's terms

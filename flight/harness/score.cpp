@@ -189,6 +189,8 @@ Condition parseCondition(const std::string& id, const std::string& text, bool le
       c.altitudeFt = 0;
     } else if (word == "clean") {
       c.config = config("clean");
+    } else if (word == "CONF 1") {
+      c.config = config("conf1");
     } else if (word == "CONF 1+F") {
       c.config = config("conf1f");
     } else if (word == "CONF 2") {

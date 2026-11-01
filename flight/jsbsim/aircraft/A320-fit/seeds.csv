@@ -48,9 +48,6 @@ aero/fit/cl-spoiler,0.60,0.15,0.2,0.9,estimate,share of lift all spoilers at 50 
 aero/fit/ground-effect,1.0,0.3,0.0,2.0,datcom,1 is the lift-curve slope of the wing over its image
 aero/fit/cd0,0.018,0.002,0.012,0.026,openap,A32NX drag_coef_zero_lift 0.01865
 aero/fit/cd-k,0.039,0.004,0.025,0.06,openap,Oswald factor 0.80; A32NX oswald_efficiency_factor 0.70
-aero/fit/cd-conf1,0.004,0.003,0.0,0.03,estimate,slats out
-aero/fit/cd-conf1f,0.012,0.005,0.0,0.05,estimate,flaps 10 deg
-aero/fit/cd-conf2,0.020,0.006,0.0,0.06,estimate,flaps 15 deg
 aero/fit/mcrit-cl05,0.703,0.03,0.60,0.85,a32nx,its drag_coef_zero_lift_mach_tab reaches 20 counts at Mach 0.803
 aero/fit/cd-spoiler,0.06,0.02,0.01,0.15,estimate,all spoilers at 50 deg; A32NX drag_coef_spoilers 0.058
 aero/fit/cd-beta,0.4,0.2,0.0,1.5,estimate,drag of sideslip per rad squared

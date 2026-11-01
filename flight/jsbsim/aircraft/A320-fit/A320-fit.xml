@@ -359,9 +359,9 @@
          of 0.5 -->
     <property value="0.018" persistent="true">aero/fit/cd0</property>
     <property value="0.039" persistent="true">aero/fit/cd-k</property>
-    <property value="0.004" persistent="true">aero/fit/cd-conf1</property>
-    <property value="0.012" persistent="true">aero/fit/cd-conf1f</property>
-    <property value="0.020" persistent="true">aero/fit/cd-conf2</property>
+    <property value="0.010001334" persistent="true">aero/fit/cd-conf1</property>
+    <property value="0.0052352525" persistent="true">aero/fit/cd-conf1f</property>
+    <property value="0.010427904" persistent="true">aero/fit/cd-conf2</property>
     <property value="0.017361329" persistent="true">aero/fit/cd-conf3</property>
     <property value="0.038476316" persistent="true">aero/fit/cd-full</property>
     <property value="0.029700816" persistent="true">aero/fit/cd-gear</property>
