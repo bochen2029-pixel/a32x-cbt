@@ -8,7 +8,8 @@
   "scripts": {
     "build": "node tools/build.mjs",
     "test": "node --test test/*.test.mjs",
-    "release": "node tools/release.mjs"
+    "release": "node tools/release.mjs",
+    "release:gate": "npm run release && node tools/verify-release.mjs"
   },
   "dependencies": {
     "three": "0.186.1"
