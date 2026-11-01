@@ -1,35 +1,68 @@
 # A32X CBT
 
-A trainer for the A320's fly-by-wire, built to run on a laptop with no graphics card and no installer.
+![Our A320 on the ILS to Dallas Fort Worth's runway 17C at dusk, the Dallas skyline on the horizon](docs/guide/skyline.jpg)
+
+An A320 fly-by-wire trainer that runs on a laptop with no graphics card and no installer: FlyByWire's
+real A32NX flight-control computers, hand-flown in the browser from Dallas Fort Worth.
+
+**[Fly it in your browser](https://flightsim.bochen.xyz)** ·
+**[Download for Windows](https://github.com/bochen2029-pixel/a32x-cbt/releases)** (unzip, double-click
+`A32X.exe`) · **[The pilot's guide](docs/pilots-guide.md)**
+
 It has two parts:
 
 - **A flight simulator** (`flight/`, GPLv3). The real FlyByWire A32NX flight-control computers — two
   ELACs, three SECs, two FACs, two FCDCs — run at 50 Hz and fly a JSBSim airframe of ours, fitted to
-  57 cited A320 targets. It flies in the browser, straight from `file://`, with a joystick or the
-  keyboard, starting at Dallas Fort Worth (KDFW). It also flies headless, which is how it is tested.
+  cited A320 data. It flies in the browser, straight from `file://`, with a joystick or the keyboard,
+  starting at Dallas Fort Worth (KDFW). It also flies headless, which is how it is tested.
 - **A systems trainer** (`app/`, MIT): systems, ECAM, flows and graded drills.
 
-![the systems trainer](reference/ui-panel-and-drills.png)
+<table>
+<tr>
+<td width="50%"><img src="docs/guide/approach-cockpit.jpg" alt="The flight deck on the ILS to 17C"></td>
+<td width="50%"><img src="docs/guide/night-chase.jpg" alt="The A320 at night over Dallas, the approach lights of 17C ahead"></td>
+</tr>
+<tr>
+<td>On the ILS from the flight deck. Its displays are stand-ins until P8 draws the real ones.</td>
+<td>Night over Dallas: the approach lights and the touchdown zone of 17C ahead.</td>
+</tr>
+<tr>
+<td><img src="docs/guide/debrief.jpg" alt="The debrief after the stop: the gate's verdict band by band, and the flight's moments"></td>
+<td><img src="reference/ui-panel-and-drills.png" alt="The systems trainer: overhead switches, the ELEC page and a drill"></td>
+</tr>
+<tr>
+<td>After the stop: the gate's judge, band by band, and the flight's moments, reversers included.</td>
+<td>The systems trainer: the overhead switches, the ELEC page and a drill, cold and dark to powered.</td>
+</tr>
+</table>
 
 Unofficial. "Airbus", "A320" and "A32NX" belong to their owners. Not affiliated with Airbus, FlyByWire
 Simulations or Aerowinx, and not suitable for type training.
 
 ## Where it stands
 
-The flight simulator is the product now, and it is mid-build (`ROADMAP.md`, P7):
+The flight simulator is the product, at its third pre-release,
+[0.1.2](https://github.com/bochen2029-pixel/a32x-cbt/releases/tag/v0.1.2) (`ROADMAP.md`, P7):
 
-- The A32NX computers fly our A320 from takeoff to landing in normal law, and run for 30 minutes at
-  50 Hz with no NaN or infinity on any output (the P6 gate).
-- The airframe is inside all 57 of its targets: stall speeds and alphas by configuration, approach
-  attitudes, the drag rise, roll and damping, and its engines' thrust against the type certificate and
-  the public ANP noise-and-performance database, whose A320 entry Airbus developed. Public numbers,
-  not Airbus's flight-test data. `flight/README.md` has every row, its source, and the fit.
-- In the browser: the flight core as WebAssembly, a joystick mapped from the pilot's own hands, a view
-  of KDFW drawn as a 1980s full-flight simulator drew it, real runways with an ILS, wind and
-  turbulence.
-- Next: failures that reach every law, the protections driven and held, then the gate — five
-  hand-flown ILS approaches, stable and repeatable. After that the cockpit displays (P8) and the FMS
-  (P9).
+- The A32NX computers fly our A320 in normal, alternate and direct law. The instructor's failures take
+  them there, and the scripted crew lands every degraded case but the double hydraulic losses. In the
+  clean configuration the protections hold the A320's bank, load-factor and low-speed angle-of-attack
+  limits.
+- The airframe is fitted to cited data: stall speeds and alphas by configuration, approach attitudes,
+  the drag rise, roll and damping, the stall and past it, the drag of the flaps and gear, and its
+  engines' thrust against the type certificate and the public ANP noise-and-performance database,
+  whose A320 entry Airbus developed. Public numbers, not Airbus's flight-test data. `flight/README.md`
+  has every row, its source, and the fit.
+- In the browser: the flight core as WebAssembly, a joystick mapped from the pilot's own hands, KDFW
+  and Dallas drawn as a 1980s full-flight simulator drew them (a GPU tier over a floor that runs on
+  software rendering), an ILS on every runway, wind and turbulence, ground idle and reverse thrust.
+- The gate's judge scores a hand-flown ILS against stabilised-approach bands; a saved recording names
+  the build that flew it and replays natively to the same verdict.
+- Left in P7: the gate itself, five hand-flown approaches, stable and repeatable. Known open: a fast,
+  full back-stick pull with full flaps can stall it, A32NX's protection acting on a lagged alpha
+  (asked upstream as
+  [flybywiresim/aircraft discussion #11009](https://github.com/flybywiresim/aircraft/discussions/11009)).
+  After the gate, the cockpit displays (P8) and the FMS (P9).
 
 ## Run it
 
@@ -43,10 +76,13 @@ npm run build:web
 npm run check      # typecheck + 182 tests
 ```
 
-**The flight simulator** has a Windows release, built and checked here and not yet published
-(*Releases*, below). It builds with CMake against two clones kept outside this repository, A32NX and
-JSBSim at pinned commits; the browser build adds Emscripten 6.0.12 and Node. `flight/README.md` has
-the recipes: *Build and run*, *The browser simulator* and *Getting the sources*. Native, in short:
+**The flight simulator.** Nothing to build: fly it at [flightsim.bochen.xyz](https://flightsim.bochen.xyz),
+or take the Windows zip from [Releases](https://github.com/bochen2029-pixel/a32x-cbt/releases), unzip it
+and double-click `A32X.exe` (Windows SmartScreen warns on the unsigned launcher: More info, Run anyway).
+The [pilot's guide](docs/pilots-guide.md) says how to fly it. To build it yourself: CMake against two
+clones kept outside this repository, A32NX and JSBSim at pinned commits; the browser build adds
+Emscripten 6.0.12 and Node. `flight/README.md` has the recipes: *Build and run*, *The browser
+simulator* and *Getting the sources*. Native, in short:
 
 ```
 cmake -S flight -B flight/build -DA32NX_DIR=<A32NX clone> -DJSBSIM_DIR=<JSBSim clone>
@@ -66,7 +102,8 @@ Two artefacts, as `ROADMAP.md` sets them (*Decisions*, packaging):
   **`a32x-sim-0.1.2-source.zip`**, its Corresponding Source: this repository at the commit and the
   exact A32NX and JSBSim sources compiled into it, with Emscripten 6.0.12 named. `npm run release` in
   `flight/web` builds both, the first from the second, and `npm run release:gate` checks them
-  (`flight/README.md`, *The Windows release*). Built and checked; not published.
+  (`flight/README.md`, *The Windows release*). Published on GitHub as pre-releases, each with its
+  source zip and `SHA256SUMS`; from 0.1.1 the pilot's guide comes beside them as a PDF.
 
 Neither needs an installer. Unzip, then open the trainer's `index.html`, or run the simulator's
 `A32X.exe`. Tested in Chrome and Edge on Windows; other browsers and systems have not been tried.
@@ -77,7 +114,7 @@ Neither needs an installer. Unzip, then open the trainer's `index.html`, or run 
 |---|---|
 | `app/` | the systems trainer — systems, panel, ECAM, procedures. MIT. |
 | `flight/` | the flight simulator: the A32NX computers flying a JSBSim airframe, the browser shell (`flight/web`), and the tools that score and fit the airframe. GPLv3. |
-| `docs/` | provenance, architecture, and the design study of the PSX reference |
+| `docs/` | the pilot's guide (and its pictures), provenance, architecture, and the design study of the PSX reference |
 | `reference/` | screenshots |
 
 ## Licence and provenance
