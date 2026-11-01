@@ -135,7 +135,9 @@ scripted crew flares that way and touches down at about 160 fpm, the nose 5.8° 
 threshold. Keep straight on the centreline with the rudder; on the ground, Shift + PgDn pulls the
 levers into reverse thrust, and the brakes stop you. REV shows at the overlay's bottom right and in each
 N1 dial on the flight deck's engine display, as the A320's does: amber while a reverser's doors move,
-green once they are open; outside, the four doors on each engine's cowl swing out.
+green once they are open; outside, the four doors on each engine's cowl swing out. While a reverser's
+doors move, either way, its engine holds idle, as the A320's FADEC does: push the levers forward while
+the doors stow, about two seconds, and there is no thrust until they are in.
 
 **Flare progressively.** A normal approach and flare reach about 8° of angle of attack, some 2° short
 of where the protection begins. An abrupt pull to full back stick near the ground, in CONF FULL, can
