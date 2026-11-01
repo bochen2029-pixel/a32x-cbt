@@ -428,8 +428,10 @@ struct Airframe::Impl {
     pitchTrim->setDoubleValue(0);
   }
 
-  // The initial condition a measurement starts from: wings level, no sideslip.
+  // The initial condition a measurement starts from: wings level, no sideslip, in flight, so the engines
+  // idle at approach idle whatever the airframe was built from (a runway start leaves ground idle).
   void place(double altitudeFt, double casKn, double machNumber, double gammaDeg, double alphaDeg) {
+    if (groundIdleSelect) groundIdleSelect->setDoubleValue(groundIdle = 0);
     auto ic = fdm.GetIC();
     ic->SetAltitudeASLFtIC(altitudeFt);
     if (machNumber > 0) {
