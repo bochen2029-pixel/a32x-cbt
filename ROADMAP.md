@@ -256,6 +256,36 @@ this and has not been re-decided here.
 - [ ] **Done means runway to runway**: takeoff, climb, cruise, approach, landing and rollout, hand
       flown with a joystick in the browser through the real A32NX laws, with no install.
 
+Clarified the same day: *"even as CBT it should simulate ... real flying, all three laws, fmc, lnav,
+vnav not just the system but the 3d path/flight/flying in the 'air' through the 'world' ... bank angle
+protection, stall protection etc"*. So B is a simulator of the A320 in flight — real laws, real
+guidance, a real path through the world — with the CBT's procedures and scoring on top.
+
+- [ ] **All three laws, actually reached**: normal, alternate (1 and 2) and direct, and the
+      transitions between them, driven by real failures from the instructor station — air data and
+      inertial losses, hydraulic losses, ELAC and SEC failures — including direct law at gear-down
+      in alternate. The computers already contain every law (P6 reached normal and alternate 2);
+      what is missing is an airframe and failures that take them there. From **P7**.
+- [ ] **The protections, exercised and graded**: bank angle (33° spiral stability, 67° limit, less in
+      high-speed and high-AoA protection), pitch attitude (+30°/−15°, less with flaps and at low
+      speed), load factor (+2.5/−1 g clean), high angle of attack (α prot, α max, and α floor
+      commanding TOGA through the autothrust), high speed (VMO/MMO). They live in the ELAC and FAC
+      already, but mean something only on an airframe that can stall and overspeed: the **P7**
+      airframe must be judged on credible high-AoA and high-Mach behaviour, not on trim alone.
+      α floor also needs the FMGC's autothrust and the FADEC.
+- [ ] **Flying through the world**: position over a round earth — latitude, longitude, altitude,
+      wind — moving with the aircraft, and runways at real places. The FDM provides it from **P7**;
+      the P6 stub holds a fixed latitude and longitude.
+- [ ] **FMS and guidance — the Airbus LNAV and VNAV**: a flight plan; managed lateral navigation
+      (NAV, with SID, STAR, approach legs and DIR TO); managed vertical (CLB and DES profiles with
+      constraints); autopilot, flight director and autothrust. The guidance half exists in the clone
+      as `FmgcComputer`, not yet built. The flight-management half is TypeScript welded to MSFS in
+      A32NX, and its navigation data comes from MSFS or Navigraph, which this project cannot use — an
+      open source of airports, runways, waypoints and procedures has to be chosen (FAA CIFP and
+      OurAirports are public-domain candidates). **P9**. §5's "route, performance, progress, DIR"
+      is now too narrow: managed vertical is in.
+- [ ] **An exterior aircraft model**: not now; perhaps later, the operator's call.
+
 What that implies, for whoever plans P7: the computers and JSBSim reach the browser as WebAssembly
 (the A32NX computers are already built for wasm in MSFS); Three.js (MIT) and the Gamepad API are
 browser-native; and the browser product links A32NX, so it is GPLv3 like `flight/`.
