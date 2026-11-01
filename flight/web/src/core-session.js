@@ -6,9 +6,13 @@
 
 export class CoreSession {
   // mod: an instance from the module's factory (createFlightCore). airframe: 'a320', '737' or '' for the
-  // default. scripted: the harness's own crew flies, or the caller's inputs do.
-  constructor(mod, airframe, scripted) {
-    const rc = mod.ccall('flight_start', 'number', ['string', 'number'], [airframe || '', scripted ? 1 : 0]);
+  // default. scripted: the harness's own crew flies, or the caller's inputs do. scenario: where the
+  // flight starts (core.h, flight_start_scenario: "approach;distance=10;wind=227/15"), or '' for the
+  // runway.
+  constructor(mod, airframe, scripted, scenario = '') {
+    const rc = mod.ccall('flight_start_scenario', 'number', ['string', 'number', 'string'],
+                         [airframe || '', scripted ? 1 : 0, scenario || '']);
+    if (rc === -3) throw new Error(`the scenario '${scenario}' was not understood`);
     if (rc !== 0) throw new Error(`flight_start refused: ${rc} (one flight per module instance)`);
     this.mod = mod;
     this.scripted = Boolean(scripted);

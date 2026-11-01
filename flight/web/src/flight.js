@@ -21,10 +21,10 @@ export class Flight {
     this.worker.onerror = (e) => onError(e.message || 'the worker failed');
   }
 
-  start(airframe, scripted) {
+  start(airframe, scripted, scenario = '') {
     return new Promise((resolve, reject) => {
       this.started = { resolve, reject };
-      this.worker.postMessage({ type: 'start', airframe, scripted });
+      this.worker.postMessage({ type: 'start', airframe, scripted, scenario });
     });
   }
 

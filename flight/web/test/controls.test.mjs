@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, calibrated, coreInputs, deadzone, detented, initialControls, moveLever } from '../src/controls.js';
+import { apply, calibrated, controlsFromInputs, coreInputs, deadzone, detented, initialControls, moveLever } from '../src/controls.js';
 
 const none = new Set();
 
@@ -76,4 +76,18 @@ test('the input slots are the core\'s own names, and both levers move together',
   assert.equal(inputs.tla_1, 25);
   assert.equal(inputs.tla_2, 25);
   for (const name of Object.keys(inputs)) assert.match(name, /^[a-z0-9_]+$/);
+});
+
+test('the controls start where the flight core started: an approach keeps its flaps, gear and thrust', () => {
+  const names = ['pitch', 'roll', 'pedals', 'tla_1', 'tla_2', 'brakes', 'speedbrake', 'spoilers_armed', 'flap_lever',
+                 'gear_down', 'rudder_trim', 'rudder_trim_reset'];
+  const index = Object.fromEntries(names.map((n, i) => [n, i]));
+  const runway = [0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0];
+  assert.deepEqual(controlsFromInputs(runway, index), initialControls(), 'on the runway: parked, idle, flaps up');
+  const approach = [0, 0, 0, 7.1, 7.1, 0, 0, 1, 4, 1, 0, 0];
+  const c = controlsFromInputs(approach, index);
+  assert.deepEqual([c.tla, c.flapLever, c.gearDown, c.spoilersArmed, c.parkingBrake], [7.1, 4, true, true, false]);
+  const back = coreInputs(c);
+  assert.deepEqual([back.tla_1, back.flap_lever, back.gear_down, back.brakes], [7.1, 4, 1, 0],
+                   'and handed back to the core unchanged until the hands move them');
 });

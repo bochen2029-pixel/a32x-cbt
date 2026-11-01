@@ -39,11 +39,27 @@ export function detented(tla) {
   return t;
 }
 
-// Where a session starts: parked on the parking brake, levers at idle, gear down, flaps up.
+// Where a session on the runway starts: parked on the parking brake, levers at idle, gear down, flaps up.
 export function initialControls() {
   return {
     pitch: 0, roll: 0, pedals: 0, tla: 0, toeBrakes: 0, parkingBrake: true, speedbrake: 0,
     spoilersArmed: false, flapLever: 0, gearDown: true, rudderTrim: 0, rudderTrimReset: false, takeover: false,
+  };
+}
+
+// Where the flight core's start left the levers (its ready message's inputs, by name): on the runway,
+// what initialControls gives; on an approach, the flap lever and gear set, the thrust levers at the
+// angle the trim needed, the brakes off. The hands take over from there.
+export function controlsFromInputs(values, index) {
+  const v = (name) => values[index[name]];
+  return {
+    ...initialControls(),
+    tla: Math.max(0, Math.min(45, v('tla_1'))),
+    flapLever: Math.max(0, Math.min(4, Math.round(v('flap_lever')))),
+    gearDown: v('gear_down') >= 0.5,
+    spoilersArmed: v('spoilers_armed') >= 0.5,
+    speedbrake: v('speedbrake') > 0 ? 1 : 0,
+    parkingBrake: v('brakes') >= 1,
   };
 }
 

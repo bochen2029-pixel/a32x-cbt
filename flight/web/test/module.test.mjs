@@ -75,3 +75,30 @@ test('the scripted crew lands it, and a replay into a second instance matches ti
   assert.equal(b.hash, a.hash, 'the same state, every tick, to the last bit');
   assert.ok(a.msPerTick < 5, `a tick costs ${a.msPerTick.toFixed(3)} ms of its 20`);
 });
+
+test('from an approach start the scripted crew flies the ILS onto the runway it reports', { skip }, async () => {
+  const s = new CoreSession(await createFlightCore(), airframe, true, 'approach;wind=227/15');
+  const f = s.field;
+  let state = s.state();
+  assert.equal(state[f.rwy_heading_deg], 137, 'LSZH 14');
+  assert.ok(Math.abs(state[f.thr_along_m] / 1852 - 10) < 0.01 && state[f.loc_valid] && state[f.gs_valid], 'on both beams at 10 nm');
+  let touchdown = null, worstLoc = 0, worstGs = 0, lastVs = 0;
+  for (let k = 0; k < 6 * 60 * 50 && !touchdown; ++k) {
+    s.step(1);
+    state = s.state();
+    const ft = state[f.thr_height_ft];
+    if (ft <= 1000 && ft >= 50) {
+      worstLoc = Math.max(worstLoc, Math.abs(state[f.loc_dots]));
+      worstGs = Math.max(worstGs, Math.abs(state[f.gs_dots]));
+    }
+    if (state[f.on_ground]) touchdown = { past: -state[f.thr_along_m], off: state[f.thr_right_m], sinkFpm: lastVs };
+    lastVs = state[f.vs_fpm];
+  }
+  assert.ok(touchdown, 'it lands within six minutes');
+  console.log(`  ILS in a 15 kt crosswind: worst ${worstLoc.toFixed(2)} dots LOC, ${worstGs.toFixed(2)} dots G/S from 1,000 ft to ` +
+              `50 ft; touchdown ${touchdown.past.toFixed(0)} m past the threshold, ${touchdown.off.toFixed(1)} m off the ` +
+              `centreline, ${touchdown.sinkFpm.toFixed(0)} fpm`);
+  assert.ok(worstLoc <= 1 && worstGs <= 1, 'within a dot of both beams');
+  assert.ok(touchdown.past >= 300 && touchdown.past <= 900 && Math.abs(touchdown.off) <= 5, 'in the touchdown zone, on the centreline');
+  assert.ok(touchdown.sinkFpm > -360, 'at a normal sink rate');
+});

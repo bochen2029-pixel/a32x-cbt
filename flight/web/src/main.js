@@ -1,23 +1,26 @@
 // The flyable simulator's page: the flight core in its worker at 50 Hz under the display's own rate.
 // GPLv3.
 //
-//   index.html?airframe=a320|737&crew=hands|script[&bench=MINUTES]
+//   index.html?airframe=a320|737&crew=hands|script[&scenario=approach;distance=10;wind=227/15][&bench=MINUTES]
 //
 // crew=script lets the harness's own crew fly; the default is hands on the controls: a joystick through
-// the Gamepad API, or the keyboard (hands.js). bench=MINUTES first flies that many simulated minutes as
-// fast as the worker can, in batches of 500 ticks, and reports the cost of a tick: the headroom under
-// 50 Hz, free of the timer's coarse grain.
+// the Gamepad API, or the keyboard (hands.js). scenario= starts the flight elsewhere than on the runway:
+// "approach" puts it on LSZH 14's ILS, trimmed, its options as core.h lists them. bench=MINUTES first
+// flies that many simulated minutes as fast as the worker can, in batches of 500 ticks, and reports the
+// cost of a tick: the headroom under 50 Hz, free of the timer's coarse grain.
 
 import { Clock } from './clock.js';
-import { apply, coreInputs, initialControls } from './controls.js';
+import { apply, controlsFromInputs, coreInputs, initialControls } from './controls.js';
 import { Flight } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
+import { runwayFromState } from './scene-math.js';
 import { softwareRendering, View } from './view.js';
 
 const params = new URLSearchParams(location.search);
 const airframe = params.get('airframe') || '';
 const scripted = params.get('crew') === 'script';
+const scenario = params.get('scenario') || '';
 const benchTicks = Math.round(Number(params.get('bench') || 0) * 60 * 50);
 const bench = { ticks: 0, ms: 0, wallMs: 0, done: benchTicks <= 0 };
 
@@ -89,6 +92,7 @@ function report() {
     error,
     airframe: airframe || 'default',
     crew: scripted ? 'script' : 'hands',
+    scenario: scenario || 'runway',
     simulatedS: value('t_s'),
     stepsDue: clock.steps,
     stepsDropped: clock.dropped + droppedWaiting,
@@ -125,8 +129,10 @@ function show() {
   const t = latest.texts;
   const c = controls;
   const lever = DETENT_NAMES[c.tla] || `${c.tla.toFixed(1)}°`;
+  const thr = value('thr_along_m');
   hud.textContent =
-    `${value('t_s').toFixed(1).padStart(7)} s   ${t.phase}\n` +
+    `${value('t_s').toFixed(1).padStart(7)} s   ${t.phase}` +
+    (thr > 0 ? `   THR ${(thr / 1852).toFixed(1)} nm` : '') + '\n' +
     `CAS ${value('cas_kn').toFixed(0).padStart(4)} kt   ALT ${value('alt_ft').toFixed(0).padStart(6)} ft   ` +
     `V/S ${value('vs_fpm').toFixed(0).padStart(6)}\n` +
     `PITCH ${value('pitch_deg').toFixed(1).padStart(6)}   BANK ${value('roll_deg').toFixed(1).padStart(6)}   ` +
@@ -180,7 +186,8 @@ function frame(now) {
     view.render();
     keep(renderMs, performance.now() - t0);
     if (realMs > 0) keep(frameMs, realMs);
-    overlay.draw(s, view.camera.fov, controls, null);
+    const ils = s.loc_valid || s.gs_valid ? { loc: s.loc_valid ? s.loc_dots : null, gs: s.gs_valid ? s.gs_dots : null } : null;
+    overlay.draw(s, view.camera.fov, controls, ils);
   }
   show();
   if (!error) requestAnimationFrame(frame);
@@ -191,9 +198,10 @@ function keep(list, v) {
   if (list.length > 3000) list.splice(0, list.length - 3000);
 }
 
-flight.start(airframe, scripted).then((ready) => {
+flight.start(airframe, scripted, scenario).then((ready) => {
   inputs = Float64Array.from(ready.inputs);  // the core's own start: FLT CTL pushbuttons pressed
-  view.setOrigin(ready.state[flight.field.lat_deg], ready.state[flight.field.lon_deg]);
+  controls = controlsFromInputs(inputs, flight.input);
+  view.setRunway(runwayFromState(Object.fromEntries(flight.stateNames.map((n, i) => [n, ready.state[i]]))));
   status.textContent = bench.done ? 'flying' : 'measuring a tick…';
   if (bench.done) {
     requestAnimationFrame(frame);

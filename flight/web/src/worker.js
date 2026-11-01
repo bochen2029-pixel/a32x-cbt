@@ -2,7 +2,7 @@
 // followed by this, made into a Blob by the page: no file is fetched, so it runs from file:// with the
 // network off. One flight per worker; a new flight is a new worker. GPLv3.
 //
-// Messages in:  {type: 'start', airframe, scripted}
+// Messages in:  {type: 'start', airframe, scripted, scenario}
 //               {type: 'step', ticks, inputs}   inputs: a Float64Array in the core's order, or null
 // Messages out: {type: 'ready', inputNames, stateNames, state, texts, inputs}
 //               {type: 'state', state, texts, inputs, ticks, ms}   ms: what the ticks cost in here
@@ -25,7 +25,7 @@ self.onmessage = async (event) => {
   try {
     if (m.type === 'start') {
       if (session) throw new Error('this worker has flown its flight; start a new worker');
-      session = new CoreSession(await createFlightCore(), m.airframe, m.scripted);
+      session = new CoreSession(await createFlightCore(), m.airframe, m.scripted, m.scenario);
       report('ready', { inputNames: session.inputNames, stateNames: session.stateNames });
     } else if (m.type === 'step') {
       const t0 = performance.now();

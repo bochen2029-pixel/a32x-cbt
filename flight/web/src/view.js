@@ -1,9 +1,10 @@
 // The out-the-window view, as a full-flight simulator's visual system drew it in the 1980s: flat-shaded
-// polygons, light points that stay sharp at any range, a horizon in haze. A runway with its lights, a
-// PAPI, a few buildings, dusk or night. three.js (MIT), bundled. GPLv3.
+// polygons, light points that stay sharp at any range, a horizon in haze. The runway the flight core
+// names, where it is, with its lights and a PAPI; a few buildings; dusk, night or day. three.js (MIT),
+// bundled. GPLv3.
 
 import * as THREE from 'three';
-import { eye, origin, PAPI, papiBox, papiWhite, RUNWAY } from './scene-math.js';
+import { eye, origin, papiBoxes, papiWhite } from './scene-math.js';
 
 const DEG = Math.PI / 180;
 
@@ -12,6 +13,8 @@ const TIMES = {
   night: { zenith: 0x02030a, horizon: 0x101828, ground: 0x0c100c, fog: 0x0a0e16, sun: 0.0, ambient: 0.12, windows: 1.0, lights: 1.0 },
   day: { zenith: 0x3a6ab0, horizon: 0xbcd0e0, ground: 0x4a5a38, fog: 0xb0c4d4, sun: 1.0, ambient: 0.7, windows: 0.0, lights: 0.6 },
 };
+
+const SKY_M = 35000;
 
 // A deterministic pseudo-random sequence, so the scene is the same every time.
 function rng(seed) {
@@ -43,7 +46,8 @@ export function softwareRendering() {
 
 export class View {
   constructor(canvas, time = 'dusk', antialias = true) {
-    const t = TIMES[time] || TIMES.dusk;
+    this.t = TIMES[time] || TIMES.dusk;
+    const t = this.t;
     this.renderer = new THREE.WebGLRenderer({ canvas, antialias });
     this.renderer.setPixelRatio(Math.min(2, globalThis.devicePixelRatio || 1));
     this.scene = new THREE.Scene();
@@ -58,34 +62,38 @@ export class View {
 
     this.sky(t);
     this.ground(t);
-    this.runway();
-    this.lights(t);
-    this.buildings(t);
     this.renderer.setClearColor(t.zenith);
   }
 
+  // The sky, a dome that travels with the eye: it is always the same distance away, inside the far plane.
   sky(t) {
-    const g = new THREE.SphereGeometry(35000, 32, 16);
+    const g = new THREE.SphereGeometry(SKY_M, 32, 16);
     const zenith = new THREE.Color(t.zenith), horizon = new THREE.Color(t.horizon);
     const colors = [];
     const p = g.attributes.position;
     for (let i = 0; i < p.count; ++i) {
-      const up = Math.max(0, p.getY(i) / 35000);
+      const up = Math.max(0, p.getY(i) / SKY_M);
       const c = horizon.clone().lerp(zenith, Math.pow(up, 0.45));
       colors.push(c.r, c.g, c.b);
     }
     g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-    this.scene.add(new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false })));
+    this.skyDome = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.BackSide, fog: false, depthWrite: false }));
+    this.scene.add(this.skyDome);
   }
 
-  // Fields of slightly different shades, flat shaded: what gives the eye its speed and height.
+  // Fields of slightly different shades, flat shaded, 60 km across around the runway: what gives the eye
+  // its speed and height. Under them, ground of one shade to the horizon.
   ground(t) {
+    const base = new THREE.Mesh(new THREE.PlaneGeometry(200000, 200000).rotateX(-Math.PI / 2),
+                                new THREE.MeshLambertMaterial({ color: new THREE.Color(t.ground).multiplyScalar(0.9) }));
+    base.position.y = -0.2;
+    this.scene.add(base);
     const g = new THREE.PlaneGeometry(60000, 60000, 120, 120).toNonIndexed();
     g.rotateX(-Math.PI / 2);
-    const base = new THREE.Color(t.ground), r = rng(47008);
+    const shade = new THREE.Color(t.ground), r = rng(47008);
     const colors = [];
     for (let f = 0; f < g.attributes.position.count / 6; ++f) {
-      const c = base.clone().offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.06);
+      const c = shade.clone().offsetHSL((r() - 0.5) * 0.04, (r() - 0.5) * 0.1, (r() - 0.5) * 0.06);
       for (let v = 0; v < 6; ++v) colors.push(c.r, c.g, c.b);
     }
     g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
@@ -94,63 +102,73 @@ export class View {
     this.scene.add(mesh);
   }
 
-  // The pavement and its paint: threshold bars, centreline dashes, the aiming point.
-  runway() {
-    const { thresholdZ: z0, length, width, aimingPoint } = RUNWAY;
-    const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(width, length + 120).rotateX(-Math.PI / 2),
-                                   new THREE.MeshLambertMaterial({ color: 0x3c3c40 }));
-    asphalt.position.set(0, 0, z0 - length / 2);
-    this.scene.add(asphalt);
-    const paint = [];
-    const box = (x, z, w, l) => paint.push({ x, z, w, l });
-    for (let k = 0; k < 8; ++k) {  // threshold bars, either side of the centreline
-      const x = 3 + k * 2.4;
-      box(x, z0 - 30, 1.8, 30);
-      box(-x, z0 - 30, 1.8, 30);
-    }
-    for (let z = z0 - 80; z > z0 - length + 80; z -= 50) box(0, z, 0.9, 30);  // centreline dashes
-    box(9, z0 - aimingPoint, 9, 45);
-    box(-9, z0 - aimingPoint, 9, 45);
-    const geoms = paint.map(({ x, z, w, l }) => new THREE.PlaneGeometry(w, l).rotateX(-Math.PI / 2).translate(x, 0.02, z));
-    const g = mergeGeometries(geoms);
-    this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0xd8d8d0 })));
+  // The runway the flight names (scene-math.js, runwayFromState): the world's origin at its landing
+  // threshold, the pavement, paint, lights and buildings built in the runway's own frame and turned to its
+  // heading, the PAPI where the glide meets it.
+  setRunway(rwy) {
+    this.rwy = rwy;
+    this.origin = origin(rwy.lat, rwy.lon);
+    const group = new THREE.Group();
+    this.pavement(group, rwy);
+    this.lights(group, rwy);
+    this.buildings(group, rwy);
+    group.rotation.y = -rwy.headingDeg * DEG;
+    this.scene.add(group);
+
+    this.papiAt = papiBoxes(rwy);
+    this.papi = points(this.papiAt.flatMap((b) => [b.x, b.y, b.z]), new Array(12).fill(1), 5);
+    this.scene.add(this.papi);
   }
 
-  lights(t) {
-    const { thresholdZ: z0, length, width } = RUNWAY;
+  // The pavement, from the start of its displaced part to the far end, and its paint: threshold bars and
+  // line, centreline dashes, the aiming point 400 m in.
+  pavement(group, { lengthM: length, widthM: width, displacedM: displaced }) {
+    const asphalt = new THREE.Mesh(new THREE.PlaneGeometry(width, length + displaced).rotateX(-Math.PI / 2),
+                                   new THREE.MeshLambertMaterial({ color: 0x3c3c40 }));
+    asphalt.position.set(0, 0, (displaced - length) / 2);
+    group.add(asphalt);
+    const paint = [];
+    const box = (x, z, w, l) => paint.push({ x, z, w, l });
+    box(0, -1, width - 2, 1.8);  // the threshold line
+    for (let k = 0; k < 8; ++k) {  // threshold bars, either side of the centreline
+      const x = 3 + k * 2.4;
+      box(x, -30, 1.8, 30);
+      box(-x, -30, 1.8, 30);
+    }
+    for (let z = -80; z > -length + 80; z -= 50) box(0, z, 0.9, 30);  // centreline dashes
+    box(9, -400, 9, 45);
+    box(-9, -400, 9, 45);
+    const geoms = paint.map(({ x, z, w, l }) => new THREE.PlaneGeometry(w, l).rotateX(-Math.PI / 2).translate(x, 0.02, z));
+    group.add(new THREE.Mesh(mergeGeometries(geoms), new THREE.MeshLambertMaterial({ color: 0xd8d8d0 })));
+  }
+
+  lights(group, { lengthM: length, widthM: width, displacedM: displaced }) {
+    const t = this.t;
     const pos = [], col = [];
     const add = (x, y, z, c) => {
       pos.push(x, y, z);
       col.push(c.r * t.lights, c.g * t.lights, c.b * t.lights);
     };
     const white = new THREE.Color(1, 0.95, 0.8), green = new THREE.Color(0.2, 1, 0.3), red = new THREE.Color(1, 0.15, 0.1);
-    for (let z = z0; z >= z0 - length; z -= 60) {  // edge lights
+    for (let z = displaced; z >= -length; z -= 60) {  // edge lights
       add(-width / 2 - 1, 0.4, z, white);
       add(width / 2 + 1, 0.4, z, white);
     }
-    for (let z = z0 - 15; z > z0 - length; z -= 15) add(0, 0.1, z, z < z0 - length + 900 ? red : white);  // centreline
+    for (let z = -15; z > -length; z -= 15) add(0, 0.1, z, z < -length + 900 ? red : white);  // centreline
     for (let x = -width / 2; x <= width / 2; x += 3) {
-      add(x, 0.3, z0, green);              // threshold
-      add(x, 0.3, z0 - length, red);       // runway end
+      add(x, 0.3, 0, green);         // threshold
+      add(x, 0.3, -length, red);     // runway end
     }
     for (let d = 30; d <= 900; d += 30) {  // approach lights: a line, and a crossbar at 300 m
-      add(0, 0.5 + d * 0.01, z0 + d, white);
-      if (d === 300) for (let x = -15; x <= 15; x += 3) add(x, 3.5, z0 + d, white);
+      add(0, 0.5 + d * 0.01, d, white);
+      if (d === 300) for (let x = -15; x <= 15; x += 3) add(x, 3.5, d, white);
     }
-    this.scene.add(points(pos, col, 3));
-
-    // the PAPI, its colours set each frame from the eye
-    const papiPos = [];
-    for (let k = 0; k < 4; ++k) {
-      const b = papiBox(k);
-      papiPos.push(b.x, b.y, b.z);
-    }
-    this.papi = points(papiPos, new Array(12).fill(1), 5);
-    this.scene.add(this.papi);
-    this.papiZ = PAPI.z;
+    group.add(points(pos, col, 3));
   }
 
-  buildings(t) {
+  // A terminal, a tower, hangars and a few others, right of the runway: generic, not the airport's own.
+  buildings(group) {
+    const t = this.t;
     const r = rng(1983);
     const geoms = [], windows = [], windowColours = [];
     const lit = new THREE.Color(1, 0.85, 0.5).multiplyScalar(t.windows);
@@ -163,13 +181,12 @@ export class View {
         }
       }
     };
-    place(260, RUNWAY.thresholdZ - 900, 160, 40, 14);   // terminal
-    place(230, RUNWAY.thresholdZ - 1150, 12, 12, 34);   // tower
-    for (let k = 0; k < 4; ++k) place(300 + k * 70, RUNWAY.thresholdZ - 1500 - k * 30, 55, 50, 18 + 6 * r());  // hangars
-    for (let k = 0; k < 6; ++k) place(520 + r() * 300, RUNWAY.thresholdZ - 600 - r() * 1600, 20 + r() * 30, 20 + r() * 30, 8 + r() * 20);
-    const g = mergeGeometries(geoms);
-    this.scene.add(new THREE.Mesh(g, new THREE.MeshLambertMaterial({ color: 0x8a8580, flatShading: true })));
-    if (t.windows > 0) this.scene.add(points(windows, windowColours, 2));
+    place(260, -900, 160, 40, 14);   // terminal
+    place(230, -1150, 12, 12, 34);   // tower
+    for (let k = 0; k < 4; ++k) place(300 + k * 70, -1500 - k * 30, 55, 50, 18 + 6 * r());  // hangars
+    for (let k = 0; k < 6; ++k) place(520 + r() * 300, -600 - r() * 1600, 20 + r() * 30, 20 + r() * 30, 8 + r() * 20);
+    group.add(new THREE.Mesh(mergeGeometries(geoms), new THREE.MeshLambertMaterial({ color: 0x8a8580, flatShading: true })));
+    if (t.windows > 0) group.add(points(windows, windowColours, 2));
   }
 
   resize(width, height) {
@@ -178,17 +195,13 @@ export class View {
     this.camera.updateProjectionMatrix();
   }
 
-  // The camera where the pilot's eye is; the PAPI as that eye sees it.
-  // The flight's start, where the drawn runway is: from its first state.
-  setOrigin(lat, lon) {
-    this.origin = origin(lat, lon);
-  }
-
+  // The camera where the pilot's eye is, the sky around it, and the PAPI as that eye sees it.
   update(lat, lon, radioHeightFt, pitchDeg, rollDeg, headingDeg) {
     const e = eye(this.origin, lat, lon, radioHeightFt, pitchDeg, headingDeg);
     this.camera.position.set(e.x, e.y, e.z);
     this.camera.rotation.set(pitchDeg * DEG, -headingDeg * DEG, -rollDeg * DEG);
-    const white = papiWhite(e);
+    this.skyDome.position.copy(this.camera.position);
+    const white = papiWhite(e, this.papiAt);
     const c = this.papi.geometry.attributes.color;
     white.forEach((w, k) => c.setXYZ(k, 1, w ? 1 : 0.12, w ? 0.95 : 0.1));
     c.needsUpdate = true;

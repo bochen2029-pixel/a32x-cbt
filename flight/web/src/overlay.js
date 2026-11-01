@@ -97,33 +97,41 @@ export class Overlay {
     if (s.ra_ft < 2500) box(cx, cy + H * 0.22, `${s.ra_ft.toFixed(0)}`, 'center', s.ra_ft < 400 ? AMBER : GREEN);
     box(cx, H - 28 * r, `HDG ${String(Math.round(s.heading_deg) % 360).padStart(3, '0')}`, 'center');
 
-    // localizer below, glideslope right: two dots each way, the diamond when there is a beam
-    g.strokeStyle = ils ? WHITE : DIM;
-    g.fillStyle = ils ? WHITE : DIM;
+    // localizer below, glideslope right: two dots each way, and each beam's diamond where the beam lies
+    // from the aircraft (core.h: + right, + up), so flying toward the diamond centres it
     const dot = 22 * r;
-    for (let k = -2; k <= 2; ++k) {
-      if (!k) continue;
-      for (const [x, y] of [[cx + k * dot, H * 0.82], [cx + W * 0.22, cy + k * dot]]) {
+    const clampDots = (v) => Math.max(-2.5, Math.min(2.5, v));
+    const diamond = (x, y) => {
+      g.beginPath();
+      g.moveTo(x, y - 7 * r);
+      g.lineTo(x + 7 * r, y);
+      g.lineTo(x, y + 7 * r);
+      g.lineTo(x - 7 * r, y);
+      g.fill();
+    };
+    const scales = [
+      { valid: ils && ils.loc != null, at: (k) => [cx + k * dot, H * 0.82], mark: () => diamond(cx + clampDots(ils.loc) * dot, H * 0.82),
+        label: () => g.fillText('LOC —', cx, H * 0.82 + 18 * r) },
+      { valid: ils && ils.gs != null, at: (k) => [cx + W * 0.22, cy - k * dot], mark: () => diamond(cx + W * 0.22, cy - clampDots(ils.gs) * dot),
+        label: () => g.fillText('G/S —', cx + W * 0.22, cy + 2.8 * dot) },
+    ];
+    g.textAlign = 'center';
+    for (const scale of scales) {
+      g.strokeStyle = scale.valid ? WHITE : DIM;
+      g.fillStyle = scale.valid ? WHITE : DIM;
+      for (let k = -2; k <= 2; ++k) {
+        if (!k) continue;
+        const [x, y] = scale.at(k);
         g.beginPath();
         g.arc(x, y, 3 * r, 0, 2 * Math.PI);
         g.stroke();
       }
-    }
-    if (ils) {
-      g.fillStyle = '#ff40ff';
-      const diamond = (x, y) => {
-        g.beginPath();
-        g.moveTo(x, y - 7 * r);
-        g.lineTo(x + 7 * r, y);
-        g.lineTo(x, y + 7 * r);
-        g.lineTo(x - 7 * r, y);
-        g.fill();
-      };
-      diamond(cx + Math.max(-2.5, Math.min(2.5, ils.loc)) * dot, H * 0.82);
-      diamond(cx + W * 0.22, cy + Math.max(-2.5, Math.min(2.5, ils.gs)) * dot);
-    } else {
-      g.textAlign = 'center';
-      g.fillText('ILS —', cx, H * 0.82 + 18 * r);
+      if (scale.valid) {
+        g.fillStyle = '#ff40ff';
+        scale.mark();
+      } else {
+        scale.label();
+      }
     }
 
     // flaps and gear, bottom right
