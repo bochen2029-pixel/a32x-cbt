@@ -1,5 +1,5 @@
-// The P6 law harness: ELAC 1-2, SEC 1-3, FAC 1-2 and FCDC 1-2 from A32NX, unmodified, stepped at
-// 50 Hz against the stub world. GPLv3.
+// The law harness: ELAC 1-2, SEC 1-3, FAC 1-2 and FCDC 1-2 from A32NX, unmodified, stepped at 50 Hz
+// in a world whose airframe is JSBSim's 737 (world.h, airframe.h). GPLv3.
 //
 //   law_harness --minutes 30 --gate         the P6 gate: thirty simulated minutes, all of it checked
 //   law_harness --minutes 3 --check-determinism
@@ -201,7 +201,20 @@ struct Results {
   Range checkPullElevator, checkPushElevator, checkLeftAileron, checkRightAileron;
   Range doubletPullQ, doubletPushQ, doubletPullN;
   int touchdowns = 0;
+  double crashedAt = -1;
   std::map<std::string, double> firstEntered;
+  // each touchdown: the sink rate in the last airborne tick, the attitude and speed at contact, and
+  // the peak load factor in the two seconds after
+  struct Touchdown {
+    double at = 0, sinkFpm = 0, pitch = 0, bank = 0, cas = 0, peakG = 0;
+  };
+  std::vector<Touchdown> landings;
+  // steady flight — no pitch rate, one g, wings level: where the elevator rests, and where the THS sits
+  long long steadyTicks = 0;
+  double steadyElevatorSum = 0;
+  Range ths1g;
+  // the cruise pedal kick: the sideslip it raised, and what was left of it four to seven seconds after
+  double kickBeta = 0, kickResidualR = -1, kickResidualBeta = -1;
 };
 
 Results run(const Options& opt, FILE* trace) {
@@ -213,6 +226,7 @@ Results run(const Options& opt, FILE* trace) {
 
   const long long ticks = static_cast<long long>(std::llround(opt.minutes * 60 / kDt));
   bool wasOnGround = true;
+  double lastAirborneVs = 0;
   Phase lastPhase = world.phase();
   double liftoffAt = -1;
   double cruiseAt = -1;
@@ -221,7 +235,8 @@ Results run(const Options& opt, FILE* trace) {
   if (trace) {
     std::fprintf(trace,
                  "t,phase,alt_ft,tas_kn,pitch_deg,bank_deg,heading_deg,nz_g,q_deg_s,stick_pitch,stick_roll,"
-                 "elev_l,elev_r,ths,ail_l,ail_r,spoiler3_l,spoiler3_r,pitch_law,lateral_law,healthy\n");
+                 "elev_l,elev_r,ths,ail_l,ail_r,spoiler3_l,spoiler3_r,pitch_law,lateral_law,healthy,"
+                 "cas_kn,ra_ft,vs_fpm,alpha_deg,beta_deg,gamma_deg,r_deg_s,pedals,rudder,tla,flap_deg\n");
   }
 
   const auto start = std::chrono::steady_clock::now();
@@ -243,8 +258,12 @@ Results run(const Options& opt, FILE* trace) {
     const PitchLawState pl = pitchLaw(tx.fcdcBus[0].efcs_status_word_1);
     const LateralLawState ll = lateralLaw(tx.fcdcBus[0].efcs_status_word_1);
     if (wasOnGround && !world.onGround()) liftoffAt = t;
-    if (!wasOnGround && world.onGround()) ++r.touchdowns;
+    if (!wasOnGround && world.onGround()) {
+      ++r.touchdowns;
+      r.landings.push_back({t, lastAirborneVs, world.pitchDeg(), world.rollDeg(), world.casKn(), world.loadFactor()});
+    }
     wasOnGround = world.onGround();
+    if (!world.onGround()) lastAirborneVs = world.verticalSpeedFpm();
     const bool settledInFlight = !world.onGround() && liftoffAt >= 0 && t - liftoffAt > 5 &&
                                  world.phase() != Phase::Flare;
     if (settledInFlight) {
@@ -287,6 +306,9 @@ Results run(const Options& opt, FILE* trace) {
     r.bank.add(world.rollDeg());
     r.load.add(world.loadFactor());
     r.altitude.add(world.altitudeFt());
+    if (!r.landings.empty() && world.time() - r.landings.back().at <= 2) {
+      r.landings.back().peakG = std::max(r.landings.back().peakG, world.loadFactor());
+    }
 
     // the ground check legs: pull, push, left, right, three seconds each from 21 s
     const double gc = r.firstEntered.count("ground-check") ? world.time() - r.firstEntered["ground-check"] : -1;
@@ -301,20 +323,37 @@ Results run(const Options& opt, FILE* trace) {
       const double c = world.time() - cruiseAt;
       if (c > 20 && c < 22.5) r.doubletPullQ.add(world.pitchRateDegS()), r.doubletPullN.add(world.loadFactor());
       if (c > 22 && c < 24.5) r.doubletPushQ.add(world.pitchRateDegS());
+      // the pedal kick: 0.3 of left pedal from +150 s to +153 s, the steep turn from +160 s
+      if (c > 150 && c < 157) r.kickBeta = std::max(r.kickBeta, std::abs(world.betaDeg()));
+      if (c > 157 && c < 160) {
+        r.kickResidualR = std::max(r.kickResidualR, std::abs(world.yawRateDegS()));
+        r.kickResidualBeta = std::max(r.kickResidualBeta, std::abs(world.betaDeg()));
+      }
+    }
+
+    if (settledInFlight && std::abs(world.pitchRateDegS()) < 0.2 && std::abs(world.loadFactor() - 1) < 0.03 &&
+        std::abs(world.rollDeg()) < 3) {
+      ++r.steadyTicks;
+      r.steadyElevatorSum += std::abs((s.elevator[0] + s.elevator[1]) / 2);
+      r.ths1g.add(s.ths);
     }
 
     if (trace && k % 25 == 0) {
-      std::fprintf(trace, "%.2f,%s,%.1f,%.1f,%.2f,%.2f,%.1f,%.3f,%.2f,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%s,%s,%d\n",
+      std::fprintf(trace, "%.2f,%s,%.1f,%.1f,%.2f,%.2f,%.1f,%.3f,%.2f,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%s,%s,%d,",
                    world.time(), phaseName(world.phase()), world.altitudeFt(), world.tasKn(), world.pitchDeg(),
                    world.rollDeg(), world.headingDeg(), world.loadFactor(), world.pitchRateDegS(), world.crew.pitch,
                    world.crew.roll, s.elevator[0], s.elevator[1], s.ths, s.aileron[0], s.aileron[1], s.spoiler[0][2],
                    s.spoiler[1][2], name(pl), name(ll), healthy ? 1 : 0);
+      std::fprintf(trace, "%.1f,%.1f,%.0f,%.2f,%.2f,%.2f,%.2f,%.3f,%.2f,%.1f,%.1f\n", world.casKn(), world.radioHeightFt(),
+                   world.verticalSpeedFpm(), world.alphaDeg(), world.betaDeg(), world.flightPathDeg(),
+                   world.yawRateDegS(), world.crew.pedals, s.rudder, world.crew.tla[0], world.flapDeg());
     }
     ++r.ticks;
   }
   r.wallSeconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
   r.digest = digest.h;
   r.unhealthyAtEnd = unhealthyList(efcs.transmitted());
+  r.crashedAt = world.crashedAt();
   return r;
 }
 
@@ -362,6 +401,36 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
                       fmt("pitch rate peaked at %+.2f deg/s", r.doubletPullQ.hi));
     failed += verdict("and loads the airframe", r.doubletPullN.hi > 1.15, fmt("load factor peaked at %.2f g", r.doubletPullN.hi));
     failed += verdict("the push pitches it down", r.doubletPushQ.lo < -1.5, fmt("pitch rate reached %+.2f deg/s", r.doubletPushQ.lo));
+  } else if (which == "autotrim") {
+    // Normal law trims with the stabiliser: in steady flight the elevator comes back to rest.
+    const double elevator = r.steadyTicks ? r.steadyElevatorSum / r.steadyTicks : 99;
+    failed += verdict("steady flight long enough to judge", r.steadyTicks > 50 * 30, fmt("%.0f s steady", r.steadyTicks * kDt));
+    failed += verdict("the elevator rests near neutral in steady flight", elevator < 1.0,
+                      fmt("mean |elevator| %.2f deg", elevator));
+    failed += verdict("because the THS carries the trim", std::max(std::abs(r.ths1g.lo), std::abs(r.ths1g.hi)) > 1.0,
+                      fmt("THS %.2f..%.2f deg in steady flight", r.ths1g.lo, r.ths1g.hi));
+  } else if (which == "pedal-kick") {
+    // Three seconds of left pedal in cruise: the aircraft yaws, and the FACs' yaw damper takes it out.
+    failed += verdict("the kick yaws the aircraft", r.kickBeta > 1.5, fmt("sideslip peaked at %.2f deg", r.kickBeta));
+    failed += verdict("four to seven seconds after it the yaw rate is gone", r.kickResidualR >= 0 && r.kickResidualR < 0.5,
+                      fmt("yaw rate at most %.2f deg/s", r.kickResidualR));
+    failed += verdict("and so is the sideslip", r.kickResidualBeta >= 0 && r.kickResidualBeta < 0.5,
+                      fmt("sideslip at most %.2f deg", r.kickResidualBeta));
+  } else if (which == "landing") {
+    // The first landing of the run, against the A320's limits: 600 fpm and 2.6 g are its hard-landing
+    // thresholds and 11.7 deg of pitch touches its tail. 360 fpm, 6 ft/s, is this harness's bar for
+    // a normal landing, well inside them.
+    failed += verdict("a landing was flown", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
+    if (!r.landings.empty()) {
+      const auto& l = r.landings.front();
+      int bounces = 0;
+      for (const auto& b : r.landings) bounces += b.at > l.at && b.at - l.at < 30;
+      failed += verdict("touched down at a normal sink rate", l.sinkFpm > -360, fmt("%.0f fpm", l.sinkFpm));
+      failed += verdict("mains first, tail clear", l.pitch > 0 && l.pitch < 10, fmt("pitch %.1f deg", l.pitch));
+      failed += verdict("wings level", std::abs(l.bank) < 3, fmt("bank %.1f deg", l.bank));
+      failed += verdict("under the hard-landing load factor", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
+      failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
+    }
   } else if (which == "law-degrades") {
     // The negative control for the gate's law check: lose all air data and normal law must go.
     std::string seen;
@@ -407,7 +476,7 @@ int gate(const Results& r, const Options& opt) {
   failed += verdict("no NaN or infinity on any output, any tick", r.scan.bad == 0,
                     r.scan.bad ? fmt("%.0f bad values, first at %.2f s", static_cast<double>(r.scan.bad), r.scan.firstBadAt) + " in " + r.scan.firstBadWhere
                                : fmt("%.0f values checked", static_cast<double>(r.ticks * Scan::valuesPerTick())));
-  failed += verdict("the stub world stayed finite", r.worldFinite, r.worldFinite ? "" : fmt("first non-finite at %.2f s", r.worldBadAt));
+  failed += verdict("the world stayed finite", r.worldFinite, r.worldFinite ? "" : fmt("first non-finite at %.2f s", r.worldBadAt));
   failed += verdict("every computer healthy once up, to the end", r.unhealthyTicksAfterUp == 0 && r.unhealthyAtEnd == " none",
                     fmt("healthy from %.2f s; %.0f unhealthy ticks after", r.healthyFrom, static_cast<double>(r.unhealthyTicksAfterUp)) + "; at the end:" + r.unhealthyAtEnd);
   failed += verdict("normal law in pitch and roll throughout settled flight", p >= 0.999 && l >= 0.999,
@@ -437,7 +506,8 @@ bool childDigest(const char* argv0, double minutes, std::string& out) {
 void usage() {
   std::printf(
       "law_harness [--minutes N] [--gate] [--check-determinism] [--trace file.csv] [--digest]\n"
-      "            [--expect power-up|ground-check|normal-law|stick-response|law-degrades|scanner-catches-nan]\n"
+      "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|landing|\n"
+      "                      law-degrades|scanner-catches-nan]\n"
       "            [--fail-adr-at SECONDS]\n");
 }
 
@@ -500,17 +570,22 @@ int main(int argc, char** argv) {
 
   if (opt.digestOnly) {
     std::printf("digest %016llx\n", static_cast<unsigned long long>(r.digest));
-    return r.scan.bad == 0 ? 0 : 1;
+    return r.scan.bad == 0 && r.crashedAt < 0 ? 0 : 1;
   }
 
   const double sim = r.ticks * kDt;
-  std::printf("A32NX %s: ELAC x2, SEC x3, FAC x2, FCDC x2 against the stub world\n", A32NX_COMMIT);
+  std::printf("A32NX %s: ELAC x2, SEC x3, FAC x2, FCDC x2 flying JSBSim %s's %s\n", A32NX_COMMIT, JSBSIM_COMMIT,
+              Airframe::model());
   std::printf("%.0f ticks = %.1f simulated s in %.2f wall s (%.0fx real time)\n", static_cast<double>(r.ticks), sim,
               r.wallSeconds, sim / std::max(r.wallSeconds, 1e-9));
   std::printf("flight: %d touchdowns; altitude %.0f..%.0f ft, pitch %.1f..%.1f deg, bank %.1f..%.1f deg, load %.2f..%.2f g\n",
               r.touchdowns, r.altitude.lo, r.altitude.hi, r.pitch.lo, r.pitch.hi, r.bank.lo, r.bank.hi, r.load.lo, r.load.hi);
   std::printf("surfaces: elevator %.1f..%.1f, THS %.2f..%.2f, aileron %.1f..%.1f, spoiler 3 %.1f..%.1f deg\n",
               r.elevator.lo, r.elevator.hi, r.ths.lo, r.ths.hi, r.aileron.lo, r.aileron.hi, r.spoiler.lo, r.spoiler.hi);
+  for (const auto& l : r.landings) {
+    std::printf("touchdown at %.1f s: sink %.0f fpm, pitch %.1f deg, bank %.1f deg, %.0f kt, peak %.2f g\n", l.at, l.sinkFpm,
+                l.pitch, l.bank, l.cas, l.peakG);
+  }
   std::printf("phases first entered:");
   for (const auto& [phase, at] : r.firstEntered) std::printf(" %s %.0fs", phase.c_str(), at);
   std::printf("\nlaws in settled flight (%.0f s):", r.flightTicks * kDt);
@@ -520,8 +595,13 @@ int main(int argc, char** argv) {
               r.ticks * Scan::valuesPerTick(), static_cast<unsigned long long>(r.digest));
 
   int failed = 0;
+  // Whatever the run was asked, an airframe that flew into the ground voids what came after it.
+  if (r.crashedAt >= 0) {
+    failed += verdict("the airframe stayed out of the ground", false,
+                      fmt("it went below the runway at %.1f s, and the world froze there", r.crashedAt));
+  }
   if (!opt.expect.empty()) failed += checkExpectation(opt.expect, r, opt);
   if (opt.gate) failed += gate(r, opt);
-  if (opt.gate || !opt.expect.empty()) std::printf("%s\n", failed ? "FAILED" : "PASSED");
+  if (opt.gate || !opt.expect.empty() || failed) std::printf("%s\n", failed ? "FAILED" : "PASSED");
   return failed ? 1 : 0;
 }

@@ -1,0 +1,77 @@
+// The airframe: JSBSim flying an aircraft definition read from the pinned clone, with the A32NX
+// servos positioning its surfaces. GPLv3; JSBSim is LGPL-2.1, linked and never copied.
+//
+// Everything that crosses this boundary is in the A32NX computers' frame and in the units the
+// aircraft's own instruments use — degrees, knots, feet, g — so world.cpp never sees JSBSim and
+// JSBSim never sees the computers. airframe.cpp is the one place the two frames meet.
+//
+// The aircraft definition is JSBSim's 737 (docs/provenance.md says why not its A320): an A320-class
+// airframe, not an A320. Its own flight controls still run, and a system of ours
+// (flight/jsbsim/a32nx-surfaces.xml) overrides their outputs in the same pass, so the aerodynamics
+// see the servos' positions and nothing else.
+
+#pragma once
+
+#include <memory>
+
+// What the world hands the airframe for one tick.
+struct AirframeControls {
+  // Surfaces, computers' frame, degrees.
+  double elevator = 0;          // + trailing edge down; the mean of left and right
+  double ths = 0;               // + nose down
+  double aileron[2] = {0, 0};   // left, right; + trailing edge down
+  double spoiler[2][5] = {};    // left, right, spoilers 1..5; extended is negative
+  double rudder = 0;            // + trailing edge left: the computers' yaw damper and pedal sense
+  double flap = 0;              // flap surface angle
+  // The rest of the aeroplane.
+  double tla[2] = {0, 0};       // thrust lever angle, deg: 0 idle, 25 CL, 35 MCT, 45 TOGA
+  double brake[2] = {0, 0};     // left, right; 0..1 of full braking
+  double noseWheel = 0;         // nose wheel steering angle, deg, + right
+  bool gearDown = true;         // the gear lever
+};
+
+// What the airframe is doing after the tick. Truth, not sensor output: the world encodes sensors.
+struct AirframeState {
+  // air data, ISA, standard setting
+  double pressureAltitudeFt = 0;
+  double casKn = 0, tasKn = 0, mach = 0;
+  double verticalSpeedFpm = 0;
+  double alphaDeg = 0, betaDeg = 0;
+  double staticPressureHpa = 1013.25;
+  // attitude and motion
+  double pitchDeg = 0, rollDeg = 0, headingDeg = 360;   // true heading, (0, 360]
+  double pDegS = 0, qDegS = 0, rDegS = 0;               // body rates
+  double rollRateDegS = 0, pitchRateDegS = 0, headingRateDegS = 0;  // Euler angle rates
+  double nx = 0, ny = 0, nz = 1;                        // specific force, g: what accelerometers feel
+  double groundSpeedKn = 0, trackDeg = 360, flightPathDeg = 0;
+  double latitudeDeg = 0, longitudeDeg = 0;
+  double radioHeightFt = 0;                             // reads zero standing on the runway
+  // gear, engines, mass
+  bool noseWow = true, leftWow = true, rightWow = true;
+  double wheelSpeedKn = 0;                              // main wheels
+  double gearPosition = 1;                              // 0 up and locked .. 1 down and locked
+  double n1[2] = {0, 0};
+  double weightLbs = 0, cgPercentMac = 0;
+};
+
+class Airframe {
+ public:
+  // Loads the aircraft, puts it on a sea-level runway at 47 N 8 E heading 360 with engines at idle
+  // and brakes on, and lets it settle on its gear. A load failure is reported and ends the process.
+  Airframe();
+  ~Airframe();
+
+  // One tick: JSBSim runs at 200 Hz, four frames per 20 ms.
+  void step(double dt, const AirframeControls& controls);
+
+  const AirframeState& state() const;
+
+  static const char* model();
+
+  Airframe(const Airframe&) = delete;
+  Airframe& operator=(const Airframe&) = delete;
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};

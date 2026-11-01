@@ -1,4 +1,4 @@
-// The stub world. See world.h for what it is and is not. GPLv3.
+// The world. See world.h for what it is and is not. GPLv3.
 
 #include "world.h"
 
@@ -12,10 +12,8 @@
 namespace {
 
 constexpr double kPi = 3.14159265358979323846;
-constexpr double kG = 9.80665;          // m/s2
-constexpr double kMsPerKt = 0.514444;   // m/s per knot
-constexpr double kFtsPerKt = 1.687810;  // ft/s per knot
 constexpr double kDeg = kPi / 180.0;
+constexpr double kFtsPerKt = 1.687810;  // ft/s per knot
 
 constexpr unsigned kNo = 3, kNcd = 1;  // SSM: NormalOperation, NoComputedData
 
@@ -41,46 +39,69 @@ double follow(double x, double target, double ratePerS, double dt) {
   return x + clamp(target - x, -ratePerS * dt, ratePerS * dt);
 }
 
-double wrap360(double deg) {
-  deg = std::fmod(deg, 360.0);
-  return deg <= 0 ? deg + 360.0 : deg;
-}
-
 double wrap180(double deg) {
   deg = std::fmod(deg + 180.0, 360.0);
   if (deg < 0) deg += 360.0;
   return deg - 180.0;
 }
 
-// Airframe constants. A stub: plausible magnitudes, not A320 data.
-constexpr double kVref = 250;        // kt at which clean alpha 2.5 holds 1 g
-constexpr double kAlpha0 = 2.5;      // deg
-constexpr double kOmegaSp = 2.5;     // rad/s, short-period natural frequency
-constexpr double kZetaSp = 0.8;
-constexpr double kElevatorToAlpha = 0.35;  // deg of trimmed alpha per deg of elevator, trailing edge down = nose down
-constexpr double kThsToAlpha = 0.6;        // deg of trimmed alpha per deg of THS
-constexpr double kThsSign = -1.0;          // the computers' THS frame: positive = nose down, like the elevator
-constexpr double kRollTau = 0.4;           // s
-constexpr double kRollPerAileron = 1.5;    // deg/s of roll rate per deg of differential aileron
-constexpr double kRollPerSpoiler = 0.4;    // deg/s per deg of differential spoiler
-constexpr double kAileronSign = 1.0;       // + (left - right)/2 rolls right: positive aileron is trailing edge down
-constexpr double kVr = 145;                // kt, rotation
-constexpr double kTailstrikeDeg = 11.5;
-
-// Zero-lift alpha by configuration: flaps buy lift at a given alpha.
-const double kAlphaZeroLift[5] = {-2.0, -4.0, -5.0, -6.0, -8.0};
-// FPPU angles the SFCC reports (slats, flaps) per configuration.
+// The SFCCs' slat and flap pick-off angles at each lever position, CONF 1+F's flap angle, and the flap
+// surface angle each flap pick-off angle means (a320_systems hydraulic/mod.rs).
 const double kSlatFppu[5] = {0, 222.27, 272.27, 272.27, 334.16};
 const double kFlapFppu[5] = {0, 0, 145.51, 168.35, 251.97};
+constexpr double kFlap1FFppu = 120.22;
+const double kFlapFppuBreak[12] = {0, 35.66, 69.32, 89.7, 105.29, 120.22, 145.51, 168.35, 189.87, 210.69, 231.25, 251.97};
+const double kFlapSurfaceDeg[12] = {0, 0, 2.5, 5, 7.5, 10, 15, 20, 25, 30, 35, 40};
+
+double flapSurfaceDeg(double fppu) {
+  if (fppu <= kFlapFppuBreak[0]) return kFlapSurfaceDeg[0];
+  for (int k = 1; k < 12; ++k) {
+    if (fppu <= kFlapFppuBreak[k]) {
+      const double f = (fppu - kFlapFppuBreak[k - 1]) / (kFlapFppuBreak[k] - kFlapFppuBreak[k - 1]);
+      return kFlapSurfaceDeg[k - 1] + f * (kFlapSurfaceDeg[k] - kFlapSurfaceDeg[k - 1]);
+    }
+  }
+  return kFlapSurfaceDeg[11];
+}
+
+constexpr double kRudderPedalDeg = 25;    // full pedal (a320_systems: rudder travel 50 deg, end to end)
+constexpr double kPedalSteeringDeg = 6;   // nose wheel at full pedal; the tiller is not modelled
+
+// The crew's numbers for this airframe at its weight, about 107,000 lb. Calibrated airspeeds, knots.
+// JSBSim's 737 stalls near 150 kt clean and 113 kt at full flap here; it has no slats, so CONF 1 is
+// clean to it. The approach speeds keep about 1.23 VS and stay under the A320's flap limits.
+constexpr double kVr = 140;              // rotate
+constexpr double kV2 = 165;              // initial climb in CONF 1+F, to the acceleration altitude
+constexpr double kVFlapsUp = 200;        // accelerate to this in 1+F (limit 215), then retract
+constexpr double kVSlatsIn = 225;        // until the slats are in (CONF 1 limit 230)
+constexpr double kVClean = 250;          // clean, below 10,000 ft
+constexpr double kVApp = 145;            // final approach, CONF FULL (limit 177)
+constexpr double kTaxiKn = 15;           // groundspeed
+constexpr double kRotateDegS = 3;        // pitch rate of the rotation
+constexpr double kRotateToDeg = 12.5;    // pitch the rotation aims at; the wheels leave before it
+constexpr double kAccelerationFt = 1500; // take-off thrust to here, then climb thrust and accelerate
+constexpr double kCruiseFt = 8000, kPatternFt = 2000;
+// The flare: from 33 ft the sink rate is taken down exponentially, 3 s to e, toward 2 ft/s, and the
+// sidestick pulls 0.06 per ft/s of sink above that. 33 ft is where 3 s meets the glide's 13 ft/s.
+constexpr double kFlareFt = 33, kFlareTauS = 3, kFlareGain = 0.06;
+// Approach, configured in stages as the speed comes back: the speed flown in each stage, and the
+// speed below which the next configuration goes in (CONF 1, 2, 3 with the gear, FULL).
+const double kVStage[5] = {210, 200, 180, 165, kVApp};
+const double kVNextStage[4] = {215, 203, 183, 168};
 
 // The sidestick of a pilot flying a flight path angle and a heading through the laws.
 double pitchFor(double gammaTarget, double gamma, double q) {
   return clamp(0.08 * (gammaTarget - gamma) - 0.02 * q, -0.6, 0.6);
 }
 
-double rollFor(double headingTarget, double heading, double phi, double bankLimit = 25) {
-  const double phiTarget = clamp(2.0 * wrap180(headingTarget - heading), -bankLimit, bankLimit);
-  return clamp(0.05 * (phiTarget - phi), -0.5, 0.5);
+// Bank held closed loop, damped on roll rate: in normal law the stick asks for roll rate, in direct
+// law for aileron, and this flies both.
+double bankFor(double phiTarget, double phi, double p) {
+  return clamp(0.05 * (phiTarget - phi) - 0.02 * p, -0.5, 0.5);
+}
+
+double rollFor(double headingTarget, double heading, double phi, double p, double bankLimit = 25) {
+  return bankFor(clamp(2.0 * wrap180(headingTarget - heading), -bankLimit, bankLimit), phi, p);
 }
 
 }  // namespace
@@ -101,30 +122,84 @@ const char* phaseName(Phase p) {
   return "?";
 }
 
-World::World() {
+World::World() : airframe_(std::make_unique<Airframe>()) {
+  lastCas_ = air().casKn;
   sense();
 }
 
 void World::step(double dt, const Orders& orders) {
   t_ += dt;
-  fly();
+  fly(dt);
   actuate(dt, orders);
-  airframe(dt);
+  if (crashedAt_ < 0) {
+    airframe(dt);
+    if (air().radioHeightFt < -kCrashFt) crashedAt_ = t_;
+  }
   sense();
 }
 
+// A pilot's hand on the thrust levers: forward for a speed deficit, back for an acceleration.
+void World::thrustFor(double casTarget, double tlaMax, double dt) {
+  const double rate = clamp(1.0 * (casTarget - air().casKn) - 4.0 * casRate_, -8, 8);  // deg/s
+  tla_ = clamp(tla_ + rate * dt, 0, tlaMax);
+}
+
+// The sidestick for a flight path, the path itself moved no faster than 1.5 deg/s.
+void World::stickFor(double gammaTarget, double dt) {
+  gammaCmd_ = follow(gammaCmd_, gammaTarget, 1.5, dt);
+  crew.pitch = pitchFor(gammaCmd_, air().flightPathDeg, air().qDegS);
+}
+
+// More than 400 ft from the level: an open climb at climb (or take-off) thrust, or an open descent
+// at idle, with the elevator on the speed — too fast or accelerating asks for more climb. Within
+// 400 ft: the elevator brings the altitude in and the thrust keeps the speed.
+void World::climbOrDescend(double altitudeTarget, double casTarget, double climbTla, double dt) {
+  const AirframeState& a = air();
+  const double dh = altitudeTarget - a.pressureAltitudeFt;
+  if (std::abs(dh) > 400) {
+    tla_ = follow(tla_, dh > 0 ? climbTla : 0, 8, dt);
+    gammaSpeed_ = clamp(gammaSpeed_ + (0.07 * (a.casKn - casTarget) + 0.8 * casRate_) * dt, dh > 0 ? 0 : -6,
+                        dh > 0 ? 10 : 0);
+    stickFor(gammaSpeed_, dt);
+  } else {
+    thrustFor(casTarget, climbTla, dt);
+    gammaSpeed_ = gammaCmd_;
+    stickFor(clamp(0.01 * dh, -4, 4), dt);
+  }
+}
+
+// A fixed flight path, the thrust on the speed: the glide path.
+void World::holdPath(double gammaTarget, double casTarget, double dt) {
+  thrustFor(casTarget, 25, dt);
+  gammaSpeed_ = gammaCmd_;
+  stickFor(gammaTarget, dt);
+}
+
+// On the runway the feet keep the heading: rudder at speed, nose wheel slow. Pedals are + left.
+void World::steerOnGround(double headingTarget) {
+  crew.pedals = clamp(0.15 * wrap180(air().headingDeg - headingTarget) + 0.3 * air().headingRateDegS, -1, 1);
+}
+
 // The scripted crew: a circuit, flown through the laws, repeated until the run ends.
-void World::fly() {
+void World::fly(double dt) {
+  const AirframeState& a = air();
+  casRate_ += ((a.casKn - lastCas_) / dt - casRate_) * std::min(1.0, dt / 1.0);  // read over about a second
+  lastCas_ = a.casKn;
+
   const double inPhase = t_ - phaseStart_;
   auto enter = [this](Phase p) {
     phase_ = p;
     phaseStart_ = t_;
+    stage_ = 0;
   };
   Crew& c = crew;
   c.pitch = c.roll = c.pedals = 0;
+  const double h = a.pressureAltitudeFt, gamma = a.flightPathDeg, q = a.qDegS;
+  const double phi = a.rollDeg, p = a.pDegS, psi = a.headingDeg;
 
   switch (phase_) {
     case Phase::Parked:
+      c.brakes = 1;
       if (t_ >= 1.0) enter(Phase::PowerUp);
       break;
 
@@ -147,87 +222,118 @@ void World::fly() {
       break;
     }
 
-    case Phase::Taxi:
+    case Phase::Taxi:  // walking pace for ten seconds, then stop and hold, configured for takeoff
       c.spoilersArmed = true;
-      c.tla[0] = c.tla[1] = 0;
-      conf_ = 1;
-      vTarget_ = inPhase < 10 ? 15 : 0;
+      c.flapLever = 1;
+      c.gearDown = true;
+      if (inPhase < 10) {
+        c.brakes = 0;
+        tla_ = clamp(2.0 * (kTaxiKn - a.groundSpeedKn), 0, 15);
+      } else {
+        tla_ = 0;
+        c.brakes = 0.5;
+      }
+      steerOnGround(360);
       if (inPhase >= 25) enter(Phase::TakeoffRoll);
       break;
 
     case Phase::TakeoffRoll:
-      c.tla[0] = c.tla[1] = 45;
-      vTarget_ = 170;
-      if (v_ >= kVr) c.pitch = theta_ < 12 ? 0.6 : pitchFor(7, gamma_, q_);
-      if (!onGround_) {
+      c.brakes = 0;
+      tla_ = 45;
+      steerOnGround(360);
+      if (a.casKn >= kVr) {  // rotate at a steady rate toward the climb attitude
+        if (rotateAt_ < 0) rotateAt_ = t_;
+        const double pitchTarget = std::min(kRotateToDeg, kRotateDegS * (t_ - rotateAt_));
+        c.pitch = clamp(0.12 * (pitchTarget - a.pitchDeg) + 0.1 * (kRotateDegS - q), -0.2, 0.9);
+      }
+      if (!onGround() && a.radioHeightFt > 5) {
         c.spoilersArmed = false;
+        rotateAt_ = -1;
+        gammaCmd_ = gammaSpeed_ = gamma;
         enter(Phase::Climb);
       }
       break;
 
-    case Phase::Climb: {
-      const double target = 8000;
-      if (h_ > 100) gearDown_ = false;
-      if (h_ > 1500) c.tla[0] = c.tla[1] = 25;
-      if (h_ > 3000) conf_ = 0;
-      vTarget_ = h_ > 3000 ? 250 : 170;
-      headingTarget_ = h_ > 3000 && h_ < 6000 ? 90 : 360;
-      c.pitch = pitchFor(clamp(0.004 * (target - h_), -4, 7), gamma_, q_);
-      c.roll = rollFor(headingTarget_, psi_, phi_);
-      if (h_ > target - 50) enter(Phase::Cruise);
+    case Phase::Climb: {  // gear up, take-off thrust to 1500 ft, then accelerate and clean up
+      if (a.radioHeightFt > 100) c.gearDown = false;
+      if (c.flapLever == 1 && h > kAccelerationFt && a.casKn > kVFlapsUp - 5) c.flapLever = 0;
+      double v = h > kAccelerationFt ? kVFlapsUp : kV2;
+      if (c.flapLever == 0) v = slatFppu_ < 1 && flapFppu_ < 1 ? kVClean : kVSlatsIn;
+      headingTarget_ = h > 3000 && h < 6000 ? 90 : 360;
+      climbOrDescend(kCruiseFt, v, h > kAccelerationFt ? 25 : 45, dt);
+      c.roll = rollFor(headingTarget_, psi, phi, p);
+      if (std::abs(kCruiseFt - h) < 50) enter(Phase::Cruise);
       break;
     }
 
     case Phase::Cruise: {  // hold 8000 ft and work the laws: doublet, turns, speedbrake, pedals
-      c.pitch = pitchFor(clamp(0.004 * (8000 - h_), -4, 4), gamma_, q_);
-      c.roll = rollFor(headingTarget_, psi_, phi_);
+      climbOrDescend(kCruiseFt, kVClean, 25, dt);
+      c.roll = rollFor(headingTarget_, psi, phi, p);
       if (inPhase >= 20 && inPhase < 22) c.pitch = 0.5;
       if (inPhase >= 22 && inPhase < 24) c.pitch = -0.5;
       if (inPhase >= 40 && inPhase < 80) headingTarget_ = 180;  // a 180-degree turn at 25 degrees of bank
       if (inPhase >= 80 && inPhase < 120) headingTarget_ = 360;
       c.speedbrake = inPhase >= 120 && inPhase < 140 ? 1.0 : 0.0;
       if (inPhase >= 150 && inPhase < 153) c.pedals = 0.3;
-      if (inPhase >= 160 && inPhase < 175) c.roll = phi_ > -45 ? -0.5 : -0.1;  // a steep turn, held into it
-      if (inPhase >= 175 && inPhase < 200) c.roll = rollFor(headingTarget_, psi_, phi_, 45);
+      // A steep turn at 45 degrees. Past 33 degrees normal law rolls back toward 33 unless the stick
+      // holds the bank, so the crew holds it firmly.
+      if (inPhase >= 160 && inPhase < 175) c.roll = clamp(0.12 * (-45 - phi) - 0.03 * p, -0.5, 0.5);
+      if (inPhase >= 175 && inPhase < 200) c.roll = rollFor(headingTarget_, psi, phi, p, 45);
       if (inPhase >= 210) enter(Phase::Approach);
       break;
     }
 
-    case Phase::Approach: {  // down to 2000 ft, configure, then a three-degree path to the runway
-      const double glide = 2000;
-      double gammaTarget = clamp(0.004 * (glide - h_), -3.5, 3);
-      if (inPhase > 60 && h_ < glide + 100) gammaTarget = -3;
-      c.pitch = pitchFor(gammaTarget, gamma_, q_);
-      c.roll = rollFor(360, psi_, phi_);
-      vTarget_ = inPhase < 60 ? 210 : (inPhase < 100 ? 170 : 140);
-      conf_ = inPhase < 40 ? 0 : (inPhase < 70 ? 1 : (inPhase < 90 ? 2 : (inPhase < 110 ? 3 : 4)));
-      if (inPhase > 70) gearDown_ = true;
-      c.spoilersArmed = inPhase > 80;
-      c.tla[0] = c.tla[1] = 25;
-      if (h_ < 40 && inPhase > 100) enter(Phase::Flare);
+    case Phase::Approach: {  // down to 2000 ft, configure as the speed comes back, then three degrees
+      if (stage_ < 4 && a.casKn < kVNextStage[stage_] && (stage_ > 0 || h < kPatternFt + 150)) {
+        c.flapLever = ++stage_;
+        if (stage_ == 3) c.gearDown = true;
+        if (stage_ == 4) c.spoilersArmed = true;
+      }
+      // established at the approach speed in CONF FULL: start down
+      if (stage_ == 4 && a.casKn < kVApp + 4 && flapFppu_ > kFlapFppu[4] - 1) stage_ = 5;
+      if (stage_ < 5) {
+        climbOrDescend(kPatternFt, kVStage[stage_], 25, dt);
+      } else {
+        holdPath(-3.0, kVApp, dt);
+      }
+      c.roll = rollFor(360, psi, phi, p);
+      if (stage_ == 5 && a.radioHeightFt < kFlareFt) enter(Phase::Flare);
       break;
     }
 
-    case Phase::Flare:
-      c.pitch = 0.25;
-      c.tla[0] = c.tla[1] = h_ < 20 ? 0 : 25;
-      c.roll = rollFor(360, psi_, phi_);
-      if (onGround_) enter(Phase::Rollout);
+    case Phase::Flare: {  // sink rate down exponentially, to two feet a second at the wheels
+      const double height = std::max(0.0, a.radioHeightFt);
+      const double sinkTarget = height / kFlareTauS + 2.0;  // ft/s
+      const double sink = -a.verticalSpeedFpm / 60;
+      c.pitch = clamp(kFlareGain * (sink - sinkTarget) - 0.03 * q, -0.3, 0.8);
+      gammaCmd_ = gammaSpeed_ = gamma;
+      if (height < 20) {
+        tla_ = 0;  // retard
+      } else {
+        thrustFor(kVApp, 25, dt);
+      }
+      c.roll = rollFor(360, psi, phi, p);
+      if (onGround()) enter(Phase::Rollout);
       break;
+    }
 
     case Phase::Rollout:
-      c.tla[0] = c.tla[1] = 0;
-      vTarget_ = 0;
-      if (v_ < 30) {
+      tla_ = 0;
+      c.brakes = a.noseWow ? 0.3 : 0;
+      steerOnGround(360);
+      if (a.groundSpeedKn < 30) {
         c.spoilersArmed = false;
-        conf_ = 0;
+        c.flapLever = 0;
       }
-      if (v_ < 1 && inPhase > 20) {
+      if (a.groundSpeedKn < 1 && inPhase > 20) {
         ++circuit_;
+        c.brakes = 1;
         enter(Phase::Taxi);
       }
       break;
   }
+
+  c.tla[0] = c.tla[1] = tla_;
 
   if (t_ >= stickOverride.from && t_ < stickOverride.to) {
     c.pitch = stickOverride.pitch;
@@ -266,160 +372,109 @@ void World::actuate(double dt, const Orders& o) {
     if (o.travelLimiterActive[f]) surfaces.travelLimiter = follow(surfaces.travelLimiter, o.travelLimiter[f], 3, dt);
   }
 
-  // hydraulics stay pressurised: the stub has engines running from the first instant
+  // The rudder, as a320_systems' rudder mechanical assembly sums it: pedals, trim and yaw damper,
+  // inside the travel limiter. Its frame is the hydraulics' (+ right): pedals arrive there negated
+  // from the computers' frame, the yaw damper order is negated on the way in, and the trim order is
+  // not — so in the computers' frame the trim counts against. The trim stays at zero here: nothing
+  // moves it without a trim switch or an autopilot.
+  const double rudder = clamp(crew.pedals * kRudderPedalDeg - surfaces.rudderTrim + surfaces.yawDamper,
+                              -surfaces.travelLimiter, surfaces.travelLimiter);
+  surfaces.rudder = follow(surfaces.rudder, rudder, 40, dt);
+
+  // hydraulics stay pressurised: the engines run from the first instant
   for (int k = 0; k < 3; ++k) {
     hydPressurised[k] = true;
     hydPsi[k] = 3000;
   }
 
-  slatFppu_ = follow(slatFppu_, kSlatFppu[conf_], 11, dt);
-  flapFppu_ = follow(flapFppu_, kFlapFppu[conf_], 6, dt);
+  // Slats and flaps. Lever 1 is CONF 1+F below 100 kt and holds it to 210 kt; otherwise CONF 1.
+  const int lever = std::max(0, std::min(4, crew.flapLever));
+  if (lever == 1) {
+    if (air().casKn < 100) conf1F_ = true;
+    if (air().casKn > 210) conf1F_ = false;
+  } else {
+    conf1F_ = false;
+  }
+  slatFppu_ = follow(slatFppu_, kSlatFppu[lever], 11, dt);
+  flapFppu_ = follow(flapFppu_, lever == 1 && conf1F_ ? kFlap1FFppu : kFlapFppu[lever], 6, dt);
+  flapDeg_ = flapSurfaceDeg(flapFppu_);
 }
 
+// The airframe takes the surfaces where the servos put them, and the rest from the crew.
 void World::airframe(double dt) {
-  // speed: an autothrust that gets what it asks for; braking on the ground below the target
-  const double accel = onGround_ && vTarget_ < v_ ? 4.0 : 2.5;
-  vDot_ = clamp((vTarget_ - v_) / 12.0, -accel, onGround_ ? 3.0 : 2.0);
-  v_ = std::max(0.0, v_ + vDot_ * dt);
-  const double vMs = std::max(v_, 1.0) * kMsPerKt;
-
-  // pitch: a short-period response about the alpha the surfaces trim to
-  const double elevator = (surfaces.elevator[0] + surfaces.elevator[1]) / 2;
-  const double alphaTrim = kAlpha0 - kElevatorToAlpha * elevator + kThsSign * kThsToAlpha * surfaces.ths;
-  const double alpha = theta_ - gamma_;
-  const double q2 = std::min(1.0, (v_ / kVr) * (v_ / kVr));  // the tail has authority with airspeed
-  double qDot = q2 * kOmegaSp * kOmegaSp * (alphaTrim - alpha) - 2 * kZetaSp * kOmegaSp * q_;
-
-  // roll: first order to the rate the surfaces ask for. Spoilers extend negative in the computers'
-  // frame, and the wing whose spoilers rise goes down: left minus right rolls right.
-  double spoilerDiff = 0;
-  for (int k = 0; k < 5; ++k) spoilerDiff += (surfaces.spoiler[0][k] - surfaces.spoiler[1][k]) / 5;
-  const double rollCmd = kRollPerAileron * kAileronSign * (surfaces.aileron[0] - surfaces.aileron[1]) / 2 +
-                         kRollPerSpoiler * spoilerDiff;
-
-  // load factor from lift, and the flight path it bends
-  const double vRatio = v_ / kVref;
-  const double lift = (alpha - kAlphaZeroLift[conf_]) / (kAlpha0 - kAlphaZeroLift[0]) * vRatio * vRatio;
-
-  if (onGround_) {
-    p_ = phi_ = phiDot_ = 0;
-    gamma_ = gammaDot_ = 0;
-    psiDot_ = 0;
-    h_ = hDot_ = 0;
-    // the main gear is the pivot: the nose rises only when the tail lifts it, and whatever weight
-    // the wing is not yet carrying pushes it back onto the nose wheel
-    qDot -= 8.0 * (1.0 - clamp(lift, 0.0, 1.0));
-    if (theta_ <= 0 && qDot <= 0) {
-      theta_ = 0;
-      q_ = 0;
-    } else {
-      q_ += qDot * dt;
-      theta_ = clamp(theta_ + q_ * dt, 0, kTailstrikeDeg);
-      if (theta_ == 0 || theta_ == kTailstrikeDeg) q_ = 0;
-    }
-    n_ = 1;
-    if (lift > 1.0 && v_ > kVr - 10) onGround_ = false;  // rotate and fly
-    wheelSpeed_ = v_;
-    return;
+  AirframeControls c;
+  c.elevator = (surfaces.elevator[0] + surfaces.elevator[1]) / 2;
+  c.ths = surfaces.ths;
+  for (int side = 0; side < 2; ++side) {
+    c.aileron[side] = surfaces.aileron[side];
+    for (int k = 0; k < 5; ++k) c.spoiler[side][k] = surfaces.spoiler[side][k];
+    c.tla[side] = crew.tla[side];
+    c.brake[side] = crew.brakes;
   }
-
-  q_ += qDot * dt;
-  theta_ += q_ * dt;
-
-  p_ += (rollCmd - p_) / kRollTau * dt;
-  phi_ = clamp(phi_ + p_ * dt, -80, 80);
-  phiDot_ = p_;
-
-  n_ = std::max(-1.0, lift);
-  gammaDot_ = (kG / vMs) * (n_ * std::cos(phi_ * kDeg) - std::cos(gamma_ * kDeg)) / kDeg;
-  gamma_ = clamp(gamma_ + gammaDot_ * dt, -30, 30);
-  psiDot_ = (kG / vMs) * n_ * std::sin(phi_ * kDeg) / std::cos(gamma_ * kDeg) / kDeg;
-  psi_ = wrap360(psi_ + psiDot_ * dt);
-
-  hDot_ = v_ * kFtsPerKt * std::sin(gamma_ * kDeg);
-  h_ += hDot_ * dt;
-  wheelSpeed_ = std::max(0.0, wheelSpeed_ - 10 * dt);
-
-  if (h_ <= 0) {  // touchdown
-    h_ = 0;
-    onGround_ = true;
-    gamma_ = 0;
-    phi_ = p_ = 0;
-    wheelSpeed_ = v_;
-  }
+  c.rudder = surfaces.rudder;
+  c.flap = flapDeg_;
+  c.noseWheel = -crew.pedals * kPedalSteeringDeg;  // left pedal turns the nose wheel left
+  c.gearDown = crew.gearDown;
+  airframe_->step(dt, c);
 }
 
 // Sample the sensors and transmit them the way the A32NX producers do.
 void World::sense() {
-  // ISA, flat earth, field at sea level, no wind
-  const double tempK = h_ < 36089 ? 288.15 - 0.0019812 * h_ : 216.65;
-  const double sound = 38.967854 * std::sqrt(tempK);
-  const double pressure = 1013.25 * std::pow(tempK / 288.15, 5.25588);
-  const double density = std::pow(tempK / 288.15, 4.25588);
-  const double cas = v_ * std::sqrt(density);
-  const unsigned airSsm = cas < 30 ? kNcd : kNo;
-  const double alpha = theta_ - gamma_;
+  // ISA, the field at sea level, no wind, no magnetic variation
+  const AirframeState& a = air();
+  const unsigned airSsm = a.casKn < 30 ? kNcd : kNo;
 
   const bool adrFailed = adrFailAt >= 0 && t_ >= adrFailAt;
-  for (auto& a : adr) {
+  for (auto& d : adr) {
     if (adrFailed) {
-      a = base_adr_bus{};  // all-zero is FailureWarning on every word
+      d = base_adr_bus{};  // all-zero is FailureWarning on every word
       continue;
     }
-    a.altitude_standard_ft = word(h_);
-    a.altitude_corrected_1_ft = word(h_);
-    a.altitude_corrected_2_ft = word(h_);
-    a.mach = word(v_ / sound, airSsm);
-    a.airspeed_computed_kn = word(cas, airSsm);
-    a.airspeed_true_kn = word(v_, airSsm);
-    a.vertical_speed_ft_min = word(hDot_ * 60);
-    a.aoa_corrected_deg = word(alpha, airSsm);
-    a.corrected_average_static_pressure = word(pressure);
+    d.altitude_standard_ft = word(a.pressureAltitudeFt);
+    d.altitude_corrected_1_ft = word(a.pressureAltitudeFt);
+    d.altitude_corrected_2_ft = word(a.pressureAltitudeFt);
+    d.mach = word(a.mach, airSsm);
+    d.airspeed_computed_kn = word(a.casKn, airSsm);
+    d.airspeed_true_kn = word(a.tasKn, airSsm);
+    d.vertical_speed_ft_min = word(a.verticalSpeedFpm);
+    d.aoa_corrected_deg = word(a.alphaDeg, airSsm);
+    d.corrected_average_static_pressure = word(a.staticPressureHpa);
   }
 
-  // body rates from the Euler rates, inverting the kinematics adirs.rs applies
-  const double cphi = std::cos(phi_ * kDeg), sphi = std::sin(phi_ * kDeg);
-  const double cth = std::cos(theta_ * kDeg), sth = std::sin(theta_ * kDeg);
-  const double thetaDot = q_;
-  const double pBody = phiDot_ - psiDot_ * sth;
-  const double qBody = thetaDot * cphi + psiDot_ * cth * sphi;
-  const double rBody = -thetaDot * sphi + psiDot_ * cth * cphi;
-  const double longAccel = vDot_ * kMsPerKt / kG + sth;
-
   for (auto& r : ir) {
-    r.latitude_deg = word(47.0);
-    r.longitude_deg = word(8.0);
-    r.ground_speed_kn = word(v_ * std::cos(gamma_ * kDeg));
-    r.track_angle_true_deg = word(psi_);
-    r.heading_true_deg = word(psi_);
+    r.latitude_deg = word(a.latitudeDeg);
+    r.longitude_deg = word(a.longitudeDeg);
+    r.ground_speed_kn = word(a.groundSpeedKn);
+    r.track_angle_true_deg = word(a.trackDeg);
+    r.heading_true_deg = word(a.headingDeg);
     r.wind_speed_kn = word(0);
     r.wind_direction_true_deg = word(0);
-    r.track_angle_magnetic_deg = word(psi_);
-    r.heading_magnetic_deg = word(psi_);
-    r.drift_angle_deg = word(0);
-    r.flight_path_angle_deg = word(gamma_);
-    r.pitch_angle_deg = word(theta_);
-    r.roll_angle_deg = word(phi_);
-    r.body_pitch_rate_deg_s = word(qBody);
-    r.body_roll_rate_deg_s = word(pBody);
-    r.body_yaw_rate_deg_s = word(rBody);
-    r.body_long_accel_g = word(longAccel);
-    r.body_lat_accel_g = word(0);
-    r.body_normal_accel_g = word(n_);
-    r.track_angle_rate_deg_s = word(psiDot_);  // the driver feeds heading rate here (contract/12)
-    r.pitch_att_rate_deg_s = word(thetaDot);
-    r.roll_att_rate_deg_s = word(phiDot_);
-    r.inertial_vertical_speed_ft_s = word(hDot_ * 60);  // fed ft/min, as the producer does (contract/12)
+    r.track_angle_magnetic_deg = word(a.trackDeg);
+    r.heading_magnetic_deg = word(a.headingDeg);
+    r.drift_angle_deg = word(a.groundSpeedKn > 0.5 ? wrap180(a.trackDeg - a.headingDeg) : 0);
+    r.flight_path_angle_deg = word(a.flightPathDeg);
+    r.pitch_angle_deg = word(a.pitchDeg);
+    r.roll_angle_deg = word(a.rollDeg);
+    r.body_pitch_rate_deg_s = word(a.qDegS);
+    r.body_roll_rate_deg_s = word(a.pDegS);
+    r.body_yaw_rate_deg_s = word(a.rDegS);
+    r.body_long_accel_g = word(a.nx);
+    r.body_lat_accel_g = word(a.ny);
+    r.body_normal_accel_g = word(a.nz);
+    r.track_angle_rate_deg_s = word(a.headingRateDegS);  // the driver feeds heading rate here (contract/12)
+    r.pitch_att_rate_deg_s = word(a.pitchRateDegS);
+    r.roll_att_rate_deg_s = word(a.rollRateDegS);
+    r.inertial_vertical_speed_ft_s = word(a.verticalSpeedFpm);  // fed ft/min, as the producer does (contract/12)
   }
 
   // radio altimeter: valid below 2500 ft, out of range above it the way ala52b.rs reports it
-  for (auto& r : ra) r.radio_height_ft = h_ < 2500 ? word(h_) : word(8192, kNcd);
+  for (auto& r : ra) r.radio_height_ft = a.radioHeightFt < 2500 ? word(a.radioHeightFt) : word(8192, kNcd);
 
-  const bool compressed = onGround_;
+  const bool compressed = mainGearCompressed();
   const bool noseCompressed = noseGearCompressed();
-  const bool down = gearDown_;
+  const bool down = noseGearDownlocked();
   for (auto& l : lgciu) {
-    // landing_gear/mod.rs: gear and doors locked where the handle says, no transit modelled
+    // landing_gear/mod.rs: gear and doors locked where the gear is, doors not modelled
     l.discrete_word_1 = discrete({{11, false}, {12, false}, {13, false}, {14, false}, {15, false}, {16, false},
                                   {17, false}, {18, false}, {19, false}, {23, down}, {24, down}, {25, down},
                                   {26, compressed}, {27, compressed}, {28, noseCompressed}, {29, down}});
@@ -428,11 +483,12 @@ void World::sense() {
     l.discrete_word_4 = discrete({{22, true}, {26, true}});
   }
 
+  const int lever = std::max(0, std::min(4, crew.flapLever));
   for (auto& s : sfcc) {
     // sfcc/mod.rs: label 046 detent bits, and the actual-position bits from the FPPU angles
     s.slat_flap_component_status_word = base_arinc_429{};  // no producer on the aircraft either
-    s.slat_flap_system_status_word = discrete({{17, conf_ == 0}, {18, conf_ == 1}, {19, conf_ == 2},
-                                               {20, conf_ == 3}, {21, conf_ == 4}, {28, true}, {29, true}});
+    s.slat_flap_system_status_word = discrete({{17, lever == 0}, {18, lever == 1}, {19, lever == 2},
+                                               {20, lever == 3}, {21, lever == 4}, {28, true}, {29, true}});
     const double sl = slatFppu_, fl = flapFppu_;
     s.slat_flap_actual_position_word =
         discrete({{11, true}, {12, sl > -5 && sl < 6.2}, {13, sl > 210.4 && sl < 337}, {14, sl > 321.8 && sl < 337},
@@ -442,14 +498,14 @@ void World::sense() {
     s.flap_actual_position_deg = word(fl);
   }
 
-  // FMGC: not part of P6. A stub that says it is alive, autopilot off, with a weight and a CG.
+  // FMGC: not part of P7. A stub that says it is alive, autopilot off, with the airframe's weight and CG.
   for (int k = 0; k < 2; ++k) {
     base_fmgc_b_bus& f = fmgc[k];
     f = base_fmgc_b_bus{};
-    f.fac_weight_lbs = word(141000);
-    f.fm_weight_lbs = word(141000);
-    f.fac_cg_percent = word(28);
-    f.fm_cg_percent = word(28);
+    f.fac_weight_lbs = word(a.weightLbs);
+    f.fm_weight_lbs = word(a.weightLbs);
+    f.fac_cg_percent = word(a.cgPercentMac);
+    f.fm_cg_percent = word(a.cgPercentMac);
     f.fg_radio_height_ft = ra[k].radio_height_ft;
     f.discrete_word_1 = word(0);
     f.discrete_word_2 = word(0);
@@ -462,7 +518,7 @@ void World::sense() {
     f.delta_r_cmd_deg = word(0, kNcd);
     f.delta_nose_wheel_cmd_deg = word(0, kNcd);
     f.delta_q_cmd_deg = word(0, kNcd);
-    f.n1_left_percent = word(20 + crew.tla[0] * 1.7);
-    f.n1_right_percent = word(20 + crew.tla[1] * 1.7);
+    f.n1_left_percent = word(a.n1[0]);
+    f.n1_right_percent = word(a.n1[1]);
   }
 }

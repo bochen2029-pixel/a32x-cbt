@@ -1,31 +1,36 @@
-// The stub world: everything around the flight control computers that P7 replaces with a real
-// airframe. GPLv3.
+// The world around the flight control computers: the crew, the servos, the sensors, and since P7 a
+// JSBSim airframe in place of the P6 stub's point mass. GPLv3.
 //
-// It is deliberately small. Sensors are transmitted the way the A32NX producers transmit them
-// (fbw-common/.../navigation/adirs.rs, landing_gear/mod.rs, a320_systems/.../sfcc/mod.rs): standard
-// aeronautical signs, accelerometers that include gravity, discrete bits where the producers put
-// them. Actuators follow the computers' orders at a finite rate, so position feedback agrees with
-// command the way a healthy servo makes it agree. The airframe is a stub — a point mass with a
-// short-period pitch response, a first-order roll response and coordinated turns — stable enough
-// to close the loop around the laws, and not A320 data. Nothing here is aerodynamics.
+// Sensors are transmitted the way the A32NX producers transmit them (fbw-common/.../navigation/
+// adirs.rs, landing_gear/mod.rs, a320_systems/.../sfcc/mod.rs): standard aeronautical signs,
+// accelerometers that include gravity, discrete bits where the producers put them. Actuators follow
+// the computers' orders at a finite rate, so position feedback agrees with command the way a healthy
+// servo makes it agree. The airframe is JSBSim's 737 (airframe.h): A320-class, not an A320. The crew
+// is a script that flies it through the laws, closed loop, the way a pilot would.
 
 #pragma once
+
+#include <memory>
 
 #include "ElacComputer_types.h"
 #include "FacComputer_types.h"
 #include "SecComputer_types.h"
+#include "airframe.h"
 
 // What the crew's hands and the overhead panel are doing.
 struct Crew {
   double pitch = 0;       // sidestick, +1 full pull (the computers' capt_pitch_stick_pos)
   double roll = 0;        // sidestick, the computers' capt_roll_stick_pos
-  double pedals = 0;      // the computers' rudder_pedal_pos, -1..1
+  double pedals = 0;      // the computers' rudder_pedal_pos, -1..1, + left
   double speedbrake = 0;  // lever, 0 retracted .. 1 full
   bool spoilersArmed = false;
   double tla[2] = {0, 0};  // thrust lever angle, deg: 0 idle, 25 CL, 45 TOGA
   bool elacOn[2] = {false, false};
   bool secOn[3] = {false, false, false};
   bool facOn[2] = {false, false};
+  double brakes = 1;      // toe brakes, both feet, 0..1; parked on them at the start
+  bool gearDown = true;   // gear lever
+  int flapLever = 0;      // 0, 1, 2, 3, 4 = FULL
 };
 
 // What the computers tell the actuators, as FlyByWireInterface::updateServoSolenoidStatus hands it
@@ -55,6 +60,7 @@ struct Surfaces {
   double yawDamper = 0;
   double rudderTrim = 0;
   double travelLimiter = 25;
+  double rudder = 0;  // the surface: pedals, trim and yaw damper, inside the travel limit; + left
 };
 
 enum class Phase { Parked, PowerUp, GroundCheck, Taxi, TakeoffRoll, Climb, Cruise, Approach, Flare, Rollout };
@@ -80,10 +86,10 @@ class World {
   // --- discretes and analogues the driver reads from simvars -----------------------------------
   bool hydPressurised[3] = {true, true, true};  // green, blue, yellow
   double hydPsi[3] = {3000, 3000, 3000};
-  bool noseGearCompressed() const { return onGround_ && theta_ < 0.5; }
-  bool mainGearCompressed() const { return onGround_; }
-  bool noseGearDownlocked() const { return gearDown_; }
-  double wheelSpeedKn() const { return wheelSpeed_; }
+  bool noseGearCompressed() const { return air().noseWow; }
+  bool mainGearCompressed() const { return air().leftWow || air().rightWow; }
+  bool noseGearDownlocked() const { return air().gearPosition >= kDownlocked; }
+  double wheelSpeedKn() const { return air().wheelSpeedKn; }
 
   Crew crew;
   Surfaces surfaces;
@@ -92,16 +98,29 @@ class World {
   double time() const { return t_; }
   Phase phase() const { return phase_; }
   int circuit() const { return circuit_; }
-  double altitudeFt() const { return h_; }
-  double tasKn() const { return v_; }
-  double pitchDeg() const { return theta_; }
-  double rollDeg() const { return phi_; }
-  double pitchRateDegS() const { return q_; }
-  double rollRateDegS() const { return p_; }
-  double loadFactor() const { return n_; }
-  double headingDeg() const { return psi_; }
-  double flightPathDeg() const { return gamma_; }
-  bool onGround() const { return onGround_; }
+  double altitudeFt() const { return air().pressureAltitudeFt; }
+  double radioHeightFt() const { return air().radioHeightFt; }
+  double tasKn() const { return air().tasKn; }
+  double casKn() const { return air().casKn; }
+  double groundSpeedKn() const { return air().groundSpeedKn; }
+  double verticalSpeedFpm() const { return air().verticalSpeedFpm; }
+  double alphaDeg() const { return air().alphaDeg; }
+  double betaDeg() const { return air().betaDeg; }
+  double pitchDeg() const { return air().pitchDeg; }
+  double rollDeg() const { return air().rollDeg; }
+  double pitchRateDegS() const { return air().qDegS; }  // body rates
+  double rollRateDegS() const { return air().pDegS; }
+  double yawRateDegS() const { return air().rDegS; }
+  double loadFactor() const { return air().nz; }
+  double headingDeg() const { return air().headingDeg; }
+  double flightPathDeg() const { return air().flightPathDeg; }
+  double flapDeg() const { return flapDeg_; }
+  bool onGround() const { return mainGearCompressed(); }
+
+  // When the airframe went below the runway, or -1. JSBSim's 737 touches the ground only with its
+  // gear; anything lower has flown into it. The world freezes there: what JSBSim makes of an
+  // aeroplane under the ground is not something to feed the computers.
+  double crashedAt() const { return crashedAt_; }
 
   // The scripted crew may be overridden for a property test: a fixed stick input in a time window.
   struct Override {
@@ -113,30 +132,44 @@ class World {
   double adrFailAt = -1;
 
  private:
-  void fly();
+  static constexpr double kDownlocked = 0.999;
+  static constexpr double kCrashFt = 3;  // radio height below which the airframe is in the ground
+
+  double crashedAt_ = -1;
+
+  const AirframeState& air() const { return airframe_->state(); }
+
+  void fly(double dt);
   void actuate(double dt, const Orders& o);
   void airframe(double dt);
   void sense();
+
+  // The crew's hands on the thrust levers and the sidestick, split the way the A320's own modes split
+  // the job: in an open climb or descent the thrust is set and the elevator holds the speed; near the
+  // level the elevator holds the altitude and the thrust the speed; on a glide path the elevator
+  // holds the path and the thrust the speed.
+  void climbOrDescend(double altitudeTarget, double casTarget, double climbTla, double dt);
+  void holdPath(double gammaTarget, double casTarget, double dt);
+  void thrustFor(double casTarget, double tlaMax, double dt);
+  void stickFor(double gammaTarget, double dt);
+  void steerOnGround(double headingTarget);
+
+  std::unique_ptr<Airframe> airframe_;
 
   double t_ = 0;
   Phase phase_ = Phase::Parked;
   double phaseStart_ = 0;
   int circuit_ = 0;
+  int stage_ = 0;  // a step within a phase: the approach configures in stages
   double headingTarget_ = 360;
+  double rotateAt_ = -1;  // when the takeoff rotation began
 
-  // airframe state: TAS kt, altitude ft, attitudes deg, rates deg/s
-  double v_ = 0, vTarget_ = 0, vDot_ = 0;
-  double h_ = 0, hDot_ = 0;
-  double theta_ = 0, q_ = 0;
-  double gamma_ = 0, gammaDot_ = 0;
-  double phi_ = 0, p_ = 0, phiDot_ = 0;
-  double psi_ = 360, psiDot_ = 0;
-  double n_ = 1;
-  bool onGround_ = true;
-  bool gearDown_ = true;
-  double wheelSpeed_ = 0;
+  // what the crew carries from one step to the next
+  double tla_ = 0;
+  double lastCas_ = 0, casRate_ = 0;      // kt, kt/s
+  double gammaCmd_ = 0, gammaSpeed_ = 0;  // deg: the flight path being flown, and the one the speed asks for
 
-  // configuration: 0 clean, 1, 2, 3, 4 = FULL; the FPPU angles the SFCC reports
-  int conf_ = 0;
-  double slatFppu_ = 0, flapFppu_ = 0;
+  // flaps and slats: the pick-off angles the SFCCs report, and the flap surface they move
+  bool conf1F_ = false;
+  double slatFppu_ = 0, flapFppu_ = 0, flapDeg_ = 0;
 };

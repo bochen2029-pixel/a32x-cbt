@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<!--
+  The A32NX servos position the airframe's surfaces. GPLv3.
+
+  JSBSim loads this after the aircraft definition, so its channel runs last in every flight control
+  pass: whatever the airframe's own flight controls computed, these are the positions the
+  aerodynamics see. The harness writes the a32nx/ properties each tick from the servo positions,
+  already in JSBSim's frame and units (harness/airframe.cpp says how). Nothing here computes a law;
+  the laws are the A32NX computers'.
+
+  Every output is a surface position the aircraft definitions in the JSBSim clone read: flaps by
+  angle (the A320) and by fraction (the 737), speedbrake and ground spoilers by fraction.
+-->
+<system name="A32NX surfaces">
+
+  <property value="0">a32nx/elevator-rad</property>
+  <property value="0">a32nx/left-aileron-rad</property>
+  <property value="0">a32nx/right-aileron-rad</property>
+  <property value="0">a32nx/rudder-rad</property>
+  <property value="0">a32nx/flap-deg</property>
+  <property value="0">a32nx/flap-norm</property>
+  <property value="0">a32nx/speedbrake-norm</property>
+  <property value="0">a32nx/ground-spoiler-norm</property>
+
+  <channel name="A32NX surfaces">
+
+    <pure_gain name="a32nx-elevator">
+      <input>a32nx/elevator-rad</input>
+      <gain>1</gain>
+      <output>fcs/elevator-pos-rad</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-left-aileron">
+      <input>a32nx/left-aileron-rad</input>
+      <gain>1</gain>
+      <output>fcs/left-aileron-pos-rad</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-right-aileron">
+      <input>a32nx/right-aileron-rad</input>
+      <gain>1</gain>
+      <output>fcs/right-aileron-pos-rad</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-rudder">
+      <input>a32nx/rudder-rad</input>
+      <gain>1</gain>
+      <output>fcs/rudder-pos-rad</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-flap-angle">
+      <input>a32nx/flap-deg</input>
+      <gain>1</gain>
+      <output>fcs/flap-pos-deg</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-flap-fraction">
+      <input>a32nx/flap-norm</input>
+      <gain>1</gain>
+      <output>fcs/flap-pos-norm</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-speedbrake">
+      <input>a32nx/speedbrake-norm</input>
+      <gain>1</gain>
+      <output>fcs/speedbrake-pos-norm</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-ground-spoilers">
+      <input>a32nx/ground-spoiler-norm</input>
+      <gain>1</gain>
+      <output>fcs/spoiler-pos-norm</output>
+    </pure_gain>
+
+  </channel>
+
+</system>

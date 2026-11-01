@@ -96,9 +96,14 @@ add_subdirectory("${JSBSIM_DIR}" jsbsim EXCLUDE_FROM_ALL SYSTEM)
 add_executable(law_harness
   harness/main.cpp
   harness/efcs.cpp
-  harness/world.cpp)
+  harness/world.cpp
+  harness/airframe.cpp)
 target_link_libraries(law_harness PRIVATE a32nx_efcs libJSBSim)
-target_compile_definitions(law_harness PRIVATE A32NX_COMMIT="${A32NX_COMMIT}" JSBSIM_COMMIT="${JSBSIM_COMMIT}")
+target_compile_definitions(law_harness PRIVATE
+  A32NX_COMMIT="${A32NX_COMMIT}"
+  JSBSIM_COMMIT="${JSBSIM_COMMIT}"
+  JSBSIM_ROOT="${JSBSIM_DIR}"                              # aircraft/ and engine/ are read from the clone
+  FLIGHT_JSBSIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jsbsim")  # and our own JSBSim files from here
 if(MSVC)
   target_compile_options(law_harness PRIVATE /W4 /EHsc /permissive-)
   target_compile_definitions(law_harness PRIVATE _CRT_SECURE_NO_WARNINGS)  # plain fopen, as on every other platform
@@ -120,6 +125,11 @@ add_test(NAME computers_come_up COMMAND law_harness --minutes 1 --expect power-u
 add_test(NAME ground_check_moves_surfaces COMMAND law_harness --minutes 1 --expect ground-check)
 add_test(NAME normal_law_in_flight COMMAND law_harness --minutes 6 --expect normal-law)
 add_test(NAME stick_flies_the_aircraft COMMAND law_harness --minutes 8 --expect stick-response)
+
+# What a real airframe adds: the laws trim it, damp it, and land it.
+add_test(NAME stabiliser_takes_the_trim COMMAND law_harness --minutes 8 --expect autotrim)
+add_test(NAME yaw_damper_takes_out_a_pedal_kick COMMAND law_harness --minutes 8 --expect pedal-kick)
+add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 16 --expect landing)
 
 # Negative controls: the gate's two checks are shown able to fail.
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)
