@@ -522,6 +522,14 @@ guidance, a real path through the world — with the CBT's procedures and scorin
       public-domain base ships: FAA CIFP (US airports with SIDs, STARs and approaches, ARINC 424,
       every 28 days) and OurAirports (airports and runways worldwide, no procedures). **P9**.
 - [ ] **An exterior aircraft model**: not now; perhaps later, the operator's call.
+- [ ] **VR, later, as a toggle** — back burner, not to be built now. Meta Quest 3 and 3S only (a
+      Quest 2 may work but is not a target; no Apple headset), with true stereo depth. Relayed on
+      2026-11-01 by the session researching visuals, which noted the route: three.js's built-in
+      WebXR for real per-eye stereo, through Quest Link and Chrome on Windows so the joystick stays
+      on the PC, with the standalone Quest browser as the lightest tier. Not scheduled.
+- [ ] **A 3D debrief in the manner of ACMI/Tacview**: the flown trail coloured by the gate's bands, a
+      timeline and an event log, built on the deterministic replay (house rule 7). Relayed the same
+      day by the same session. Not scheduled; it extends the P7 gate's debrief.
 
 What that implies, for whoever plans P7: the computers and JSBSim reach the browser as WebAssembly
 (the A32NX computers are already built for wasm in MSFS); Three.js (MIT) and the Gamepad API are
