@@ -90,13 +90,32 @@ ground effect, spoilers and plausible lateral-directional derivatives.
 
 So the aeroplane that flies is a 737-class airframe under the A320's flight control computers:
 A320-class in size, weight and speed, not an A320. That is said wherever its numbers are reported.
-Whether to replace it with an A320 aerodynamic data set of our own is a P7 decision (`ROADMAP.md`).
+The operator decided to fly it for P7 and replace it later with an A320 data set fitted to the
+targets in §1d; the rule for that swap is in `ROADMAP.md`, P7.
 
 Both aircraft files carry the same note: built from public data and guesses, for education and
 entertainment, not endorsed by the manufacturer, not to be sold. This project sells nothing.
 
 The file that puts the A32NX servos in charge of the airframe's surfaces,
 `flight/jsbsim/a32nx-surfaces.xml`, is ours and GPLv3.
+
+### 1d · The A320's acceptance targets — numbers, cited
+
+`flight/targets/a320.csv` and `a320-speeds.csv` hold the numbers an airframe is scored against
+(`airframe_score`). They are ours and GPLv3, like everything in `flight/`. No flight-test data and no
+Airbus document stands behind them, and none is claimed: every row names one of these sources.
+
+| source | licence | what is taken | how |
+|---|---|---|---|
+| A32NX `NXSpeeds.ts`, VS1g and VLS tables (§1a clone) | GPLv3 | stall and lowest selectable speeds by configuration and weight | sampled at 5 t steps into `a320-speeds.csv`; three points corrected for typos, each one said in the file. A community reconstruction of Airbus's tables, not Airbus data |
+| A32NX `ElacComputer`, α max and α prot tables | GPLv3 | the alpha the wing must still lift at, and the alpha ceiling at VLS | read out of the compiled parameter table and cited by value |
+| A32NX lateral normal law | GPLv3 | the 15°/s roll rate full stick asks for | cited by value |
+| OpenAP WRAP, A320 (Sun, Ellerbroek and Hoekstra, *Transportation Research Part C*, 2019; `junzis/openap`) | LGPL-3.0 | the ranges of its ADS-B fits for takeoff acceleration, liftoff speed, climb and descent rate, and its typical cruise | four ranges and a typical cruise Mach and level cited, units converted; no file copied. The four ranges are context rows, not counted |
+| MIL-F-8785C, *Flying Qualities of Piloted Airplanes* (US DoD, 1980) | public domain | Level 1 floors for large aircraft: roll-mode time constant at most 1.4 s, Dutch-roll damping at least 0.08 | cited |
+| pilot literature | — | approach attitude in CONF FULL and cruise attitude | wide bands, marked in the file as not confirmed against Airbus's FCTM. To confirm |
+
+The margins and the bands' widths that no source gives — ±3 kt on a stall speed, 1° above α max —
+are this project's, and the file says so where it uses them.
 
 ---
 

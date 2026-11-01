@@ -20,7 +20,8 @@
 #   source     key, explained below
 #
 # Sources
-#   a32nx-speeds        a320-speeds.csv: A32NX's VS1g tables, a community reconstruction of Airbus's
+#   a32nx-speeds        a320-speeds.csv: A32NX's VS1g tables, a community reconstruction of Airbus's;
+#                       the band of 3 kt either side is ours
 #   elac-alpha-max+1    the ELAC's own alpha max (A32NX 66021c2, ElacComputer_P, Mach 0 to 0.5: clean 8.7,
 #                       CONF 1 and 1+F 13.6, CONF 2 14.2, CONF 3 13.1, FULL 13.0 deg) plus 1 deg: the wing
 #                       must still be lifting where the law lets the pilot take it. The margin is ours
