@@ -26,11 +26,23 @@ if(NOT EXISTS "${FBW}/model/ElacComputer.cpp")
     "Clone them as flight/README.md says, or pass -DA32NX_DIR=<path to the clone>.")
 endif()
 
+# Which commit an upstream is at: a clone says so through git. The source archive of a release
+# (flight/web/tools/release.mjs) holds exports, not clones, and an export has no .git to ask: each says
+# the commit it was exported from in a SOURCE-COMMIT file of its own, which is read first.
 find_package(Git QUIET)
-if(GIT_FOUND)
-  execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${A32NX_DIR}" rev-parse --short=7 HEAD
-                  OUTPUT_VARIABLE A32NX_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-endif()
+function(upstream_commit dir out)
+  set(commit "")
+  if(EXISTS "${dir}/SOURCE-COMMIT")
+    file(STRINGS "${dir}/SOURCE-COMMIT" commit LIMIT_COUNT 1)
+    string(SUBSTRING "${commit}" 0 7 commit)
+  elseif(GIT_FOUND)
+    execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${dir}" rev-parse --short=7 HEAD
+                    OUTPUT_VARIABLE commit OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+  endif()
+  set(${out} "${commit}" PARENT_SCOPE)
+endfunction()
+
+upstream_commit("${A32NX_DIR}" A32NX_COMMIT)
 if(NOT A32NX_COMMIT STREQUAL A32NX_COMMIT_EXPECTED)
   message(FATAL_ERROR
     "The A32NX clone is at '${A32NX_COMMIT}'; the bus contract was written against ${A32NX_COMMIT_EXPECTED}.\n"
@@ -45,10 +57,7 @@ if(NOT EXISTS "${JSBSIM_DIR}/src/FGFDMExec.cpp")
     "No JSBSim sources under ${JSBSIM_DIR}.\n"
     "Clone them as docs/provenance.md says, or pass -DJSBSIM_DIR=<path to the clone>.")
 endif()
-if(GIT_FOUND)
-  execute_process(COMMAND "${GIT_EXECUTABLE}" -C "${JSBSIM_DIR}" rev-parse --short=7 HEAD
-                  OUTPUT_VARIABLE JSBSIM_COMMIT OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
-endif()
+upstream_commit("${JSBSIM_DIR}" JSBSIM_COMMIT)
 if(NOT JSBSIM_COMMIT STREQUAL JSBSIM_COMMIT_EXPECTED)
   message(FATAL_ERROR
     "The JSBSim clone is at '${JSBSIM_COMMIT}'; the airframe was measured against ${JSBSIM_COMMIT_EXPECTED}.\n"
