@@ -179,14 +179,15 @@
   <propulsion>
     <!-- ===== The thrust the fitter tunes: shares of the 25,000 lbf take-off rating ===== -->
 
-    <!-- take-off thrust, delta^x (1 + a1 Mach + a2 Mach^2) (1 + c Mach (1 - delta)), and idle thrust,
-         delta (i0 + i1 Mach): Engines/CFM56-5A1-fit.xml -->
-    <property value="0.34870938" persistent="true">propulsion/fit/lapse-delta</property>
-    <property value="-1.1964355" persistent="true">propulsion/fit/lapse-mach</property>
-    <property value="1.5525532" persistent="true">propulsion/fit/lapse-mach2</property>
-    <property value="-0.98107818" persistent="true">propulsion/fit/lapse-mach-delta</property>
-    <property value="0.087183774" persistent="true">propulsion/fit/idle</property>
-    <property value="-0.24100822" persistent="true">propulsion/fit/idle-mach</property>
+    <!-- take-off thrust, delta^x (1 + a1 Mach + a2 Mach^2) (1 + (c Mach + c2 Mach^2) (1 - delta)),
+         and idle thrust, delta (i0 + i1 Mach): Engines/CFM56-5A1-fit.xml -->
+    <property value="0.59376506" persistent="true">propulsion/fit/lapse-delta</property>
+    <property value="-1.1535441" persistent="true">propulsion/fit/lapse-mach</property>
+    <property value="1.3501107" persistent="true">propulsion/fit/lapse-mach2</property>
+    <property value="0.44662955" persistent="true">propulsion/fit/lapse-mach-delta</property>
+    <property value="-1.32362" persistent="true">propulsion/fit/lapse-mach2-delta</property>
+    <property value="0.087199766" persistent="true">propulsion/fit/idle</property>
+    <property value="-0.24105816" persistent="true">propulsion/fit/idle-mach</property>
     <!-- ground idle and reverse thrust, for the harness to read, see thrust-seeds.csv: ground idle and the
          reverser's efficiency cited, MAX REV provisional. The selector the harness writes, 0 for the flight
          idle above and 1 for ground idle; declared, it turns ground idle on (the harness parks and rolls an
@@ -197,8 +198,8 @@
     <property value="0">propulsion/a320/ground-idle</property>
     <!-- the thrust lever schedule (flight/harness/airframe.cpp): at the CL and MCT detents, the fraction
          of the way from idle to take-off thrust at the flight condition -->
-    <property value="0.8309924" persistent="true">propulsion/fit/climb-fraction</property>
-    <property value="0.94281725" persistent="true">propulsion/fit/mct-fraction</property>
+    <property value="0.83358206" persistent="true">propulsion/fit/climb-fraction</property>
+    <property value="0.94281731" persistent="true">propulsion/fit/mct-fraction</property>
     <!-- the pace of spool-up, JSBSim's own rate times this (Engines/CFM56-5A1-fit.xml); see spool-seeds.csv -->
     <property value="1.4311835" persistent="true">propulsion/fit/spool-up</property>
 

@@ -369,6 +369,9 @@ add_test(NAME scorer_instruments_read_pitch_as_the_files_have_it COMMAND airfram
 # And our A320's engine spools up at JSBSim's own rate times its one fitted number: at 1 in JSBSim's
 # default 5.80 s, from flight idle to 95 % of take-off thrust, and at 2 in half the time.
 add_test(NAME scorer_instruments_spool_our_engine_as_jsbsim_does COMMAND airframe_score --instruments-spool)
+# And its take-off thrust falls with height less at lift-off speed than at rest, as ANP and Bartel and
+# Young both have it: at 4,000 and 8,000 ft it keeps more of its sea-level thrust at Mach 0.25.
+add_test(NAME scorer_instruments_thrust_falls_less_with_height_at_speed COMMAND airframe_score --instruments-thrust)
 
 # Our fitted A320 flies by default since 2026-11-01. The 737 it replaced stays selectable and keeps its
 # own cases, so the swap rule can always score both: it is scored, flies the gate, and lands.

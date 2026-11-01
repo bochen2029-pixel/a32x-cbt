@@ -131,7 +131,12 @@
 #                       Aircraft 45(4), 2008, equations 11 to 14, as OpenAP's thrust.py implements them) for
 #                       the CFM56-5A1's bypass ratio, 6.0 (ICAO's engine emissions databank, through OpenAP):
 #                       77.0 % of static thrust at Mach 0.25. A generic model of the engine class, independent
-#                       of ANP, so a wider band, 5 % either way: ours
+#                       of ANP, so a wider band, 5 % either way: ours.
+#                       With the runway's pressure ratio (its equations 12 to 14), the same model gives
+#                       the 5A1's take-off thrust at a high airfield, as shares of OpenAP's 111,200 N static
+#                       rating: 88.0 % static at 6,000 ft, 83.8 % static and 65.9 % at Mach 0.25 at 8,000 ft;
+#                       97.81, 93.14 and 73.26 kN. It agrees with ANP within 3.5 % at ANP's six take-off
+#                       rows, at sea level and 4,000 ft. Bands 5 % either way, as above
 #   anp-gradient        The steady gradient ANP gives the A320-211 at 65 t: Doc 29's equation B-12 without its
 #                       factor K for an 8 kt headwind and the acceleration of a constant-CAS climb, so
 #                       sin gamma = 2 Fn / W - R, with the thrust above and Airbus's drag-to-lift ratio R for
@@ -246,6 +251,9 @@ thrust-idle-250kt-5000ft,target,thrust,thrust of one engine,idle; 250 kt; 5000 f
 thrust-idle-210kt-8000ft,target,thrust,thrust of one engine,idle; 210 kt; 8000 ft,,,-0.66,1.34,kN,check,anp-a320-211
 spool-up,target,spool,seconds from a steady flight idle to 95 % of take-off thrust,one engine; static; sea level; the levers moved at once to TOGA,,,,5,s,fit,cfr-33-73
 thrust-lapse-m025,target,thrust,take-off thrust of one engine as a share of its static thrust,TOGA; Mach 0.25; sea level,,,73.16,80.87,%,check,bartel-young
+thrust-toga-static-6000ft,target,thrust,thrust of one engine,TOGA; static; 6000 ft,,,92.92,102.71,kN,check,bartel-young
+thrust-toga-static-8000ft,target,thrust,thrust of one engine,TOGA; static; 8000 ft,,,88.48,97.80,kN,fit,bartel-young
+thrust-toga-m025-8000ft,target,thrust,thrust of one engine,TOGA; Mach 0.25; 8000 ft,,,69.60,76.92,kN,check,bartel-young
 takeoff-gradient,target,performance,steady climb gradient at take-off thrust,TOGA; CONF 1+F; gear up; 149 kt; 1000 ft,65,,18.44,22.54,%,check,anp-gradient
 climb-gradient,target,performance,steady climb gradient at climb thrust,CL; clean; gear up; 250 kt; 6000 ft,65,,12.02,14.69,%,check,anp-gradient
 descent-gradient,target,performance,steady descent gradient at idle,idle; clean; gear up; 210 kt; 5000 ft,65,,-6.23,-5.10,%,check,anp-gradient

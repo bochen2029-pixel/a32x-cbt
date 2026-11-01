@@ -6,7 +6,7 @@
 //   airframe_score --check            exit 1 unless every target and context row was measured
 //   airframe_score --only-group thrust, --skip-group thrust [--skip-group poststall]
 //                                     one group of rows, or every group but those skipped
-//   airframe_score --instruments, --instruments-pitch, --instruments-spool
+//   airframe_score --instruments, --instruments-pitch, --instruments-spool, --instruments-thrust
 //                                     the instruments checked against what the aircraft files say
 //
 // It scores; it does not gate. Outside a band is a fact about the airframe, not a failed build.
@@ -888,6 +888,26 @@ int spoolInstruments() {
   return failed ? 1 : 0;
 }
 
+// Our A320's take-off thrust falls with height less at lift-off speed than at rest, as ANP's model and
+// Bartel and Young's both have it: at 4,000 and 8,000 ft it keeps more of its sea-level thrust at Mach
+// 0.25 than standing still. The form before the airframe plan's part 2, with one Mach-height term, had
+// it the other way round.
+int thrustInstruments() {
+  int failed = 0;
+  Airframe::select("a320");
+  Airframe a;
+  const double still0 = a.engineThrustLbs(0, 0, 0, 45), moving0 = a.engineThrustLbs(0, 0, 0.25, 45);
+  for (const double ft : {4000.0, 8000.0}) {
+    const double still = a.engineThrustLbs(ft, 0, 0, 45) / still0;
+    const double moving = a.engineThrustLbs(ft, 0, 0.25, 45) / moving0;
+    const std::string name = fmt("at %.0f ft, take-off thrust keeps more of itself at Mach 0.25 than at rest", ft);
+    failed += verdict(name.c_str(), moving > still,
+                      fmt("%.1f %% of sea level's at Mach 0.25, ", moving * 100) + fmt("%.1f %% at rest", still * 100));
+  }
+  std::printf("%s\n", failed ? "FAILED" : "PASSED");
+  return failed ? 1 : 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -918,11 +938,13 @@ int main(int argc, char** argv) {
       return pitchInstruments();
     } else if (a == "--instruments-spool") {
       return spoolInstruments();
+    } else if (a == "--instruments-thrust") {
+      return thrustInstruments();
     } else {
       std::printf(
           "airframe_score [--airframe 737|a320] [--coefficients file] [--targets dir] [--out score.csv]\n"
           "               [--check] [--fit-rows] [--only-group G | --skip-group G ...]\n"
-          "               [--instruments | --instruments-pitch | --instruments-spool]\n");
+          "               [--instruments | --instruments-pitch | --instruments-spool | --instruments-thrust]\n");
       return 2;
     }
   }

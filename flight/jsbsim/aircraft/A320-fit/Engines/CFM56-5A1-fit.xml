@@ -13,13 +13,13 @@
   the MilThrust function and n runs from 0 at idle to 1 at full throttle. Here, as shares of the rating,
   with delta the pressure ratio and Mach the flight Mach number:
 
-    take-off thrust  T = delta^x (1 + a1 Mach + a2 Mach^2) (1 + c Mach (1 - delta))
+    take-off thrust  T = delta^x (1 + a1 Mach + a2 Mach^2) (1 + (c Mach + c2 Mach^2) (1 - delta))
     idle thrust      I = delta ((1 - g) (i0 + i1 Mach) + g ground-idle)
 
   where g, propulsion/a320/ground-idle, is 0 for the flight idle the fit found and 1 for ground idle,
   the harness's to write; A320-fit.xml declares it at 0, so that left alone the idle is the fit's.
 
-  and MilThrust is (T - I) / (1 - I), so that take-off thrust is the rating times T. Their six numbers
+  and MilThrust is (T - I) / (1 - I), so that take-off thrust is the rating times T. Their seven numbers
   are properties declared in A320-fit.xml under propulsion/fit/, beside the thrust lever schedule the
   harness reads there; the fitter (flight/harness/fit.cpp) rewrites them in that file, not here.
 
@@ -94,6 +94,15 @@
             <value>1</value>
             <product>
               <property>propulsion/fit/lapse-mach-delta</property>
+              <property>velocities/mach</property>
+              <difference>
+                <value>1</value>
+                <property>atmosphere/delta</property>
+              </difference>
+            </product>
+            <product>
+              <property>propulsion/fit/lapse-mach2-delta</property>
+              <property>velocities/mach</property>
               <property>velocities/mach</property>
               <difference>
                 <value>1</value>
