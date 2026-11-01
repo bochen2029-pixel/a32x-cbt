@@ -10,7 +10,8 @@
 //   A320): an A320-class airframe, not an A320. It has one pitch control with the trim folded in, no
 //   slats and no roll spoilers, so the stabiliser acts through its elevator and the rest is dropped.
 // - "a320": an A320 of ours, flight/jsbsim/aircraft/A320-fit, fitted to flight/targets/a320.csv. It
-//   takes the stabiliser, the slats and each wing's spoilers as they are.
+//   takes the stabiliser, the slats and each wing's spoilers as they are, and its engines and thrust
+//   lever schedule are its own.
 // Each one's own flight controls still run, and a system of ours (flight/jsbsim/a32nx-surfaces.xml)
 // overrides their outputs in the same pass, so the aerodynamics see the servos' positions and nothing
 // else.

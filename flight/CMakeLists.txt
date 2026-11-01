@@ -185,10 +185,10 @@ if(EMSCRIPTEN)
   set(FLIGHT_EMBED
     "${JSBSIM_DIR}/aircraft/737/737.xml@/jsbsim/aircraft/737/737.xml"
     "${JSBSIM_DIR}/engine/CFM56.xml@/jsbsim/engine/CFM56.xml"
-    "${JSBSIM_DIR}/engine/CFM56_5.xml@/jsbsim/engine/CFM56_5.xml"
     "${JSBSIM_DIR}/engine/direct.xml@/jsbsim/engine/direct.xml"
     "${CMAKE_CURRENT_SOURCE_DIR}/jsbsim/a32nx-surfaces.xml@/flight/a32nx-surfaces.xml"
-    "${CMAKE_CURRENT_SOURCE_DIR}/jsbsim/aircraft/A320-fit/A320-fit.xml@/flight/aircraft/A320-fit/A320-fit.xml")
+    "${CMAKE_CURRENT_SOURCE_DIR}/jsbsim/aircraft/A320-fit/A320-fit.xml@/flight/aircraft/A320-fit/A320-fit.xml"
+    "${CMAKE_CURRENT_SOURCE_DIR}/jsbsim/aircraft/A320-fit/Engines/CFM56-5A1-fit.xml@/flight/aircraft/A320-fit/Engines/CFM56-5A1-fit.xml")
   set(FLIGHT_EMBED_OPTIONS "")
   set(FLIGHT_EMBED_FILES "")
   foreach(pair IN LISTS FLIGHT_EMBED)

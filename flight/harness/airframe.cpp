@@ -3,6 +3,7 @@
 #include "airframe.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -85,11 +86,14 @@ constexpr double kSpeedbrakeFullDeg = 40;
 constexpr double kFlapFullDeg = 40;
 constexpr double kWingSpoilersFullDeg = 5 * 50;
 
-// Thrust lever angle to thrust as a fraction of take-off thrust: idle, CL, MCT, TOGA. A schedule of
-// this project's choosing, shaped like the A320's — climb thrust a little under take-off thrust —
-// since the FADEC's own is not public. Reverse is not modelled: below idle is idle.
+// Thrust lever angle to thrust at the A320's detents, idle, CL, MCT and TOGA, as the fraction of the way
+// from idle to take-off thrust at the flight condition. The FADEC's own schedule is not public. JSBSim's
+// 737 flies this file's, of this project's choosing and shaped like the A320's, climb thrust a little
+// under take-off thrust. Our A320 flies its own, which its aircraft file declares under propulsion/fit/
+// and the fitter sets with its engines. Reverse is not modelled: below idle is idle.
+using Schedule = std::array<double, 4>;
 const double kTla[4] = {0, 25, 35, 45};
-const double kThrust[4] = {0, 0.88, 0.95, 1.0};
+constexpr Schedule k737Schedule = {0, 0.88, 0.95, 1.0};
 
 // Where a start puts the airframe: AirframeStart (airframe.h). An airborne start trims with alpha held
 // under this, comfortably past any approach's and short of every configuration's stall.
@@ -118,25 +122,25 @@ double wrap360(double deg) {
 
 // JSBSim's turbine spools N2 linearly with the throttle and makes thrust above idle with the square
 // of N2: the throttle that gives a thrust fraction is its square root.
-double throttleFor(double tla) {
+double throttleFor(const Schedule& s, double tla) {
   double fraction = 0;
   if (tla >= kTla[3]) {
-    fraction = kThrust[3];
+    fraction = s[3];
   } else if (tla > kTla[0]) {
     int k = 0;
     while (tla > kTla[k + 1]) ++k;
-    fraction = kThrust[k] + (kThrust[k + 1] - kThrust[k]) * (tla - kTla[k]) / (kTla[k + 1] - kTla[k]);
+    fraction = s[k] + (s[k + 1] - s[k]) * (tla - kTla[k]) / (kTla[k + 1] - kTla[k]);
   }
   return std::sqrt(fraction);
 }
 
 // And back: the thrust lever angle for a throttle.
-double tlaFor(double throttle) {
+double tlaFor(const Schedule& s, double throttle) {
   const double fraction = throttle * throttle;
-  if (fraction >= kThrust[3]) return kTla[3];
+  if (fraction >= s[3]) return kTla[3];
   int k = 0;
-  while (fraction > kThrust[k + 1]) ++k;
-  return kTla[k] + (kTla[k + 1] - kTla[k]) * (fraction - kThrust[k]) / (kThrust[k + 1] - kThrust[k]);
+  while (fraction > s[k + 1]) ++k;
+  return kTla[k] + (kTla[k + 1] - kTla[k]) * (fraction - s[k]) / (s[k + 1] - s[k]);
 }
 
 // For measuring: how far JSBSim's trim may move the elevator, through the pitch trim command.
@@ -180,6 +184,7 @@ struct Airframe::Impl {
   AirframeState state;
   double radioZeroFt = 0;
   TrimPoint startTrim;
+  Schedule schedule = k737Schedule;
 
   SGPropertyNode* node(const std::string& path) {
     SGPropertyNode* n = fdm.GetPropertyManager()->GetNode(path);
@@ -419,7 +424,9 @@ Airframe::Airframe(const AirframeStart& start) : impl_(std::make_unique<Impl>())
   fdm.GetOutput()->Disable();
 
   try {
-    // Engines from the clone, whichever aircraft: the 737's CFM56 and our A320's CFM56_5 are both its.
+    // Engines from the clone unless the aircraft has its own, which JSBSim looks for first: the 737's
+    // CFM56 is the clone's, our A320's CFM56-5A1 its own (aircraft/A320-fit/Engines). Both thrusters are
+    // the clone's.
     const SGPath root(JSBSIM_ROOT);
     fdm.SetRootDir(root);
     const SGPath aircraft = model.ours ? SGPath(FLIGHT_JSBSIM_DIR) / "aircraft" : root / "aircraft";
@@ -444,6 +451,14 @@ Airframe::Airframe(const AirframeStart& start) : impl_(std::make_unique<Impl>())
     SGPropertyNode* n = fdm.GetPropertyManager()->GetNode(name);
     if (!n) die("the " + std::string(model.name) + " declares no coefficient " + name);
     n->setDoubleValue(value);
+  }
+  // Our A320's thrust lever schedule is its own, from its file or the fitter's coefficients.
+  if (model.ours) {
+    m.schedule = {0, m.node("propulsion/fit/climb-fraction")->getDoubleValue(),
+                  m.node("propulsion/fit/mct-fraction")->getDoubleValue(), 1};
+    if (!(m.schedule[0] < m.schedule[1] && m.schedule[1] < m.schedule[2] && m.schedule[2] <= m.schedule[3])) {
+      die("the " + std::string(model.name) + "'s thrust lever schedule does not rise from idle to TOGA");
+    }
   }
 
   fdm.Setdt(kFrame);
@@ -539,7 +554,7 @@ void Airframe::step(double dt, const AirframeControls& c) {
   }
 
   for (int e = 0; e < 2; ++e) {
-    m.throttle[e]->setDoubleValue(throttleFor(c.tla[e]));
+    m.throttle[e]->setDoubleValue(throttleFor(m.schedule, c.tla[e]));
     m.brake[e]->setDoubleValue(clamp(c.brake[e], 0, 1));
   }
   m.steer->setDoubleValue(c.noseWheel);
@@ -616,7 +631,7 @@ TrimPoint Airframe::trimmed(double altitudeFt, double casKn, double mach, double
     t.pitchControlDeg = m.elevatorPos->getDoubleValue() / kRad;
     t.thsDeg = t.pitchControlDeg / kThsAsElevator;
   }
-  t.tla = tlaFor(m.throttle[0]->getDoubleValue());
+  t.tla = tlaFor(m.schedule, m.throttle[0]->getDoubleValue());
   // JSBSim's trim runs the engines in their trim phase, where thrust is already the steady thrust of
   // the throttle it found
   t.thrustLbs = m.thrust[0]->getDoubleValue() + m.thrust[1]->getDoubleValue();
@@ -652,8 +667,8 @@ double Airframe::engineThrustLbs(double altitudeFt, double casKn, double mach, d
   Impl& m = *impl_;
   m.configure(Configuration{});
   m.place(altitudeFt, casKn, mach, 0, 2);
-  m.throttle[0]->setDoubleValue(throttleFor(tla));
-  m.throttle[1]->setDoubleValue(throttleFor(tla));
+  m.throttle[0]->setDoubleValue(throttleFor(m.schedule, tla));
+  m.throttle[1]->setDoubleValue(throttleFor(m.schedule, tla));
   if (!m.fdm.RunIC()) die("JSBSim could not initialise for a thrust");
   m.fdm.GetPropulsion()->GetSteadyState();
   m.read();

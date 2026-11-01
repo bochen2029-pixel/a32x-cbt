@@ -2,10 +2,10 @@
 <!--
   An A320 for JSBSim, fitted to the project's acceptance targets. GPLv3, like everything in flight/.
 
-  Written for this project; not derived from JSBSim's own A320 or 737 files. The engines are JSBSim's
-  CFM56_5 (25,000 lb, the A320-211's CFM56-5A1), read at run time from the pinned clone as the 737 reads
-  its CFM56. The surfaces are positioned by the A32NX servos through flight/jsbsim/a32nx-surfaces.xml,
-  which JSBSim loads after this file.
+  Written for this project; not derived from JSBSim's own A320 or 737 files. The engines are ours too,
+  the A320-211's CFM56-5A1 (Engines/CFM56-5A1-fit.xml), started from Aeromatic's CFM56_5 in the pinned
+  clone and fitted to the thrust rows of flight/targets/a320.csv. The surfaces are positioned by the
+  A32NX servos through flight/jsbsim/a32nx-surfaces.xml, which JSBSim loads after this file.
 
   Where the numbers come from:
     geometry          A32NX's MSFS flight model (fbw-a32nx/.../FlyByWire_A320_NEO/flight_model.cfg,
@@ -19,6 +19,8 @@
                       started from before the fit and where the seed came from; see
                       flight/jsbsim/aircraft/A320-fit/seeds.csv. The fitter (flight/harness/fit.cpp)
                       rewrites the values here and nothing else
+    thrust            the engines' lapse and the thrust lever schedule, each a property under
+                      propulsion/fit/, seeded and fitted the same way; see thrust-seeds.csv
     ground effect     ours, from textbook theory: lift by the effective aspect ratio of a wing over its
                       image (DATCOM's lift-curve slope), induced drag by McCormick's factor
                       (16 h/b)^2 / (1 + (16 h/b)^2)
@@ -173,7 +175,22 @@
   </ground_reactions>
 
   <propulsion>
-    <engine file="CFM56_5">
+    <!-- ===== The thrust the fitter tunes: shares of the 25,000 lbf take-off rating ===== -->
+
+    <!-- take-off thrust, delta^x (1 + a1 Mach + a2 Mach^2) (1 + c Mach (1 - delta)), and idle thrust,
+         delta (i0 + i1 Mach): Engines/CFM56-5A1-fit.xml -->
+    <property value="0.68" persistent="true">propulsion/fit/lapse-delta</property>
+    <property value="-0.444" persistent="true">propulsion/fit/lapse-mach</property>
+    <property value="0.601" persistent="true">propulsion/fit/lapse-mach2</property>
+    <property value="-0.079" persistent="true">propulsion/fit/lapse-mach-delta</property>
+    <property value="0.065" persistent="true">propulsion/fit/idle</property>
+    <property value="-0.130" persistent="true">propulsion/fit/idle-mach</property>
+    <!-- the thrust lever schedule (flight/harness/airframe.cpp): at the CL and MCT detents, the fraction
+         of the way from idle to take-off thrust at the flight condition -->
+    <property value="0.88" persistent="true">propulsion/fit/climb-fraction</property>
+    <property value="0.95" persistent="true">propulsion/fit/mct-fraction</property>
+
+    <engine file="CFM56-5A1-fit">
       <feed>0</feed>
       <feed>1</feed>
       <feed>3</feed>
@@ -190,7 +207,7 @@
         </orient>
       </thruster>
     </engine>
-    <engine file="CFM56_5">
+    <engine file="CFM56-5A1-fit">
       <feed>0</feed>
       <feed>2</feed>
       <feed>4</feed>

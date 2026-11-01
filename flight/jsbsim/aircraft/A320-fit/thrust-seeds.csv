@@ -1,0 +1,27 @@
+# The thrust of A320-fit.xml before the fit: where each number started, how far the fitter may move it,
+# and why it started there. GPLv3, like everything in flight/. The columns are seeds.csv's.
+#
+# The engine is the A320-211's CFM56-5A1 (Engines/CFM56-5A1-fit.xml): take-off thrust as a share of its
+# 25,000 lbf rating, T = delta^x (1 + a1 Mach + a2 Mach^2) (1 + c Mach (1 - delta)); idle thrust,
+# I = delta (i0 + i1 Mach). The thrust lever schedule puts the CL and MCT detents a fraction of the way
+# from idle to take-off thrust (flight/harness/airframe.cpp). `airframe_fit --thrust` fits them, on the
+# fit rows of the thrust group of flight/targets/a320.csv and on nothing else.
+#
+# Sources
+#   cfm56-5       Aeromatic's CFM56_5 in the JSBSim clone (engine/CFM56_5.xml, LGPL-2.1), the engine our
+#                 A320 flew with before: the six lapse numbers fitted to its tables by least squares, take-off
+#                 thrust over Mach 0 to 0.85 and 0 to 40,000 ft (within 2.3 % of the rating everywhere), idle
+#                 over Mach 0 to 0.5 and 0 to 10,000 ft (within 2.1 %), where the targets are. Aeromatic's
+#                 tables are generic, so the widths are wide: the seed is a start, not an estimate to keep
+#   harness       the schedule the harness flew both airframes with, drawn up for the 737 stand-in
+#
+# None of these seeds was compared with a held-out row while it was made.
+property,seed,sigma,lo,hi,source,note
+propulsion/fit/lapse-delta,0.68,0.4,0.0,1.5,cfm56-5,how take-off thrust falls with the pressure ratio at rest
+propulsion/fit/lapse-mach,-0.444,0.8,-2.5,0.5,cfm56-5,how it falls with Mach at sea level
+propulsion/fit/lapse-mach2,0.601,1.0,-1.0,3.0,cfm56-5,and how that fall levels off
+propulsion/fit/lapse-mach-delta,-0.079,1.0,-2.0,1.0,cfm56-5,how the fall with Mach changes with height
+propulsion/fit/idle,0.065,0.05,-0.05,0.2,cfm56-5,idle thrust at rest at sea level
+propulsion/fit/idle-mach,-0.130,0.2,-0.6,0.2,cfm56-5,how idle thrust falls with Mach
+propulsion/fit/climb-fraction,0.88,0.06,0.6,1.0,harness,the CL detent
+propulsion/fit/mct-fraction,0.95,0.04,0.8,1.0,harness,the MCT detent

@@ -1,9 +1,15 @@
 // The fitter: CMA-ES over our A320's coefficients, scored by airframe_score on the fit rows of
 // flight/targets/a320.csv and on nothing else. GPLv3.
 //
-//   airframe_fit                  fit and report; the aircraft file is left alone
+//   airframe_fit                  fit the aerodynamics and report; the aircraft file is left alone
 //   airframe_fit --write          and write the fitted coefficients into it
+//   airframe_fit --thrust         the engines instead: their lapse and the thrust lever schedule
 //   airframe_fit --selftest       the optimiser alone, on functions whose minima are known
+//
+// The aerodynamics and the engines are fitted apart, each on its own rows (the thrust group, or every
+// group but it) and from its own seeds (seeds.csv, thrust-seeds.csv). No row of one answers to the
+// other's numbers, and a candidate carries only the numbers being fitted: the rest are the aircraft
+// file's, as the last fit of them left it.
 //
 // Parameter identification, not controller learning: the controller stays the A32NX computers. A
 // candidate is a full set of coefficients, handed to `airframe_score --airframe a320 --coefficients FILE
@@ -345,8 +351,8 @@ std::string quoted(const std::string& s) {
   return "\"" + s + "\"";
 }
 
-Score scoreOne(const std::string& scorer, const std::string& file) {
-  std::string command = quoted(scorer) + " --airframe a320 --coefficients " + quoted(file) + " --fit-rows";
+Score scoreOne(const std::string& scorer, const std::string& file, const std::string& rows) {
+  std::string command = quoted(scorer) + " --airframe a320 --coefficients " + quoted(file) + " --fit-rows " + rows;
 #ifdef _WIN32
   command = "\"" + command + "\"";  // cmd.exe drops the outer pair of quotes
 #endif
@@ -374,7 +380,7 @@ Score scoreOne(const std::string& scorer, const std::string& file) {
 }
 
 // All candidates at once, each in its own process: the population is sized to the machine's threads.
-std::vector<Score> scoreAll(const std::string& scorer, const std::filesystem::path& work,
+std::vector<Score> scoreAll(const std::string& scorer, const std::string& rows, const std::filesystem::path& work,
                             const std::vector<Coefficient>& coefficients, const Matrix& candidates) {
   std::vector<Score> scores(candidates.size());
   std::vector<std::thread> threads;
@@ -388,7 +394,7 @@ std::vector<Score> scoreAll(const std::string& scorer, const std::filesystem::pa
         out << coefficients[i].name << " " << buf << "\n";
       }
     }
-    threads.emplace_back([&, k, file] { scores[k] = scoreOne(scorer, file); });
+    threads.emplace_back([&, k, file] { scores[k] = scoreOne(scorer, file, rows); });
   }
   for (auto& t : threads) t.join();
   return scores;
@@ -463,27 +469,31 @@ std::string sibling(const char* argv0, const char* name) {
 
 int main(int argc, char** argv) {
   int generations = 200, lambda = 16;
-  bool write = false;
+  bool write = false, thrust = false;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--selftest") {
       return selftest();
     } else if (a == "--write") {
       write = true;
+    } else if (a == "--thrust") {
+      thrust = true;
     } else if (a == "--generations" && i + 1 < argc) {
       generations = std::atoi(argv[++i]);
     } else if (a == "--population" && i + 1 < argc) {
       lambda = std::atoi(argv[++i]);
     } else {
-      std::printf("airframe_fit [--generations N] [--population N] [--write] | --selftest\n");
+      std::printf("airframe_fit [--thrust] [--generations N] [--population N] [--write] | --selftest\n");
       return 2;
     }
   }
 
-  const std::string aircraft = std::string(FLIGHT_JSBSIM_DIR) + "/aircraft/A320-fit/A320-fit.xml";
-  const std::vector<Coefficient> coefficients = readSeeds(std::string(FLIGHT_JSBSIM_DIR) + "/aircraft/A320-fit/seeds.csv");
+  const std::string here = std::string(FLIGHT_JSBSIM_DIR) + "/aircraft/A320-fit/";
+  const std::string aircraft = here + "A320-fit.xml";
+  const std::vector<Coefficient> coefficients = readSeeds(here + (thrust ? "thrust-seeds.csv" : "seeds.csv"));
   const std::string scorer = sibling(argv[0], "airframe_score");
-  const std::filesystem::path work = std::filesystem::path(argv[0]).parent_path() / "fit";
+  const std::string rows = thrust ? "--only-group thrust" : "--skip-group thrust";
+  const std::filesystem::path work = std::filesystem::path(argv[0]).parent_path() / (thrust ? "fit-thrust" : "fit");
   std::filesystem::create_directories(work);
   const auto started = std::chrono::steady_clock::now();
   const Load load;
@@ -504,7 +514,7 @@ int main(int argc, char** argv) {
   std::vector<Score> screened;
   for (size_t k = 0; k < probes.size(); k += lambda) {
     const Matrix batch(probes.begin() + k, probes.begin() + std::min(probes.size(), k + lambda));
-    for (const Score& s : scoreAll(scorer, work, coefficients, batch)) screened.push_back(s);
+    for (const Score& s : scoreAll(scorer, rows, work, coefficients, batch)) screened.push_back(s);
   }
   const Score& atSeed = screened[0];
   if (!atSeed.ok) {
@@ -521,8 +531,8 @@ int main(int argc, char** argv) {
     }
     if (moves) free.push_back(i);
   }
-  std::printf("A32X CBT A320 fit: %zu coefficients, %zu of them answered to by the fit rows (%d rows); the rest held at their seeds\n",
-              coefficients.size(), free.size(), atSeed.rows);
+  std::printf("A32X CBT A320 fit, %s: %zu coefficients, %zu of them answered to by the fit rows (%d rows); the rest held at their seeds\n",
+              thrust ? "the engines" : "the aerodynamics", coefficients.size(), free.size(), atSeed.rows);
   std::printf("at the seeds: cost %.4f, fit rows inside %d of %d\n", atSeed.cost, atSeed.inside, atSeed.rows);
   for (size_t i : free) std::printf("  free  %s\n", coefficients[i].name.c_str());
 
@@ -557,7 +567,7 @@ int main(int argc, char** argv) {
     Matrix candidates;
     Vector outside(xs.size());
     for (size_t k = 0; k < xs.size(); ++k) candidates.push_back(expand(xs[k], outside[k]));
-    const std::vector<Score> scores = scoreAll(scorer, work, coefficients, candidates);
+    const std::vector<Score> scores = scoreAll(scorer, rows, work, coefficients, candidates);
     evaluations += static_cast<int>(xs.size());
     Vector f(xs.size());
     for (size_t k = 0; k < xs.size(); ++k) {
