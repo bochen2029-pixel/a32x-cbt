@@ -469,6 +469,8 @@ if(FLIGHT_NODE)
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/replay.test.mjs")
   add_test(NAME the_debrief_draws_the_fuselage_in_vectors COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/vector.test.mjs")
+  add_test(NAME the_debrief_aircraft_moves_as_it_flies COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/vectors.test.mjs")
   add_test(NAME the_pilots_guide_ships_as_a_page_with_its_pictures COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/guide-html.test.mjs")
   if(EMSCRIPTEN)

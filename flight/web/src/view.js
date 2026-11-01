@@ -22,6 +22,7 @@ import { hazedLightMaterial, lightMaterial } from './lights.js';
 import { eye, origin, xz } from './scene-math.js';
 import { HOURS, Scenery } from './scenery.js';
 import { sampleState } from './timeline.js';
+import { EDGE_DEG, linesShown, showVectors, vectorize } from './vectors.js';
 import { validateAirframe, validateRegion, validateSkyline } from './world-data.js';
 
 const DEG = Math.PI / 180;
@@ -226,7 +227,12 @@ export class View {
   airliner3d() {
     const A = this.airframe, u = this.scenery?.u;
     this.airliner = new Airliner(A);
-    this.outline = this.airliner.staticGeometry();   // while everything is shown: for the debrief's vectors
+    // still outlines for the debrief's playhead (setHead), taken posed at rest, the gear down and then up
+    this.airliner.update({ gear_pos: 1 }, 0);
+    this.outline = this.airliner.staticGeometry();
+    this.airliner.update({ gear_pos: 0 }, 0);
+    this.outlineUp = this.airliner.staticGeometry();
+    this.airliner.update({ gear_pos: 1 }, 0);
     this.cockpit = new Cockpit((m) => (u ? ambient(m, u, 0.45) : m), A);
     this.airliner.structure.add(this.cockpit.group);
     if (u) {
@@ -302,22 +308,28 @@ export class View {
     this.acmi.group.visible = false;
     this.acmi.wire.visible = false;
     this.scene.add(this.acmi.group);
-    const edges = new THREE.EdgesGeometry(this.outline, 28);
-    edges.applyMatrix4(this.structural.clone().invert());   // into the structure's metres
-    // and the fuselage's own lines, which its smooth body cannot give the edges (airliner.js, fuselageWire)
-    this.vector = new THREE.LineSegments(mergeGeometries([edges, this.airliner.fuselageWire()]),
-      new THREE.LineBasicMaterial({ color: 0xf2f2f2 }));
-    this.vector.visible = false;
-    // hung as the structure is, from the CG flying (update), but beside it: the debrief hides the structure
-    this.vector.matrixAutoUpdate = false;
-    this.vector.matrix.copy(this.structural);
-    this.airliner.root.add(this.vector);
-    // the aircraft where the debrief's playhead holds it (setHead): the same outline, in the playhead's colour
+    // the aircraft in vectors, carried by its parts so that the gear, the flaps, the surfaces and the doors move in
+    // the debrief as they fly (vectors.js), with the fuselage's own lines, which its smooth body cannot give the
+    // edges (airliner.js, fuselageWire)
+    this.vectors = vectorize(this.airliner.root, new THREE.LineBasicMaterial({ color: 0xf2f2f2 }), {
+      skip: (o) => Boolean(this.cockpit.group.getObjectById(o.id)),
+      extra: [[this.airliner.fuselage, this.airliner.fuselageWire()]],
+    });
+    // the aircraft where the debrief's playhead holds it (setHead): a still outline in the playhead's colour, its
+    // gear as it was then
     this.ghost = new THREE.Group();
-    this.ghostLines = new THREE.LineSegments(this.vector.geometry, new THREE.LineBasicMaterial({ color: 0x4fd8ff }));
-    this.ghostLines.matrixAutoUpdate = false;
-    this.ghostLines.matrix.copy(this.structural);
-    this.ghost.add(this.ghostLines);
+    const cyan = new THREE.LineBasicMaterial({ color: 0x4fd8ff });
+    const still = (outline) => {
+      const edges = new THREE.EdgesGeometry(outline, EDGE_DEG);
+      edges.applyMatrix4(this.structural.clone().invert());   // into the structure's metres
+      const l = new THREE.LineSegments(mergeGeometries([edges, this.airliner.fuselageWire()]), cyan);
+      l.matrixAutoUpdate = false;
+      l.matrix.copy(this.structural);
+      this.ghost.add(l);
+      return l;
+    };
+    this.ghostDown = still(this.outline);
+    this.ghostUp = still(this.outlineUp);
     this.ghost.visible = false;
     this.scene.add(this.ghost);
   }
@@ -349,16 +361,26 @@ export class View {
     if (!this.ghost.visible) return;
     this.ghost.position.fromArray(sample.p);
     this.ghost.quaternion.fromArray(sample.q);
+    const down = !(sample.s?.gear_pos < 0.5);   // a sample older than the gear's slot: down
+    this.ghostDown.visible = down;
+    this.ghostUp.visible = !down;
     this.ghost.updateMatrixWorld(true);
     this.focus = { position: this.ghost.position, quaternion: this.ghost.quaternion, heading: sample.s?.heading_deg };
+  }
+
+  // How many of the debrief's vector lines are drawn now, of all (vectors.js): a retracted gear's are not.
+  vectorsShown() {
+    return this.vectors ? linesShown(this.vectors) : { shown: 0, total: 0 };
   }
 
   setDebrief(on) {
     this.build();
     this.debriefOn = on;
     for (const o of this.world) o.visible = !on;
-    this.airliner.structure.visible = !on;
-    this.vector.visible = on;
+    // the aircraft in vectors: its parts' lines on and their paint off, its lights off (vectors.js)
+    showVectors(this.vectors, on);
+    this.airliner.lights.points.visible = !on;
+    if (on && this.mode === 'cockpit') this.cockpit.group.visible = false;
     this.acmi.wire.visible = on;
     this.acmi.group.visible = on || this.trailOn;
     if (this.floor) {
@@ -415,7 +437,7 @@ export class View {
     this.flyby = null;
     if (this.mode !== 'eye') this.build();
     if (!this.airliner) return;
-    this.cockpit.group.visible = this.mode === 'cockpit';
+    this.cockpit.group.visible = this.mode === 'cockpit' && !this.debriefOn;   // its paint would cover the vectors
     this.airliner.fuselage.visible = this.mode !== 'cockpit';
     this.lastTubes = -1;
   }
@@ -471,8 +493,7 @@ export class View {
         this.cgNow = cg;
         this.structural = structuralMatrix(cg);
         this.airliner.structure.matrix.copy(this.structural);
-        this.vector?.matrix.copy(this.structural);
-        this.ghostLines?.matrix.copy(this.structural);
+        for (const g of [this.ghostDown, this.ghostUp]) g?.matrix.copy(this.structural);
       }
       root.position.copy(body.position);
       root.quaternion.copy(body.quaternion);
@@ -630,7 +651,7 @@ export class View {
   // Everything compiled and sent to the GPU once, before the flight's clock starts, so the first frames
   // do not cost the flight its first steps: 4 were dropped at t = 0 when the first frame paid for it.
   warm() {
-    const hidden = (this.airliner ? [this.airliner.root, this.cockpit.group, this.acmi.group, this.acmi.wire, this.vector] : []).filter((o) => !o.visible);
+    const hidden = (this.airliner ? [this.airliner.root, this.cockpit.group, this.acmi.group, this.acmi.wire, ...this.vectors.lines] : []).filter((o) => !o.visible);
     for (const o of hidden) o.visible = true;
     this.renderer.compile(this.scene, this.camera);
     if (this.shadowScene) this.renderer.compile(this.shadowScene, this.camera);

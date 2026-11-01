@@ -10,7 +10,7 @@ import { standing, tagColour } from './events.js';
 
 // What a sample keeps of the state, for the readout and the camera (view.js, record); the core's own names.
 export const KEPT = ['thr_height_ft', 'thr_along_m', 'cas_kn', 'vapp_kn', 'vs_fpm', 'loc_dots', 'gs_dots', 'roll_deg',
-  'pitch_deg', 'heading_deg', 'gs_kn', 'on_ground'];
+  'pitch_deg', 'heading_deg', 'gs_kn', 'on_ground', 'gear_pos'];
 const BAND_CSS = ['#40ff73', '#ff3829', '#8c99a8'];     // acmi.js's BAND_COLOUR: in the bands, out of them, outside
 const BAND_WORD = ['in the bands', 'out of the bands', ''];
 const LEFT = 8, RIGHT_PAD = 56;                          // the bar's ends in the canvas, in CSS pixels

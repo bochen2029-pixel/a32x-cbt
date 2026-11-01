@@ -294,6 +294,8 @@ globalThis.flightDebug = {
   },
   // the flight so far as Ctrl+S saves it, for a driver to open again (tools/drive.mjs)
   recording: () => flight.recording({}).then((r) => r.text),
+  // the debrief's aircraft in vectors: how many of its parts' lines are drawn, of all (view.js, vectorsShown)
+  vectors: () => view.vectorsShown(),
   // the debrief's playhead (timeline.js): to a time of the flight (Infinity: live); play or pause; what it shows
   seek(t) {
     playhead.playing = false;
