@@ -97,6 +97,7 @@ const MIT = /^MIT License\b/;
 export const BINARY_NOTICES = [
   ['LICENSE.txt', GPL3, 'the GNU GPL, version 3'],
   ['README.txt', DISCLAIMER, 'the disclaimer'],
+  ['web/index.html', DISCLAIMER, 'the disclaimer on the flight page, as the trainer page carries it'],
   ['README.txt', /NO WARRANTY/, 'that it comes with no warranty'],
   ['README.txt', /Corresponding Source is a32x-sim-\S+-source\.zip/, 'where its Corresponding Source is'],
   ['README.txt', /"Airbus", "A320" and "A32NX" belong to their owners/, 'the trademarks'],

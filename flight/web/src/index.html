@@ -23,6 +23,8 @@
     max-height: 30vh; overflow: auto; }
   #debrief button { font: inherit; color: var(--fg); background: rgba(40,60,45,0.8);
     border: 1px solid rgba(160,200,160,0.4); border-radius: 3px; margin-top: 8px; cursor: pointer; }
+  #notice { position: fixed; left: 50%; top: 6px; transform: translateX(-50%); font-size: 11px;
+    color: var(--dim); white-space: nowrap; pointer-events: none; text-shadow: 0 0 3px #000; }
 </style>
 </head>
 <body>
@@ -30,6 +32,7 @@
 <canvas id="overlay"></canvas>
 <div id="hud"></div>
 <div id="status">loading the flight core…</div>
+<div id="notice">Unofficial. Not affiliated with Airbus, FlyByWire Simulations or Aerowinx. Not for type training.</div>
 <div id="debrief" hidden><div id="verdict"></div><div id="events"></div><button id="save" type="button">save the recording (Ctrl+S)</button></div>
 <script src="core.js"></script>
 <script src="flight.js"></script>

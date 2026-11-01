@@ -60,7 +60,7 @@ function binary() {
     ['A32X.exe', fakePe()],
     ['README.txt', fill(read('../release/README.txt'), values, 'README.txt')],
     ['LICENSE.txt', GPL3],
-    ['web/index.html', '<!doctype html><script src="core.js"></script><script src="flight.js"></script>'],
+    ['web/index.html', `<!doctype html><div id="notice">${DISCLAIMER}</div><script src="core.js"></script><script src="flight.js"></script>`],
     ['web/flight.js', '(() => {})();\n/*! Bundled license information:\n  (**\n   * @license\n   * Copyright 2010-2026 Three.js Authors\n   * SPDX-License-Identifier: MIT\n   *)\n*/\n'],
     ['web/core.js', 'globalThis.FLIGHT_CORE_SOURCE = "";\n'],
     ['notices/A32NX.txt', notice(`A32NX, ${UPSTREAM.a32nx.commit}.`, GPL3)],
@@ -264,4 +264,10 @@ test("a link's system libraries map to their notices, and one with no known lice
 
 test('a page names what it loads', () => {
   assert.deepEqual(pageReferences(read('../src/index.html')), ['core.js', 'flight.js']);
+});
+
+// The release refuses an archive whose page lacks it (BINARY_NOTICES, checked row by row above); this
+// holds the page itself to it.
+test('the flight page carries the disclaimer, as the trainer page does', () => {
+  assert.ok(read('../src/index.html').includes(DISCLAIMER), 'the disclaimer is on the flight page');
 });
