@@ -173,6 +173,13 @@ function metrics(r) {
   return Object.fromEntries(r.metrics.map((m) => [m.name, m.value]));
 }
 
+/** Heap and DOM size after a full collection, so nodes waiting for the collector do not read as a leak. */
+async function settled(page) {
+  await page.send('HeapProfiler.collectGarbage');
+  const m = metrics(await page.send('Performance.getMetrics'));
+  return { heapMB: m.JSHeapUsedSize / 2 ** 20, nodes: m.Nodes };
+}
+
 async function sustained(url, o) {
   const { browser, page } = await open(url, o);
   try {
@@ -192,6 +199,7 @@ async function sustained(url, o) {
     await page.send('Performance.enable');
     await sleep(2_000); // the drill's setup and the first frames settle before the window opens
 
+    const before = await settled(page); // collected outside the window, so it costs the window nothing
     const m0 = metrics(await page.send('Performance.getMetrics'));
     const w0 = await page.evaluate('({ marks: __cbtTick.marks.length, frames: __cbtTick.frames.length })');
     await sleep(o.seconds * 1000);
@@ -201,6 +209,7 @@ async function sustained(url, o) {
       frames: __cbtTick.frames.slice(${w0.frames}),
       status: document.getElementById('status').textContent,
     })`);
+    const after = await settled(page);
     healthy(w1.status, 1);
     page.clean();
 
@@ -221,8 +230,8 @@ async function sustained(url, o) {
       style: share('RecalcStyleDuration'),
       layout: share('LayoutDuration'),
       msPerStep: ((m1.TaskDuration - m0.TaskDuration) * 1000) / (rate * GRID_HZ * wall),
-      heapMB: [m0.JSHeapUsedSize / 2 ** 20, m1.JSHeapUsedSize / 2 ** 20],
-      nodes: [m0.Nodes, m1.Nodes],
+      heapMB: [before.heapMB, after.heapMB],
+      nodes: [before.nodes, after.nodes],
     };
   } finally {
     await browser.close();
@@ -260,7 +269,7 @@ function report(r) {
   const pc = (x) => `${(x * 100).toFixed(2)} %`;
   p(`  main thread busy                     ${pc(t.busy)}: script ${pc(t.script)}, style ${pc(t.style)}, layout ${pc(t.layout)}, other ${pc(t.busy - t.script - t.style - t.layout)}`);
   p(`  main-thread time per step            ${t.msPerStep.toFixed(3)} ms of the 50 ms step`);
-  p(`  JS heap; DOM nodes                   ${t.heapMB[0].toFixed(1)} -> ${t.heapMB[1].toFixed(1)} MB; ${t.nodes[0]} -> ${t.nodes[1]}`);
+  p(`  JS heap; DOM nodes, after a GC       ${t.heapMB[0].toFixed(2)} -> ${t.heapMB[1].toFixed(2)} MB; ${t.nodes[0]} -> ${t.nodes[1]}`);
   return out.join('\n');
 }
 
