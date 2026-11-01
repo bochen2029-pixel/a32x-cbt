@@ -68,14 +68,15 @@ normal law in pitch and roll for 100 % of 1,594 s of settled flight, 0 non-finit
 all computers healthy, a landing at 1,042.1 s at −143 fpm, 5.5° of pitch, 138 kt and 1.41 g; 5.18 s
 of wall time on MSVC 19.44, about 350 times real time.
 
-Seventeen `ctest` cases hold the parts the gate leans on, what the airframe adds, the scorer and the
-fitter, and keep the 737 flying. Two are negative controls that show the gate's checks can fail; two of the airframe's were
+Eighteen `ctest` cases hold the parts the gate leans on, what the airframe adds, the scorer and the
+fitter, and keep the 737 flying. Two are negative controls that show the gate's checks can fail; three of the airframe's were
 shown able to fail by hand: reverse the yaw damper's sign and the aircraft departs and flies into the
 ground 40 s after liftoff; reverse the THS's and the stabiliser runs to its stop while the elevator
-holds 24° against it. The scorer's instruments and the fitter's optimiser were shown able to fail the
-same way (their rows below). All seventeen pass on MSVC 19.44 with our A320 flying, and all seventeen
-again with `FLIGHT_AIRFRAME=737`. GCC 13.3 on Ubuntu 24.04 (WSL) gives the same verdicts and scores,
-with no warning in our code. Where a row gives one number, it is the 737's, measured before the swap.
+holds 24° against it; reverse either rudder trim sign and the trim case fails. The scorer's instruments and the fitter's optimiser were shown able to fail the
+same way (their rows below). All eighteen pass on MSVC 19.44 with our A320 flying, and all eighteen
+again with `FLIGHT_AIRFRAME=737`. GCC 13.3 on Ubuntu 24.04 (WSL) gives the same verdicts on all
+eighteen with either airframe and, as measured before the trim case, the same scores, with no warning
+in our code. Where a row gives one number, it is the 737's, measured before the swap.
 
 | case | what it shows |
 |---|---|
@@ -87,6 +88,7 @@ with no warning in our code. Where a row gives one number, it is the 737's, meas
 | `stick_flies_the_aircraft` | a 0.5 pull gives +4.3°/s and 1.67 g; the push −6.8°/s |
 | `stabiliser_takes_the_trim` | in steady flight the elevator rests at 0.25° on average; the THS holds the trim, 2 to 3.5° nose up |
 | `yaw_damper_takes_out_a_pedal_kick` | three seconds of 0.3 left pedal raise 4.6° of sideslip; four seconds after release yaw rate and sideslip are under 0.1 |
+| `rudder_trim_moves_the_nose_the_way_it_is_set` | the RUD TRIM switch held left six seconds in cruise, stick left alone: the FAC orders 6.0° left and reads 6.0° back, the rudder trails 5.3° left, 3.6° of sideslip nose left; RESET brings it to 0.0°. With the trim's sign reversed in the rudder it fails on the rudder and the sideslip; with the position fed back negated it fails on the read-back |
 | `lands_inside_the_limits` | the first landing, wings level, no bounce: the 737 at −77 fpm, 3.2° of pitch, 1.27 g; our A320 at −143 fpm, 5.5°, 1.41 g. Eighteen minutes, because the A320 descends at idle at about 1,030 fpm against the 737's 1,700 and lands 125 s later |
 | `airframe_is_scored_against_the_a320` | the scorer measures every target and context row; it fails only on a row it could not measure (shown with a planted bogus row), never on a row outside its band |
 | `scorer_instruments_read_the_737_right` | the scorer's instruments read the 737's own file back: its gear drag, 0.015; the Mach at which its drag table crosses 20 counts, 0.8170; a nose-down elevator pulse lowering alpha. Without the gear fix (Findings) it fails two of three |
@@ -399,14 +401,21 @@ From P7's first slice:
 
 - **JSBSim's A320 cannot be trimmed on approach** at 130–150 kt in CONF FULL; its pitch stiffness is
   several times a transport's. Measurements in `docs/provenance.md`.
-- **The rudder, in the computers' frame, is 25° × pedal − trim + yaw damper**, inside the travel
-  limiter. The driver hands the computers the pedal negated (`FlyByWireInterface.cpp` `:1414`); the
-  hydraulics negate the yaw damper order on the way in ("FBW negative is right", `a320_systems`
-  `hydraulic/mod.rs` `:5018`) and take the trim order as it is. Positive is trailing edge left, as in
-  JSBSim. Reversing the yaw damper's sign proves it: the aircraft departs.
-- **`efcs.cpp` feeds the rudder trim's position back un-negated where the driver negates it**
-  (`:2464`). Harmless while nothing moves the trim — no trim switch, no autopilot — and a departure
-  from the driver to fix when something does. Left alone here: this slice keeps `efcs.cpp` unchanged.
+- **The rudder, in the computers' frame, is 25° × pedal + trim + yaw damper**, inside the travel
+  limiter. The driver hands the computers the pedal negated (`FlyByWireInterface.cpp` `:1414`), and
+  the hydraulics negate both the yaw damper order and the trim order on the way in ("FBW negative is
+  right", `a320_systems` `hydraulic/mod.rs` `:5018`; "Trim commands from FBW is negative for right
+  positive for left", `:5107`). Positive is trailing edge left, as in JSBSim. Reversing the yaw
+  damper's sign proves it: the aircraft departs.
+- **Corrected after slice 1: the trim counted against the pedals.** This README said the hydraulics
+  take the trim order as it is, and that `efcs.cpp` fed the trim's position back with the wrong sign.
+  Both were wrong. The hydraulics negate the trim order (`:5107`), so the world's rudder sum had the
+  trim's sign reversed; `efcs.cpp` was right not to negate the position, because the world holds the
+  trim in the computers' frame, and the driver negates it (`:2464`) only because the hydraulics hold
+  it in theirs.
+  Harmless while nothing moved the trim. `rudder_trim_moves_the_nose_the_way_it_is_set` now holds the
+  RUD TRIM switch left for six seconds in cruise: 6.0° ordered and read back, the rudder 5.3° left,
+  3.6° of sideslip nose left, and RESET back to 0.0°. Reversing either sign fails it.
 - **The P6 crew leaned on the stub.** The stub clamped bank at 80° and gave speed by fiat; under real
   aerodynamics the old open-loop steep turn overbanked in direct law into a spiral, a stall at 80° of
   alpha and the ground. The crew now holds bank closed loop, and a crash fails the run.
