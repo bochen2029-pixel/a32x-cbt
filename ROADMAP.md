@@ -310,7 +310,8 @@ aerodynamics; and a fast pull in CONF FULL at 150 kt passes alpha max (13.0°, r
 fitted range — an open finding, diagnosed and tested: A32NX's ELAC acts on an alpha lagged by 2 s, which
 keeps the protection swinging after a fast entry on our A320 (with the lag alone at 0.2 s, in a throwaway
 copy of the sources, it settles), while the first overshoot, near 17°, is neither the lag's nor, within
-cited data, the airframe's; an upstream report is drafted, not filed (`flight/upstream-reports.md`, §4).
+cited data, the airframe's; the question is posted upstream as flybywiresim/aircraft discussion #11009
+(`flight/upstream-reports.md`, §4).
 A normal flare stays 2.3° short of alpha prot. Alpha floor waits for the autothrust and the FADEC (P9). On the way, a
 start in the air with the gear up held the ELAC on the ground until a gear reported weight on wheels only
 while down. `flight/README.md` has the table.

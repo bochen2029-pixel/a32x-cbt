@@ -1,14 +1,16 @@
 # Reports for FlyByWire A32NX — posted
 
-Two defects found in the A32NX sources while running its flight control computers outside MSFS,
-filed as issues on `flybywiresim/aircraft`.
+Found in the A32NX sources while running its flight control computers outside MSFS: three defects,
+filed as issues on `flybywiresim/aircraft` (§1 to §3), and a tuning question, posted in its
+Discussions (§4).
 
 **Status: posted 2026-11-01** on the operator's word (*"post them"*), under their account, with
 the text below unchanged:
 [#11005](https://github.com/flybywiresim/aircraft/issues/11005) (§1) and
 [#11006](https://github.com/flybywiresim/aircraft/issues/11006) (§2); §3 followed later that day as
-[#11007](https://github.com/flybywiresim/aircraft/issues/11007). §4 is a draft, not filed: it waits
-for the operator's word. Filed through the API with
+[#11007](https://github.com/flybywiresim/aircraft/issues/11007). §4 was posted the same evening as a
+question, not a bug, in the repository's Discussions (Q&A):
+[discussion #11009](https://github.com/flybywiresim/aircraft/discussions/11009). Filed through the API with
 `gh`: the repository turns blank issues off and asks for its bug-report form, which is built for
 reports from the simulator (simulator version, the EFB's build info, steps in the sim). These were
 found in source, outside MSFS, so they went as written. Checked on 2026-11-01: `master` of `flybywiresim/aircraft` was
@@ -112,7 +114,11 @@ since they run the base constructor first).
 
 ## 4 · The ELAC's high-AoA protection acts on an alpha lagged by 2 s, and keeps swinging after a fast entry
 
-Drafted 2026-11-01 by the P7 session, **not filed**: it waits for the operator's word. Our condition for
+Drafted 2026-11-01 by the P7 session. Posted the same day on the operator's word (*"Q&A discussion"*),
+under their account, as a question rather than a bug, in the repository's Discussions, Q&A:
+[discussion #11009](https://github.com/flybywiresim/aircraft/discussions/11009), the title and body below
+unchanged. Checked just before posting: `master` still `66021c2`, and no issue, pull request or discussion
+on the lag or the protection's swinging. Our condition for
 writing it was that the overshoot persist on an airframe fitted where it happens; it did. The lag was
 then tested directly, before the operator's decision, in a throwaway copy of the sources (the table
 below), and the test narrowed the report: the lag keeps the protection swinging; it does not make the
