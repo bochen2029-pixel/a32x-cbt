@@ -699,7 +699,9 @@ edge lights turning yellow and centreline lights red and white toward the end, A
 sequenced flashers and a PAPI on each arrival end, set to the core's glide — a generic parallel taxiway
 each, and its five terminals, central ramps and three towers where the FAA's airport diagram draws them
 (`docs/provenance.md` §1f). Every light is one point whose colour, beam and flash the GPU decides from
-the eye; a runway no airport file holds is drawn as an airport of one. Over it, until P8 draws a PFD: a conformal horizon and pitch
+the eye; a runway no airport file holds is drawn as an airport of one. The ground is laid in pieces no
+longer than 150 m, the ramps' triangles cut as the rectangles' cells are, so that a curved earth bends it
+rather than burying what lies across it. Over it, until P8 draws a PFD: a conformal horizon and pitch
 ladder, the flight path, speed, altitude, V/S, radio height, heading, flaps, gear, and the ILS's
 localizer and glideslope scales.
 
@@ -979,13 +981,23 @@ all five STABLE, their touchdowns within a metre of their mean: 329 m past the t
 lands at 651 fpm and 2.8 g, 1,613 m past the threshold and 140 m right of the centreline, and the judge
 names the seven bands it broke.
 
-**What the gate still needs** is the page's half: the target speed shown, the debrief at the stop, and a
-recording saved with the lines above, so that five approaches flown by hand in the browser can be judged
-with `--repeatable`. Then the operator flies them.
+**The page's half.** The browser's module records the flight as it flies it: `CoreSession` keeps the inputs
+that flew each step — the caller's, or the scripted crew's, stepped a tick at a time — and `recording()`
+gives them as `law_harness --replay` reads them, the scenario and the airframe (`flight_airframe()`, the
+default resolved) above the columns. The worker puts the judge's text on every message, `debrief`, and
+answers `{type: 'recording'}` at any time; `Flight.recording()` is its promise on the page's side. A
+recording made in the module replays into a fresh one to the same state and the same verdict, and the
+native build judges it alike: the scripted crew's approach from a dot left, flown in the module and
+saved, is STABLE with its touchdown 328.9 m past the threshold in both. The pilot's eye is the airframe's
+own: the core reports the definition's EYEPOINT from the CG (`eye_fwd_m`, `eye_right_m`, `eye_up_m`) and
+the CG's height on the gear (`cg_height_m`), and the eye camera, the PAPI and the overlay stand there —
+on the A320, 4.69 m above the runway and 0.51 m left of the centreline, the left seat. What the gate
+still needs is the page's own: the target speed marked, the debrief shown at the stop and the recording
+saved (fbw-desktop's change). Then the operator flies five.
 
 New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `the_judge_finds_an_unflared_approach_not_stable` and `the_judge_has_nothing_to_judge_on_the_runway`,
-through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-six native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-one under node, the WebAssembly build leaving out the five that start processes.
+through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-seven native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-two under node, the WebAssembly build leaving out the five that start processes.
 
 ## What P7 still has to build
 
