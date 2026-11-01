@@ -268,8 +268,10 @@ add_test(NAME stick_flies_the_aircraft COMMAND law_harness --minutes 8 --expect 
 add_test(NAME stabiliser_takes_the_trim COMMAND law_harness --minutes 8 --expect autotrim)
 add_test(NAME yaw_damper_takes_out_a_pedal_kick COMMAND law_harness --minutes 8 --expect pedal-kick)
 add_test(NAME rudder_trim_moves_the_nose_the_way_it_is_set COMMAND law_harness --minutes 8 --expect rudder-trim)
-# Eighteen minutes: our A320 descends at idle at about 1,030 fpm against the 737's 1,700 and lands later.
-add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 18 --expect landing)
+# Twenty minutes: our A320 descends at idle at about 1,100 fpm against the 737's 1,700, and since its
+# engines were fitted climbs at about 3,300 fpm against 4,600; its first landing comes at 1,077 s, and a
+# bounce is looked for over the 30 s after it.
+add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 20 --expect landing)
 
 # The scorer runs, and measures every target and context row. It scores the airframe; a row outside
 # its band is information, not a failure.

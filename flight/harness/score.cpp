@@ -398,7 +398,8 @@ void measureFlown(Measures& m) {
   double brakeRelease = -1, liftoff = -1, cruise = -1, climbFrom[2] = {-1, 0}, descentFrom[2] = {-1, 0};
   std::vector<double> rollTime, roll, kickTime, beta;
 
-  const long long ticks = std::llround(13 * 60 / kDt);
+  // to 3,000 ft on the approach, where the descent is timed: 13 minutes in, with the engines fitted
+  const long long ticks = std::llround(15 * 60 / kDt);
   for (long long k = 0; k < ticks && world.crashedAt() < 0; ++k) {
     efcs.tick(world, kDt);
     world.step(kDt, efcs.orders());
