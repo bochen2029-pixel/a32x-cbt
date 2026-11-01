@@ -230,6 +230,34 @@ add_test(NAME ils_on_the_beams COMMAND ils_test "approach" 0 0)
 add_test(NAME ils_a_dot_off_the_localizer COMMAND ils_test "approach$<SEMICOLON>loc=1" 1 0)
 add_test(NAME ils_a_dot_low COMMAND ils_test "approach$<SEMICOLON>distance=8$<SEMICOLON>gs=1" 0 1)
 
+# The scripted crew flies the ILS from 10 nm to a stop, judged by the hand-flown ILS's bands (ROADMAP.md,
+# P7): on the beams, a dot off each of them either way, 10 kt fast and slow, a 15 kt crosswind from
+# either side. In light turbulence the gusts are felt and it lands inside the A320's hard-landing
+# limits; they take it past the stabilised bands by a little, by a margin that depends on the compiler.
+foreach(start IN ITEMS
+    "on_the_beams|approach"
+    "from_a_dot_left|approach$<SEMICOLON>loc=1"
+    "from_a_dot_right|approach$<SEMICOLON>loc=-1"
+    "from_a_dot_low|approach$<SEMICOLON>gs=1"
+    "from_a_dot_high|approach$<SEMICOLON>gs=-1"
+    "from_10_kt_fast|approach$<SEMICOLON>cas=150"
+    "from_10_kt_slow|approach$<SEMICOLON>cas=130"
+    "in_a_crosswind_from_the_left|approach$<SEMICOLON>wind=47/15"
+    "in_a_crosswind_from_the_right|approach$<SEMICOLON>wind=227/15")
+  string(FIND "${start}" "|" bar)
+  string(SUBSTRING "${start}" 0 ${bar} name)
+  math(EXPR after "${bar} + 1")
+  string(SUBSTRING "${start}" ${after} -1 scenario)
+  add_test(NAME ils_flown_${name} COMMAND law_harness --scenario "${scenario}" --minutes 6 --expect ils)
+endforeach()
+add_test(NAME ils_in_light_turbulence_lands_inside_the_hard_landing_limits
+         COMMAND law_harness --scenario "approach$<SEMICOLON>wind=227/15$<SEMICOLON>turbulence=1" --minutes 6 --expect turbulence)
+# A recorded approach replays to the same bytes and touchdown (every hand-flown approach must too).
+if(NOT EMSCRIPTEN)
+  add_test(NAME ils_approach_replays_to_the_same_touchdown
+           COMMAND law_harness --scenario "approach$<SEMICOLON>wind=227/15$<SEMICOLON>turbulence=1" --minutes 6 --check-replay)
+endif()
+
 # The parts of a flight the gate leans on, each checked on its own.
 add_test(NAME computers_come_up COMMAND law_harness --minutes 1 --expect power-up)
 add_test(NAME ground_check_moves_surfaces COMMAND law_harness --minutes 1 --expect ground-check)

@@ -100,6 +100,14 @@ constexpr double kFlareFt = 33, kFlareTauS = 3, kFlareGain = 0.10, kFlarePitchRa
 // speed below which the next configuration goes in (CONF 1, 2, 3 with the gear, FULL).
 const double kVStage[5] = {210, 200, 180, 165, kVApp};
 const double kVNextStage[4] = {215, 203, 183, 168};
+// The ILS, raw data: the deviations read as metres with the distance, as a pilot reads dots against
+// DME. The centreline is closed at its offset over 20 s, never steeper than a 30 degree intercept; the
+// glide at its offset over 10 s, within a degree of the glide's angle, so that the sink rate asked for
+// stays under 1,000 fpm. Bank is held to 5 degrees below 1,500 ft and 3 over the runway; in the last
+// 15 ft the rudder takes the crab out.
+constexpr double kLocCloseS = 20, kGsCloseS = 10, kGsAuthorityDeg = 1.0, kInterceptDeg = 30;
+constexpr double kShortFinalFt = 1500, kDecrabFt = 15, kDecrabGain = 0.08;
+constexpr double kMsPerKt = 0.514444, kMPerFt = 0.3048, kRadPerDeg = 3.14159265358979323846 / 180;
 
 // The sidestick of a pilot flying a flight path angle and a heading through the laws.
 double pitchFor(double gammaTarget, double gamma, double q) {
@@ -152,7 +160,7 @@ AirframeStart configured(const WorldStart& s) {
 Runway runwayAtStart(const AirframeState& a) {
   Runway r;
   r.name = "start";
-  constexpr double kBehindM = 150, kRadPerDeg = 3.14159265358979323846 / 180;
+  constexpr double kBehindM = 150;
   const double metresPerDegLat = 111132.954 - 559.822 * std::cos(2 * a.latitudeDeg * kRadPerDeg);
   r.endLatDeg = a.latitudeDeg - kBehindM / metresPerDegLat;
   r.endLonDeg = a.longitudeDeg;
@@ -167,9 +175,16 @@ Runway runwayAtStart(const AirframeState& a) {
 World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(configured(start))) {
   runway_ = start.runway.name.empty() ? runwayAtStart(air()) : start.runway;
   if (start.airframe.airborne) {
-    // In the air: the levers and the surfaces where the trim left them, the brakes off.
+    // In the air: the levers and the surfaces where the trim left them, the brakes off, the flight
+    // controls on, and the scripted crew established on the final approach.
     const int lever = std::max(0, std::min(4, start.flapLever));
     const TrimPoint& t = airframe_->startTrim();
+    for (bool& on : crew.elacOn) on = true;
+    for (bool& on : crew.secOn) on = true;
+    for (bool& on : crew.facOn) on = true;
+    ilsCrew_ = true;
+    phase_ = Phase::Approach;
+    stage_ = 5;
     crew.flapLever = lever;
     crew.gearDown = start.gearDown;
     crew.spoilersArmed = lever >= 3;
@@ -238,7 +253,38 @@ void World::steerOnGround(double headingTarget) {
   crew.pedals = clamp(0.15 * wrap180(air().headingDeg - headingTarget) + 0.3 * air().headingRateDegS, -1, 1);
 }
 
-// The scripted crew: a circuit, flown through the laws, repeated until the run ends.
+double World::approachSpeedKn() {
+  return kVApp;
+}
+
+// The track that closes on the extended centreline, flown on the bank.
+void World::rollToCentreline(double bankLimit) {
+  const AirframeState& a = air();
+  const IlsReading r = ils();
+  const double v = std::max(30.0, a.groundSpeedKn) * kMsPerKt;  // m/s over the ground
+  const double limit = v * std::sin(kInterceptDeg * kRadPerDeg);
+  const double closing = clamp(-r.rightM / kLocCloseS, -limit, limit);  // m/s, + toward the right
+  const double track = runway_.headingDeg + std::asin(closing / v) / kRadPerDeg;
+  crew.roll = rollFor(track, a.trackDeg, a.rollDeg, a.pDegS, bankLimit);
+}
+
+// The final approach on the ILS: CONF FULL and the gear down, the beams on the stick, the speed on
+// the thrust levers.
+void World::flyIls(double dt) {
+  const AirframeState& a = air();
+  const IlsReading r = ils();
+  crew.flapLever = 4;
+  crew.gearDown = true;
+  crew.spoilersArmed = true;
+  rollToCentreline(r.heightM < kShortFinalFt * kMPerFt ? 5 : 25);
+  const double v = std::max(30.0, a.groundSpeedKn) * kMsPerKt;
+  const double limit = v * std::tan(kGsAuthorityDeg * kRadPerDeg);
+  const double rising = clamp(-r.aboveGlideM / kGsCloseS, -limit, limit);  // m/s, + up
+  holdPath(-runway_.glideDeg + std::atan(rising / v) / kRadPerDeg, kVApp, dt);
+}
+
+// The scripted crew: a circuit, flown through the laws, repeated until the run ends; or, from an
+// approach start, the ILS to a landing and a stop.
 void World::fly(double dt) {
   const AirframeState& a = air();
   casRate_ += ((a.casKn - lastCas_) / dt - casRate_) * std::min(1.0, dt / 1.0);  // read over about a second
@@ -342,6 +388,11 @@ void World::fly(double dt) {
     }
 
     case Phase::Approach: {  // down to 2000 ft, configure as the speed comes back, then three degrees
+      if (ilsCrew_) {
+        flyIls(dt);
+        if (a.radioHeightFt < kFlareFt) enter(Phase::Flare);
+        break;
+      }
       if (stage_ < 4 && a.casKn < kVNextStage[stage_] && (stage_ > 0 || h < kPatternFt + 150)) {
         c.flapLever = ++stage_;
         if (stage_ == 3) c.gearDown = true;
@@ -370,12 +421,25 @@ void World::fly(double dt) {
       } else {
         thrustFor(kVApp, 25, dt);
       }
-      c.roll = rollFor(360, psi, phi, p);
+      if (ilsCrew_) {
+        // Over the runway: the centreline on the track, the wings nearly level; in the last feet the
+        // rudder takes the crab out, so the wheels meet the runway along it. Pedals are + left.
+        rollToCentreline(3);
+        if (height < kDecrabFt) c.pedals = clamp(kDecrabGain * wrap180(psi - runway_.headingDeg), -1, 1);
+      } else {
+        c.roll = rollFor(360, psi, phi, p);
+      }
       if (onGround()) enter(Phase::Rollout);
       break;
     }
 
     case Phase::Rollout:
+      if (ilsCrew_) {  // idle, the brakes once the nose is down, the feet on the centreline; then stop
+        tla_ = 0;
+        c.brakes = a.groundSpeedKn < 1 ? 1 : a.noseWow ? 0.3 : 0;
+        steerOnGround(runway_.headingDeg - clamp(0.5 * ils().rightM, -4, 4));
+        break;
+      }
       tla_ = 0;
       c.brakes = a.noseWow ? 0.3 : 0;
       steerOnGround(360);

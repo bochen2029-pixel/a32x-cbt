@@ -136,6 +136,18 @@ struct Options {
   std::string expect;
   std::string trace;
   std::string record, replay;  // a crew recording to write from the scripted crew, or to fly from
+  std::string scenario;        // where the flight starts (core.h, flight_start_scenario); empty: the runway
+};
+
+// The worst a measure reached, and the height above the threshold (or the distance past it) where.
+struct Worst {
+  double value = NAN, at = NAN;
+  void add(double v, double where) {
+    if (std::isnan(value) || v > value) {
+      value = v;
+      at = where;
+    }
+  }
 };
 
 struct Results {
@@ -180,6 +192,15 @@ struct Results {
   // the RUD TRIM test, at the end of its hands-off window: what the engaged FAC ordered (+ left) and read
   // back, the rudder (+ left) and the sideslip (+ nose left of the flight path); then the trim after RESET
   double trimOrder = NAN, trimReadBack = NAN, trimRudder = NAN, trimBeta = NAN, trimAfterReset = NAN;
+  // an ILS approach: the stabilised window from 1,000 ft above the threshold to 50 ft before the first
+  // touchdown, each measure's worst and the height where; then the touchdown and rollout on the runway
+  bool ilsApproach = false;
+  long long ilsTicks = 0;
+  Worst ilsLocDots, ilsGsDots, ilsSinkFpm, ilsBankDeg, ilsFastKn, ilsSlowKn;
+  double ilsUnconfiguredAtFt = NAN;
+  double touchdownPastM = NAN, touchdownOffM = NAN;  // from the threshold, and from the centreline (+ right)
+  double landingRunwayHalfWidthM = NAN;
+  Worst rolloutOffM;                                  // where: metres past the threshold
 };
 
 // A crew recording: a line of input values per tick, the columns named by the first line in the flight
@@ -241,7 +262,13 @@ Results run(const Options& opt, FILE* trace) {
       std::exit(2);
     }
   }
-  FlightCore core(!replaying);
+  WorldStart worldStart;
+  std::string why;
+  if (!FlightCore::parseScenario(opt.scenario.c_str(), worldStart, why)) {
+    std::printf("--scenario: %s\n", why.c_str());
+    std::exit(2);
+  }
+  FlightCore core(!replaying, worldStart);
   World& world = core.world();
   world.adrFailAt = opt.failAdrAt;
   if (opt.expect == "rudder-trim") world.trimTest = {kTrimFrom, kTrimTo, kTrimHandsOffTo, +1};
@@ -297,6 +324,12 @@ Results run(const Options& opt, FILE* trace) {
       if (!wasOnGround && world.onGround()) {
         ++r.touchdowns;
         r.landings.push_back({t, lastAirborneVs, world.pitchDeg(), world.rollDeg(), world.casKn(), world.loadFactor()});
+        if (world.ilsApproach() && r.landings.size() == 1) {
+          const IlsReading ir = world.ils();
+          r.touchdownPastM = -ir.alongM;
+          r.touchdownOffM = ir.rightM;
+          r.landingRunwayHalfWidthM = world.runway().widthM / 2;
+        }
       }
       wasOnGround = world.onGround();
       if (!world.onGround()) lastAirborneVs = world.verticalSpeedFpm();
@@ -316,6 +349,26 @@ Results run(const Options& opt, FILE* trace) {
       }
     });
     if (!opt.record.empty()) recording.write(core.inputs());
+
+    if (world.ilsApproach()) {
+      r.ilsApproach = true;
+      const IlsReading ir = world.ils();
+      const double ft = ir.heightM / 0.3048;
+      if (r.landings.empty() && !world.onGround() && ft <= 1000 && ft >= 50) {
+        const double vapp = World::approachSpeedKn();
+        ++r.ilsTicks;
+        r.ilsLocDots.add(std::abs(ir.locDots), ft);
+        r.ilsGsDots.add(std::abs(ir.gsDots), ft);
+        r.ilsSinkFpm.add(-world.verticalSpeedFpm(), ft);
+        r.ilsBankDeg.add(std::abs(world.rollDeg()), ft);
+        r.ilsFastKn.add(world.casKn() - vapp, ft);
+        r.ilsSlowKn.add(vapp - world.casKn(), ft);
+        const bool configured = world.crew.flapLever == 4 && world.flapDeg() > 39.5 &&
+                                world.airframeState().gearPosition >= 0.999;
+        if (!configured && std::isnan(r.ilsUnconfiguredAtFt)) r.ilsUnconfiguredAtFt = ft;
+      }
+      if (!r.landings.empty() && world.groundSpeedKn() > 1) r.rolloutOffM.add(std::abs(ir.rightM), -ir.alongM);
+    }
 
     const Transmitted& tx = efcs.transmitted();
     const Surfaces& s = world.surfaces;
@@ -490,6 +543,64 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
       failed += verdict("under the hard-landing load factor", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
       failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
     }
+  } else if (which == "ils") {
+    // A hand-flown ILS's bands (ROADMAP.md, P7: how a hand-flown ILS is judged), here applied to the
+    // scripted crew: stabilised from 1,000 ft above the threshold to 50 ft, then the touchdown and the
+    // rollout against the runway. Each band prints its worst and where it happened.
+    const double vapp = World::approachSpeedKn();
+    auto worst = [](const Worst& w, const char* unit) {
+      return std::isnan(w.value) ? std::string("never measured") : fmt("worst %.2f ", w.value) + unit + fmt(" at %.0f ft", w.at);
+    };
+    failed += verdict("an approach start", r.ilsApproach, opt.scenario.empty() ? "no --scenario" : opt.scenario);
+    failed += verdict("the stabilised window was flown, 1,000 ft to 50 ft", r.ilsTicks * kDt > 60,
+                      fmt("%.0f s of it", r.ilsTicks * kDt));
+    failed += verdict("localizer within 1 dot", r.ilsLocDots.value <= 1, worst(r.ilsLocDots, "dots"));
+    failed += verdict("glideslope within 1 dot", r.ilsGsDots.value <= 1, worst(r.ilsGsDots, "dots"));
+    failed += verdict("sink rate under 1,000 fpm", r.ilsSinkFpm.value < 1000, worst(r.ilsSinkFpm, "fpm"));
+    failed += verdict("gear down and CONF FULL from 1,000 ft", std::isnan(r.ilsUnconfiguredAtFt),
+                      std::isnan(r.ilsUnconfiguredAtFt) ? std::string("throughout") : fmt("not at %.0f ft", r.ilsUnconfiguredAtFt));
+    failed += verdict("speed within Vapp -5/+10 kt", r.ilsFastKn.value <= 10 && r.ilsSlowKn.value <= 5,
+                      fmt("Vapp %.0f kt; %+.1f to ", vapp, -r.ilsSlowKn.value) + fmt("%+.1f kt", r.ilsFastKn.value));
+    failed += verdict("bank within 7 deg", r.ilsBankDeg.value <= 7, worst(r.ilsBankDeg, "deg"));
+    failed += verdict("normal law on the approach", r.flightTicks > 0 && share(r.pitchLawTicks, "normal", r.flightTicks) == 1 &&
+                      share(r.lateralLawTicks, "normal", r.flightTicks) == 1, r.firstNonNormalAt < 0 ? "throughout" : r.firstNonNormal);
+    failed += verdict("a landing", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
+    if (!r.landings.empty()) {
+      const auto& l = r.landings.front();
+      int bounces = 0;
+      for (const auto& b : r.landings) bounces += b.at > l.at && b.at - l.at < 30;
+      failed += verdict("sink rate at touchdown under 360 fpm", l.sinkFpm > -360, fmt("%.0f fpm", l.sinkFpm));
+      failed += verdict("load factor at touchdown under 2.6 g", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
+      failed += verdict("pitch at touchdown 0 to 10 deg", l.pitch > 0 && l.pitch < 10, fmt("%.1f deg", l.pitch));
+      failed += verdict("touchdown 300 to 900 m past the threshold", r.touchdownPastM >= 300 && r.touchdownPastM <= 900,
+                        fmt("%.0f m", r.touchdownPastM));
+      failed += verdict("on the centreline at touchdown, within 5 m", std::abs(r.touchdownOffM) <= 5,
+                        fmt("%+.1f m (+ right)", r.touchdownOffM));
+      failed += verdict("and through the rollout", r.rolloutOffM.value <= 5,
+                        fmt("worst %.1f m, ", r.rolloutOffM.value) + fmt("%.0f m past the threshold", r.rolloutOffM.at));
+      failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
+    }
+  } else if (which == "turbulence") {
+    // Light turbulence on the approach: the gusts are felt, and the scripted crew still lands inside the
+    // A320's hard-landing limits, 600 fpm and 2.6 g, tail clear, no bounce. Gusts take a crew this simple
+    // past the stabilised bands now and then, and where depends on the last bit of the arithmetic (one
+    // compiler's run touches down at 207 fpm, another's at 362), so those bands are not asked of it here.
+    failed += verdict("an approach start in turbulence", r.ilsApproach && opt.scenario.find("turbulence") != std::string::npos,
+                      opt.scenario.empty() ? "no --scenario" : opt.scenario);
+    failed += verdict("the gusts are felt: bank on the approach past half a degree", r.ilsBankDeg.value > 0.5,
+                      std::isnan(r.ilsBankDeg.value) ? std::string("never measured") : fmt("worst %.2f deg at %.0f ft", r.ilsBankDeg.value, r.ilsBankDeg.at));
+    failed += verdict("a landing", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
+    if (!r.landings.empty()) {
+      const auto& l = r.landings.front();
+      int bounces = 0;
+      for (const auto& b : r.landings) bounces += b.at > l.at && b.at - l.at < 30;
+      failed += verdict("under the hard-landing sink rate, 600 fpm", l.sinkFpm > -600, fmt("%.0f fpm", l.sinkFpm));
+      failed += verdict("under the hard-landing load factor, 2.6 g", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
+      failed += verdict("mains first, tail clear", l.pitch > 0 && l.pitch < 10, fmt("pitch %.1f deg", l.pitch));
+      failed += verdict("on the runway", std::abs(r.touchdownOffM) <= r.landingRunwayHalfWidthM,
+                        fmt("%+.1f m from the centreline (+ right)", r.touchdownOffM));
+      failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
+    }
   } else if (which == "law-degrades") {
     // The negative control for the gate's law check: lose all air data and normal law must go.
     std::string seen;
@@ -555,7 +666,12 @@ std::string self(const char* argv0) {
 // command line.
 bool childDigest(const char* argv0, double minutes, std::string& out, std::string* touchdown = nullptr,
                  const std::string& extra = "") {
-  const std::string cmd = self(argv0) + " --digest --minutes " + fmt("%.3f", minutes) + extra;
+  std::string cmd = self(argv0) + " --digest --minutes " + fmt("%.3f", minutes) + extra;
+#ifdef _WIN32
+  // cmd /c strips the first and the last quote of a line that holds more than two: give it a pair of
+  // its own to strip, so a quoted executable and a quoted scenario both survive.
+  cmd = "\"" + cmd + "\"";
+#endif
   FILE* p = popen(cmd.c_str(), "r");
   if (!p) return false;
   char line[256];
@@ -572,8 +688,9 @@ void usage() {
   std::printf(
       "law_harness [--minutes N] [--gate] [--check-determinism] [--check-replay] [--trace file.csv] [--digest]\n"
       "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|rudder-trim|landing|\n"
-      "                      law-degrades|scanner-catches-nan]\n"
-      "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv]\n");
+      "                      law-degrades|ils|turbulence|scanner-catches-nan]\n"
+      "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv]\n"
+      "            [--scenario \"approach;distance=10;loc=0;gs=0;cas=140;wind=227/15;turbulence=1\"]\n");
 }
 
 }  // namespace
@@ -596,6 +713,7 @@ int main(int argc, char** argv) {
     else if (a == "--check-replay") opt.replayCheck = true;
     else if (a == "--record") opt.record = next("--record");
     else if (a == "--replay") opt.replay = next("--replay");
+    else if (a == "--scenario") opt.scenario = next("--scenario");
     else if (a == "--expect") opt.expect = next("--expect");
     else if (a == "--fail-adr-at") opt.failAdrAt = std::atof(next("--fail-adr-at").c_str());
     else if (a == "--trace") opt.trace = next("--trace");
@@ -634,9 +752,10 @@ int main(int argc, char** argv) {
   // as an outside crew, in another: the same bytes from every computer, and the same touchdown.
   if (opt.replayCheck) {
     const std::string file = "replay-check.csv";
+    const std::string scenario = opt.scenario.empty() ? "" : " --scenario \"" + opt.scenario + "\"";
     std::string a, b, ta, tb;
-    const bool ran = childDigest(argv[0], opt.minutes, a, &ta, " --record " + file) &&
-                     childDigest(argv[0], opt.minutes, b, &tb, " --replay " + file);
+    const bool ran = childDigest(argv[0], opt.minutes, a, &ta, scenario + " --record " + file) &&
+                     childDigest(argv[0], opt.minutes, b, &tb, scenario + " --replay " + file);
     std::printf("A32NX %s, %s, %.1f simulated minutes recorded and replayed in fresh processes\n", A32NX_COMMIT,
                 Airframe::model(), opt.minutes);
     int failed = verdict("the replay gives the same bytes", ran && a == b, ran ? "digests " + a + " and " + b : "a child run failed");

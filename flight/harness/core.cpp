@@ -308,7 +308,6 @@ int flight_start_scenario(const char* airframe, int scripted, const char* scenar
     std::fprintf(stderr, "flight_start_scenario: %s\n", error.c_str());
     return -3;
   }
-  if (scripted && start.airframe.airborne) return -2;
   if (airframe && *airframe) Airframe::select(airframe);
   g_core = std::make_unique<FlightCore>(scripted != 0, start);
   g_core->writeState(g_state);

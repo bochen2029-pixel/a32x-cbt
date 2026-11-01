@@ -79,6 +79,7 @@ IlsReading readIls(const Runway& r, double latDeg, double lonDeg, double heightA
   out.locValid = fromLoc > 0 && std::abs(locDeg) < 35 && fromLoc < 25 * kNm;
 
   const double fromGs = out.alongM + gsOriginPastThresholdM(r);
+  out.aboveGlideM = out.heightM - std::tan(r.glideDeg * kRad) * fromGs;
   const double elevation = std::atan2(out.heightM, fromGs) / kRad;
   out.gsDots = (r.glideDeg - elevation) / gsDotDeg(r);
   // ICAO asks the glideslope to reach at least 10 nm; 12 here, so that a start 10 nm before the threshold

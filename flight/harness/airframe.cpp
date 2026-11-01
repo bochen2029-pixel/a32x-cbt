@@ -20,6 +20,7 @@
 #include "models/FGInput.h"
 #include "models/FGMassBalance.h"
 #include "models/FGOutput.h"
+#include "models/FGPropagate.h"
 #include "models/FGPropulsion.h"
 #include "simgear/misc/sg_path.hxx"
 #include "simgear/props/props.hxx"
@@ -467,14 +468,27 @@ Airframe::Airframe(const AirframeStart& start) : impl_(std::make_unique<Impl>())
   m.read();
 
   if (!start.airborne) return;
-  // Into the air above the same field: the wind set first, so the speed is the air's; then JSBSim's own
-  // trim. Turbulence, when asked for, from a fixed seed, so that a run repeats.
+  // Into the air above the same field, trimmed by JSBSim's own routine in still air. The wind goes in
+  // after the trim, not through the initial condition: JSBSim's initial condition takes the airspeed as
+  // the ground velocity plus the wind and its dynamics as the ground velocity less the wind (FGAuxiliary,
+  // vAeroUVW), so a wind set there starts the aircraft with an airspeed off by twice the wind. Here it
+  // goes into the atmosphere and onto the ground velocity together, so the airspeed stays the trimmed
+  // one and the aircraft starts drifting with the air, as it would. Turbulence, when asked for, from a
+  // fixed seed, so that a run repeats.
   m.brake[0]->setDoubleValue(0);
   m.brake[1]->setDoubleValue(0);
-  const double from = start.windFromDeg * kRad, wind = start.windKn * kFpsPerKt;
-  ic->SetWindNEDFpsIC(-wind * std::cos(from), -wind * std::sin(from), 0);
   m.startTrim = trimmed(start.fieldElevationFt + start.heightFt, start.casKn, 0, start.gammaDeg, start.config,
                         kStartTrimAlphaLimitDeg);
+  const double from = start.windFromDeg * kRad, wind = start.windKn * kFpsPerKt;
+  if (wind > 0) {
+    const JSBSim::FGColumnVector3 air(-wind * std::cos(from), -wind * std::sin(from), 0);  // the air's velocity, NED
+    auto propagate = fdm.GetPropagate();
+    const JSBSim::FGColumnVector3 uvw = propagate->GetUVW() + propagate->GetTl2b() * air;
+    for (int axis = 1; axis <= 3; ++axis) propagate->SetUVW(axis, uvw(axis));
+    m.node("atmosphere/wind-north-fps")->setDoubleValue(air(1));
+    m.node("atmosphere/wind-east-fps")->setDoubleValue(air(2));
+    m.node("atmosphere/wind-down-fps")->setDoubleValue(air(3));
+  }
   if (start.turbulence > 0) {
     m.node("atmosphere/randomseed")->setIntValue(1983);
     m.node("atmosphere/turb-type")->setIntValue(4);  // Tustin, MIL-F-8785C

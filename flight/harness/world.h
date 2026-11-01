@@ -134,6 +134,10 @@ class World {
   bool onGround() const { return mainGearCompressed(); }
   const AirframeState& airframeState() const { return air(); }
   const Runway& runway() const { return runway_; }
+  // An approach start (WorldStart.airframe.airborne): the scripted crew flies the ILS to a landing.
+  bool ilsApproach() const { return ilsCrew_; }
+  // The final approach speed the scripted crew flies, CAS.
+  static double approachSpeedKn();
   IlsReading ils() const { return readIls(runway_, air().latitudeDeg, air().longitudeDeg, air().radioHeightFt); }
 
   // When the airframe went below the runway, or -1. JSBSim's 737 touches the ground only with its
@@ -181,9 +185,13 @@ class World {
   void thrustFor(double casTarget, double tlaMax, double dt);
   void stickFor(double gammaTarget, double dt);
   void steerOnGround(double headingTarget);
+  // The ILS crew: the beams on the approach, the centreline over the runway and on it.
+  void flyIls(double dt);
+  void rollToCentreline(double bankLimit);
 
   std::unique_ptr<Airframe> airframe_;
   Runway runway_;
+  bool ilsCrew_ = false;
 
   double t_ = 0;
   Phase phase_ = Phase::Parked;

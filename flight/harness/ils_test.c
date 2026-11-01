@@ -32,7 +32,6 @@ int main(int argc, char** argv) {
     return 2;
   }
   const double locWanted = atof(argv[2]), gsWanted = atof(argv[3]);
-  check(flight_start_scenario(NULL, 1, argv[1]) == -2, "a scripted crew on an approach is refused, for now", 0);
   check(flight_start_scenario(NULL, 0, "approach;nonsense=1") == -3, "a scenario not understood is refused", 0);
   if (flight_start_scenario(NULL, 0, argv[1]) != 0) {
     printf("FAILED: the scenario did not start\n");

@@ -32,6 +32,7 @@ struct IlsReading {
   double alongM = 0;                // before the threshold, toward the approach: +; past it: -
   double rightM = 0;                // right of the extended centreline, looking along the landing direction
   double heightM = 0;               // above the threshold, the earth's curve taken out
+  double aboveGlideM = 0;           // above the glide path's straight line, here
 };
 
 // The threshold's position and the ILS read at a geodetic position and height above the field.

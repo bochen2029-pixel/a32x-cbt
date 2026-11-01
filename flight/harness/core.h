@@ -25,8 +25,8 @@ int flight_start(const char* airframe, int scripted);
 // The same, from a scenario: "runway" (or empty) is flight_start's; "approach" starts in the air on LSZH
 // 14's ILS, options after it separated by semicolons — distance=NM (10), loc=DOTS (0), gs=DOTS (0),
 // cas=KT (140), lever=0..4 (4, FULL), wind=FROM/KT (0/0), turbulence=SEVERITY (0) — in CONF and gear
-// for the lever, trimmed. An outside crew only, for now: a scripted crew asked for there returns -2; a
-// scenario not understood, -3.
+// for the lever, trimmed. There the scripted crew flies the ILS to a landing and a stop. A scenario not
+// understood returns -3.
 int flight_start_scenario(const char* airframe, int scripted, const char* scenario);
 
 // The inputs, read before each step when the crew is not scripted.
