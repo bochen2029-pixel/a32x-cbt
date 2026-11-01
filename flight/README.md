@@ -866,6 +866,10 @@ The test programs run under node on the real file system; three cases that start
 stay native. `flight_core.js` is the browser's module: the core and every file it reads, one JavaScript
 file with the WebAssembly inside, 2.14 MB. Built in WSL's Ubuntu 24.04 in 67 s from scratch.
 
+**A pilot's guide**, with pictures: `docs/pilots-guide.md` — getting the page running, the controls
+and the cameras, flying the ILS to 17C, how the gate judges it, the debrief, and saving a recording to
+hand in.
+
 **The page** (`web/`): `npm install` there, then `node tools/build.mjs --core <flight_core.js>` writes
 `flight/build-web/` — `index.html`, `flight.js`, `core.js` — and nothing else; it is not a package. Open
 `index.html`: no server, no network. `?airframe=737`, `?crew=script` (watch the scripted crew),
