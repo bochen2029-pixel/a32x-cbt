@@ -25,6 +25,7 @@ export class CoreSession {
     // the recording (recording()): what the flight was started from, and the inputs that flew each step
     this.scenario = scenario || '';
     this.airframe = mod.UTF8ToString(mod._flight_airframe());
+    this.build = mod.UTF8ToString(mod._flight_build());  // the commit this module was built from (core.h)
     this.rows = new Float64Array(1024 * this.inputNames.length);
     this.steps = 0;
   }
@@ -42,19 +43,24 @@ export class CoreSession {
   }
 
   // The flight so far as law_harness --replay reads it (flight/harness/main.cpp, Recording): what it was
-  // started from and who flew it - the scripted crew, or hands at the page's controls - then the input
-  // names, then the inputs that flew each step, a row a step. extra adds lines the caller knows, by name:
-  // the page gives {hands: the device, flown: the wall-clock time}. Saved, it is what a pilot hands in:
-  // law_harness --replay FILE --expect ils judges it as the page's judge did.
+  // started from, who flew it - the scripted crew, or hands at the page's controls - and on which build,
+  // then the input names, then the inputs that flew each step, a row a step, then the judge's verdict as
+  // it stands, a "# judged: " line for each line of its debrief. extra adds lines the caller knows, by
+  // name: the page gives {hands: the device, flown: the wall-clock time}. Saved, it is what a pilot hands
+  // in: law_harness from the same build judges it as the page's judge did (--repeatable), and a later
+  // build says which bands it would judge otherwise (--rejudge).
   recording(extra = {}) {
     const n = this.inputNames.length;
-    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, `# crew: ${this.scripted ? 'script' : 'hands'}`];
+    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, `# crew: ${this.scripted ? 'script' : 'hands'}`,
+                   `# build: ${this.build}`];
     for (const [key, value] of Object.entries(extra)) {
-      if (!/^[a-z][a-z0-9_-]*$/.test(key) || ['scenario', 'airframe', 'crew'].includes(key)) throw new Error(`no header line called ${key}`);
+      const ours = ['scenario', 'airframe', 'crew', 'build', 'judged'];
+      if (!/^[a-z][a-z0-9_-]*$/.test(key) || ours.includes(key)) throw new Error(`no header line called ${key}`);
       lines.push(`# ${key}: ${String(value).replace(/[\r\n]+/g, ' ')}`);
     }
     lines.push(this.inputNames.join(','));
     for (let k = 0; k < this.steps; ++k) lines.push(Array.from(this.rows.subarray(k * n, (k + 1) * n), String).join(','));
+    for (const line of this.debrief().split('\n')) if (line) lines.push(`# judged: ${line}`);
     return lines.join('\n') + '\n';
   }
 

@@ -62,6 +62,12 @@ const char* flight_debrief(void);
 // for. A recording says it, so that it replays on the same airframe.
 const char* flight_airframe(void);
 
+// This build's own name: the commit it was built from, "+dirty" when it was built with changes to flight/
+// that commit does not hold, "unknown" when no commit could be named (build-id.cmake). A recording says
+// it, so that the gate judges five approaches with the law_harness of the build that flew them. Callable
+// before flight_start.
+const char* flight_build(void);
+
 #ifdef __cplusplus
 }
 

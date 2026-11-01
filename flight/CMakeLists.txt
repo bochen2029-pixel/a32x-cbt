@@ -130,12 +130,23 @@ function(flight_warnings target)
   endif()
 endfunction()
 
-set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp harness/runway.cpp harness/judge.cpp)
+# The build's own name (harness/build-id.cmake): the commit it is built from, asked of git at every
+# build rather than at configure, so that every recording names the build that flew it.
+set(FLIGHT_GENERATED "${CMAKE_CURRENT_BINARY_DIR}/generated")
+add_custom_target(flight_build_id
+  COMMAND "${CMAKE_COMMAND}" "-DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}" "-DOUT=${FLIGHT_GENERATED}/build_id.h"
+          "-DGIT=${GIT_EXECUTABLE}" -P "${CMAKE_CURRENT_SOURCE_DIR}/harness/build-id.cmake"
+  BYPRODUCTS "${FLIGHT_GENERATED}/build_id.h"
+  VERBATIM)
+
+set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp harness/runway.cpp harness/judge.cpp
+                 harness/build_id.cpp)
 add_library(flight_world STATIC
   ${FLIGHT_WORLD}
   harness/core.cpp)  # the step loop behind a C API: start, inputs, step, state
 target_link_libraries(flight_world PUBLIC a32nx_efcs libJSBSim)
-target_include_directories(flight_world PUBLIC harness)
+target_include_directories(flight_world PUBLIC harness PRIVATE "${FLIGHT_GENERATED}")
+add_dependencies(flight_world flight_build_id)
 target_compile_definitions(flight_world PRIVATE
   JSBSIM_ROOT="${JSBSIM_DIR}"                              # aircraft/ and engine/ are read from the clone
   FLIGHT_JSBSIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jsbsim")  # and our own JSBSim files from here
@@ -202,7 +213,8 @@ endif()
 if(EMSCRIPTEN)
   add_library(flight_world_web STATIC ${FLIGHT_WORLD})
   target_link_libraries(flight_world_web PUBLIC a32nx_efcs libJSBSim)
-  target_include_directories(flight_world_web PUBLIC harness)
+  target_include_directories(flight_world_web PUBLIC harness PRIVATE "${FLIGHT_GENERATED}")
+  add_dependencies(flight_world_web flight_build_id)
   target_compile_definitions(flight_world_web PRIVATE JSBSIM_ROOT="/jsbsim" FLIGHT_JSBSIM_DIR="/flight")
   flight_warnings(flight_world_web)
 
@@ -226,7 +238,7 @@ if(EMSCRIPTEN)
   flight_warnings(flight_core)
   target_link_options(flight_core PRIVATE
     --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createFlightCore -sENVIRONMENT=worker,node -sSINGLE_FILE=1
-    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief,_flight_airframe"
+    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief,_flight_airframe,_flight_build"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPF64"
     ${FLIGHT_EMBED_OPTIONS})
   set_target_properties(flight_core PROPERTIES LINK_DEPENDS "${FLIGHT_EMBED_FILES}")
@@ -294,7 +306,9 @@ add_test(NAME ils_in_light_turbulence_reaches_the_runway
          COMMAND law_harness --scenario "approach$<SEMICOLON>wind=270/15$<SEMICOLON>turbulence=1" --minutes 6 --expect turbulence)
 # A recorded approach replays from its file alone to the same bytes, touchdown and verdict (every
 # hand-flown approach must too); and five of the scripted crew's, from varied starts, pass the gate's
-# repeatability as five hand-flown ones would be asked to.
+# repeatability as five hand-flown ones would be asked to. On copies of those five, relabelled as only a
+# test may, the gate's build rules: five flown on two builds, or on a build other than law_harness's, are
+# refused; --rejudge passes five another build flew that are stable on this one, naming a changed band.
 if(NOT EMSCRIPTEN)
   add_test(NAME ils_approach_replays_to_the_same_touchdown
            COMMAND law_harness --scenario "approach$<SEMICOLON>wind=270/15$<SEMICOLON>turbulence=1" --minutes 6 --check-replay)

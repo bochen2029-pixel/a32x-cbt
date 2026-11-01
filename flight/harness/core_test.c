@@ -38,6 +38,8 @@ int main(void) {
   check(count(flight_input_name) == flight_input_count(), "the input names end where the count says");
   check(count(flight_state_name) == flight_state_count(), "the state names end where the count says");
   check(flight_step(1) == 0 && flight_state() == NULL && flight_inputs() == NULL, "nothing runs before the start");
+  printf("  this build: %s\n", flight_build());
+  check(flight_build() != NULL && strlen(flight_build()) >= 7, "the build names itself, before any start: a commit, or unknown");
 
   check(flight_start(NULL, 0) == 0, "a flight starts, the crew outside");
   check(flight_start(NULL, 0) == -1, "a second start in the same process is refused");

@@ -136,6 +136,7 @@ struct Options {
   double minutes = 30;
   bool minutesGiven = false;               // a replay otherwise runs as long as its recording
   std::vector<std::string> repeatable;     // recordings to judge as the gate's five approaches
+  std::vector<std::string> rejudge;        // the gate's five, judged again on this build
   bool repeatableCheck = false;
   bool gate = false;
   bool digestOnly = false;
@@ -215,14 +216,21 @@ struct Results {
 // A crew recording: a line of input values per tick, the columns named by the first line in the flight
 // core's order (core.h), every value written so that it reads back as the same double. A run recorded
 // from the scripted crew and replayed through the core as an outside crew must give the same bytes.
-// A recording: what flew it, then a row of the core's inputs a step. Lines that begin with '#' come
-// first and say where it was flown from - "# scenario: <text>" (core.h) and "# airframe: <a320|737>" -
-// so that it replays by itself, and who flew it: "# crew: script" (this harness's crew, as --record
-// records it) or "# crew: hands" (a person at the page's controls), with the page's "# hands: <device>"
-// and "# flown: <wall-clock time>". A recording without them replays from --scenario and
-// FLIGHT_AIRFRAME, as before.
+// A recording: what flew it, then a row of the core's inputs a step, then what the judge said of it.
+// The lines that begin with '#' before the column names say where it was flown from - "# scenario:
+// <text>" (core.h) and "# airframe: <a320|737>" - so that it replays by itself; who flew it: "# crew:
+// script" (this harness's crew, as --record records it) or "# crew: hands" (a person at the page's
+// controls), with the page's "# hands: <device>" and "# flown: <wall-clock time>"; and the build that
+// flew it, "# build: <commit>" (core.h, flight_build). After the rows, a "# judged: " line for each line
+// of the gate's judge's debrief as it stood when the recording was made, for a later build to be
+// compared with (--rejudge). A recording without the first lines replays from --scenario and
+// FLIGHT_AIRFRAME, as before; one without a build line was made before builds named themselves, and
+// counts as v0.1.0's (fbw-parent's ruling, 2026-11-01).
+constexpr const char* kUnnamedBuild = "1a672e9";  // v0.1.0, the last release whose recordings had no build line
+
 struct RecordingHeader {
-  std::string scenario, airframe, crew, hands, flown;
+  std::string scenario, airframe, crew, hands, flown, build;
+  std::vector<std::string> judged;  // the trailer: the judge's debrief, a line each
   bool hasScenario = false;
   long long rows = -1;  // the column names
   std::string who() const {
@@ -230,6 +238,7 @@ struct RecordingHeader {
     if (crew != "hands") return "nobody said: the recording has no crew line";
     return "hand" + (hands.empty() ? std::string() : " (" + hands + ")") + (flown.empty() ? std::string() : ", " + flown);
   }
+  std::string flownOn() const { return build.empty() ? kUnnamedBuild : build; }
 };
 
 class Recording {
@@ -240,8 +249,8 @@ class Recording {
     std::string names;
     for (const char* n : FlightCore::inputNames()) names += (names.empty() ? "" : ",") + std::string(n);
     if (write) {
-      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n# crew: script\n%s\n", scenario.c_str(), Airframe::selected().c_str(),
-                   names.c_str());
+      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n# crew: script\n# build: %s\n%s\n", scenario.c_str(),
+                   Airframe::selected().c_str(), flight_build(), names.c_str());
       return true;
     }
     char line[4096] = "";
@@ -252,8 +261,8 @@ class Recording {
     }
     return true;
   }
-  // A recording's header, read before the run is built: its scenario and airframe, when it says, and
-  // how many steps it holds.
+  // A recording's header, read before the run is built: its scenario and airframe, when it says, who
+  // flew it on which build, how many steps it holds, and the judge's verdict when it was made.
   static bool header(const std::string& path, RecordingHeader& h) {
     FILE* f = std::fopen(path.c_str(), "r");
     if (!f) return false;
@@ -261,8 +270,13 @@ class Recording {
     char line[4096];
     while (std::fgets(line, sizeof line, f)) {
       const std::string l(line, std::strcspn(line, "\r\n"));
-      if (h.rows >= 0 || l.empty() || l[0] != '#') {
-        ++h.rows;
+      const bool comment = !l.empty() && l[0] == '#';
+      if (h.rows >= 0 || !comment) {  // the column names, then a row a step, then the trailer
+        if (h.rows < 0 || !comment) {
+          ++h.rows;
+        } else if (l.rfind("# judged: ", 0) == 0) {
+          h.judged.push_back(l.substr(10));
+        }
         continue;
       }
       auto field = [&l](const char* key, std::string& into) {
@@ -276,6 +290,7 @@ class Recording {
       field("crew", h.crew);
       field("hands", h.hands);
       field("flown", h.flown);
+      field("build", h.build);
     }
     std::fclose(f);
     return true;
@@ -284,9 +299,20 @@ class Recording {
     for (size_t k = 0; k < v.size(); ++k) std::fprintf(f_, k ? ",%.17g" : "%.17g", v[k]);
     std::fprintf(f_, "\n");
   }
+  // After the rows: the judge's debrief as it stands at the end of the run, a "# judged: " line each.
+  void trailer(const std::string& debrief) {
+    for (size_t at = 0; at < debrief.size();) {
+      size_t eol = debrief.find('\n', at);
+      if (eol == std::string::npos) eol = debrief.size();
+      std::fprintf(f_, "# judged: %s\n", debrief.substr(at, eol - at).c_str());
+      at = eol + 1;
+    }
+  }
   bool read(std::vector<double>& v) {
     char line[4096];
-    if (!std::fgets(line, sizeof line, f_)) return fail("the recording ended before the run did");
+    do {
+      if (!std::fgets(line, sizeof line, f_)) return fail("the recording ended before the run did");
+    } while (line[0] == '#');  // the trailer: the judge's verdict when it was made
     char* p = line;
     for (double& x : v) {
       char* end = nullptr;
@@ -542,6 +568,7 @@ Results run(const Options& opt, FILE* trace) {
   r.unhealthyAtEnd = unhealthyList(efcs.transmitted());
   r.crashedAt = world.crashedAt();
   r.judge = core.judge();
+  if (!opt.record.empty()) recording.trailer(r.judge.debrief());
   return r;
 }
 
@@ -855,68 +882,174 @@ std::string judgeLine(const ApproachJudge& j) {
   return "judge: " + j.summary() + (std::isnan(m) ? std::string() : fmt(", touchdown %.1f m past the threshold", m));
 }
 
-// The gate's repeatability (ROADMAP.md, P7: how a hand-flown ILS is judged): five consecutive approaches,
-// each replayed from its recording in a fresh process and judged, each of them stable, with their
-// touchdown points within 150 m of their mean.
-int repeatable(const char* argv0, const std::vector<std::string>& files, bool byHand = true) {
+// The inputs a recording was flown with, hashed: its rows alone, without the lines that say who flew it
+// or what the judge said, so that the same flight given twice hashes the same however it is labelled.
+size_t flightHash(const std::string& path) {
+  FILE* in = std::fopen(path.c_str(), "r");
+  if (!in) return 0;
+  std::string rows;
+  bool names = false;
+  char line[4096];
+  while (std::fgets(line, sizeof line, in)) {
+    if (line[0] == '#') continue;
+    if (!names) {  // the column names
+      names = true;
+      continue;
+    }
+    rows.append(line, std::strcspn(line, "\r\n"));
+    rows += '\n';
+  }
+  std::fclose(in);
+  return std::hash<std::string>{}(rows);
+}
+
+// A band's verdict in a line, as the judge's debrief (judge.h) and law_harness's own verdicts print it:
+// "pass", "FAIL" or "...." (not judged yet), two spaces, the band, " - ", what was seen.
+bool bandLine(const std::string& text, std::string& band, std::string& status) {
+  const size_t at = text.find_first_not_of(' ');
+  if (at == std::string::npos || text.size() < at + 7 || text.compare(at + 4, 2, "  ") != 0) return false;
+  status = text.substr(at, 4);
+  if (status != "pass" && status != "FAIL" && status != "....") return false;
+  const size_t dash = text.find(" - ", at + 6);
+  band = text.substr(at + 6, dash == std::string::npos ? std::string::npos : dash - at - 6);
+  return true;
+}
+
+// A build named by a commit: not one built with changes no commit holds, nor one that could name none.
+bool aCommit(const std::string& build) {
+  return !build.empty() && build != "unknown" && build.find("+dirty") == std::string::npos;
+}
+
+// How five recordings are judged: fbw-parent's rules of 2026-11-01 (flight/README.md, Flying the gate).
+enum class Judging {
+  Gate,      // --repeatable: the gate, five approaches flown by hand, by the law_harness of the build that flew them
+  Rejudge,   // --rejudge: the same five on this build, which may be a later one, each band against its saved verdict
+  Scripted,  // --check-repeatable: the scripted crew's five, recorded by this very build
+};
+
+struct Rule {
+  std::string name;
+  bool ok;
+  std::string detail;
+};
+
+// Whether these recordings may be judged here: five flown on one build (both rules); judged by the
+// law_harness of that build, itself the build of a commit (rule 1, the gate). --rejudge judges them on
+// any build (rule 2): whether they still pass there is what it is for.
+std::vector<Rule> buildRules(const std::vector<RecordingHeader>& heads, Judging how) {
+  const std::string here = flight_build();
+  std::map<std::string, int> builds;
+  for (const RecordingHeader& h : heads) ++builds[h.flownOn()];
+  std::string list;
+  for (const auto& [b, n] : builds) {
+    list += (list.empty() ? "" : ", ") + b + (builds.size() > 1 ? fmt(" (%.0f)", n) : std::string());
+  }
+  const std::string flownOn = builds.size() == 1 ? builds.begin()->first : std::string();
+  std::vector<Rule> rules = {{"flown on one build", builds.size() == 1, "flown on " + list}};
+  if (how == Judging::Rejudge) return rules;
+  rules.push_back({"judged by the law_harness of the build that flew them", flownOn == here,
+                   "this law_harness is " + here +
+                       (flownOn == here || flownOn.empty()
+                            ? std::string()
+                            : "; judge them with law_harness built from " + flownOn + ", or check them on this build with --rejudge")});
+  if (how == Judging::Gate) {
+    rules.push_back({"that build a commit's", aCommit(flownOn),
+                     aCommit(flownOn) ? flownOn
+                                      : (flownOn.empty() ? std::string("not one build") : flownOn) +
+                                            ": built with changes no commit holds, or where none could be named; fly them on "
+                                            "a build of a commit"});
+  }
+  return rules;
+}
+
+// Five recordings judged as the gate judges them (ROADMAP.md, P7: how a hand-flown ILS is judged): each
+// replayed from its recording in a fresh process and judged, each of them stable, five different flights,
+// their touchdown points within 150 m of their mean, flown by hand unless they are the scripted crew's own
+// check. Refused, and not replayed, where the build rules forbid judging them here. --rejudge also says of
+// each recording which bands give a different verdict here from the one it was saved with; changed, if
+// given, counts them.
+int judgeFive(const char* argv0, const std::vector<std::string>& files, Judging how, int* changed = nullptr) {
   struct Approach {
     std::string file, judge, who;
     double touchdownM = NAN;
     bool stable = false, hand = false;
-    size_t flight = 0;  // the inputs it was flown with, hashed: the same flight given twice hashes the same
+    size_t flight = 0;
+    std::map<std::string, std::string> saved, here;  // band: pass, FAIL or ...., as saved and as judged here
   };
+  std::vector<RecordingHeader> heads(files.size());
+  for (size_t k = 0; k < files.size(); ++k) Recording::header(files[k], heads[k]);
+  int refused = 0;
+  for (const Rule& r : buildRules(heads, how)) refused += verdict(r.name.c_str(), r.ok, r.detail);
+  if (how == Judging::Rejudge) {
+    std::printf("  judged here on %s%s\n", flight_build(),
+                aCommit(flight_build()) ? "" : ": not the build of a commit, so a check, not a release's verdict");
+  }
+  if (refused) {
+    std::printf("refused, so not replayed\n");
+    return refused;
+  }
+
   std::vector<Approach> flown;
-  for (const std::string& f : files) {
+  for (size_t k = 0; k < files.size(); ++k) {
     Approach a;
-    a.file = f;
-    RecordingHeader h;
-    if (Recording::header(f, h)) {
-      a.who = h.who();
-      a.hand = h.crew == "hands";
+    a.file = files[k];
+    a.who = heads[k].who();
+    a.hand = heads[k].crew == "hands";
+    a.flight = flightHash(files[k]);
+    for (const std::string& l : heads[k].judged) {
+      std::string band, status;
+      if (bandLine(l, band, status)) a.saved[band] = status;
     }
-    if (FILE* in = std::fopen(f.c_str(), "rb")) {
-      std::string text;
-      char chunk[1 << 16];
-      for (size_t n; (n = std::fread(chunk, 1, sizeof chunk, in)) > 0;) text.append(chunk, n);
-      std::fclose(in);
-      size_t at = 0;  // past the header and the column names: the rows alone
-      while (at < text.size() && text[at] == '#') {
-        const size_t eol = text.find('\n', at);
-        at = eol == std::string::npos ? text.size() : eol + 1;
-      }
-      at = text.find('\n', at);
-      a.flight = std::hash<std::string>{}(at == std::string::npos ? std::string() : text.substr(at));
-    }
-    std::string cmd = self(argv0) + " --replay \"" + f + "\"";
+    std::string cmd = self(argv0) + " --replay \"" + files[k] + "\"" + (how == Judging::Rejudge ? " --expect ils" : "");
 #ifdef _WIN32
     cmd = "\"" + cmd + "\"";  // childDigest says why
 #endif
     if (FILE* p = popen(cmd.c_str(), "r")) {
       char line[512];
       while (std::fgets(line, sizeof line, p)) {
-        if (std::strncmp(line, "judge: ", 7) != 0) continue;
-        a.judge = std::string(line + 7, std::strcspn(line + 7, "\r\n"));
-        a.stable = a.judge.rfind("STABLE", 0) == 0;
-        const size_t at = a.judge.find("touchdown ");
-        if (at != std::string::npos) a.touchdownM = std::atof(a.judge.c_str() + at + 10);
+        const std::string l(line, std::strcspn(line, "\r\n"));
+        std::string band, status;
+        if (l.rfind("judge: ", 0) == 0) {
+          a.judge = l.substr(7);
+          a.stable = a.judge.rfind("STABLE", 0) == 0;
+          const size_t at = a.judge.find("touchdown ");
+          if (at != std::string::npos) a.touchdownM = std::atof(a.judge.c_str() + at + 10);
+        } else if (how == Judging::Rejudge && bandLine(l, band, status)) {
+          a.here[band] = status;
+        }
       }
       pclose(p);
     }
     flown.push_back(a);
   }
-  std::printf("%.0f approaches replayed from their recordings and judged\n", static_cast<double>(flown.size()));
-  int failed = 0, stable = 0;
+  std::printf("%.0f approaches replayed from their recordings and judged%s\n", static_cast<double>(flown.size()),
+              how == Judging::Rejudge ? " here, each band against the verdict it was saved with" : "");
+  int failed = 0, stable = 0, landed = 0, bandsChanged = 0;
   double sum = 0;
-  int landed = 0;
   for (const Approach& a : flown) {
-    failed += verdict(a.file.c_str(), a.stable,
-                      (a.judge.empty() ? std::string("did not replay") : a.judge) + "; flown by " + (a.who.empty() ? "?" : a.who));
+    std::string detail = (a.judge.empty() ? std::string("did not replay") : a.judge) + "; flown by " + (a.who.empty() ? "?" : a.who);
+    std::vector<std::string> moved;
+    if (how == Judging::Rejudge) {
+      for (const auto& [band, then] : a.saved) {
+        const auto now = a.here.find(band);
+        if (now == a.here.end() || then == "...." || now->second == "....") continue;  // not judged then, or now
+        if (now->second != then) moved.push_back(band + ": " + then + " when flown, " + now->second + " here");
+      }
+      const double n = static_cast<double>(moved.size());
+      detail += a.saved.empty()      ? std::string("; saved with no verdict to compare")
+                : moved.empty()      ? std::string("; every band as when flown")
+                                     : fmt("; %.0f band", n) + (moved.size() == 1 ? "" : "s") + " changed";
+      bandsChanged += static_cast<int>(moved.size());
+    }
+    failed += verdict(a.file.c_str(), a.stable, detail);
+    for (const std::string& m : moved) std::printf("        %s\n", m.c_str());
     stable += a.stable;
     if (!std::isnan(a.touchdownM)) {
       sum += a.touchdownM;
       ++landed;
     }
   }
+  if (changed) *changed = bandsChanged;
   failed += verdict("five consecutive approaches, as the gate asks", flown.size() == 5, fmt("%.0f of them", static_cast<double>(flown.size())));
   int hand = 0, twice = 0;
   for (size_t i = 0; i < flown.size(); ++i) {
@@ -925,7 +1058,7 @@ int repeatable(const char* argv0, const std::vector<std::string>& files, bool by
   }
   failed += verdict("five different flights: no recording given twice", twice == 0,
                     twice ? fmt("%.0f pairs of them the same flight", twice) : std::string("each its own"));
-  if (byHand) {
+  if (how != Judging::Scripted) {
     failed += verdict("each flown by hand, in the page, as the gate asks", hand == static_cast<int>(flown.size()),
                       fmt("%.0f of %.0f", hand, static_cast<double>(flown.size())));
   }
@@ -948,6 +1081,10 @@ int repeatable(const char* argv0, const std::vector<std::string>& files, bool by
 
 // The repeatability check on the scripted crew: five approaches from varied starts recorded in fresh
 // processes, then judged as five hand-flown ones would be. The crew passes before anyone is asked to.
+// Then the gate's build rules, on copies of the five relabelled as only a test may: the gate refuses five
+// flown on two builds, and five flown on a build other than this law_harness's; --rejudge passes five
+// flown by hand on another build when each is stable here, and reports the one band whose saved verdict
+// the copy was given wrong.
 int checkRepeatable(const char* argv0) {
   const char* starts[] = {"approach", "approach;loc=1", "approach;loc=-1", "approach;gs=1", "approach;gs=-1"};
   std::vector<std::string> files;
@@ -964,7 +1101,7 @@ int checkRepeatable(const char* argv0) {
   }
   std::printf("the scripted crew's five approaches, recorded from varied starts: a check that the gate's rule can be "
               "met, not the gate, which takes only approaches flown by hand\n");
-  int result = repeatable(argv0, files, false);
+  int result = judgeFive(argv0, files, Judging::Scripted);
   int hand = 0;
   for (const std::string& f : files) {
     RecordingHeader h;
@@ -972,8 +1109,60 @@ int checkRepeatable(const char* argv0) {
   }
   result += verdict("and the gate would not take them as hand-flown", hand == 0,
                     fmt("%.0f of %.0f say crew: hands", hand, static_cast<double>(files.size())));
+
+  // Copies, relabelled: the first one's build line, the others', who flew them, and the first one's saved
+  // verdict on the localizer turned from pass to FAIL. An empty build keeps the line as recorded.
+  std::vector<std::string> copies;
+  auto relabel = [&files, &copies](const std::string& tag, const std::string& firstBuild, const std::string& restBuild,
+                                   bool hands, bool wrongVerdict) {
+    std::vector<std::string> out;
+    for (size_t k = 0; k < files.size(); ++k) {
+      out.push_back(tag + "-" + files[k]);
+      copies.push_back(out.back());
+      FILE* in = std::fopen(files[k].c_str(), "r");
+      FILE* to = std::fopen(out.back().c_str(), "w");
+      const std::string build = k == 0 ? firstBuild : restBuild;
+      char line[4096];
+      while (in && to && std::fgets(line, sizeof line, in)) {
+        std::string l(line, std::strcspn(line, "\r\n"));
+        if (!build.empty() && l.rfind("# build: ", 0) == 0) l = "# build: " + build;
+        if (hands && l == "# crew: script") l = "# crew: hands";
+        const size_t band = l.find("pass  localizer within 1 dot");
+        if (wrongVerdict && k == 0 && l.rfind("# judged: ", 0) == 0 && band != std::string::npos) l.replace(band, 4, "FAIL");
+        std::fprintf(to, "%s\n", l.c_str());
+      }
+      if (in) std::fclose(in);
+      if (to) std::fclose(to);
+    }
+    return out;
+  };
+  auto headers = [](const std::vector<std::string>& fs) {
+    std::vector<RecordingHeader> hs(fs.size());
+    for (size_t k = 0; k < fs.size(); ++k) Recording::header(fs[k], hs[k]);
+    return hs;
+  };
+  auto broke = [](const std::vector<Rule>& rules, const char* name) {
+    for (const Rule& r : rules) {
+      if (r.name == name) return !r.ok;
+    }
+    return false;
+  };
+  std::printf("and the gate's build rules (this build %s), on copies of the five relabelled as only a test may:\n", flight_build());
+  const auto twoBuilds = buildRules(headers(relabel("two-builds", "0000000", "", false, false)), Judging::Gate);
+  result += verdict("the gate refuses five flown on two builds", broke(twoBuilds, "flown on one build"), twoBuilds[0].detail);
+  const auto another = buildRules(headers(relabel("another-build", "0000000", "0000000", false, false)), Judging::Gate);
+  result += verdict("and five flown on a build other than this law_harness's",
+                    !broke(another, "flown on one build") && broke(another, "judged by the law_harness of the build that flew them"),
+                    another.size() > 1 ? another[1].detail : std::string("no such rule"));
+  std::printf("  --rejudge on the five, as if flown by hand on build 0000000, the first saved with the localizer FAILed:\n");
+  int bandsChanged = -1;
+  const int rejudged = judgeFive(argv0, relabel("rejudge", "0000000", "0000000", true, true), Judging::Rejudge, &bandsChanged);
+  result += verdict("--rejudge passes another build's five that are stable here, and reports the one band changed",
+                    rejudged == 0 && bandsChanged == 1, fmt("rules broken: %.0f; bands changed: %.0f", rejudged, bandsChanged));
+
   if (result == 0) {
     for (const std::string& f : files) std::remove(f.c_str());
+    for (const std::string& f : copies) std::remove(f.c_str());
   } else {
     std::printf("the recordings are kept\n");
   }
@@ -987,7 +1176,8 @@ void usage() {
       "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|rudder-trim|landing|\n"
       "                      law-degrades|ils|turbulence|scanner-catches-nan]\n"
       "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv]\n"
-      "            [--repeatable approach1.csv ... approach5.csv] [--check-repeatable]\n"
+      "            [--repeatable approach1.csv ... approach5.csv] [--rejudge approach1.csv ... approach5.csv]\n"
+      "            [--check-repeatable]\n"
       "            [--scenario \"runway;runway=LSZH14\" | \"approach;distance=10;loc=0;gs=0;cas=140;wind=270/15\" | \"reference\"]\n");
 }
 
@@ -1010,6 +1200,9 @@ int main(int argc, char** argv) {
     }
     else if (a == "--repeatable") {
       while (i + 1 < argc) opt.repeatable.push_back(argv[++i]);
+    }
+    else if (a == "--rejudge") {
+      while (i + 1 < argc) opt.rejudge.push_back(argv[++i]);
     }
     else if (a == "--check-repeatable") opt.repeatableCheck = true;
     else if (a == "--gate") opt.gate = true;
@@ -1052,8 +1245,9 @@ int main(int argc, char** argv) {
     std::printf("--record writes what the scripted crew does, --replay flies a recording: one or the other\n");
     return 2;
   }
-  if (!opt.repeatable.empty()) {
-    const int failed = repeatable(argv[0], opt.repeatable);
+  if (!opt.repeatable.empty() || !opt.rejudge.empty()) {
+    const bool again = !opt.rejudge.empty();
+    const int failed = judgeFive(argv[0], again ? opt.rejudge : opt.repeatable, again ? Judging::Rejudge : Judging::Gate);
     std::printf("%s\n", failed ? "FAILED" : "PASSED");
     return failed ? 1 : 0;
   }
