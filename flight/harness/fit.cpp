@@ -6,18 +6,20 @@
 //   airframe_fit --thrust         the engines instead: their lapse and the thrust lever schedule
 //   airframe_fit --poststall      past the stall instead: the pitch break, the tail's fade with alpha
 //                                 and the lift beyond the peak
+//   airframe_fit --drag           the drag of the landing flaps and of the gear instead
 //   airframe_fit --from-file      start from the aircraft file's values, the last fit, not the seeds;
 //                                 the prior stays on the seeds, and what no fit row answers to keeps
 //                                 the file's value
 //   airframe_fit --selftest       the optimiser alone, on functions whose minima are known
 //
-// The aerodynamics, the engines and what lies past the stall are fitted apart, each on its own rows (the
-// thrust group, the poststall group, or every group but those) and from its own seeds (seeds.csv,
-// thrust-seeds.csv, poststall-seeds.csv). A candidate carries only the numbers being fitted: the rest are
-// the aircraft file's, as the last fit of them left it. No fit row of the aerodynamics answers to the
-// others' numbers. The rows past the stall answer to the aerodynamics' pitch numbers as well, which
-// their fit holds where they are: what happens beyond the stall is not to move the pitch of normal
-// flight, which none of those rows measures.
+// The aerodynamics, the engines, what lies past the stall and the drag of the flaps and the gear are
+// fitted apart, each on its own rows (the thrust, poststall or drag group, or every group but those) and
+// from its own seeds (seeds.csv, or GROUP-seeds.csv). A candidate carries only the numbers being fitted:
+// the rest are the aircraft file's, as the last fit of them left it. No fit row of the aerodynamics
+// answers to the others' numbers. The rows past the stall answer to the aerodynamics' pitch numbers as
+// well, and the drag rows to its profile and induced drag, which their fits hold where they are: what
+// happens beyond the stall is not to move the pitch of normal flight, nor the drag of two configurations
+// the clean polar, which none of those rows measures.
 //
 // Parameter identification, not controller learning: the controller stays the A32NX computers. A
 // candidate is a full set of coefficients, handed to `airframe_score --airframe a320 --coefficients FILE
@@ -344,6 +346,11 @@ std::vector<Coefficient> readSeeds(const std::string& path) {
     }
     out.push_back(k);
   }
+  if (out.empty()) {
+    // nothing to fit: a search over no numbers would have no step to take
+    std::fprintf(stderr, "%s holds no coefficients\n", path.c_str());
+    std::exit(2);
+  }
   return out;
 }
 
@@ -499,18 +506,32 @@ std::string sibling(const char* argv0, const char* name) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  // The groups of rows fitted apart, each from seeds of its own (GROUP-seeds.csv); every other row is the
+  // aerodynamics', fitted from seeds.csv.
+  struct Apart {
+    const char *group, *what;
+  };
+  static const Apart kApart[] = {
+      {"thrust", "the engines"}, {"poststall", "past the stall"}, {"drag", "the drag of the flaps and the gear"}};
   int generations = 200, lambda = 16;
-  bool write = false, thrust = false, poststall = false, fromFile = false;
+  bool write = false, fromFile = false;
+  const Apart* apart = nullptr;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
-    if (a == "--selftest") {
+    const Apart* named = nullptr;
+    for (const Apart& g : kApart) {
+      if (a == std::string("--") + g.group) named = &g;
+    }
+    if (named) {
+      if (apart && apart != named) {
+        std::fprintf(stderr, "airframe_fit: one group fitted apart at a time\n");
+        return 2;
+      }
+      apart = named;
+    } else if (a == "--selftest") {
       return selftest();
     } else if (a == "--write") {
       write = true;
-    } else if (a == "--thrust") {
-      thrust = true;
-    } else if (a == "--poststall") {
-      poststall = true;
     } else if (a == "--from-file") {
       fromFile = true;
     } else if (a == "--generations" && i + 1 < argc) {
@@ -518,26 +539,26 @@ int main(int argc, char** argv) {
     } else if (a == "--population" && i + 1 < argc) {
       lambda = std::atoi(argv[++i]);
     } else {
-      std::printf("airframe_fit [--thrust | --poststall] [--from-file] [--generations N] [--population N] [--write] | --selftest\n");
+      std::printf("airframe_fit [--thrust | --poststall | --drag] [--from-file] [--generations N] [--population N] [--write]\n"
+                  "             | --selftest\n");
       return 2;
     }
-  }
-  if (thrust && poststall) {
-    std::fprintf(stderr, "airframe_fit: --thrust or --poststall, not both\n");
-    return 2;
   }
 
   const std::string here = std::string(FLIGHT_JSBSIM_DIR) + "/aircraft/A320-fit/";
   const std::string aircraft = here + "A320-fit.xml";
   const std::vector<Coefficient> coefficients =
-      readSeeds(here + (thrust ? "thrust-seeds.csv" : poststall ? "poststall-seeds.csv" : "seeds.csv"));
+      readSeeds(here + (apart ? std::string(apart->group) + "-seeds.csv" : std::string("seeds.csv")));
   const std::string scorer = sibling(argv[0], "airframe_score");
-  const std::string rows = thrust      ? "--only-group thrust"
-                           : poststall ? "--only-group poststall"
-                                       : "--skip-group thrust --skip-group poststall";
-  const char* what = thrust ? "the engines" : poststall ? "past the stall" : "the aerodynamics";
+  std::string rows;
+  if (apart) {
+    rows = std::string("--only-group ") + apart->group;
+  } else {
+    for (const Apart& g : kApart) rows += std::string(rows.empty() ? "" : " ") + "--skip-group " + g.group;
+  }
+  const char* what = apart ? apart->what : "the aerodynamics";
   const std::filesystem::path work =
-      std::filesystem::path(argv[0]).parent_path() / (thrust ? "fit-thrust" : poststall ? "fit-poststall" : "fit");
+      std::filesystem::path(argv[0]).parent_path() / (apart ? std::string("fit-") + apart->group : std::string("fit"));
   std::filesystem::create_directories(work);
   const auto started = std::chrono::steady_clock::now();
   const Load load;

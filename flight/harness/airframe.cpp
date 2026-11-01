@@ -760,6 +760,8 @@ TrimPoint Airframe::trimmed(double altitudeFt, double casKn, double mach, double
   // JSBSim's trim runs the engines in their trim phase, where thrust is already the steady thrust of
   // the throttle it found
   t.thrustLbs = m.thrust[0]->getDoubleValue() + m.thrust[1]->getDoubleValue();
+  t.liftLbs = m.lift->getDoubleValue();
+  t.dragLbs = m.drag->getDoubleValue();
   m.untrim();
   return t;
 }

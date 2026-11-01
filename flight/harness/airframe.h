@@ -88,6 +88,7 @@ struct TrimPoint {
   double thsDeg = 0;           // the stabiliser, with the elevator at rest as autotrim leaves it
   double tla = 0;              // thrust lever angle for the thrust the trim needed
   double thrustLbs = 0;        // that thrust, all engines together
+  double liftLbs = 0, dragLbs = 0;  // the aerodynamic lift and drag at the trim, wind axes, the tail's included
 };
 
 // The airframe's own lift and drag coefficients at a state, from its aerodynamics alone: no trim, pitch

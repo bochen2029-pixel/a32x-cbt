@@ -10,7 +10,7 @@
 #   kind       target  - scored inside or outside its band, and counted
 #              context - scored beside its band, not counted: operational data, not capability
 #              pending - named, not yet measured
-#   group      stall, alpha, attitude, dynamics, performance, thrust, poststall (past the stall: fitted apart)
+#   group      stall, alpha, attitude, dynamics, performance, thrust, poststall and drag (fitted apart)
 #   condition  what the airframe is doing when measured (semicolons, not commas). A thrust or gradient
 #              row's condition is read by the scorer: the lever (TOGA, MCT, CL, idle), the configuration,
 #              a CAS in kt, static, or a Mach, and an altitude in ft, sea level or a flight level. ISA
@@ -140,6 +140,21 @@
 #                       with C = 0.394884: 149 kt. Thrust and drag tested together. The A320-211 has wingtip
 #                       fences where ours has the sharklets of A32NX's A320neo, a few per cent less drag: the
 #                       band, 10 % either way, is ours
+#   anp-drag            Airbus's drag-to-lift ratio R for the A320-211 in the same ANP database, version 2.3,
+#                       its aerodynamic coefficients: 0.101204 in CONF 3 and 0.115860 in CONF FULL with the
+#                       gear down (flap IDs 3_D and FULL_D), each at the approach speed ANP gives the
+#                       configuration, D sqrt(W) with D 0.385223 and 0.370520 (kt and lbf): 145.8 and
+#                       140.3 kt at 65 t. That speed holds the lift coefficient at 1.51 and 1.63 whatever
+#                       the weight. ANP's other approach ratios name no speed (clean 0.057558, CONF 1
+#                       0.061662, CONF 2 0.067463 with the gear up and 0.096267 down), so are not scored.
+#                       The A320-211 has wingtip fences where ours has sharklets: the band, 10 % either way,
+#                       is ours
+#   dlr-gear            Deiler and Fezans (DLR): Modeling of the A320 Landing Gear Drag During Their
+#                       Extension and Retraction, AIAA SciTech Forum 2025, AIAA 2025-1250. Identified from
+#                       A320neo operational flight data, configuration by configuration: the gear's drag
+#                       coefficient 0.0296 in FLAP 2, 0.0291 in FLAP 3 and 0.0311 in FLAP FULL, which the
+#                       paper takes as one, 0.0299; the gear is the A320 family's. The band, 10 % either
+#                       way, is ours
 #   wrap                OpenAP WRAP A320, ADS-B: the range of its fitted distribution (to_acc_tof,
 #                       to_v_lof, cl_vs_avg_pre_cas, de_vs_avg_after_cas). What airlines fly, and so not a
 #                       pass mark for capability. Take-off thrust is mostly reduced, toward the weight's share
@@ -218,6 +233,9 @@ thrust-lapse-m025,target,thrust,take-off thrust of one engine as a share of its 
 takeoff-gradient,target,performance,steady climb gradient at take-off thrust,TOGA; CONF 1+F; gear up; 149 kt; 1000 ft,65,,18.44,22.54,%,check,anp-gradient
 climb-gradient,target,performance,steady climb gradient at climb thrust,CL; clean; gear up; 250 kt; 6000 ft,65,,12.02,14.69,%,check,anp-gradient
 descent-gradient,target,performance,steady descent gradient at idle,idle; clean; gear up; 210 kt; 5000 ft,65,,-6.23,-5.10,%,check,anp-gradient
+drag-ratio-conf3-65t,target,drag,drag over lift in level flight,CONF 3; gear down; 145.8 kt; 1000 ft,65,,0.0911,0.1113,ratio,fit,anp-drag
+drag-ratio-full-65t,target,drag,drag over lift in level flight,CONF FULL; gear down; 140.3 kt; 1000 ft,65,,0.1043,0.1274,ratio,fit,anp-drag
+gear-drag-conf3,target,drag,drag coefficient of the gear,gear down less gear up; CONF 3; 6 deg; 1000 ft; Mach 0.23,,,0.0269,0.0329,CD,fit,dlr-gear
 to-accel,context,performance,mean acceleration from brake release to liftoff,TOGA; CONF 1+F; sea level,,,1.50,2.37,m/s2,check,wrap
 lof-speed,context,performance,ground speed at liftoff,CONF 1+F; sea level; no wind,,,145,187,kt,check,wrap
 climb-rate,context,performance,rate of climb at climb thrust,4000 to 7500 ft; up to 250 kt,,,1500,2530,ft/min,check,wrap

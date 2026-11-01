@@ -148,10 +148,11 @@ const Config* config(const std::string& name) {
   return nullptr;
 }
 
-// What a thrust or a gradient row's condition names, in its own column: the thrust lever's detent, the
-// configuration, the speed and the altitude. "TOGA; 150 kt; 4000 ft", "CL; Mach 0.80; FL350",
-// "idle; clean; gear up; 210 kt; 5000 ft". A word the parser does not know ends the run: the column is
-// the row's definition, and a row read wrongly would be scored wrongly.
+// What a thrust, a gradient or a drag row's condition names, in its own column: the thrust lever's
+// detent (none for a drag row), the configuration, the speed and the altitude. "TOGA; 150 kt; 4000 ft",
+// "CL; Mach 0.80; FL350", "idle; clean; gear up; 210 kt; 5000 ft", "CONF FULL; gear down; 140.3 kt;
+// 1000 ft". A word the parser does not know ends the run: the column is the row's definition, and a row
+// read wrongly would be scored wrongly.
 struct Condition {
   double tla = kNaN;                 // 0 idle, 25 CL, 35 MCT, 45 TOGA
   const Config* config = nullptr;    // named configurations only; a thrust row names none
@@ -164,7 +165,7 @@ std::string trim(const std::string& s) {
   return a == std::string::npos ? "" : s.substr(a, b - a + 1);
 }
 
-Condition parseCondition(const std::string& id, const std::string& text) {
+Condition parseCondition(const std::string& id, const std::string& text, bool lever = true) {
   Condition c;
   size_t from = 0;
   while (from <= text.size()) {
@@ -190,6 +191,12 @@ Condition parseCondition(const std::string& id, const std::string& text) {
       c.config = config("clean");
     } else if (word == "CONF 1+F") {
       c.config = config("conf1f");
+    } else if (word == "CONF 2") {
+      c.config = config("conf2");
+    } else if (word == "CONF 3") {
+      c.config = config("conf3");
+    } else if (word == "CONF FULL") {
+      c.config = config("full");
     } else if (word == "gear up" || word == "gear down") {
       if (!c.config || c.config->surfaces.gearDown != (word == "gear down")) {
         std::fprintf(stderr, "a320.csv: %s: the gear and the configuration disagree\n", id.c_str());
@@ -208,8 +215,9 @@ Condition parseCondition(const std::string& id, const std::string& text) {
       std::exit(2);
     }
   }
-  if (std::isnan(c.tla) || std::isnan(c.altitudeFt) || (std::isnan(c.casKn) && !(c.mach > 0))) {
-    std::fprintf(stderr, "a320.csv: %s: its condition names no lever, speed or altitude\n", id.c_str());
+  if ((lever && std::isnan(c.tla)) || std::isnan(c.altitudeFt) || (std::isnan(c.casKn) && !(c.mach > 0))) {
+    std::fprintf(stderr, "a320.csv: %s: its condition names no %s\n", id.c_str(),
+                 lever ? "lever, speed or altitude" : "speed or altitude");
     std::exit(2);
   }
   if (std::isnan(c.casKn)) c.casKn = 0;
@@ -452,6 +460,33 @@ class Bare {
               fmt("thrust %.0f lbf; a level trim needs %.0f lbf at alpha %.1f deg", available, level.thrustLbs,
                   level.alphaDeg)};
     }
+    if (family.rfind("drag-ratio-", 0) == 0 && config(family.substr(11))) {
+      // drag over lift in level flight, as ANP's R: the aerodynamic forces where a level trim ends, the
+      // tail's lift and what it adds to the induced drag included
+      const Config* named = config(family.substr(11));
+      const Condition c = parseCondition(id, condition, false);
+      if (c.config != named) {
+        std::fprintf(stderr, "a320.csv: %s: the condition names another configuration\n", id.c_str());
+        std::exit(2);
+      }
+      const TrimPoint level = a_.trim(c.altitudeFt, c.casKn, c.mach, 0, named->surfaces);
+      if (!level.ok || !(level.liftLbs > 0)) return {kNaN, fmt("no level trim at %.1f kt", c.casKn)};
+      // at 1,000 ft and these speeds a CAS is near enough an EAS for the lift coefficient in the note
+      const double qbar = 0.5 * kRho0 * std::pow(c.casKn * kFpsPerKt, 2);
+      return {level.dragLbs / level.liftLbs, fmt("lift %.0f lbf, drag %.0f lbf, ", level.liftLbs, level.dragLbs) +
+                                                 fmt("CL %.2f at alpha %.1f deg", level.liftLbs / (qbar * a_.wingAreaFt2()),
+                                                     level.alphaDeg)};
+    }
+    if (family.rfind("gear-drag-", 0) == 0 && config(family.substr(10))) {
+      // the drag coefficient the gear adds: the configuration's aerodynamics at 6 deg of alpha, 150 kt at
+      // 1,000 ft, the gear down less the gear up
+      Configuration down = config(family.substr(10))->surfaces, up = down;
+      down.gearDown = true;
+      up.gearDown = false;
+      constexpr double kAltitudeFt = 1000, kMach = 0.23, kAlphaDeg = 6;
+      const AeroPoint d = a_.aero(kAltitudeFt, kMach, kAlphaDeg, down), u = a_.aero(kAltitudeFt, kMach, kAlphaDeg, up);
+      return {d.cd - u.cd, fmt("CD %.4f down, %.4f up", d.cd, u.cd)};
+    }
     if (family.rfind("vs1g-", 0) == 0 && config(family.substr(5))) {
       const LiftPeak& p = peak(*config(family.substr(5)));
       const double vs1g = std::sqrt(2 * lbs / (kRho0 * a_.wingAreaFt2() * p.clMax)) / kFpsPerKt;
@@ -519,7 +554,8 @@ class Bare {
 
   // Whether a row is measured on the bare airframe rather than flown.
   static bool measures(const std::string& id, const std::string& family) {
-    for (const char* prefix : {"vs1g-", "stall-alpha-", "vls-alpha-", "elevator-alpha-", "pitch-break-"}) {
+    for (const char* prefix :
+         {"vs1g-", "stall-alpha-", "vls-alpha-", "elevator-alpha-", "pitch-break-", "drag-ratio-", "gear-drag-"}) {
       const size_t n = std::strlen(prefix);
       if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
     }
