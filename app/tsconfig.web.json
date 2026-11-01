@@ -1,12 +1,12 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "ES2022",
+    "module": "esnext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,
-    "outDir": "web/js",
-    "rootDir": "src",
+    "noEmit": true,
+    "rootDir": ".",
     "strict": true,
     "noUncheckedIndexedAccess": false,
     "noImplicitOverride": true,
@@ -14,12 +14,16 @@
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "lib": ["ES2022", "DOM"],
     "types": []
   },
   "include": ["src/**/*.ts"],
   "exclude": ["src/**/demo*.ts", "src/**/*.test.ts", "src/ecam/messages.ts", "src/panel/overhead.ts", "src/ecam/pages.ts"]
 }
+
+
+
 
 
 

@@ -80,7 +80,7 @@ A phase is done when its gate passes, not when the code exists.
 | P2 | **Content as data** — panels, messages, pages in JSON | content loads, validates, and is refused when broken; one copy serves both runtimes | **passed** [M] |
 | P3 | **Curriculum v1** — SOP flows, drills, measured steps | six drills grade end to end, each with a written aim | **passed** [M] |
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
-| P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | **not started** |
+| P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — runs without Node; needs reference-machine numbers and a zip |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | spike passed, harness pending |
 | P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
@@ -89,11 +89,11 @@ A phase is done when its gate passes, not when the code exists.
 
 ### P5 in detail — the shipping gate
 
-- [ ] `git init`, trainer/flight split, `.gitignore` for `node_modules`, `web/js`, assets
+- [x] `git init`, trainer/flight split, `.gitignore` for `node_modules`, build output, assets
 - [ ] licence notices: A32NX attribution not required for A (no code linked) but JSBSim's is
-- [ ] the disclaimer, permanent: *unofficial, not affiliated with Airbus, not for type training*
-- [ ] a build that needs no Node: prebuilt `web/js`, one folder, double-click `index.html`
-      (or a 20-line server, if `file://` module loading gets in the way)
+- [x] the disclaimer, permanent: *unofficial, not affiliated with Airbus, not for type training*
+- [x] a build that needs no Node: one bundled `web/app.js`, content inlined, double-click `index.html`
+      — verified opening from `file://` in headless Chrome
 - [ ] measured on the reference machine: 20 Hz held, cold start under 1 s, scenario reset under 20 ms
 - [ ] a README a stranger can follow in one screen
 
@@ -153,6 +153,7 @@ Kill criteria, agreed in advance [B]:
 3. Grow content: the message set toward 60, the panel toward the full overhead.
 4. A scenario picker so a drill starts from a saved `.situ` rather than `setup.ts` code.
 5. Then P6 again, deliberately, with the harness and a 30-minute run as its gate.
+
 
 
 

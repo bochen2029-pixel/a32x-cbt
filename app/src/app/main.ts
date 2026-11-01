@@ -20,6 +20,9 @@ import { beforeStart } from '../training/beforestart.ts';
 import { afterStart } from '../training/afterstart.ts';
 import { applySetup, type SetupId } from '../training/setup.ts';
 import { faultIds } from '../faults/index.ts';
+import panelJson from '../../web/data/panel.json' with { type: 'json' };
+import pagesJson from '../../web/data/pages.json' with { type: 'json' };
+import messagesJson from '../../web/data/messages.json' with { type: 'json' };
 import type { Procedure } from '../training/procedure.ts';
 
 const CELL = 13;
@@ -56,34 +59,32 @@ let pageId = 'elec';
 let messages: readonly Message[] = [];
 let pages: readonly PageSpec[] = [];
 
-/** Panel and messages are content, not code: the page fetches the same JSON the tests read. */
+/**
+ * Content is imported, not fetched. Under `file://` a fetch is blocked by CORS, and the trainer has
+ * to run from a double-click with no server — so the bundle carries the JSON and the validator
+ * still runs on it at load.
+ */
 let loadError = '';
 
-const overhead: Panel = await fetch('data/panel.json')
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`panel ${r.status}`))))
-  .then(parsePanel)
-  .catch((err: unknown) => {
-    loadError = `panel failed to load: ${String(err)}`;
-    return { id: 'empty', title: 'PANEL', cols: 10, rows: 2, controls: [] } as Panel;
-  });
+function attempt<T>(what: string, run: () => T, fallback: T): T {
+  try {
+    return run();
+  } catch (err) {
+    loadError = `${what} failed to load: ${String(err)}`;
+    return fallback;
+  }
+}
+
+const overhead: Panel = attempt(
+  'panel',
+  () => parsePanel(panelJson as unknown),
+  { id: 'empty', title: 'PANEL', cols: 10, rows: 2, controls: [] } as Panel,
+);
 
 let session = new Session({ procedure: powerUp, panel: overhead });
 
-pages = await fetch('data/pages.json')
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`pages ${r.status}`))))
-  .then(parsePages)
-  .catch((err: unknown) => {
-    loadError = `pages failed to load: ${String(err)}`;
-    return [] as PageSpec[];
-  });
-
-messages = await fetch('data/messages.json')
-  .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`messages ${r.status}`))))
-  .then(parseMessages)
-  .catch((err: unknown) => {
-    loadError = `messages failed to load: ${String(err)}`;
-    return [] as Message[];
-  });
+pages = attempt('pages', () => parsePages(pagesJson as unknown), [] as PageSpec[]);
+messages = attempt('messages', () => parseMessages(messagesJson as unknown), [] as Message[]);
 
 
 canvas.width = overhead.cols * CELL + PAD * 2;
@@ -258,6 +259,7 @@ function frame(now: number): void {
 
 paintAll();
 requestAnimationFrame(frame);
+
 
 
 

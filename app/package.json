@@ -25,7 +25,7 @@
     "demo:drill": "node src/demo-drill.ts",
     "test:packs": "node --test tests/packsfail.test.ts",
     "demo:depress": "node src/demo-depress.ts",
-    "build:web": "node node_modules/typescript/bin/tsc -p tsconfig.web.json",
+    "build:web": "npm run typecheck && node tools/build.mjs",
     "serve": "node tools/serve.mjs web 8130",
     "test:session": "node --test tests/session.test.ts",
     "test:replay": "node --test tests/replay.test.ts",
@@ -33,9 +33,12 @@
     "test:panelschema": "node --test tests/panelschema.test.ts",
     "test:pageschema": "node --test tests/pageschema.test.ts",
     "test:curriculum": "node --test tests/curriculum.test.ts",
-    "test:instructor": "node --test tests/instructor.test.ts"
+    "test:instructor": "node --test tests/instructor.test.ts",
+    "typecheck": "node node_modules/typescript/bin/tsc -p tsconfig.web.json",
+    "check": "npm run typecheck && npm run test:all"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "typescript": "^7.0.2"
   }
 }

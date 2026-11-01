@@ -1,5 +1,4 @@
-# build output
-app/web/js/
+# build output — web/app.js is committed so a zip runs with no Node
 *.tsbuildinfo
 
 # deps
@@ -26,3 +25,4 @@ app/situations/*.situ
 .idea/
 .DS_Store
 Thumbs.db
+

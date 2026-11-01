@@ -25,15 +25,17 @@ which add the real law core, JSBSim and the displays.
 
 ## Run it
 
+**No Node needed to run it.** Open `app/web/index.html` — double-click it. The page is one committed
+script with its content inlined, so it works straight off the disk.
+
+To rebuild or develop:
+
 ```
 cd app
 npm ci
 npm run build:web
-npm run serve      # then open http://127.0.0.1:8130
-npm run test:all   # 160 tests
+npm run check      # typecheck + 160 tests
 ```
-
-Node 24. One dev dependency, TypeScript, used only for the browser build; no runtime dependencies.
 
 ## Layout
 
@@ -55,3 +57,4 @@ position taken on each source: `docs/provenance.md`.
 
 Read `CLAUDE.md`, then `docs/provenance.md`, then `ROADMAP.md`. The suite must be green before any
 commit.
+
