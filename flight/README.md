@@ -889,12 +889,63 @@ protection, or both.
 
 New `ctest` cases, judged on the product airframe, our A320, whatever `FLIGHT_AIRFRAME` the suite runs
 with: `protection_full_stick_bank_stops_at_67_deg`, `protection_full_pull_inside_2_5_g_and_30_deg`,
-`protection_full_push_inside_minus_1_g`, `protection_alpha_max_held_without_a_stall`. Fifty-two native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; forty-eight under node, the WebAssembly build leaving out the four that start processes.
+`protection_full_push_inside_minus_1_g`, `protection_alpha_max_held_without_a_stall`. The suite's count is in
+the next section.
+
+## The gate's judge (P7, preparing the gate)
+
+**One judge.** The bands of *How a hand-flown ILS is judged* (`ROADMAP.md`, P7) are judged by one piece
+of code, `harness/judge.h`, which the flight core keeps and observes after every step. The harness's
+`--expect ils` prints its verdict; the browser reads the same verdict through the C API; and a
+recording, replayed, meets the same judge. It watches an approach start from 1,000 ft above the
+threshold to 50 ft — localizer and glideslope within a dot, sink rate under 1,000 fpm, gear down and
+CONF FULL, speed within Vapp −5/+10 kt, bank within 7° — then the touchdown — sink under 360 fpm, load
+factor under 2.6 g, pitch 0 to 10°, 300 to 900 m past the threshold, within 5 m of the centreline —
+the rollout, within 5 m of it to the stop, and no bounce. Each band reports its worst and the height
+or the distance where it happened. *Stable* is every band held, once the aircraft has stopped.
+
+**Vapp** is Airbus's on the A320: the FAC's VLS + 5 kt, read until the window is entered at 1,000 ft and
+kept from there — 134 kt on the approach start's 65 t, its VLS 128.6 kt. On the 737 the FAC computes an
+A320's VLS, which sits on its 116 kt floor at the 737's 48.5 t, so the 737 keeps the scripted crew's
+140 kt; the airframe table says whose speeds the FAC's are. The scripted crew flies 140 kt either way,
+6.4 kt over the A320's Vapp, inside the band.
+
+**Through the C API**, for the page: `flight_debrief()` gives the verdict as text, a line a band —
+`pass`, `FAIL`, or `....` while it cannot be judged yet — then STABLE, NOT STABLE or flying; and the
+state carries `vls_kn` and `vapp_kn`, the target the pilot flies; `judge_window` and `judge_in_bands`,
+whether this step is inside the window and inside every band of it, for a debrief that colours the
+flown trail; `judge_stable`, the verdict once stopped; and `judge_touchdown_m`.
+
+**Recordings replay by themselves.** A recording now begins `# scenario: <text>` and
+`# airframe: <a320|737>`, above its columns, so `law_harness --replay approach.csv` needs nothing else:
+it takes both from the file, refuses a `--scenario` or `FLIGHT_AIRFRAME` that disagrees, and runs as
+long as the recording does. Every run with an approach ends with the judge's line,
+`judge: STABLE, touchdown 328.2 m past the threshold`, and the replay check now gives its replay only
+the file and asks for the same verdict as well as the same bytes.
+
+**Repeatable.** `law_harness --repeatable a.csv b.csv c.csv d.csv e.csv` is the gate's last rule: each
+recording replayed in a fresh process and judged, five of them, each stable, their touchdown points
+within 150 m of their mean. `--check-repeatable` applies it to the scripted crew, five approaches
+recorded from varied starts — on the beams, a dot either side of the localizer and of the glideslope:
+all five STABLE, their touchdowns within a metre of their mean: 329 m past the threshold on the A320, 361 m on the 737.
+
+**Measured with it.** Nobody flying, the trimmed aircraft drifts off the beams and never flares: the A320
+lands at 651 fpm and 2.8 g, 1,613 m past the threshold and 140 m right of the centreline, and the judge
+names the seven bands it broke.
+
+**What the gate still needs** is the page's half: the target speed shown, the debrief at the stop, and a
+recording saved with the lines above, so that five approaches flown by hand in the browser can be judged
+with `--repeatable`. Then the operator flies them.
+
+New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
+`the_judge_finds_an_unflared_approach_not_stable` and `the_judge_has_nothing_to_judge_on_the_runway`,
+through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-six native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-one under node, the WebAssembly build leaving out the five that start processes.
 
 ## What P7 still has to build
 
 `ROADMAP.md` §4, *P7 in detail*: the gate — a hand-flown ILS, stable and repeatable, with its measures
-and bands written down. The browser steps (5 to 8), the runway, ILS and wind (step 2), the failures and
+and bands written down. Its judge, its recordings and its repeatability are built (above); the page's
+half and five approaches flown by hand remain. The browser steps (5 to 8), the runway, ILS and wind (step 2), the failures and
 their laws (step 3) and the protections (step 4) are above, with what step 4 leaves open: the airframe's
 stall above Mach 0.3 and its transonic aerodynamics, to be fitted, and a fast entry into high alpha in
 CONF FULL. Our fitted A320 flies all of it from
