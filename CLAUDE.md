@@ -24,7 +24,7 @@ built-ins and the browser. Do not add runtime dependencies without a reason in t
 
 `flight/` builds with CMake against clones of A32NX and JSBSim kept outside the repository, read-only;
 `flight/README.md` says how. Its `ctest` suite must be green, with either airframe, before a commit
-that touches it.
+that changes its code or its build.
 
 ## 1 · The dictionary is the only state
 
