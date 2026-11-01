@@ -1,9 +1,8 @@
 # 05 · The network protocol
 
 Source: `Developers\Network Documentation.txt`, 82,773 B, document version 4 (4 June
-2017), plus `AddonExample.java` (14,819 B), `AddonExampleNetThread.java` (4,252 B),
-`BoostClientExample.java` (4,332 B) — all three are complete compiling clients, not
-illustrations.
+2017), and the three example clients in Java that ship beside it — all three complete,
+compiling clients, not illustrations.
 
 ## Shape
 
@@ -16,11 +15,8 @@ illustrations.
   The topology is symmetric — a node is a client of one server and a server to one
   boost client.
 
-`Network.java:181-210` shows the emitter is three lines of `StringBuilder`:
-
-```java
-sbPr.append('Q').append(q).append(idx).append('=').append(iv)
-```
+The emitter is a few lines that build each message as text — `Q`, the category, the index, `=`,
+the value — and send it.
 
 Inbound parsing is the same shape in reverse; anything that is not a valid Q code is a
 keyword.
@@ -45,8 +41,8 @@ state. There is no locking and no revision — just the pause.
 
 `Q<category><index>=<value>` where category is `i`, `h` or `s`.
 
-A malformed or out-of-range value is **ignored, not corrected** — `Qs.transfer` returns
-the previous value when the length is outside `Min..Max` (Qs.java:35-40). Add-ons
+A malformed or out-of-range value is **ignored, not corrected** — a string variable keeps its
+previous value when the new one's length is outside its declared bounds. Add-ons
 therefore cannot corrupt the model, and they also cannot tell they failed except by
 watching the value not change.
 
@@ -87,4 +83,3 @@ by binding on `localhost` or a `WebSocket` and by adding a version handshake.
 
 The MSFS bridge later is the same protocol with a scenery generator on the far end —
 which is precisely what it was designed for.
-

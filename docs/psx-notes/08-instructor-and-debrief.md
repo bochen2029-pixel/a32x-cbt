@@ -1,26 +1,25 @@
 # 08 · The instructor surface, and the debrief
 
-55 `Instructor*.java` classes, 1.06 MB of source — larger than `Aerodynamics`. The
-instructor is not a settings dialog; it is a second product surface, and it is the part
-most worth copying for a CBT.
+The instructor is a larger part of the program than the flight model. It is not a settings
+dialog; it is a second product surface, and it is the part most worth copying for a CBT.
 
 ## It is split by concern
 
-| group | classes |
+| group | pages |
 |---|---|
-| situation control | `InstructorSituAero` (24 K), `InstructorSituPos` (44 K), `InstructorSituServ` (48 K), `InstructorSituTime` (22 K), `InstructorSituHuman` |
-| model / aircraft config | `InstructorModel` (106 K), `InstructorLoadModel` |
-| faults | `InstructorMalf*` — one per chapter (Airframe, Alerts, Bleed, Electrical, Engines, Fire, Fuel, General, Hydraulics, Navigation, Self) |
-| human actors | `InstructorHumanAtis`, `Calls`, `Cpdlc` (103 K), `Dispatch`, `Pnf`, `Traffic`, `VoiceAtc` |
-| analysis / debrief | `InstructorAnalyse{Arpt,Elec,Misc,Navaid,Navig,Profile,Rec,Touch}`, `InstructorAnalysis` |
-| network, prefs, layouts | `InstructorNetwork`, `InstructorNetMain`, `InstructorPref*`, `InstructorLayout` |
+| situation control | aerodynamics, position, services, time, and the human crew |
+| model / aircraft config | the aircraft model and loading one |
+| faults | one page per chapter: airframe, alerts, bleed, electrical, engines, fire, fuel, general, hydraulics, navigation, self |
+| human actors | ATIS, calls, CPDLC, dispatch, the pilot-not-flying, traffic, voice ATC |
+| analysis / debrief | airport, electrics, miscellaneous, navaids, navigation, profile, the recorder, touchdown, and an overview |
+| network, prefs, layouts | network, the main connection, preferences, layout |
 
-Naming by measurement axis (`Arpt`, `Navig`, `Touch`, `Profile`) rather than by code
+Naming by measurement axis (airport, navigation, touchdown, profile) rather than by code
 module is what makes it a grading instrument.
 
 ## The debrief is a metric grid with stated aims
 
-`InstructorAnalyseTouch` lays out three titled sections:
+The touchdown page lays out three titled sections:
 
 1. **"Component sinkrate on respective initial ground contact"** — nose gear
    ("aim for circa 80 fpm"), main gear ("aim for circa 200 fpm"), nose fuselage (if nose
@@ -29,18 +28,17 @@ module is what makes it a grading instrument.
    threshold, pitch, bank, crab, speed deviation, scrub.
 3. **"Non-normal events"** — pod 1, pod 4, wing L, wing R, tail.
 
-Every cell is a `PLabel` over a `StringBuilder` that persists between runs, so the
-instructor compares sorties. The aim text is part of the label, so the target is on
-screen next to the measurement.
+Every cell is a label whose text persists between runs, so the instructor compares sorties. The
+aim text is part of the label, so the target is on screen next to the measurement.
 
-`InstructorAnalyseRec` is the recorder: CSV named by UTC under `Logs/`, modes
-`EMBRY1` / `TACVIEW1` / `CLOUD1`, accumulating `distFt`, `millisRun`, `millisTotal` in
-the fast pass (`Core.deltaAllegroAcc`). It is a flight-data recorder, not a replay.
+The recorder page writes a CSV named by UTC time under `Logs/`, in one of three output formats
+(one of them for Tacview), accumulating distance flown and run time in the fast pass. It is a
+flight-data recorder, not a replay.
 
 ## Why this is the strongest thing to copy
 
 - It proves the product is a *training* tool and not a simulator with a menu. The
-  analyst classes exist to say "here is how that landing was".
+  analysis pages exist to say "here is how that landing was".
 - Targets live with the measurements, so no separate spec can drift.
 - Per-component breakdown (six contact points, not "the landing") is how a real AQT
   debriefs.
@@ -69,4 +67,3 @@ lesson.
 
 That is the whole product delta between PSX and the CBT, and it is small — it sits on
 top of a metric grid that already exists.
-

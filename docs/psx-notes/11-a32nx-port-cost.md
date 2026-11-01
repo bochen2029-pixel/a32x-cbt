@@ -72,7 +72,7 @@ Cheaper than the previous round's estimate, and the risk moved rather than shran
 - **Displays/EFB/FMS pages: rewrite.** 121 K of TypeScript welded to
   `@flybywiresim/msfs-avionics`. This is the real bulk and it was always going to be.
 - **Driver: write.** Our own, against our dictionary — which is exactly the layer PSX
-  solved with `AdfsHub`/`AfdsFcc` and which note 10 describes.
+  solved with its autopilot's mode hub and servo, and which note 10 describes.
 
 ## Licence
 

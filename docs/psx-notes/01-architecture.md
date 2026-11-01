@@ -1,26 +1,18 @@
 # 01 · Architecture
 
-All line references are `<Class>.java:<line>` after decompilation.
-
 ## 1 · Process shape
 
-Two daemon threads own the whole simulation.
+Two background threads own the whole simulation: a slow pass that sleeps a second between
+iterations, and a fast pass that sleeps 50 ms. Both are endless loops in a single process.
 
-- `LentoThread` (Core.java:1713) — slow pass, `sleep(1000)`, unclamped iteration at
-  Core.java:1740-1846.
-- `AllegroThread` (Core.java:1959) — fast pass, `sleep(50)`, Core.java:1966-2062.
-
-Both are `while (true)` loops in a single JVM. Every domain class exposes a matching
-`static void runLento()` and/or `static void runAllegro()`; `Core` calls them in a
-**fixed, hand-ordered list** each pass (lento ≈ 50 calls at 1767-1822, allegro ≈ 70 at
-1979-2060). There is no scheduler, no event queue, no component registry. The order in
-`Core` *is* the schedule, and it is written to be causally correct:
-
-```
-MalfunctionsConseq → EarthTime → Weather → Gear → AisleSeatbelts → Aerodynamics
-  → CabinTemp → RadioVoice → Sound → [display] → Brakes → FlightControls → AfdsFcc
-  → engines → Elec → Hydraulics → Flaps → Fmc → BleedAir → Fire → Pnf
-```
+Every domain of the aircraft offers a slow-pass step, a fast-pass step or both, and the program
+calls them from a **fixed, hand-ordered list** each pass — about fifty calls in the slow pass,
+about seventy in the fast one. There is no scheduler, no event queue, no component registry. The
+order of the list *is* the schedule, and it is written to be causally correct. The fast pass runs,
+in outline: fault consequences first; then simulated time and the weather; the landing gear, the
+cabin signs and the aerodynamics; cabin temperature, radio voice, sound and the displays; brakes,
+flight controls and the autopilot; the engines, electrics, hydraulics and flaps; the flight
+management computer, bleed air and fire protection; and last the simulated pilot-not-flying.
 
 Cause precedes effect by construction. Nothing reads a value its producer has not yet
 written this pass. That is the whole ordering discipline and it is worth copying
@@ -28,70 +20,59 @@ exactly: a dataflow order, not an arbitrary module list.
 
 ## 2 · Time
 
-`deltaAcc` (Core.java:125) = `delta * simSpeed` (Core.java:1110); `deltaAllegroAcc`
-(Core.java:129) = `deltaAllegro * simSpeed` (Core.java:1970). Milliseconds.
+Each pass works from the time elapsed since the previous one, in milliseconds, multiplied by the
+simulation-speed factor: one such figure for the slow pass and one for the fast pass.
 
-Clamps: real-delta to 1..500 (Core.java:1969), and a second guard at
-Aerodynamics.java:823 where `safeDelta = deltaAcc > 80 ? 0.1 : deltaAcc * 0.00125`.
+Clamps: the real elapsed time is held between 1 and 500 ms, and the flight model guards itself a
+second time — its step factor is capped at the value an 80 ms frame gives.
 
-`Core.simSpeed` is a slider 0..8 (InstructorSituTime.java:40). Above 1 everything is
-time-scaled by the same factor. `simSpeed` also gates physics fidelity —
-AfdsFcc.java:2406 widens a rate when `simSpeed > 8`, Elec.java:2059 switches timers,
-several subsystems pin behaviour to `simSpeed == 1.0`.
+Simulation speed is an instructor slider from 0 to 8. Above 1 everything is time-scaled by the same
+factor. The factor also gates physics fidelity: the autopilot widens a rate above a factor of 8, the
+electrics switch timers, and several subsystems pin their behaviour to a factor of exactly 1.
 
 ## 3 · State ownership
 
-Every domain is a **static class holding static state**: `Aerodynamics.pitch`,
-`FlightControls.getAerodynamicAileron()`, `Elec`, `Hydraulics`, `Fuel`. No instances,
-no dependency injection, no ownership tree.
+Every domain — the aerodynamics, the flight controls, the electrics, the hydraulics, the fuel — is a
+**static class holding static state**. No instances, no dependency injection, no ownership tree.
 
 Consequences, all of them deliberate:
 
 - The whole model is reachable by name, which is what makes the network layer
-  (Variables.txt / Network Documentation.txt) able to enumerate and drive it by string,
-  and what let the author skip offsets entirely.
-- One `psxFrame`, one `visuals` — a single simulator, not a reusable engine.
-- Recursion into another domain is direct (`BleedAir.java:689-695` calls every valve's
-  `runLento()` inline).
+  (the developer documentation's variable list and protocol) able to enumerate and drive it by
+  string, and what let the author skip offsets entirely.
+- One window, one view — a single simulator, not a reusable engine.
+- Calls into another domain are direct: the bleed-air pass runs every valve's own slow step
+  inline.
 
 ## 4 · Sub-model shape
 
-Each axis is a state machine with a fixed field set and a single pass function:
+Each axis is a state machine with the same five quantities and a single pass function: a
+commanded target, a rate, an inertia (the reciprocal of responsiveness), a drag (dissipation) and
+a back force (restoring), advanced by one integrator step each pass.
 
-```
-targX      commanded target
-xVel       rate
-xInertia   reciprocal of responsiveness
-xDrag      dissipation
-xBackForce restoring
-xProgress()  the integrator
-```
-
-Rudder: `targYwVel`, `ywVel`, `yawInertia` (Aerodynamics.java:1472), `impulseYaw`
-(1426). Pitch: `targPitch`, `pitchRate`, `pitchInertia`, `pitchDrag`, `pitchBackForce`,
-`pitchProgress()` (1328-1404). Roll identical at 1133-1232. Vertical speed
-`vsInertia` (919-929), heading (`headingInertia`, 1629), TAS (`tasInertia`, 1749).
+Rudder and yaw, pitch, roll, vertical speed, heading and true airspeed all follow it. Pitch, for
+instance, carries a target, a rate, an inertia, a drag and a back force, and its pass turns the
+target into a rate and the rate into an attitude; yaw adds an impulse term.
 
 The pass functions are long, branch-heavy functions that read a global, apply a rate
-per `deltaAcc`, and never take a per-frame constant.
+per elapsed millisecond, and never take a per-frame constant.
 
 ## 5 · Guards
 
-- `Core.isPaused()` gates dozens of domains (1778, 1996).
-- `Network.notClient()` enforces a single authority: only the master runs the CDU,
-  the autosave, the monitor lockout (1823, 1990).
-- NaN containment is a first-class system: `checkNan(int)` / `stopByNan(int, String)`
-  (Aerodynamics.java:2168-2176 and ~200 call sites) halt the affected subsystem and
-  name it instead of propagating a NaN through the model.
-- `Idu.java:45` and `StandbyIsfd.java:1269` cap their own delta again locally.
+- Pause gates dozens of domains.
+- A single authority: when several machines share one simulation, only the master runs the CDU,
+  the autosave and the monitor lockout.
+- NaN containment is a first-class system: numbered checkpoints at about two hundred places in the
+  flight model halt the affected subsystem and name the stage instead of propagating a NaN through
+  the model.
+- The display units and the standby instrument cap their own delta again locally.
 
 ## 6 · Presentation separation
 
-The physical model never touches the camera. `Core.psxFrame` is the view, not the
-airframe (`visuals.mouseHolder()`, Core.java:1980). Aircraft position is produced by
-Aerodynamics through **three separate sinks** (1982, 2017, 2081) under
-`radPerFrFac = 1.237588837910e10 / deltaAcc` (1944) — one per coordinate, so the
-integrator never has to carry a world frame.
+The physical model never touches the camera. The program's window is the view, not the airframe.
+Aircraft position leaves the flight model through **three separate sinks**, one per coordinate,
+scaled by a factor that turns the pass's distance into radians — so the integrator never has to
+carry a world frame.
 
 ## 7 · What this architecture is good at
 
@@ -103,11 +84,10 @@ every subsystem can be frozen independently.
 ## 8 · Where it would hurt us
 
 - Static singletons make a browser tab with two aircraft awkward.
-- The `sleep`-driven passes have no accretion control: at time-warp the integrator
+- The sleep-driven passes have no accretion control: at time-warp the integrator
   just gets a bigger delta, so accuracy degrades exactly where education wants
   determinism.
 - One simulator per process; a CBT wants scenario instances that reset in milliseconds.
 
 Keep the *ordering discipline* and the per-axis shape. Drop the statics for typed
 instances, and drive the two passes from a fixed-step accumulator rather than a sleep.
-

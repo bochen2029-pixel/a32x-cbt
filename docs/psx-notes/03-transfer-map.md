@@ -7,22 +7,21 @@ What carries from PSX to an A320 FBW CBT, what must be rebuilt, and why.
 | item | note |
 |---|---|
 | two-rate scheduler with a causal dispatch list | 01 §1, I6. Copy the discipline; drive it from an accumulator. |
-| the four `Calc` integrators | I2. Small, provable, unit-testable. |
+| the four safe integrators | I2. Small, provable, unit-testable. |
 | the per-axis command→rate→accel template | 01 §4, I3. Already the FBW shape. |
 | elapsed-time integration | I1. |
 | delta clamping | I4, tightened. |
 | unit convention and edge translation | I9. |
 | state-by-name dictionary + transport | I7. This is the debrief bus as much as the network. |
 | guard instrumentation | I10, left switched on. |
-| instructor surface as a first-class window | `InstructorSituTime`, `InstructorModel` (2,223 lines), `InstructorAnalyseRec` (flight-data recorder). |
-| scenario save/load | `SituationFiler`, 119 `.situ` files. |
-| panel geometry and the 2D panel idiom | `Layouts\`, `Models\`, `MainPanels` (2,716 lines). |
-| power-source dependency tables | `Developers\Power Sources for Indicator Lights.txt` — 4,998 B of lamp→bus mapping. Treat lamps as a graph, not a lookup. |
+| instructor surface as a first-class window | the situation and time pages, the aircraft-model page, the flight-data recorder (note 08). |
+| scenario save/load | the situation file; 119 of them ship (note 06). |
+| panel geometry and the 2D panel idiom | the shipped layouts and aircraft models, and the vector panels (note 07). |
+| power-source dependency tables | `Developers\Power Sources for Indicator Lights.txt`, a lamp→bus mapping. Treat lamps as a graph, not a lookup. |
 
 ## Carries in shape, needs re-derivation — the systems
 
-Electrical buses, hydraulics, bleed, fuel, fire, pressurisation (`Elec` 2,562 lines,
-`Hydraulics`, `Fuel` 2,288, `Fire` 2,833, `CabinPress`). The *structure* — source,
+Electrical buses, hydraulics, bleed, fuel, fire, pressurisation. The *structure* — source,
 distribution, consumer, failure propagation — is aircraft-neutral. The topology is
 Boeing: three hydraulic systems where the A320 has three but with a PTU, a RAT-driven
 GREEN channel, and a different bus map. Re-pin against A320 chapter references.
@@ -32,15 +31,11 @@ GREEN channel, and a different bus map. Re-pin against A320 chapter references.
 This is the whole reason for the project and the only part of PSX that is
 near-worthless as a source.
 
-In PSX the stick goes straight into the surface command and the law shapes it:
-
-```java
-targBkVel = ail * 0.0018f + elevator * -1.0E-4f * sinPitch * sinBank;
-targBkVel *= iasReal / 280.0f;              // gain scheduled by IAS
-...
-bankInertiaDelta = Core.deltaAcc / bankInertia;
-if (ground && absBank > 0.1134464f) { podstrike = true; bankInertiaDelta *= 5.0f; }
-```
+In PSX the stick goes straight into the surface command and the law shapes it. The roll-rate
+target is the aileron input times a small gain, plus a coupling term from the elevator through
+pitch and bank; that target is gain-scheduled by indicated airspeed, in proportion to it and
+normalised at 280 kt; bank follows the target through an inertia term; and on the ground, past
+about 6.5° of bank, a pod strike is flagged and the roll response is made five times quicker.
 
 That is a *direct law with airspeed scheduling and a hard clamp*. The A320 needs:
 
@@ -51,10 +46,9 @@ That is a *direct law with airspeed scheduling and a hard clamp*. The A320 needs
 - the degradation ladder C* → alternate → direct, with the reconfiguration triggers,
 - the FBW computer set and its failure modes (ELAC/SEC/FAC, side-specific).
 
-None of that exists anywhere in `Aerodynamics`, `FlightControls` or `AfdsFcc`. `AfdsFcc`
-is 2,453 lines with 23 inner classes and is entirely Boeing autopilot mode logic;
-copy its *shape* (per-channel state machine, acquire smoothers, mode timers), not its
-content.
+None of that exists anywhere in PSX's flight model, flight controls or autopilot. The autopilot's
+servo layer is entirely Boeing mode logic; copy its *shape* (per-channel state machine, smoothers
+that ramp a mode in, mode timers), not its content.
 
 ## Source of the law: A32NX, not PSX
 
@@ -71,8 +65,7 @@ without needing the law. Only B2 introduces the FBW layer, and only then does JS
 
 ## Legal
 
-Decompiled output is a derivative of proprietary code. Notes are in our own words.
-`psx-notes/` stays separate from product source so a structural-derivation argument
-stays available. A32NX GPLv3 is viral on distribution; JSBSim LGPL-2.1 is fine as a
-linked library.
-
+Decompiled output is a derivative of proprietary code, so none of it is quoted here. Notes are in
+our own words and describe behaviour. `psx-notes/` stays separate from product source so a
+structural-derivation argument stays available. A32NX GPLv3 is viral on distribution; JSBSim
+LGPL-2.1 is fine as a linked library.

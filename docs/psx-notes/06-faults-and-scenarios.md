@@ -5,61 +5,40 @@ parallel namespace.
 
 ## Faults
 
-A fault is not code. It is one row in the registry plus a trigger, held in a
-`Malfunction.Condition` (Malfunction.java:1598).
+A fault is not code. It is one row in the registry plus a trigger condition. A condition holds
+the trigger mode — one of seven: when airspeed is, when altitude is, when heading is, at a
+distance to the destination, at a simulated UTC time, at random, or on manual activation — a
+severity flag, the switch event that fires it, and the registry slot the fault lives in.
 
-```java
-String[] strCond = {
-    "When airspeed is:", "When altitude is:", "When heading is:",
-    "At distance to DEST:", "At simulated UTC:", "At random:", "Manual activation:"
-};
-boolean severe;
-SwitchEvent switchEvent;
-int globIdx;        // the registry slot this fault lives in
-```
+There are 188 such conditions, one per fault. Activation state is a short semicolon-separated
+string on a string variable — the severity flag, the trigger mode, the trigger value — so a fault
+is addressed, transported, saved and triggered by exactly the same machinery as a switch. Reading
+it back parses the same string with defensive bounds on the mode (0..6) and re-sends a reset on
+anything malformed.
 
-188 `static Condition` fields are declared one per fault (grep `^    static Condition `
-in Malfunction.java). Activation state is a string on a `Qs` variable:
-
-```java
-Glob.qs[this.globIdx].transfer((se ? "1;" : "0;") + m + ";" + v, 'w', 1);
-```
-
-so a fault is addressed, transported, saved and triggered by exactly the same machinery
-as a switch. `readGlob()` (Malfunction.java:1994) parses the same string back with
-defensive bounds on the mode (0..6) and re-sends a reset on anything malformed.
-
-Groupings are by ATA-ish chapter, and they exist for bulk arming and repair:
-`extDisarmLong{Bleed,Electrical,Engines,Fire,Fuel,Hydraulics,Navigation,Alerts,Airframe}`
-and the matching `extRepairLong*` (Malfunction.java ~1390-1500). `MalfunctionsRandom`
-(1,996 lines) drives the "At random" mode; `MalfunctionsConseq` (195 lines) chains
-consequences and runs **first in the fast pass** (Core.java:1979) so a fault is in force
-before anything samples it.
+Groupings are by ATA-ish chapter, and they exist for bulk arming and repair: one disarm-all and
+one repair-all action per chapter — bleed, electrical, engines, fire, fuel, hydraulics,
+navigation, alerts, airframe. A separate module drives the "at random" mode, and a short one
+chains consequences and runs **first in the fast pass** (01 §1) so a fault is in force before
+anything samples it.
 
 ## Scenarios
 
-`Situations\*.situ`, 119 of them, ~24–27 KB each, 1,051 lines — see
-`00 Parked 001 - Sydney.situ`.
+The situation files, `Situations\*.situ`: 119 of them ship, each about 24–27 KB and about a
+thousand lines.
 
-Format: a header, a description block, then flat `VariableName=Value` lines.
+Format: a header line naming the program and the file type; a free-text description,
+closed by a marker line; then flat `VariableName=Value` lines, one per variable, under the
+names the developer variable list publishes — the aircraft configuration variant and the
+selected speed in the mode control panel's window are two of them.
 
-```
-[Aerowinx Precision Simulator - Situation]
-Description=Qantas Airways VH-OJU at gate 10, Sydney. …
-^-^-^-^ End of description ^-^-^-^
-CfgVariant=2
-McpWdoSpd=143
-```
+Saving walks the **entire** registry — every integer, human-input and string variable — and
+writes each by its published name with its current value. Loading splits each line at `=`,
+finds the variable by name, and writes it through the same transfer path a network write takes.
+So a scenario is the state dictionary serialised, and loading a scenario is a bulk actuation.
 
-`SituationFiler.save()` (SituationFiler.java:48-56) walks the **entire** registry —
-every `qi`, `qh`, `qs` — and writes each by `varName` with its current value. Load
-(83-209) splits on `=` (ASCII 61), finds the variable by name, and calls
-`transfer(..., 'w', 1)`. So a scenario is the state dictionary serialised, and loading a
-scenario is a bulk actuation.
-
-After a load, each class re-establishes its own invariants through `situLoadInit()`
-(e.g. `Aerodynamics.situLoadInit`, `Malfunction.situLoadInit`) and `Global` resets
-derived values. `load1/load2/load3` on the network brackets the whole thing so no client
+After a load, each domain re-establishes its own invariants through its own post-load step, and
+derived values are reset. `load1/load2/load3` on the network brackets the whole thing so no client
 sees a partial state (note 05).
 
 ## Why this is good
@@ -83,9 +62,9 @@ A CBT wants the mode list extended with:
 - **state-anomaly** — fire when the aircraft is in a state the scenario should punish
   (e.g. on approach with the landing memo incomplete).
 
-### 2 · `severe` is a single boolean
+### 2 · Severity is a single boolean
 
-Two outcomes per fault (big/small fire, from the tooltip at Malfunction.java:1660-1662).
+Two outcomes per fault (a big or a small fire, as the instructor's tooltip puts it).
 An ECAM-driven course needs a graded severity and a *consequence*, not a size.
 
 ### 3 · Situations carry no curriculum
@@ -102,4 +81,3 @@ re-initialisation after load.
 
 Add the three trigger families above, replace the boolean with a graded severity, and
 put a curriculum object alongside the state. Keep the `.situ` shape.
-
