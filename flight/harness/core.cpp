@@ -20,13 +20,15 @@ constexpr double kDt = 0.02;  // 50 Hz, the rate the computers are built for
 constexpr double kRunwayStartPastThresholdM = 150;  // where a runway start stands, lined up
 
 // Input slots. Signs and units are the crew's (world.h): stick +1 full pull and full right, pedals
-// +1 full left, thrust lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left and -1 right.
+// +1 full left, thrust lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left and -1 right,
+// pitch_trim the trim wheel turned at that fraction of its rate, + nose up.
 const std::vector<const char*> kInputs = {
     "pitch",      "roll",      "pedals",     "tla_1",       "tla_2",
     "brakes",     "speedbrake", "spoilers_armed", "flap_lever", "gear_down",
     "rudder_trim", "rudder_trim_reset",
     "elac_1",     "elac_2",    "sec_1",      "sec_2",       "sec_3",
-    "fac_1",      "fac_2"};
+    "fac_1",      "fac_2",
+    "pitch_trim"};
 
 // State slots. Air data in ISA with the standard setting; attitude and rates in degrees; heading and
 // track true; ra_ft zero standing on the runway. Surfaces in the computers' frame, except the
@@ -57,6 +59,67 @@ int slot(const std::vector<const char*>& names, const char* name) {
 
 double bounded(double v, double lo, double hi, double previous) {
   return std::isfinite(v) ? std::max(lo, std::min(hi, v)) : previous;  // a non-finite input changes nothing
+}
+
+// Where a unit's failure time is kept: adr1-3, ir1-3, green, blue, yellow, elac1-2, sec1-3.
+double* failureSlot(Failures& f, const std::string& unit) {
+  struct Indexed {
+    const char* prefix;
+    double* times;
+    int count;
+  };
+  for (const Indexed& u : {Indexed{"adr", f.adr, 3}, Indexed{"ir", f.ir, 3}, Indexed{"elac", f.elac, 2}, Indexed{"sec", f.sec, 3}}) {
+    const std::string prefix = u.prefix;
+    if (unit.size() == prefix.size() + 1 && unit.compare(0, prefix.size(), prefix) == 0) {
+      const int k = unit.back() - '1';
+      return k >= 0 && k < u.count ? &u.times[k] : nullptr;
+    }
+  }
+  if (unit == "green") return &f.hyd[0];
+  if (unit == "blue") return &f.hyd[1];
+  if (unit == "yellow") return &f.hyd[2];
+  return nullptr;
+}
+
+// A failure list (core.h): groups separated by commas, each the units that fail together joined by
+// '+' (or by spaces, as a '+' in a page's address arrives), and after an '@' the seconds from the
+// start at which they fail; without one, from the start.
+bool parseFailures(const std::string& text, Failures& f, std::string& error) {
+  for (size_t at = 0; at <= text.size();) {
+    const size_t end = std::min(text.find(',', at), text.size());
+    std::string group = text.substr(at, end - at);
+    at = end + 1;
+    double when = 0;
+    const size_t mark = group.find('@');
+    if (mark != std::string::npos) {
+      char* stop = nullptr;
+      when = std::strtod(group.c_str() + mark + 1, &stop);
+      if (mark + 1 == group.size() || !stop || *stop != '\0' || !(when >= 0)) {
+        error = "'" + group + "': after @, the seconds from the start";
+        return false;
+      }
+      group.resize(mark);
+    }
+    int units = 0;
+    for (size_t u = 0; u <= group.size();) {
+      const size_t stop = std::min(group.find_first_of("+ ", u), group.size());
+      const std::string unit = group.substr(u, stop - u);
+      u = stop + 1;
+      if (unit.empty()) continue;
+      double* slot = failureSlot(f, unit);
+      if (!slot) {
+        error = "no unit called '" + unit + "': adr1-3, ir1-3, green, blue, yellow, elac1-2, sec1-3";
+        return false;
+      }
+      *slot = when;
+      ++units;
+    }
+    if (units == 0) {
+      error = "'" + group + "' names no unit to fail";
+      return false;
+    }
+  }
+  return true;
 }
 
 std::unique_ptr<FlightCore> g_core;
@@ -115,8 +178,9 @@ void FlightCore::toInputs(const Crew& c, std::vector<double>& v) {
                            c.secOn[1] ? 1.0 : 0.0,
                            c.secOn[2] ? 1.0 : 0.0,
                            c.facOn[0] ? 1.0 : 0.0,
-                           c.facOn[1] ? 1.0 : 0.0};
-  static_assert(sizeof values / sizeof values[0] == 19, "one value per input slot");
+                           c.facOn[1] ? 1.0 : 0.0,
+                           c.pitchTrim};
+  static_assert(sizeof values / sizeof values[0] == 20, "one value per input slot");
   std::copy(std::begin(values), std::end(values), v.begin());
 }
 
@@ -144,6 +208,7 @@ void FlightCore::fromInputs(const std::vector<double>& v, Crew& c) {
   c.secOn[2] = on(16, c.secOn[2]);
   c.facOn[0] = on(17, c.facOn[0]);
   c.facOn[1] = on(18, c.facOn[1]);
+  c.pitchTrim = bounded(v[19], -1, 1, c.pitchTrim);
 }
 
 void FlightCore::writeState(std::vector<double>& s) const {
@@ -259,8 +324,12 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       }
       continue;
     }
+    if (key == "fail") {
+      if (!parseFailures(value, start.failures, error)) return false;
+      continue;
+    }
     if (kind == "runway") {
-      error = "the runway start takes only runway=";
+      error = "the runway start takes only runway= and fail=";
       return false;
     }
     char* end = nullptr;

@@ -299,6 +299,36 @@ endif()
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)
 add_test(NAME losing_all_air_data_ends_normal_law COMMAND law_harness --minutes 8 --fail-adr-at 240 --expect law-degrades)
 
+# The instructor's failures and the laws the computers choose for them (ROADMAP.md, P7 step 3): each
+# failure in the circuit from KDFW 17C at 300 s, in the cruise, and the laws the FCDC reports from five
+# seconds after it: pitch and lateral before the crew configures to land, and pitch once the gear is
+# down; then the landing flown in them, judged as any other. A32NX's ELAC makes the lateral law direct
+# whenever pitch leaves normal law, and every alternate law direct once the gear is down. With both SECs
+# lost the ELAC cannot see the gear and goes direct on the flaps instead, a second later, so that case
+# leaves the gear-down law out. One unit lost of each kind leaves normal law, if together they leave every
+# surface a servo: green and ELAC 1 together take both of the left elevator's, and leave alternate 1.
+foreach(case IN ITEMS
+    "two_adrs_alternate_1_then_direct_at_gear_down|adr1+adr2@300|alternate-1/direct,direct"
+    "three_adrs_alternate_2_then_direct_at_gear_down|adr1+adr2+adr3@300|alternate-2/direct,direct"
+    "two_irs_alternate_1_then_direct_at_gear_down|ir1+ir2@300|alternate-1/direct,direct"
+    "three_irs_direct|ir1+ir2+ir3@300|direct/direct,direct"
+    "blue_and_yellow_alternate_1_then_direct_at_gear_down|blue+yellow@300|alternate-1/direct,direct"
+    "both_elacs_alternate_1_then_direct_at_gear_down|elac1+elac2@300|alternate-1/direct,direct"
+    "secs_1_and_2_alternate_1|sec1+sec2@300|alternate-1/direct"
+    "an_adr_an_ir_an_elac_and_a_sec_normal|adr1+ir2+elac1+sec3@300|normal/normal,normal"
+    "green_alone_normal|green@300|normal/normal,normal")
+  string(REPLACE "|" ";" fields "${case}")
+  list(GET fields 0 name)
+  list(GET fields 1 failures)
+  list(GET fields 2 laws)
+  add_test(NAME laws_${name} COMMAND law_harness --fail "${failures}" --minutes 20 --expect "laws=${laws}")
+endforeach()
+# A degraded flight, the trim wheel turned by hand in it, replays to the same bytes and touchdown.
+if(NOT EMSCRIPTEN)
+  add_test(NAME laws_three_irs_replays_to_the_same_touchdown
+           COMMAND law_harness --fail "ir1+ir2+ir3@300" --minutes 18 --check-replay)
+endif()
+
 # The page's own tests (flight/web), in node: its clock wherever node is found, and in the WebAssembly
 # build the browser's module itself, the very file the page loads.
 find_program(FLIGHT_NODE NAMES node nodejs)

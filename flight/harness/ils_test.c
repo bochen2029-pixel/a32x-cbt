@@ -33,6 +33,9 @@ int main(int argc, char** argv) {
   }
   const double locWanted = atof(argv[2]), gsWanted = atof(argv[3]);
   check(flight_start_scenario(NULL, 0, "approach;nonsense=1") == -3, "a scenario not understood is refused", 0);
+  check(flight_start_scenario(NULL, 0, "runway;fail=adr4") == -3, "so is a failure of a unit there is not", 0);
+  check(flight_start_scenario(NULL, 0, "runway;fail=ir1+ir2@soon") == -3, "and one at no time", 0);
+  check(flight_start_scenario(NULL, 0, "runway;fail=") == -3, "and a failure of nothing", 0);
   if (flight_start_scenario(NULL, 0, argv[1]) != 0) {
     printf("FAILED: the scenario did not start\n");
     return 1;

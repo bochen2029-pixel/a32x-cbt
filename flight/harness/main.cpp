@@ -139,6 +139,7 @@ struct Options {
   bool determinism = false;
   bool replayCheck = false;
   double failAdrAt = -1;
+  std::string fail;   // the instructor's failures (core.h, fail=), folded into the scenario
   std::string expect;
   std::string trace;
   std::string record, replay;  // a crew recording to write from the scripted crew, or to fly from
@@ -176,6 +177,11 @@ struct Results {
   // laws in settled flight once an injected failure has had five seconds to be noticed
   long long afterFailureTicks = 0;
   std::map<std::string, long long> afterFailurePitchLaw;
+  // after the first failure, from five seconds on, the laws in settled flight: before the gear is down,
+  // and once it has been down and locked for three seconds
+  double failAt = -1;
+  long long beforeGearTicks = 0, gearDownTicks = 0;
+  std::map<std::string, long long> beforeGearPitch, beforeGearLateral, gearDownPitch;
   // what moved
   Range elevator, ths, aileron, spoiler, pitch, bank, load, altitude;
   Range checkPullElevator, checkPushElevator, checkLeftAileron, checkRightAileron;
@@ -259,6 +265,22 @@ class Recording {
   std::string error_;
 };
 
+// The first of the instructor's failures, in seconds from the start; -1 if none.
+double earliestFailure(const Failures& f) {
+  double at = -1;
+  auto take = [&at](const double* times, int n) {
+    for (int k = 0; k < n; ++k) {
+      if (times[k] >= 0 && (at < 0 || times[k] < at)) at = times[k];
+    }
+  };
+  take(f.adr, 3);
+  take(f.ir, 3);
+  take(f.hyd, 3);
+  take(f.elac, 2);
+  take(f.sec, 3);
+  return at;
+}
+
 Results run(const Options& opt, FILE* trace) {
   Recording recording;
   const bool replaying = !opt.replay.empty();
@@ -276,10 +298,14 @@ Results run(const Options& opt, FILE* trace) {
   }
   FlightCore core(!replaying, worldStart);
   World& world = core.world();
-  world.adrFailAt = opt.failAdrAt;
+  if (opt.failAdrAt >= 0) {
+    for (double& at : world.failures.adr) at = opt.failAdrAt;
+  }
   if (opt.expect == "rudder-trim") world.trimTest = {kTrimFrom, kTrimTo, kTrimHandsOffTo, +1};
   Efcs& efcs = core.efcs();
   Results r;
+  r.failAt = earliestFailure(world.failures);
+  double gearDownAt = -1;
   Digest digest;
 
   const long long ticks = static_cast<long long>(std::llround(opt.minutes * 60 / kDt));
@@ -348,9 +374,23 @@ Results run(const Options& opt, FILE* trace) {
           r.firstNonNormalAt = t;
           r.firstNonNormal = std::string("pitch ") + name(pl) + ", lateral " + name(ll) + " in " + phaseName(world.phase());
         }
-        if (opt.failAdrAt >= 0 && t > opt.failAdrAt + 5) {
+        if (r.failAt >= 0 && t > r.failAt + 5) {
           ++r.afterFailureTicks;
           ++r.afterFailurePitchLaw[name(pl)];
+          if (!r.landings.empty()) {
+            // after the first landing the laws are no longer the failure's approach
+          } else if (!world.crew.gearDown && world.crew.flapLever < 3 && !world.noseGearDownlocked()) {  // not yet configuring to land
+            gearDownAt = -1;
+            ++r.beforeGearTicks;
+            ++r.beforeGearPitch[name(pl)];
+            ++r.beforeGearLateral[name(ll)];
+          } else if (world.noseGearDownlocked()) {
+            if (gearDownAt < 0) gearDownAt = t;
+            if (t - gearDownAt > 3) {
+              ++r.gearDownTicks;
+              ++r.gearDownPitch[name(pl)];
+            }
+          }
         }
       }
     });
@@ -481,6 +521,24 @@ double share(const std::map<std::string, long long>& m, const char* key, long lo
 
 // Verdicts are separate statements: operands of + are evaluated in no fixed order, and the report
 // should read in the order it is written.
+// The first landing of the run, against the A320's limits: 600 fpm and 2.6 g are its hard-landing
+// thresholds and 11.7 deg of pitch touches its tail. 360 fpm, 6 ft/s, is this harness's bar for a
+// normal landing, well inside them.
+int landingChecks(const Results& r) {
+  int failed = verdict("a landing was flown", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
+  if (!r.landings.empty()) {
+    const auto& l = r.landings.front();
+    int bounces = 0;
+    for (const auto& b : r.landings) bounces += b.at > l.at && b.at - l.at < 30;
+    failed += verdict("touched down at a normal sink rate", l.sinkFpm > -360, fmt("%.0f fpm", l.sinkFpm));
+    failed += verdict("mains first, tail clear", l.pitch > 0 && l.pitch < 10, fmt("pitch %.1f deg", l.pitch));
+    failed += verdict("wings level", std::abs(l.bank) < 3, fmt("bank %.1f deg", l.bank));
+    failed += verdict("under the hard-landing load factor", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
+    failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
+  }
+  return failed;
+}
+
 int checkExpectation(const std::string& which, const Results& r, const Options& opt) {
   int failed = 0;
   if (which == "power-up") {
@@ -536,20 +594,35 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
     failed += verdict("RESET centres the trim", std::abs(r.trimAfterReset) < 0.2,
                       fmt("trim %.2f deg 15 s after RESET", r.trimAfterReset));
   } else if (which == "landing") {
-    // The first landing of the run, against the A320's limits: 600 fpm and 2.6 g are its hard-landing
-    // thresholds and 11.7 deg of pitch touches its tail. 360 fpm, 6 ft/s, is this harness's bar for
-    // a normal landing, well inside them.
-    failed += verdict("a landing was flown", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
-    if (!r.landings.empty()) {
-      const auto& l = r.landings.front();
-      int bounces = 0;
-      for (const auto& b : r.landings) bounces += b.at > l.at && b.at - l.at < 30;
-      failed += verdict("touched down at a normal sink rate", l.sinkFpm > -360, fmt("%.0f fpm", l.sinkFpm));
-      failed += verdict("mains first, tail clear", l.pitch > 0 && l.pitch < 10, fmt("pitch %.1f deg", l.pitch));
-      failed += verdict("wings level", std::abs(l.bank) < 3, fmt("bank %.1f deg", l.bank));
-      failed += verdict("under the hard-landing load factor", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
-      failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
+    failed += landingChecks(r);
+  } else if (which.rfind("laws=", 0) == 0) {
+    // A failure's laws, as the computers chose them, and the landing flown in them (ROADMAP.md, P7 step
+    // 3): laws=PITCH/LATERAL[,PITCH] names the pitch and lateral law in flight before the gear is down,
+    // and the pitch law once it is down, each as the FCDC reports it, held throughout from five seconds
+    // after the failure.
+    const std::string spec = which.substr(5);
+    const size_t comma = spec.find(','), slash = spec.find('/');
+    const std::string before = spec.substr(0, comma), gearDown = comma == std::string::npos ? "" : spec.substr(comma + 1);
+    const std::string pitch = before.substr(0, slash), lateral = slash == std::string::npos ? "" : before.substr(slash + 1);
+    auto seen = [](const std::map<std::string, long long>& m) {
+      std::string out;
+      for (const auto& [law, n] : m) out += (out.empty() ? "" : ", ") + law + fmt(" %.0f s", n * kDt);
+      return out.empty() ? std::string("none flown") : out;
+    };
+    failed += verdict("a failure in flight", r.failAt >= 0 && r.afterFailureTicks > 50 * 30,
+                      fmt("at %.0f s, then %.0f s of settled flight", r.failAt, r.afterFailureTicks * kDt));
+    failed += verdict(("pitch " + pitch + " law before the gear is down").c_str(),
+                      r.beforeGearTicks > 50 * 20 && share(r.beforeGearPitch, pitch.c_str(), r.beforeGearTicks) == 1,
+                      seen(r.beforeGearPitch));
+    failed += verdict(("lateral " + lateral + " law").c_str(),
+                      r.beforeGearTicks > 50 * 20 && share(r.beforeGearLateral, lateral.c_str(), r.beforeGearTicks) == 1,
+                      seen(r.beforeGearLateral));
+    if (!gearDown.empty()) {
+      failed += verdict(("pitch " + gearDown + " law with the gear down").c_str(),
+                        r.gearDownTicks > 50 * 10 && share(r.gearDownPitch, gearDown.c_str(), r.gearDownTicks) == 1,
+                        seen(r.gearDownPitch));
     }
+    failed += landingChecks(r);
   } else if (which == "ils") {
     // A hand-flown ILS's bands (ROADMAP.md, P7: how a hand-flown ILS is judged), here applied to the
     // scripted crew: stabilised from 1,000 ft above the threshold to 50 ft, then the touchdown and the
@@ -614,7 +687,7 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
     // The negative control for the gate's law check: lose all air data and normal law must go.
     std::string seen;
     for (const auto& [law, n] : r.afterFailurePitchLaw) seen += " " + law + fmt(" %.0f s", n * kDt);
-    failed += verdict("a failure was injected in flight, and flown through", opt.failAdrAt >= 0 && r.afterFailureTicks > 50 * 30,
+    failed += verdict("a failure was injected in flight, and flown through", r.failAt >= 0 && r.afterFailureTicks > 50 * 30,
                       fmt("%.0f s of settled flight after it", r.afterFailureTicks * kDt));
     failed += verdict("pitch normal law is gone once all three ADRs fail",
                       r.afterFailureTicks > 0 && share(r.afterFailurePitchLaw, "normal", r.afterFailureTicks) == 0,
@@ -731,6 +804,7 @@ int main(int argc, char** argv) {
     else if (a == "--record") opt.record = next("--record");
     else if (a == "--replay") opt.replay = next("--replay");
     else if (a == "--scenario") opt.scenario = next("--scenario");
+    else if (a == "--fail") opt.fail = next("--fail");
     else if (a == "--expect") opt.expect = next("--expect");
     else if (a == "--fail-adr-at") opt.failAdrAt = std::atof(next("--fail-adr-at").c_str());
     else if (a == "--trace") opt.trace = next("--trace");
@@ -748,9 +822,15 @@ int main(int argc, char** argv) {
     std::printf("%s\n", failed ? "FAILED" : "PASSED");
     return failed ? 1 : 0;
   }
-  if (opt.gate && opt.failAdrAt >= 0) {
-    std::printf("the gate runs a healthy aircraft: --gate and --fail-adr-at do not mix\n");
+  if (opt.gate && (opt.failAdrAt >= 0 || !opt.fail.empty() || opt.scenario.find("fail=") != std::string::npos)) {
+    std::printf("the gate runs a healthy aircraft: --gate and a failure do not mix\n");
     return 2;
+  }
+
+  // the failures go into the scenario, so a replay check's children fly them too
+  if (!opt.fail.empty()) {
+    opt.scenario = (opt.scenario.empty() ? std::string("runway") : opt.scenario) + ";fail=" + opt.fail;
+    opt.fail.clear();
   }
 
   if (!opt.record.empty() && !opt.replay.empty()) {

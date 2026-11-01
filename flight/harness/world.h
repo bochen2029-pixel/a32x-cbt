@@ -34,6 +34,7 @@ struct Crew {
   int flapLever = 0;      // 0, 1, 2, 3, 4 = FULL
   bool rudderTrimLeft = false, rudderTrimRight = false;  // RUD TRIM switch, momentary
   bool rudderTrimReset = false;                          // RUD TRIM RESET pushbutton
+  double pitchTrim = 0;   // the pitch trim wheel, turned at this fraction of its rate, -1..1, + nose up
 };
 
 // What the computers tell the actuators, as FlyByWireInterface::updateServoSolenoidStatus hands it
@@ -52,6 +53,8 @@ struct Orders {
   double rudderTrim[2] = {};
   bool travelLimiterActive[2] = {};
   double travelLimiter[2] = {};
+  // and what the FCDC tells the cockpit: pitch direct law, the PFD's USE MAN PITCH TRIM
+  bool pitchDirect = false;
 };
 
 // Surface positions, computers' frame, degrees.
@@ -70,13 +73,28 @@ enum class Phase { Parked, PowerUp, GroundCheck, Taxi, TakeoffRoll, Climb, Cruis
 
 const char* phaseName(Phase p);
 
-// Where the world begins: the airframe's start, the runway it is judged against, and the levers the
-// crew finds set. The default is P7's slice 1: on the gear at the start, a runway drawn 150 m behind it.
+// The instructor's failures (ROADMAP.md, P7 step 3): each unit fails from its time on, in seconds after
+// the start; negative is never. A failed ADR or IR transmits FailureWarning on every word; a failed
+// hydraulic system loses its pressure, and with it the servos, the THS motor and the slat and flap
+// motors it drives; a failed ELAC or SEC stops, as A32NX's failure stops it (the computer's
+// faultActive). The computers decide what law that leaves.
+struct Failures {
+  double adr[3] = {-1, -1, -1};
+  double ir[3] = {-1, -1, -1};
+  double hyd[3] = {-1, -1, -1};  // green, blue, yellow
+  double elac[2] = {-1, -1};
+  double sec[3] = {-1, -1, -1};
+};
+
+// Where the world begins: the airframe's start, the runway it is judged against, the levers the crew
+// finds set, and what will fail. The default is P7's slice 1: on the gear at the start, a runway drawn
+// 150 m behind it.
 struct WorldStart {
   AirframeStart airframe;
   Runway runway;           // empty name: the default runway, made from where the airframe starts
   int flapLever = 0;
   bool gearDown = true;
+  Failures failures;
 };
 
 class World {
@@ -151,8 +169,9 @@ class World {
     double pitch = 0, roll = 0;
   } stickOverride;
 
-  // From this time on, all three ADRs transmit FailureWarning, as failed ADRs do. Negative: never.
-  double adrFailAt = -1;
+  // What fails, and when (Failures); whether a unit has failed by now.
+  Failures failures;
+  bool failed(double at) const { return at >= 0 && t_ >= at; }
 
   // A property test's hand on the RUD TRIM switch, in seconds after the start of cruise: the switch
   // held from `from` to `to` (+1 left, -1 right), the stick neutral from `from` to `handsOffTo` so that
@@ -209,4 +228,12 @@ class World {
   // flaps and slats: the pick-off angles the SFCCs report, and the flap surface they move
   bool conf1F_ = false;
   double slatFppu_ = 0, flapFppu_ = 0, flapDeg_ = 0;
+
+  // In direct law the crew's hand holds the load factor its stick would have asked of normal law, and
+  // turns the trim wheel against what it holds (directLawHands).
+  void directLawHands(double dt);
+  bool pitchDirect_ = false;  // the PFD's USE MAN PITCH TRIM: the FCDC reports pitch direct law
+  double handHeld_ = 0;       // the stick the hand has been holding, over a few seconds
+  bool trimming_ = false;
+  int elevatorsWorking_ = 2;  // elevators with an active, pressurised servo
 };

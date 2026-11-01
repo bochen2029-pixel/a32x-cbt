@@ -108,6 +108,12 @@ const double kVNextStage[4] = {215, 203, 183, 168};
 constexpr double kLocCloseS = 20, kGsCloseS = 10, kGsAuthorityDeg = 1.0, kInterceptDeg = 30;
 constexpr double kShortFinalFt = 1500, kDecrabFt = 15, kDecrabGain = 0.08;
 constexpr double kMsPerKt = 0.514444, kMPerFt = 0.3048, kRadPerDeg = 3.14159265358979323846 / 180;
+// The crew's hand in direct law (directLawHands): over how long it feels what it has been holding; the
+// held stick at which it starts trimming, the one at which it stops, and the one it trims at full rate.
+constexpr double kHeldTauS = 3, kTrimStartHeld = 0.02, kTrimStopHeld = 0.005, kTrimFullHeld = 0.3;
+// The pitch trim wheel turned briskly moves the THS this fast with both its hydraulic motors, half with
+// one: an estimate. The THS's travel, in the computers' frame, negative nose up: 13.5 deg up, 4 down.
+constexpr double kTrimWheelDegS = 0.5, kThsNoseUpDeg = -13.5, kThsNoseDownDeg = 4.0;
 
 // The sidestick of a pilot flying a flight path angle and a heading through the laws.
 double pitchFor(double gammaTarget, double gamma, double q) {
@@ -175,6 +181,7 @@ Runway runwayAtStart(const AirframeState& a) {
 World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(configured(start))) {
   runway_ = start.runway.name.empty() ? runwayAtStart(air()) : start.runway;
   headingTarget_ = runway_.headingDeg;  // the circuit's turns are flown relative to the runway
+  failures = start.failures;
   if (start.airframe.airborne) {
     // In the air: the levers and the surfaces where the trim left them, the brakes off, the flight
     // controls on, and the scripted crew established on the final approach.
@@ -203,7 +210,11 @@ World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(con
 
 void World::step(double dt, const Orders& orders) {
   t_ += dt;
-  if (scripted) fly(dt);
+  pitchDirect_ = orders.pitchDirect;
+  if (scripted) {
+    fly(dt);
+    directLawHands(dt);
+  }
   actuate(dt, orders);
   if (crashedAt_ < 0) {
     airframe(dt);
@@ -222,6 +233,27 @@ void World::thrustFor(double casTarget, double tlaMax, double dt) {
 void World::stickFor(double gammaTarget, double dt) {
   gammaCmd_ = follow(gammaCmd_, gammaTarget, 1.5, dt);
   crew.pitch = pitchFor(gammaCmd_, air().flightPathDeg, air().qDegS);
+}
+
+// In direct law the stick moves the elevator itself and nothing trims: the PFD says USE MAN PITCH TRIM.
+// The crew's loops fly the stick as they do in normal law; it asks for elevator now rather than load
+// factor, near enough the same at approach speeds, and the loops hold their paths in it, only off by
+// what is out of trim. So the hand trims as a pilot does there: once it has held a pull or a push for
+// a few seconds it turns the trim wheel against it, faster the more it holds, until the force is off;
+// never in the flare. The wheel is then the integrator the loops lack. With one elevator left (the ECAM
+// says which) the hand moves the stick twice as far for the same response. On the ground it lets go.
+void World::directLawHands(double dt) {
+  if (!pitchDirect_ || onGround()) {
+    handHeld_ = 0;
+    trimming_ = false;
+    crew.pitchTrim = 0;
+    return;
+  }
+  if (elevatorsWorking_ == 1) crew.pitch = clamp(2 * crew.pitch, -1, 1);
+  handHeld_ += (crew.pitch - handHeld_) * dt / kHeldTauS;  // what the hand has been holding
+  if (std::abs(handHeld_) > kTrimStartHeld) trimming_ = true;
+  if (std::abs(handHeld_) < kTrimStopHeld || phase_ == Phase::Flare) trimming_ = false;
+  crew.pitchTrim = trimming_ ? clamp(handHeld_ / kTrimFullHeld, -1, 1) : 0.0;
 }
 
 // More than 400 ft from the level: an open climb at climb (or take-off) thrust, or an open descent
@@ -475,21 +507,45 @@ void World::fly(double dt) {
   }
 }
 
-// Servos follow the computers. A surface follows its active servo; with two active it follows their
-// mean; with none it is in damping mode and the air slowly centres it.
+// Servos follow the computers, as far as their hydraulics let them. A surface follows its active,
+// pressurised servo; with two, their mean; with none it is in damping mode and the air slowly centres
+// it, and a spoiler without pressure is blown down. Which system powers which servo is as A32NX's
+// computers count it (ElacComputer, SecComputer): ELAC 1's aileron servos are blue on the left and green
+// on the right, ELAC 2's the other way round; the elevator servos of ELAC 1 and SEC 1 blue on both
+// sides, of ELAC 2 and SEC 2 green on the left and yellow on the right; spoilers 1 and 5 green, 2 and 4
+// yellow, 3 blue; the THS's two motors green and yellow; the yaw dampers green (FAC 1) and yellow
+// (FAC 2); the rudder's three servos one on each.
 void World::actuate(double dt, const Orders& o) {
-  auto servo = [dt](double pos, const bool active[2], const double cmd[2], double rate) {
-    if (active[0] && active[1]) return follow(pos, (cmd[0] + cmd[1]) / 2, rate, dt);
-    if (active[0]) return follow(pos, cmd[0], rate, dt);
-    if (active[1]) return follow(pos, cmd[1], rate, dt);
+  // The hydraulic systems: pressurised from the first instant, as the engines run, until they fail.
+  for (int k = 0; k < 3; ++k) {
+    hydPressurised[k] = !failed(failures.hyd[k]);
+    hydPsi[k] = hydPressurised[k] ? 3000 : 0;
+  }
+  const bool green = hydPressurised[0], blue = hydPressurised[1], yellow = hydPressurised[2];
+  const bool aileronPower[2][2] = {{blue, green}, {green, blue}};
+  const bool elevatorPower[2][2] = {{blue, green}, {blue, yellow}};
+  const bool spoilerPower[5] = {green, yellow, blue, yellow, green};
+
+  auto servo = [dt](double pos, const bool active[2], const bool power[2], const double cmd[2], double rate) {
+    const bool first = active[0] && power[0], second = active[1] && power[1];
+    if (first && second) return follow(pos, (cmd[0] + cmd[1]) / 2, rate, dt);
+    if (first) return follow(pos, cmd[0], rate, dt);
+    if (second) return follow(pos, cmd[1], rate, dt);
     return follow(pos, 0.0, 5.0, dt);
   };
+  elevatorsWorking_ = 0;
   for (int side = 0; side < 2; ++side) {
-    surfaces.aileron[side] = servo(surfaces.aileron[side], o.aileronActive[side], o.aileron[side], 50);
-    surfaces.elevator[side] = servo(surfaces.elevator[side], o.elevatorActive[side], o.elevator[side], 40);
-    for (int k = 0; k < 5; ++k) surfaces.spoiler[side][k] = follow(surfaces.spoiler[side][k], o.spoiler[side][k], 40, dt);
+    const bool* active = o.elevatorActive[side];
+    if ((active[0] && elevatorPower[side][0]) || (active[1] && elevatorPower[side][1])) ++elevatorsWorking_;
+    surfaces.aileron[side] = servo(surfaces.aileron[side], o.aileronActive[side], aileronPower[side], o.aileron[side], 50);
+    surfaces.elevator[side] = servo(surfaces.elevator[side], o.elevatorActive[side], elevatorPower[side], o.elevator[side], 40);
+    for (int k = 0; k < 5; ++k) {
+      surfaces.spoiler[side][k] = follow(surfaces.spoiler[side][k], spoilerPower[k] ? o.spoiler[side][k] : 0.0, 40, dt);
+    }
   }
 
+  // The THS: the trim wheel, which has priority, or the motors the computers drive; through the green
+  // and yellow hydraulic motors, at half the rate with one. With neither it stays where it is.
   int thsMotors = 0;
   double thsCmd = 0;
   for (int m = 0; m < 3; ++m) {
@@ -498,10 +554,17 @@ void World::actuate(double dt, const Orders& o) {
       ++thsMotors;
     }
   }
-  if (thsMotors) surfaces.ths = follow(surfaces.ths, thsCmd / thsMotors, 1.0, dt);
+  const double thsShare = ((green ? 1 : 0) + (yellow ? 1 : 0)) / 2.0;
+  const double wheel = clamp(crew.pitchTrim, -1, 1);
+  if (wheel != 0) {
+    surfaces.ths = clamp(surfaces.ths - wheel * kTrimWheelDegS * thsShare * dt, kThsNoseUpDeg, kThsNoseDownDeg);
+  } else if (thsMotors) {
+    surfaces.ths = follow(surfaces.ths, thsCmd / thsMotors, 1.0 * thsShare, dt);
+  }
 
   for (int f = 0; f < 2; ++f) {
-    if (o.yawDamperActive[f]) surfaces.yawDamper = follow(surfaces.yawDamper, o.yawDamper[f], 25, dt);
+    const bool yawPower = f == 0 ? green : yellow;
+    if (o.yawDamperActive[f] && yawPower) surfaces.yawDamper = follow(surfaces.yawDamper, o.yawDamper[f], 25, dt);
     if (o.rudderTrimActive[f]) surfaces.rudderTrim = follow(surfaces.rudderTrim, o.rudderTrim[f], 1.5, dt);
     if (o.travelLimiterActive[f]) surfaces.travelLimiter = follow(surfaces.travelLimiter, o.travelLimiter[f], 3, dt);
   }
@@ -514,13 +577,7 @@ void World::actuate(double dt, const Orders& o) {
   // negative for right positive for left"). So in the computers' frame all three count the same way.
   const double rudder = clamp(crew.pedals * kRudderPedalDeg + surfaces.rudderTrim + surfaces.yawDamper,
                               -surfaces.travelLimiter, surfaces.travelLimiter);
-  surfaces.rudder = follow(surfaces.rudder, rudder, 40, dt);
-
-  // hydraulics stay pressurised: the engines run from the first instant
-  for (int k = 0; k < 3; ++k) {
-    hydPressurised[k] = true;
-    hydPsi[k] = 3000;
-  }
+  if (green || blue || yellow) surfaces.rudder = follow(surfaces.rudder, rudder, 40, dt);
 
   // Slats and flaps. Lever 1 is CONF 1+F below 100 kt and holds it to 210 kt; otherwise CONF 1.
   const int lever = std::max(0, std::min(4, crew.flapLever));
@@ -530,8 +587,11 @@ void World::actuate(double dt, const Orders& o) {
   } else {
     conf1F_ = false;
   }
-  slatFppu_ = follow(slatFppu_, kSlatFppu[lever], 11, dt);
-  flapFppu_ = follow(flapFppu_, lever == 1 && conf1F_ ? kFlap1FFppu : kFlapFppu[lever], 6, dt);
+  // Their power control units each have two hydraulic motors, slats green and blue, flaps green and
+  // yellow, and run at half speed on one; with neither, they stay where they are.
+  const double slatShare = ((green ? 1 : 0) + (blue ? 1 : 0)) / 2.0, flapShare = ((green ? 1 : 0) + (yellow ? 1 : 0)) / 2.0;
+  slatFppu_ = follow(slatFppu_, kSlatFppu[lever], 11 * slatShare, dt);
+  flapFppu_ = follow(flapFppu_, lever == 1 && conf1F_ ? kFlap1FFppu : kFlapFppu[lever], 6 * flapShare, dt);
   flapDeg_ = flapSurfaceDeg(flapFppu_);
 }
 
@@ -560,9 +620,9 @@ void World::sense() {
   const AirframeState& a = air();
   const unsigned airSsm = a.casKn < 30 ? kNcd : kNo;
 
-  const bool adrFailed = adrFailAt >= 0 && t_ >= adrFailAt;
-  for (auto& d : adr) {
-    if (adrFailed) {
+  for (int k = 0; k < 3; ++k) {
+    base_adr_bus& d = adr[k];
+    if (failed(failures.adr[k])) {
       d = base_adr_bus{};  // all-zero is FailureWarning on every word
       continue;
     }
@@ -577,7 +637,12 @@ void World::sense() {
     d.corrected_average_static_pressure = word(a.staticPressureHpa);
   }
 
-  for (auto& r : ir) {
+  for (int k = 0; k < 3; ++k) {
+    base_ir_bus& r = ir[k];
+    if (failed(failures.ir[k])) {
+      r = base_ir_bus{};  // all-zero is FailureWarning on every word
+      continue;
+    }
     r.latitude_deg = word(a.latitudeDeg);
     r.longitude_deg = word(a.longitudeDeg);
     r.ground_speed_kn = word(a.groundSpeedKn);

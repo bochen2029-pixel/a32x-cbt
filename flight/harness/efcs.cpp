@@ -6,6 +6,7 @@
 #include <cstring>
 
 #include "Arinc429Utils.h"
+#include "laws.h"
 
 Efcs& Efcs::instance() {
   static Efcs set;  // static storage: zero-filled before the constructor runs, as in MSFS
@@ -109,7 +110,7 @@ void Efcs::updateElac(const World& w, int i, double dt) {
   b.sec_2_bus = tx_.secBus[1];
   b.elac_opp_bus = tx_.elacBus[opp];
 
-  elacs_[i].update(dt, time_, false, true);
+  elacs_[i].update(dt, time_, w.failed(w.failures.elac[i]), true);  // the instructor's failure, as failuresConsumer's
   tx_.elacDiscrete[i] = elacs_[i].getDiscreteOutputs();
   tx_.elacAnalog[i] = elacs_[i].getAnalogOutputs();
   tx_.elacBus[i] = elacs_[i].getBusOutputs();
@@ -197,7 +198,7 @@ void Efcs::updateSec(const World& w, int i, double dt) {
   b.lgciu_1_bus = w.lgciu[0];
   b.lgciu_2_bus = w.lgciu[1];
 
-  secs_[i].update(dt, time_, false, true);
+  secs_[i].update(dt, time_, w.failed(w.failures.sec[i]), true);
   tx_.secDiscrete[i] = secs_[i].getDiscreteOutputs();
   tx_.secAnalog[i] = secs_[i].getAnalogOutputs();
   tx_.secBus[i] = secs_[i].getBusOutputs();
@@ -357,5 +358,8 @@ Orders Efcs::orders() const {
     o.travelLimiterActive[f] = tx_.facDiscrete[f].rudder_travel_lim_engaged;
     o.travelLimiter[f] = tx_.facAnalog[f].rudder_travel_limit_order_deg;
   }
+  // the law the cockpit shows, from FCDC 1, or FCDC 2 when FCDC 1 is not transmitting
+  const int fcdc = tx_.fcdcBus[0].efcs_status_word_1.SSM == static_cast<uint32_t>(Arinc429SignStatus::NormalOperation) ? 0 : 1;
+  o.pitchDirect = pitchLaw(tx_.fcdcBus[fcdc].efcs_status_word_1) == PitchLawState::Direct;
   return o;
 }

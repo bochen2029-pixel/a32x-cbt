@@ -24,8 +24,11 @@ extern "C" {
 int flight_start(const char* airframe, int scripted);
 
 // The same, from a scenario: "runway" (or empty) is flight_start's; "approach" starts in the air on the
-// runway's ILS. Options follow, separated by semicolons: runway=KDFW17C|LSZH14 for either; and for an
-// approach distance=NM (10), loc=DOTS (0), gs=DOTS (0), cas=KT (140), lever=0..4 (4, FULL),
+// runway's ILS. Options follow, separated by semicolons: runway=KDFW17C|LSZH14 for either;
+// fail=UNITS[@SECONDS][,...] for the instructor's failures (world.h, Failures), the units that fail
+// together joined by '+' (adr1-3, ir1-3, green, blue, yellow, elac1-2, sec1-3) and failing that many
+// seconds after the start, or from it: "fail=adr1+adr2+adr3@300,green@420"; and for an approach
+// distance=NM (10), loc=DOTS (0), gs=DOTS (0), cas=KT (140), lever=0..4 (4, FULL),
 // wind=FROM/KT (0/0), turbulence=SEVERITY (0) — in CONF and gear for the lever, trimmed. There the
 // scripted crew flies the ILS to a landing and a stop. "reference" is the start P6 and the airframe
 // scorer use: 47 N 8 E, sea level, heading 360. A scenario not understood returns -3.
