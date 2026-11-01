@@ -1395,6 +1395,39 @@ Found on the way: Node 24.16 on Windows corrupts its own heap (exit `0xC0000374`
 `Buffer` that starts at an odd offset, as `git cat-file --batch`'s blobs did; the release searches for
 UTF-16 paths byte by byte instead.
 
+## Ground idle and reverse thrust (P7, after 0.1.0)
+
+Neither airframe had either: our A320's one idle is Airbus's approach idle, and below idle was idle.
+fbw-parent gave the crew, the harness and the page to the P7 lane and the engine data to the airframe
+fit's; the harness and the page are built, and act only on an airframe whose file declares the data:
+`propulsion/fit/ground-idle`, the ground idle thrust's share of the rating; `propulsion/fit/reverse-efficiency`,
+the share of an engine's thrust its reverser turns forward; `propulsion/fit/reverse-max`, MAX REV's setting
+as the fraction of the way from idle to take-off thrust; and `propulsion/a320/ground-idle`, which the
+harness writes and the engine file weighs its idle thrust by. Until the fit declares them, nothing flies
+differently.
+
+- The thrust levers reach the A320's reverse range, `tla_1` and `tla_2` from −20 (MAX REV) to 45, with
+  reverse idle at −6, A32NX's own detents; the computers read the levers and see it.
+- Ground idle on the ground, approach idle in the air, coming in over 5 s as the engines spool. Ground
+  idle from the start, parked on the brakes; every measurement the scorer and the fitter make flies at
+  approach idle whatever start built the airframe (`80502e4`), so declaring ground idle leaves every
+  thrust row as it was — checked with the fit's planned numbers, where without that fix two idle rows
+  left their bands.
+- The reversers deploy only on the ground, with the engine running and its lever below idle, in 2 s; give
+  reverse idle until they are out; then reverse thrust to MAX REV, through JSBSim's direct thruster, its
+  thrust times the cosine of its reverser angle: +1 stowed, −efficiency deployed. The times are ours.
+- The state reports `ground_idle`, `reverser_1` and `reverser_2`.
+- The page: the reverse latches as a held control — Shift on the keyboard (Shift with PgDn pulls the
+  levers into reverse), D-pad up on a standard gamepad, a step in the mapping wizard. The levers go
+  behind idle only with the latches held, click into REV IDLE and MAX REV, and stop at idle coming
+  forward; a throttle axis spans the reverse range while they are held.
+
+New `ctest` cases on JSBSim's 737, which has no reversers: `without_reversers_below_idle_is_idle` and
+`without_reversers_nothing_deploys_in_flight`. The same test on our A320 proves the mechanics once the
+data is declared; checked with placeholder numbers in a throwaway copy, it does. The scripted crews' use
+of reverse on the landing roll — MAX REV at touchdown, reverse idle from 70 kt, idle by taxi speed —
+lands with the data, since it changes the flight.
+
 ## What P7 still has to build
 
 `ROADMAP.md` §4, *P7 in detail*: the gate — a hand-flown ILS, stable and repeatable, with its measures
