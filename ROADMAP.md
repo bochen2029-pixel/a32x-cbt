@@ -17,7 +17,8 @@ Last written: 2026-10-31, at P5 (packaging) — the tree was split into `app/` a
   ├─ tools\       build, serve, package (zip), measure, gate
   └─ situations\  one saved aircraft as a sample
 
-  flight\         GPLv3. The A32NX port contract and the headless ELAC proof. Not running yet.
+  flight\         GPLv3. The A32NX port contract, and the flight control computers running headless
+                  at 50 Hz against a stub world (P6). Nothing flies for real until P7.
   docs\           provenance, architecture, psx-notes\, conventions
   tools\          regen-psx-reference.md
   reference\      two screenshots
@@ -81,7 +82,7 @@ A phase is done when its gate passes, not when the code exists.
 | P3 | **Curriculum v1** — SOP flows, drills, measured steps | six drills grade end to end, each with a written aim | **passed** [M] |
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
-| P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | spike passed, harness pending |
+| P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
 | P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, performance, progress, DIR | one flight plan flies end to end | not started |
@@ -153,6 +154,26 @@ What the numbers say:
   list redrawn twenty times a second. If the reference laptop cannot hold 20 Hz, cutting systems
   will not recover much.
 
+### P6 in detail — the law harness
+
+Started 2026-11-01 on the operator's instruction, before P5's reference-machine box closed.
+
+- [x] A32NX `66021c2` compiled where it stands — ELAC 1–2, SEC 1–3, FAC 1–2, FCDC 1–2 and their laws,
+      unmodified, from a clone outside the repository (`flight/CMakeLists.txt`, `-DA32NX_DIR`)
+- [x] a world adapter in place of `FlyByWireInterface.cpp`: the driver's update functions line for
+      line, in its order, with its one-tick staleness (`flight/harness/efcs.cpp`)
+- [x] a stub world: sensors encoded as the A32NX producers encode them, servos that follow orders, a
+      small closed-loop airframe and a scripted crew flying circuits (`flight/harness/world.cpp`).
+      Not aerodynamics; no rudder or sideslip; the FMGC is a stub
+- [x] **the gate**: 90,000 ticks of 20 ms, 0 non-finite in 20,520,000 output values, all nine
+      computers healthy from 2.02 s to the end, normal law in pitch and roll for 100 % of 1,512 s of
+      settled flight. 1.0 s of wall time on MSVC 19.44; same verdicts on GCC 13.3. [M]
+- [x] eight `ctest` cases, two of them negative controls: a planted NaN is caught; all three ADRs
+      failed in flight take the laws to alternate 2
+
+Found on the way, in `flight/README.md`: the computers depend on zero-filled static storage; the
+driver reads one past a five-element array for SEC 2; elevator servos run reverted solenoid logic.
+
 ---
 
 ## 5 · The problems that decide it
@@ -209,8 +230,3 @@ Kill criteria, agreed in advance [B]:
 3. Grow content: the message set toward 60, the panel toward the full overhead.
 4. A scenario picker so a drill starts from a saved `.situ` rather than `setup.ts` code.
 5. Then P6 again, deliberately, with the harness and a 30-minute run as its gate.
-
-
-
-
-
