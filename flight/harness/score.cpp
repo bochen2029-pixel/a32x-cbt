@@ -11,6 +11,7 @@
 // trims it (airframe.h). The airframe flown: one circuit through the A32NX laws, with a full-stick roll
 // added in cruise, timed as the gate's circuit is.
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
