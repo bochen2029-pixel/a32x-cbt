@@ -629,6 +629,32 @@ From the thrust fit:
   fit, whose rows read only the engines, lands on the same eight numbers to the last printed digit on
   GCC as on MSVC, in 169 generations either way.
 
+From the view and the replays, 2026-11-01:
+
+- **A32NX's ARINC 429 words start as whatever the memory held** ([flybywiresim/aircraft#11007](https://github.com/flybywiresim/aircraft/issues/11007)).
+  `Arinc429DiscreteWord` and `Arinc429NumericWord` have empty constructors, so a word built anywhere but
+  in static storage starts with garbage: the bus the FCDC builds on the stack each tick
+  (`Fcdc::getBusOutputs`, `FcdcBus output = {};`) carried it in the bits the FCDC never sets, and
+  `setBit` converts that float to a `uint32_t`, undefined for garbage such as −1.46 (GCC's UBSan:
+  `Arinc429.cpp:100`). A scripted run and its replay run different code before the call, so under GCC
+  their FCDC buses differed from the ground check on: the touchdown was the same, the bytes not. MSVC
+  carried garbage there too, the same in every run. `harness/arinc429.cpp` now implements their
+  `Arinc429.h`, compiled in place of their `Arinc429.cpp`, with each word starting at zero — SSM
+  FailureWarning, data 0.0, as a word in static storage does — and everything else as theirs, bit for
+  bit; A32NX's files stay unmodified. The flight is unchanged; the digests, which hash every word the
+  computers transmit, move:
+
+  | digest, MSVC 19.44 | before | after |
+  |---|---|---|
+  | the A320's P6 gate, 30 min, the `reference` start | `8b900ac83924e845` | `b1937af96b0f1385` |
+  | the 737's P6 gate, 30 min, the `reference` start | `ae72d18431512654` | `76c7767895d921d4` |
+  | the 737's determinism case, 3 min | `79dd930cc06b6ef6` | `1b101f09cc662b7c` |
+
+  It brought GCC 13.3 to parity as well. GCC's plain build had replayed the 18-minute circuit to the
+  same touchdown but not the same bytes, even with the FCDC's bus alone built in zeroed storage
+  (0dd0b59); with every word starting at zero it gives the same bytes, so some other word was built off
+  leftover memory too. GCC now passes every case with either airframe, as MSVC does.
+
 ## The browser simulator (P7, steps 5 to 8)
 
 The same flight, in a browser, from `file://`, with a joystick and a view out of the window.
@@ -665,9 +691,15 @@ is the fallback (H lists the keys): arrows, Z X rudder, PgUp PgDn thrust levers 
 detents, R F flaps, G gear, B brakes, P parking brake, S speedbrake, A ground spoilers, T Y U RUD TRIM and
 its RESET. The takeover pushbutton is mapped; with no autopilot until P9 it disconnects nothing.
 
-**The view.** three.js, drawn as a 1980s full-flight simulator drew it: fields, haze, the runway the
-flight core names (below) with its paint and lights, an approach light line, a PAPI that reads the eye's
-angle, a few buildings, dusk, night or day. Over it, until P8 draws a PFD: a conformal horizon and pitch
+**The view.** three.js, drawn as a 1980s full-flight simulator drew it: fields, haze, dusk, night or
+day, and the airport the flight is at, around the runway the flight core names (below). KDFW is drawn
+whole from `web/data/kdfw.json`, validated on load: its seven runways where OurAirports puts them, with
+the FAA's precision markings and lights — threshold stripes by width, touchdown zone, aiming point,
+edge lights turning yellow and centreline lights red and white toward the end, ALSF-2 with its
+sequenced flashers and a PAPI on each arrival end, set to the core's glide — a generic parallel taxiway
+each, and its five terminals, central ramps and three towers where the FAA's airport diagram draws them
+(`docs/provenance.md` §1f). Every light is one point whose colour, beam and flash the GPU decides from
+the eye; a runway no airport file holds is drawn as an airport of one. Over it, until P8 draws a PFD: a conformal horizon and pitch
 ladder, the flight path, speed, altitude, V/S, radio height, heading, flaps, gear, and the ILS's
 localizer and glideslope scales.
 
@@ -680,30 +712,40 @@ As measured, 2026-11-01, headless Chrome at 1440 × 900, with the desktop's CPU 
 | a frame on the GPU (RTX 4070 Ti) | 6.9 ms median, 13.9 ms p99 | 77 % mean |
 | a frame in software (SwiftShader), the default there: no antialiasing | 33 ms median (30 fps), 67 ms p99; the flight holds real time | 77 % mean |
 | the same with antialiasing | 67 ms median | 77 % mean |
+| a frame with KDFW drawn, lined up on 17C: on the GPU, on WARP, on SwiftShader | 7.4, 15.4 and 33.3 ms median: the floor as before | 64 % mean |
+| the same 2.5 nm out on its approach, on WARP and on SwiftShader | 15.2 and 16.7 ms median | 64 % mean |
 
-`web/tools/measure.mjs [--software]` repeats the frame measurements. The 2014 reference laptop has not
+`web/tools/measure.mjs [--software | --warp]` repeats the frame measurements; WARP is what Chrome on
+Windows now falls back to with no usable GPU. The 2014 reference laptop has not
 been measured.
 
 The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach_the_controls`,
-`the_view_puts_the_eye_and_the_papi_right`, and in the WebAssembly build `the_browser_module_flies` —
+`the_view_puts_the_eye_where_the_flight_is`, `kdfw_is_laid_out_as_ourairports_and_the_faa_have_it`, and
+in the WebAssembly build `the_browser_module_flies` —
 the very file the page loads, in node: the scripted crew lands it at the native build's touchdown to the
-printed digit (A320: 1076.66 s, −152.4 fpm), and its inputs replayed into a second instance give the same
+printed digit (the A320 from KDFW 17C: 1,023.84 s, −143.5 fpm), and its inputs replayed into a second instance give the same
 state on every tick. The suite's count is in the next section.
 
-## A runway, its ILS and the wind (P7, step 2)
+## Runways, the ILS and the wind (P7, step 2)
 
-**The runway** is a real one: Zurich's runway 14, from OurAirports (`harness/runway.cpp`,
-`docs/provenance.md` §1f), at its place on the earth, its elevation, its heading of 137° true, its
-3,300 m and its displaced threshold. **The ILS** on it is a textbook one, to ICAO's geometry: a 3° glide
+**The runways** are real ones. KDFW, Dallas/Fort Worth International, is the main airport by the
+operator's decision (`ROADMAP.md` §9), and every flight starts there unless it asks otherwise: on the
+gear on runway 17C, lined up 150 m past its threshold, or on 17C's ILS. 17C comes from OurAirports
+(`harness/runway.cpp`, `docs/provenance.md` §1f): 13,400 × 150 ft, 180.3° true, 562 ft at both ends —
+level, which the flat terrain here needs, and the runway DFW lands on in its usual south flow. Zurich's
+runway 14, where step 2 began, stays as an alternative (`runway=LSZH14`). P6's start, 47 N 8 E at sea
+level, stays as the `reference` scenario, and the airframe scorer measures there, so no fitted number
+moves with the airport. **The ILS** on a runway is a textbook one, to ICAO's geometry: a 3° glide
 crossing the threshold at 50 ft; full scale, two dots, 107 m either side of the centreline at the
 threshold and 0.24 of the glide's angle above and below it. Readings take the earth's curve out. A
 beam's deviation is where it lies from the aircraft, + right and + up, so flying toward the diamond
 centres it.
 
 **An approach start** puts the aircraft on it, in the air, trimmed by JSBSim, in CONF FULL with the gear
-down: `law_harness --scenario "approach;distance=10;loc=0;gs=0;cas=140;wind=227/15;turbulence=0"`, the
-page's `?scenario=` and the C API's `flight_start_scenario` all take the same text. The wind is steady,
-from a true direction; turbulence is JSBSim's Tustin model at a MIL-F-8785C severity, from a fixed seed.
+down: `law_harness --scenario "approach;distance=10;loc=0;gs=0;cas=140;wind=270/15;turbulence=0"`, with
+`runway=LSZH14` for Zurich; the page's `?scenario=` and the C API's `flight_start_scenario` take the same
+text. The wind is steady, from a true direction; turbulence is JSBSim's Tustin model at a MIL-F-8785C
+severity, from a fixed seed.
 
 **The scripted crew** flies it from 10 nm to a stop, raw data: the beams' deviations read as metres
 with the distance, the track closing on the centreline over 20 s and the flight path on the glide over
@@ -711,30 +753,37 @@ with the distance, the track closing on the centreline over 20 s and the flight 
 crab out with rudder in the last 15 ft. `--expect ils` judges it by the bands a hand-flown ILS will be
 judged by (`ROADMAP.md`, P7), each band's worst printed with where it happened. Every start passes with
 either airframe, and by 1,000 ft every start has converged, so the stabilised window reads the same
-whatever the start:
+whatever the start. On KDFW 17C, the A320 on its fitted engines:
 
 | airframe | starts | worst LOC, G/S | worst sink | speed | touchdown | off the centreline | sink at touchdown |
 |---|---|---|---|---|---|---|---|
-| A320 | on the beams; a dot left, right, low, high; 10 kt fast, slow | 0.01, 0.03 dots | 756 fpm | 140.0 kt | 330–331 m | +0.5 m | 147–151 fpm |
-| A320 | 15 kt crosswind from the left, from the right | 0.01, 0.03 dots | 752 fpm | 140.0 kt | 317 m | +0.5 m | 236–240 fpm |
-| 737 | on the beams; a dot left, right, low, high; 10 kt fast, slow | 0.01, 0.04 dots | 756 fpm | 140.0 kt | 364–365 m | +0.5 m | 80–85 fpm |
-| 737 | 15 kt crosswind from the left, from the right | 0.01, 0.04 dots | 752 fpm | 140.0 kt | 357–359 m | −0.1 to +1.0 m | 95–104 fpm |
+| A320 | on the beams; a dot left, right, low, high; 10 kt fast, slow | 0.01, 0.02 dots | 747 fpm | 140.0 kt | 328–329 m | +0.4 m | 155–158 fpm |
+| A320 | 15 kt crosswind from 090, from 270 | 0.01, 0.02 dots | 743 fpm | 140.0 kt | 316 m | +0.3 to +0.4 m | 243 fpm |
+| 737 | on the beams; a dot left, right, low, high; 10 kt fast, slow | 0.01, 0.05 dots | 747 fpm | 140.0 kt | 360–361 m | +0.3 m | 90–94 fpm |
+| 737 | 15 kt crosswind from 090, from 270 | 0.01, 0.05 dots | 743 fpm | 140.0 kt | 354–355 m | −0.2 to +0.8 m | 111 fpm |
 
-In light turbulence the gusts take a crew this simple past the stabilised bands by a little: the sink
-rate past 1,000 fpm for a moment, the A320's touchdown to 296 m, the 737 5.8 kt slow. How far depends on
-the last bit of the arithmetic — the WebAssembly build's A320 touches down at 351 fpm where MSVC's does at
-197 — so the turbulence case asks what holds on every compiler: the gusts are felt, and the landing is
-inside the A320's hard-landing limits. The hand-flown gate is the operator's, and may be flown in calm air.
+At LSZH 14 in a 15 kt crosswind from 227°: the A320 317 m and 240 fpm, the 737 357 m and 104 fpm.
 
-The page flies the same approaches: `index.html?scenario=approach` (add `&crew=script` to watch), the
-runway drawn where it is from the core's `rwy_` state, the diamonds on the overlay. The browser's own
+**In light turbulence the crew is not robust.** From 18 starts per airframe at 17C (wind 250 to 290°,
+11 to 19 kt, 9.5 to 10.5 nm), 10 of each broke a landing limit and 4 (A320) and 6 (737) landed hard; in
+still air all 36 landed well. Which gusts a run meets is the standard library's: JSBSim draws them from
+`std::default_random_engine` and `std::normal_distribution`, whose algorithms MSVC's library, libstdc++
+and libc++ choose differently, so one seed flies different gusts on each (found by the thrust fit's
+session; it is not, as this section said before, the last bit of the arithmetic). So
+`ils_in_light_turbulence_reaches_the_runway` asks what holds on every start and every library: the gusts
+are felt — the load factor strays 0.12 to 0.28 g from one on the approach, where still air leaves it at
+0.00 and the case fails — normal law holds, and the aircraft touches down on the runway; its touchdown is
+printed, not judged. The hand-flown gate is the operator's, and may be flown in calm air.
+
+The page flies the same approaches: `index.html?scenario=approach` (add `&crew=script` to watch), with
+the airport drawn around the runway the core names and the diamonds on the overlay. The browser's own
 module lands the scripted crew in a 15 kt crosswind at the native build's touchdown, to the metre.
 
 New `ctest` cases: `ils_on_the_beams`, `ils_a_dot_off_the_localizer`, `ils_a_dot_low` (an approach start
 reads the beams where it asked, holds hands off); nine `ils_flown_` cases (the crew, judged by the
-bands); `ils_in_light_turbulence_lands_inside_the_hard_landing_limits`;
-`ils_approach_replays_to_the_same_touchdown`. Thirty-seven native cases pass with either airframe, MSVC
-19.44; thirty-four under node, the WebAssembly build leaving out the three that start processes.
+bands); `ils_in_light_turbulence_reaches_the_runway`; `ils_approach_replays_to_the_same_touchdown`.
+Thirty-eight native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; thirty-five under node,
+the WebAssembly build leaving out the three that start processes.
 
 ## What P7 still has to build
 

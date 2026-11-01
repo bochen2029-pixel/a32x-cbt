@@ -7,8 +7,10 @@ Last written: 2026-11-01, at P7. The flyable simulator is now the product (§3, 
 trainer still ships on its own, MIT (P5's zip). P7's slice 1 flies the A32NX computers on an A320
 of ours, fitted to 57 cited targets, its aerodynamics and its engines, headless from takeoff to landing
 (§4, P7). The browser track (steps 5–8) is done: the same flight in a browser from `file://`, a
-joystick, a view. So is step 2: Zurich's runway 14 and an ILS on it, wind and turbulence, the scripted
-crew flying the ILS inside every band. So is the thrust fit; steps 3, 4 and the gate are next.
+joystick, a view. So is step 2: real runways and an ILS on them, wind and turbulence, the scripted crew
+flying the ILS inside every band. Every flight starts at KDFW, the main airport by the operator's word
+(§9), and the view draws it whole: seven runways, terminals, ramps and towers. So is the thrust fit;
+steps 3, 4 and the gate are next.
 
 ---
 
@@ -266,17 +268,21 @@ Blob worker, a tick at 79 to 117 µs; a joystick mapped from the pilot's hands, 
 the view at 30 fps in software rendering, 1440 × 900. Numbers and their desktop load in
 `flight/README.md`. Not done in them: the 2014 laptop.
 
-Step 2 is done [M]: LSZH runway 14 from OurAirports at its place and elevation, an ILS to ICAO's
-geometry on it (3°, 50 ft over the threshold), steady wind and Tustin turbulence from JSBSim's
-atmosphere, and an approach start, trimmed, in the harness, the C API and the page. The scripted crew
-flies raw-data ILS from 10 nm to a stop, from the beams, a dot left, right, low and high, 10 kt fast and
-slow, and in a 15 kt crosswind from either side, inside every band below, with either airframe (A320
-touching down 317 to 331 m past the threshold on its fitted engines, the 737 357 to 365 m, within a
-metre of the centreline). In light turbulence it stays inside the A320's hard-landing limits but strays
-past the stabilised bands by a little — a sink past 1,000 fpm for a moment, a touchdown at 296 m — by
-a margin that depends on the compiler; `flight/README.md` has the numbers. A recorded approach replays
-to the same bytes. One finding on the way: JSBSim's initial condition and its dynamics take the wind
-with opposite signs, so the wind is set after the trim.
+Step 2 is done [M]: real runways from OurAirports at their places and elevations — KDFW 17C, where
+every flight starts by the operator's word (§9), and LSZH 14 as an alternative — an ILS to ICAO's geometry
+on each (3°, 50 ft over the threshold), steady wind and Tustin turbulence from JSBSim's atmosphere, and
+an approach start, trimmed, in the harness, the C API and the page. The scripted crew flies raw-data ILS
+from 10 nm to a stop, from the beams, a dot left, right, low and high, 10 kt fast and slow, and in a
+15 kt crosswind from either side, inside every band below, with either airframe (at KDFW 17C the A320
+on its fitted engines touches down 316 to 329 m past the threshold, the 737 354 to 361 m, within a
+metre of the centreline). In light turbulence it is not robust: from 18 perturbed starts per airframe,
+10 broke a landing limit, so that case asks only that the gusts are felt, normal law holds and the
+aircraft touches down on the runway; which gusts a run meets is the standard library's random number
+generator's, different on each compiler. A recorded approach replays to the same bytes, on MSVC, GCC and
+in the browser, since A32NX's ARINC 429 words start at zero here (flybywiresim/aircraft#11007). The
+view draws KDFW whole, its terminals and towers from the FAA's airport diagram. One finding on the way:
+JSBSim's initial condition and its dynamics take the wind with opposite signs, so the wind is set after
+the trim.
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
@@ -530,6 +536,20 @@ guidance, a real path through the world — with the CBT's procedures and scorin
 - [ ] **A 3D debrief in the manner of ACMI/Tacview**: the flown trail coloured by the gate's bands, a
       timeline and an event log, built on the deterministic replay (house rule 7). Relayed the same
       day by the same session. Not scheduled; it extends the P7 gate's debrief.
+- [x] **KDFW is the main airport, and where the simulator starts.** From the operator, 2026-11-01, in
+      their words: *"kdfw should be the main airport, In Microsoft Flight Simulator, it always started
+      in like this airport in Seattle, because that's where Microsoft was based. ... It should be Dallas
+      Fort Worth International Airport. That should be the main focus, and that should also where
+      default starts."* And of the look: *"from artistic and everything else perspective, should focus
+      on Dallas-Fort Worth."* So the default start — the harness's, the C API's and the browser page's —
+      is on KDFW runway 17C, lined up, and the default ILS approach is 17C's: level at 562 ft from end
+      to end, which the flat terrain needs, and the runway DFW lands on in its usual south flow
+      (OurAirports; `docs/provenance.md` §1f). The view draws the whole airport: its seven runways
+      where they are, with the FAA's markings and lights, and its five terminals, central ramps and
+      three towers where the FAA's airport diagram draws them. LSZH 14 stays as an
+      alternative (`runway=LSZH14`). P6's sea-level start stays as the `reference` scenario, and the
+      airframe scorer measures from it, so fitted numbers do not move with the airport. Scenery and
+      visual work model DFW and the Dallas skyline first.
 
 What that implies, for whoever plans P7: the computers and JSBSim reach the browser as WebAssembly
 (the A32NX computers are already built for wasm in MSFS); Three.js (MIT) and the Gamepad API are
