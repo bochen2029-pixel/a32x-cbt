@@ -6,7 +6,10 @@
  *   judge_test hands-off  nobody flies it: the trimmed aircraft drifts off the beams and never flares;
  *                         the judge says what broke, the hard touchdown among it, and once the test has
  *                         stopped it, that the approach was NOT STABLE
- *   judge_test runway     a runway start: there is no approach to judge */
+ *   judge_test runway     a runway start: there is no approach to judge
+ *   judge_test short      the scripted crew from 3.5 nm, where the window opens before the FAC's VLS has
+ *                         settled: no Vapp until it has, then VLS + 5 and final; the in-band slot leaves
+ *                         speed out until then, so the crew holds every band at every step; STABLE */
 
 #include <math.h>
 #include <stdio.h>
@@ -41,14 +44,15 @@ static int input(const char* name) {
 int main(int argc, char** argv) {
   const char* mode = argc > 1 ? argv[1] : "";
   const int scripted = strcmp(mode, "scripted") == 0, handsOff = strcmp(mode, "hands-off") == 0;
-  const int runway = strcmp(mode, "runway") == 0;
-  if (!scripted && !handsOff && !runway) {
-    fprintf(stderr, "judge_test scripted | hands-off | runway\n");
+  const int runway = strcmp(mode, "runway") == 0, shortStart = strcmp(mode, "short") == 0;
+  if (!scripted && !handsOff && !runway && !shortStart) {
+    fprintf(stderr, "judge_test scripted | hands-off | runway | short\n");
     return 2;
   }
   const char* airframe = getenv("FLIGHT_AIRFRAME");
   const int a737 = airframe && strcmp(airframe, "737") == 0;
-  if (flight_start_scenario(NULL, scripted, runway ? "runway" : "approach") != 0) {
+  const char* scenario = runway ? "runway" : shortStart ? "approach;distance=3.5" : "approach";
+  if (flight_start_scenario(NULL, scripted || shortStart, scenario) != 0) {
     printf("FAILED: the scenario did not start\n");
     return 1;
   }
@@ -70,6 +74,9 @@ int main(int argc, char** argv) {
   int entered = 0, left = 0;
   double vappAtEntry = NAN, vlsAtEntry = NAN, touchdownM = NAN;
   int touchedDown = 0;
+  /* the short start: when Vapp came, against the VLS then, and whether it ever moved after */
+  double enteredAt = NAN, vappAt = NAN, vappFirst = NAN, vlsAtVapp = NAN, floorUntil = NAN;
+  int vappMoved = 0;
   const double* s = flight_state();
   for (int tick = 0; tick < 6 * 60 * 50; ++tick) {
     if (handsOff && s[field("on_ground")] == 1) {  /* the test stops it on the runway: idle, brakes */
@@ -79,12 +86,22 @@ int main(int argc, char** argv) {
     }
     flight_step(1);
     s = flight_state();
+    const double vapp = s[field("vapp_kn")], vls = s[field("vls_kn")];
+    if (!isnan(vapp) && isnan(vappFirst)) {
+      vappFirst = vapp;
+      vappAt = s[field("t_s")];
+      vlsAtVapp = vls;
+    } else if (!isnan(vappFirst) && vapp != vappFirst) {
+      vappMoved = 1;
+    }
+    if (isnan(vappFirst) && !isnan(vls) && vls <= 116.2) floorUntil = s[field("t_s")];  /* before Vapp came */
     const double window = s[field("judge_window")];
     if (window == 1) {
       if (!entered) {
         entered = 1;
-        vappAtEntry = s[field("vapp_kn")];
-        vlsAtEntry = s[field("vls_kn")];
+        enteredAt = s[field("t_s")];
+        vappAtEntry = vapp;
+        vlsAtEntry = vls;
       }
       ++windowTicks;
       if (s[field("judge_in_bands")] != 1) ++outOfBands;
@@ -101,6 +118,26 @@ int main(int argc, char** argv) {
   printf("%s", debrief);
 
   check(entered && left, "the stabilised window was entered and left", (double)windowTicks / 50);
+  if (shortStart) {
+    printf("  the window opened at %.2f s; Vapp came at %.2f s, %.2f kt, the VLS then %.2f kt\n", enteredAt, vappAt,
+           vappFirst, vlsAtVapp);
+    if (a737) {
+      check(vappFirst == 140 && vappAt < 0.1 && !vappMoved, "on the 737, Vapp is the scripted crew's 140 kt from the start",
+            vappFirst);
+    } else {
+      printf("  the FAC's VLS sat on its 116 kt floor until %.2f s\n", floorUntil);
+      check(vappAt >= floorUntil + 3, "no Vapp until 3 s after the FAC's VLS left its 116 kt floor", vappAt);
+      check(enteredAt < vappAt, "the window opened before the FAC's VLS had settled", enteredAt);
+      check(fabs(vappFirst - (vlsAtVapp + 5)) < 1e-9 && vlsAtVapp > 120, "then Vapp is the settled VLS + 5 kt", vappFirst);
+      check(!vappMoved, "and final from there: the window had opened", vappFirst);
+    }
+    check(outOfBands == 0, "the in-band slot left speed out until then, and the crew held every band at every step",
+          (double)outOfBands);
+    check(s[field("judge_stable")] == 1, "stopped, the verdict is STABLE", s[field("judge_stable")]);
+    check(strstr(debrief, "pass  speed within Vapp") != NULL, "the speed band too, against the final Vapp", 0);
+    printf("%s\n", failures ? "FAILED" : "PASSED");
+    return failures ? 1 : 0;
+  }
   if (a737) {
     check(vappAtEntry == 140, "on the 737, whose FAC computes an A320's speeds, Vapp is the scripted crew's 140 kt", vappAtEntry);
   } else {

@@ -23,6 +23,12 @@ std::string worst(const Worst& w, const char* unit) {
 constexpr double kMPerFt = 0.3048;
 constexpr double kWindowTopFt = 1000, kWindowBottomFt = 50;  // the stabilised window, above the threshold
 constexpr double kScriptedVappKn = 140;                      // the scripted crew's (World::approachSpeedKn)
+// When the FAC's VLS has settled (ApproachJudge::vappKn): held within kVlsHeldKn for kVlsSettleS, or for
+// kVlsFloorSettleS on A32NX's floor (FacComputer_P.Vmcl_Value, 116 kt), where it sits while the FAC ramps
+// its VS1g factor up from nothing at 0.1 a second (RateLimiterGenericVariableTs): 12.8 s at most, to the
+// clean configuration's 1.28. Measured from every approach start: no VLS for 10.0 s, the floor to 18.9 s,
+// the ramp to 20.9 s, settled at 23.9 s.
+constexpr double kVlsHeldKn = 0.2, kVlsSettleS = 3, kVlsFloorKn = 116, kVlsFloorSettleS = 13;
 
 // the FAC's VLS: FAC 1's, or FAC 2's when FAC 1 is not transmitting it; NaN when neither is
 double facVls(const Transmitted& tx) {
@@ -39,21 +45,46 @@ void ApproachJudge::begin(const World& w) {
   active_ = w.ilsApproach();
   halfWidthM_ = w.runway().widthM / 2;
   runwayName_ = w.runway().name;
-  vappKn_ = kScriptedVappKn;  // until the FAC transmits a VLS
+  if (!Airframe::facSpeedsAreItsOwn()) {  // the FAC's speeds are an A320's: the scripted crew's, throughout
+    vappKn_ = kScriptedVappKn;
+    vappFinal_ = true;
+  }
+}
+
+// The FAC's VLS, until Vapp is final: whether it has settled, and Vapp from it once it has.
+void ApproachJudge::readVls(double t) {
+  if (std::isnan(vlsKn_)) {
+    vlsHeldSince_ = NAN;
+    return;
+  }
+  lastVlsKn_ = vlsKn_;
+  if (std::isnan(vlsHeldSince_) || std::max(vlsHeldHigh_, vlsKn_) - std::min(vlsHeldLow_, vlsKn_) > kVlsHeldKn) {
+    vlsHeldSince_ = t;  // a new span
+    vlsHeldLow_ = vlsHeldHigh_ = vlsKn_;
+  } else {
+    vlsHeldLow_ = std::min(vlsHeldLow_, vlsKn_);
+    vlsHeldHigh_ = std::max(vlsHeldHigh_, vlsKn_);
+  }
+  const double held = t - vlsHeldSince_;
+  if (held >= kVlsSettleS && (vlsKn_ > kVlsFloorKn + kVlsHeldKn || held >= kVlsFloorSettleS)) vlsSettled_ = true;
+  if (vlsSettled_) {  // settled once, it is followed until Vapp is final
+    vappKn_ = vlsKn_ + 5;
+    vappFromFac_ = true;
+  }
+}
+
+void ApproachJudge::finalVapp() {
+  vappFinal_ = true;  // the settled VLS + 5 as it stands; if it never settled, none
 }
 
 void ApproachJudge::observe(const World& w, const Transmitted& tx) {
   if (!seen_) begin(w);
-  // the approach speed: read until the window is entered, kept from there
-  vlsKn_ = facVls(tx);
-  if (!vappKept_) {
-    vappFromFac_ = Airframe::facSpeedsAreItsOwn() && !std::isnan(vlsKn_);
-    vappKn_ = vappFromFac_ ? vlsKn_ + 5 : kScriptedVappKn;
-  }
-
   const bool onGround = w.onGround();
   const double t = now_ = w.time();
   const IlsReading ils = w.ils();
+
+  vlsKn_ = facVls(tx);
+  if (!vappFinal_) readVls(t);
 
   // a touchdown: the gear compressed where a step before it was not; its sink rate the last airborne
   // step's, its attitude and speed at contact, its load factor the peak over the next two seconds
@@ -87,22 +118,28 @@ void ApproachJudge::observe(const World& w, const Transmitted& tx) {
   const double ft = ils.heightM / kMPerFt;
   if (touchdowns_ == 0 && !onGround && ft <= kWindowTopFt && ft >= kWindowBottomFt) {
     inWindow_ = true;
-    vappKept_ = true;
+    if (!vappFinal_ && vlsSettled_) finalVapp();  // in the window, a settled Vapp is kept from here
     ++windowTicks_;
     const double loc = std::abs(ils.locDots), gs = std::abs(ils.gsDots), sink = -w.verticalSpeedFpm();
-    const double bank = std::abs(w.rollDeg()), fast = w.casKn() - vappKn_, slow = vappKn_ - w.casKn();
+    const double bank = std::abs(w.rollDeg()), cas = w.casKn();
     loc_.add(loc, ft);
     gs_.add(gs, ft);
     sink_.add(sink, ft);
     bank_.add(bank, ft);
     loadDev_.add(std::abs(w.loadFactor() - 1), ft);
-    fast_.add(fast, ft);
-    slow_.add(slow, ft);
+    // the speed is held to Vapp from the moment it is known: here, in the in-band slot and in the verdict
+    // alike, so that the trail, the log and the verdict agree
+    if (vappFinal_) {
+      casHigh_.add(cas, ft);
+      casLow_.add(-cas, ft);
+    }
     const bool configured = w.crew.flapLever == 4 && w.flapDeg() > 39.5 && w.airframeState().gearPosition >= 0.999;
     if (!configured && std::isnan(unconfiguredAtFt_)) unconfiguredAtFt_ = ft;
-    inBands_ = loc <= 1 && gs <= 1 && sink < 1000 && configured && fast <= 10 && slow <= 5 && bank <= 7;
+    const bool speed = !vappFinal_ || (cas - vappKn_ <= 10 && vappKn_ - cas <= 5);
+    inBands_ = loc <= 1 && gs <= 1 && sink < 1000 && configured && speed && bank <= 7;
   }
   if (touchdowns_ > 0) windowOver_ = true;
+  if (!vappFinal_ && (windowOver_ || finished())) finalVapp();  // the window over: Vapp as it stands
 
   // the rollout, from the step after the touchdown until the aircraft stops
   if (touchdowns_ > 0 && !touchedThisStep_ && w.groundSpeedKn() > 1) rolloutOffM_.add(std::abs(ils.rightM), -ils.alongM);
@@ -125,9 +162,26 @@ std::vector<Band> ApproachJudge::verdict() const {
   band("gear down and CONF FULL from 1,000 ft", windowJudged, std::isnan(unconfiguredAtFt_) && windowTicks_ > 0,
        std::isnan(unconfiguredAtFt_) ? std::string(windowTicks_ > 0 ? "throughout" : "never measured")
                                      : fmt("not at %.0f ft", unconfiguredAtFt_));
-  band("speed within Vapp -5/+10 kt", windowJudged, fast_.value <= 10 && slow_.value <= 5,
-       fmt("Vapp %.0f kt", vappKn_) + (vappFromFac_ ? fmt(" (VLS %.0f + 5)", vappKn_ - 5) : std::string(" (the scripted crew's)")) +
-           fmt("; %+.1f to ", -slow_.value) + fmt("%+.1f kt", fast_.value));
+  // the speed band: the fastest and slowest in the window from the moment Vapp was known, against it
+  const double fast = casHigh_.value - vappKn_, slow = vappKn_ + casLow_.value;
+  std::string speed;
+  if (!vappFinal_) {
+    speed = std::isnan(vlsKn_) ? std::string("Vapp to come: the FAC transmits no VLS yet")
+                               : fmt("Vapp to come: the FAC's VLS, %.0f kt, has not settled", vlsKn_);
+  } else if (std::isnan(casHigh_.value)) {  // no step of the window was flown with a Vapp to hold
+    if (windowTicks_ == 0) {
+      speed = "never measured";
+    } else if (vlsSettled_) {
+      speed = fmt("no Vapp in the window: the FAC's VLS settled only after it, at %.0f kt", lastVlsKn_);
+    } else {
+      speed = std::isnan(lastVlsKn_) ? std::string("no Vapp in the window: the FAC transmitted no VLS")
+                                     : fmt("no Vapp in the window: the FAC's VLS, %.0f kt at the last, had not settled", lastVlsKn_);
+    }
+  } else {
+    speed = fmt("Vapp %.0f kt", vappKn_) + (vappFromFac_ ? fmt(" (VLS %.0f + 5)", vappKn_ - 5) : std::string(" (the scripted crew's)")) +
+            fmt("; %+.1f to ", -slow) + fmt("%+.1f kt", fast);
+  }
+  band("speed within Vapp -5/+10 kt", windowJudged, fast <= 10 && slow <= 5, speed);
   band("bank within 7 deg", windowJudged, bank_.value <= 7, worst(bank_, "deg"));
   const Touchdown& l = touchdown_;
   band("a landing", touchdownJudged, landed, fmt("%.0f touchdowns", touchdowns_));

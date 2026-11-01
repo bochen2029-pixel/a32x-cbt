@@ -243,6 +243,9 @@ add_test(NAME ils_a_dot_low COMMAND ils_test "approach$<SEMICOLON>distance=8$<SE
 add_test(NAME the_judge_finds_the_scripted_approach_stable COMMAND judge_test scripted)
 add_test(NAME the_judge_finds_an_unflared_approach_not_stable COMMAND judge_test hands-off)
 add_test(NAME the_judge_has_nothing_to_judge_on_the_runway COMMAND judge_test runway)
+# From 3.5 nm the window opens before the FAC's VLS has settled: the judge waits for it before it fixes
+# Vapp, and leaves speed out of the in-band slot until then.
+add_test(NAME the_judge_waits_for_the_fac_s_vls_on_a_short_approach COMMAND judge_test short)
 
 # The scripted crew flies KDFW 17C's ILS from 10 nm to a stop, judged by the hand-flown ILS's bands
 # (ROADMAP.md, P7): on the beams, a dot off each of them either way, 10 kt fast and slow, a 15 kt
