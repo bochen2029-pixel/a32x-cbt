@@ -143,6 +143,19 @@ The fit is `flight/harness/fit.cpp`: CMA-ES as Hansen's tutorial sets it (arXiv:
 here, scored by `airframe_score` on the fit rows of §1d only. The method is the tutorial's; the code
 is ours.
 
+### 1f · The runway and its ILS
+
+`flight/harness/runway.cpp` is ours, GPLv3. Its numbers, and where they come from:
+
+| source | licence | what is taken |
+|---|---|---|
+| OurAirports, `runways.csv` (davidmegginson.github.io/ourairports-data), retrieved 2026-11-01 | public domain | LSZH (Zurich) runway 14: its end at 47.483101 N 8.53473 E, 1,402 ft, 137° true, 10,827 × 197 ft, the threshold displaced 492 ft. Six numbers copied by value into the source and cited there; no file is copied |
+| ICAO Annex 10, Volume I (Radio Navigation Aids) | — | the ILS's geometry, as a method: the localizer's displacement sensitivity (full scale 107 m either side at the threshold), the glide path's (0.24 of its angle), its coverage; the localizer's antenna 300 m past the stop end, a typical siting. Implemented here, not copied |
+| this project | — | the 3° glide path and 50 ft threshold crossing height (LSZH's published ILS is not used); two dots for full scale, as the A320's PFD draws it; the scripted crew; the bands it is judged by (`ROADMAP.md`, P7) |
+
+The runway is real, and so is its place on the earth; the ILS on it is a textbook one. Nothing here is
+fit for navigation.
+
 ---
 
 ## 2 · Third-party dependencies
