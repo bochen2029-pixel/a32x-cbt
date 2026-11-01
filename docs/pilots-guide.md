@@ -206,8 +206,8 @@ sink, the beams and the bank. **,** and **.** step a second (with Shift, ten), *
 flight's own pace, and clicking a moment in the panel, the touchdown say, takes you there. **LIVE**, at
 the bar's right end, follows the flight again.
 
-![The debrief (K) after the stop: the aircraft's outline at the end of its rollout, the path behind
-it, the moments tagged.](guide/debrief.jpg)
+![The debrief (K) after the stop, its playhead held at the touchdown: the aircraft in cyan where it
+touched down, the moment lit in the panel, and the timeline along the foot.](guide/debrief.jpg)
 
 # Saving a flight, and handing it in
 
