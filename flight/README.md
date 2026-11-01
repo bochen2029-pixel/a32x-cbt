@@ -460,12 +460,74 @@ From the A320 fit:
 - **The scripted flare is sensitive.** Of 72 settings swept for the crew, nine landed the A320 inside
   the limits, and a setting that lands one airframe well can leave the other touching down flat. The crew is a test fixture; a hand-flown ILS (P7's gate) will judge landings properly.
 
+## The browser simulator (P7, steps 5 to 8)
+
+The same flight, in a browser, from `file://`, with a joystick and a view out of the window.
+
+**The flight core** (`harness/core.h`) is the step loop behind a small C API: `flight_start`,
+`flight_inputs`, `flight_step`, `flight_state`. Slots are found by name (`flight_input_name`,
+`flight_state_name`), so a JavaScript caller cannot drift from the C side. The scripted crew is one input
+source; an outside crew — a recording, a person — is another. One flight per process or per WebAssembly
+instance, because the computers rely on zero-filled static storage. `law_harness` steps through the same
+core, byte for byte as before. `--record` and `--replay` write and fly a crew recording;
+`replay_reaches_the_same_touchdown` proves a replay gives the same bytes from every computer.
+
+**WebAssembly.** Emscripten 6.0.12 (`docs/provenance.md` §2b) builds the same CMake project:
+
+```
+emcmake cmake -S flight -B flight/build-wasm -G Ninja -DCMAKE_BUILD_TYPE=Release -DA32NX_DIR=<clone> -DJSBSIM_DIR=<clone>
+cmake --build flight/build-wasm && ctest --test-dir flight/build-wasm
+```
+
+The test programs run under node on the real file system; three cases that start processes of their own
+stay native. `flight_core.js` is the browser's module: the core and every file it reads, one JavaScript
+file with the WebAssembly inside, 2.14 MB. Built in WSL's Ubuntu 24.04 in 67 s from scratch.
+
+**The page** (`web/`): `npm install` there, then `node tools/build.mjs --core <flight_core.js>` writes
+`flight/build-web/` — `index.html`, `flight.js`, `core.js` — and nothing else; it is not a package. Open
+`index.html`: no server, no network. `?airframe=737`, `?crew=script` (watch the scripted crew),
+`?time=night|day`, `?bench=MINUTES` (a tick's cost, flat out). The worker is made from a Blob of
+`core.js`; the page steps it at 50 Hz on a fixed-step clock under the display's rate, paying back up to
+five steps a frame and dropping the rest, counted.
+
+**Hands.** A joystick or gamepad through the Gamepad API; a standard gamepad flies out of the box, any
+other device is mapped from the pilot's own hands (M) and calibrated (C), both kept per device. The keyboard
+is the fallback (H lists the keys): arrows, Z X rudder, PgUp PgDn thrust levers with CL, MCT and TOGA
+detents, R F flaps, G gear, B brakes, P parking brake, S speedbrake, A ground spoilers, T Y U RUD TRIM and
+its RESET. The takeover pushbutton is mapped; with no autopilot until P9 it disconnects nothing.
+
+**The view.** three.js, drawn as a 1980s full-flight simulator drew it: fields, haze, a 3,000 m runway with
+its paint and lights, an approach light line, a PAPI that reads the eye's angle, a few buildings, dusk,
+night or day. Over it, until P8 draws a PFD: a conformal horizon and pitch ladder, the flight path,
+speed, altitude, V/S, radio height, heading, flaps, gear, and ILS scales that stay empty until step 2.
+The runway is drawn at the start; the scripted crew lands wherever its path meets the ground, which step 2
+moves onto the runway.
+
+As measured, 2026-11-01, headless Chrome at 1440 × 900, with the desktop's CPU sampled each second:
+
+| what | result | desktop CPU |
+|---|---|---|
+| a tick in the page's worker, flat out | 117 µs, 171 × real time (79 to 117 µs over runs) | 65 % mean |
+| 25 s in real time, from `file://` | all steps but those of the first frame | 65 % mean |
+| a frame on the GPU (RTX 4070 Ti) | 6.9 ms median, 13.9 ms p99 | 77 % mean |
+| a frame in software (SwiftShader), the default there: no antialiasing | 33 ms median (30 fps), 67 ms p99; the flight holds real time | 77 % mean |
+| the same with antialiasing | 67 ms median | 77 % mean |
+
+`web/tools/measure.mjs [--software]` repeats the frame measurements. The 2014 reference laptop has not
+been measured.
+
+The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach_the_controls`,
+`the_view_puts_the_eye_and_the_papi_right`, and in the WebAssembly build `the_browser_module_flies` —
+the very file the page loads, in node: the scripted crew lands it at the native build's touchdown to the
+printed digit (A320: 1042.12 s, −143.2 fpm), and its inputs replayed into a second instance give the same
+state on every tick. Twenty-three native cases pass with either airframe; under node, all but the three
+that start processes.
+
 ## What P7 still has to build
 
 `ROADMAP.md` §4, *P7 in detail*: a runway, an ILS and wind in the world; failures and the laws they
-reach; the protections exercised; the flight core as a library; WebAssembly; the joystick and the
-browser loop; a Three.js view; and the gate — a hand-flown ILS, stable and repeatable, with its
-measures and bands written down. Our fitted A320 flies all of it from here; the next fit is thrust
+reach; the protections exercised; and the gate — a hand-flown ILS, stable and repeatable, with its
+measures and bands written down. The browser steps (5 to 8) are above. Our fitted A320 flies all of it from here; the next fit is thrust
 ([above](#the-swap-made-2026-11-01)).
 
 ## What is here

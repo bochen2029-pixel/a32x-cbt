@@ -6,7 +6,8 @@ installer. This document is the plan and the honest state of it.
 Last written: 2026-11-01, at P7. The flyable simulator is now the product (§3, §9); the systems
 trainer still ships on its own, MIT (P5's zip). P7's slice 1 flies the A32NX computers on an A320
 of ours, fitted to 33 cited targets, headless from takeoff to landing (§4, P7). The browser track
-(steps 5–8) and the thrust fit are under way.
+(steps 5–8) is done: the same flight in a browser from `file://`, a joystick, a view. The thrust
+fit is under way; steps 2–4 and the gate are next.
 
 ---
 
@@ -98,7 +99,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 33 A320 targets where the 737 it replaced is inside 8 [M]; the rest is planned below, not started |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 33 A320 targets where the 737 it replaced is inside 8 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; steps 2–4 and the gate not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -250,6 +251,15 @@ row in the table above is still the hand-flown ILS unless the operator widens it
 | 7 | Joystick and the loop | the Gamepad API: sidestick pitch and roll, rudder on a twist or pedals, a throttle axis with CL, MCT and TOGA detents, buttons for takeover, brakes, speedbrake, flaps and gear; per-device mapping, deadzones and calibration kept between sessions; keyboard only as fallback; fixed 50 Hz steps under a display-rate loop that drops debt rather than stretch a step |
 | 8 | The view | Three.js (MIT), bundled with the page rather than fetched: runway with edge, centreline and approach lights, horizon, ground, a few buildings, dusk and night, from the pilot's eyepoint; a minimal overlay — speed, altitude, attitude, localizer and glideslope dots, flaps, gear — until P8 draws a PFD; frame time measured under software rendering |
 | 9 | **the gate** | a hand-flown ILS, judged as below |
+
+Steps 5 to 8 are done, in the order the operator chose (*"continue"*, 2026-11-01: the browser first,
+because WebAssembly carried the most risk of a redesign and a stick in the hands comes soonest) [M]: the
+flight core as a C API whose replays give the same bytes; Emscripten 6.0.12 building it, the module
+landing the scripted crew at the native touchdown to the printed digit; the page from `file://` in a
+Blob worker, a tick at 79 to 117 µs; a joystick mapped from the pilot's hands, the keyboard as fallback;
+the view at 30 fps in software rendering, 1440 × 900. Numbers and their desktop load in
+`flight/README.md`. Not done in them: the 2014 laptop, and an ILS for the overlay's empty scales
+(step 2).
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
