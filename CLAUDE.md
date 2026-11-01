@@ -19,8 +19,12 @@ npm run test:all      # must be green before any commit
 npm run serve         # http://127.0.0.1:8130
 ```
 
-`app/` has one dev dependency (TypeScript). Everything else is Node built-ins and the browser. Do not
-add runtime dependencies without a reason in the commit message.
+`app/` has two dev dependencies, TypeScript and esbuild, both build-only. Everything else is Node
+built-ins and the browser. Do not add runtime dependencies without a reason in the commit message.
+
+`flight/` builds with CMake against clones of A32NX and JSBSim kept outside the repository, read-only;
+`flight/README.md` says how. Its `ctest` suite must be green, with either airframe, before a commit
+that touches it.
 
 ## 1 · The dictionary is the only state
 
@@ -90,6 +94,10 @@ variable is a startup error, not something to find in play. Silent success is th
 ## 10 · Scope fences
 
 - `app/` links **no** A32NX code. Keep it free of GPL obligations.
-- `flight/` is GPLv3 and does. Do not move code across that line casually.
-- P5 ships before P6 starts. A half-built flight model with four drills is not a product.
+- `flight/` is GPLv3 and does. Do not move code across that line casually. The flyable artefact may
+  carry `app/`'s MIT code; `app/` never imports from `flight/` (`ROADMAP.md` §4, P7: packaging).
+- Phases start on the operator's word, in `ROADMAP.md`'s order, and finish at their gates: half-built
+  is not a product. Until 2026-11-01 this rule read "P5 ships before P6 starts"; the operator started
+  P6 and P7 before P5's reference-laptop box closed, and made the flyable simulator the product
+  (`ROADMAP.md` §3).
 - Never claim type-rating fidelity. `docs/provenance.md` §3 has the wording.
