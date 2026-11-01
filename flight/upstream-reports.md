@@ -1,14 +1,21 @@
-# Reports for FlyByWire A32NX — drafted, not posted
+# Reports for FlyByWire A32NX — posted
 
-Two defects found in the A32NX sources while running its flight control computers outside MSFS.
-Both are drafted below as issues for `flybywiresim/aircraft`.
+Two defects found in the A32NX sources while running its flight control computers outside MSFS,
+filed as issues on `flybywiresim/aircraft`.
 
-**Status: not posted.** Posting puts them on GitHub under the operator's account, so it waits for
-the operator's yes on this text. Checked on 2026-11-01: `master` of `flybywiresim/aircraft` was
+**Status: posted 2026-11-01** on the operator's word (*"post them"*), under their account, with
+the text below unchanged:
+[#11005](https://github.com/flybywiresim/aircraft/issues/11005) (§1) and
+[#11006](https://github.com/flybywiresim/aircraft/issues/11006) (§2). Filed through the API with
+`gh`: the repository turns blank issues off and asks for its bug-report form, which is built for
+reports from the simulator (simulator version, the EFB's build info, steps in the sim). These were
+found in source, outside MSFS, so they went as written. Checked on 2026-11-01: `master` of `flybywiresim/aircraft` was
 `66021c24448c44399a8ff569eb14715b6b26558e`, the commit this project pins, so both defects are in
 current code. Searches of the repository's issues and pull requests for `idLeftSpoilerPosition`,
 "spoiler position out of bounds", "NXSpeeds VLS", "NXSpeeds stall speed", "VS1G CONF 1+F" and "VLS
-CONF 3 wrong" found nothing about either.
+CONF 3 wrong" found nothing about either, and again just before posting, for `idLeftSpoilerPosition`,
+"NXSpeeds" and "updateSec spoiler": two unrelated hits (#4432, an S-speed display mismatch; #2889, a
+CONF 3 landing feature).
 
 ---
 

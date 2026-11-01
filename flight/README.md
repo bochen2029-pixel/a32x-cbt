@@ -387,7 +387,8 @@ From P6:
   the set in one function-local static for the same reason; a set built on the stack runs on garbage.
 - **The driver reads past an array.** For SEC 2, `updateSec` reads `idLeftSpoilerPosition[5]` and
   `idRightSpoilerPosition[5]` (`FlyByWireInterface.cpp` `:1592-1595`) from five-element arrays. SEC 2
-  drives one spoiler pair; the adapter feeds zero there. Worth reporting upstream.
+  drives one spoiler pair; the adapter feeds zero there. Reported upstream as
+  [flybywiresim/aircraft#11005](https://github.com/flybywiresim/aircraft/issues/11005).
 - **Elevator servos run reverted solenoid logic** (`a320_systems/src/hydraulic/mod.rs`,
   `elevator_actuator_mode_from_solenoid`): de-energised is position control. A computer's "damping
   mode" output energises the *other* servo, so it reads as "I am active".
@@ -429,7 +430,8 @@ From P7's first slice:
   `117 + 0.8 + (m - 65)` and `121 + 0.8 + (m - 70)` where every neighbouring bracket multiplies — 1.8 kt
   high at 70 and 75 t, with steps at the bracket edges; CONF 3's VLS writes `151 + m - 65` in the
   75–80 t bracket — 10 kt high across it. `targets/a320-speeds.csv` corrects the three points and says
-  so. Worth reporting upstream.
+  so. Reported upstream as
+  [flybywiresim/aircraft#11006](https://github.com/flybywiresim/aircraft/issues/11006).
 - **JSBSim's trim searches alpha up to 20° unless the aircraft sets limits**, and the 737 sets none.
   Past the 737's 13.25° lift peak the search loses solutions it straddles: clean trims below about
   185 kt failed until `Airframe::trim` held the search to the attached-flow side, by setting
