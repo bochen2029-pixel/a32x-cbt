@@ -80,7 +80,7 @@ A phase is done when its gate passes, not when the code exists.
 | P2 | **Content as data** — panels, messages, pages in JSON | content loads, validates, and is refused when broken; one copy serves both runtimes | **passed** [M] |
 | P3 | **Curriculum v1** — SOP flows, drills, measured steps | six drills grade end to end, each with a written aim | **passed** [M] |
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
-| P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — runs without Node; needs reference-machine numbers and a zip |
+| P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | spike passed, harness pending |
 | P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
@@ -90,12 +90,68 @@ A phase is done when its gate passes, not when the code exists.
 ### P5 in detail — the shipping gate
 
 - [x] `git init`, trainer/flight split, `.gitignore` for `node_modules`, build output, assets
-- [ ] licence notices: A32NX attribution not required for A (no code linked) but JSBSim's is
-- [x] the disclaimer, permanent: *unofficial, not affiliated with Airbus, not for type training*
+- [x] licence notices: the zip carries `LICENSE` (MIT) and `README.txt` — the disclaimer, the
+      attribution for the PSX design study, trademarks. A owes no A32NX or JSBSim notice: the bundle
+      holds only `src/` and `web/data/` modules plus esbuild's three-line class-field helper, and
+      JSBSim arrives with `flight/` at P7
+- [x] the disclaimer, permanent: *unofficial, not affiliated with Airbus, not for type training* — in
+      `README.md`, in the zip's `README.txt`, and on the page under the status line
 - [x] a build that needs no Node: one bundled `web/app.js`, content inlined, double-click `index.html`
-      — verified opening from `file://` in headless Chrome
+      — verified opening from `file://` in headless Chrome. Until `9d04fb0` it stopped at 0 s on 9 of
+      12 cold loads under software rendering: a frame stamped before startup finished handed the
+      clock a negative interval, and the refusal killed the frame loop
+- [x] a zip: `npm run package` → `dist/a32x-cbt.zip`, about 25 KB — `index.html`, `app.js`, `data/`,
+      `LICENSE`, `README.txt`. Explicit file list, notices checked, same files → same bytes
+- [x] the zip gate: `npm run gate` unzips with the operating system's `tar.exe` into `%TEMP%`, outside
+      the repository, and opens `index.html` from `file://` with the network off. **Passed
+      2026-11-01 UTC** in Chrome 148 and Edge 156, software and default rendering, 19 loads: every
+      request inside the folder (the page reads `index.html` and `app.js`, nothing else), nothing
+      thrown, time moving, a real click answered. The same gate failed 2 of 4 loads on the pre-fix zip
 - [ ] measured on the reference machine: 20 Hz held, cold start under 1 s, scenario reset under 20 ms
-- [ ] a README a stranger can follow in one screen
+      — **not done: no 2014 laptop was available.** Measured on a dev desktop instead, below
+- [ ] a README a stranger can follow in one screen — the draft is the zip's `README.txt`, 36 lines;
+      no stranger has tried it yet
+
+#### P5 measurements — a dev desktop, not the reference machine
+
+`npm run measure` at `19df65a`, 2026-11-01 UTC: the page from `file://` in headless Chrome 148.0.7778.98
+with software rendering, watched from outside — nothing is built into `app.js`. Each cold start is a
+fresh browser on a fresh profile. Machine: Intel Core i9-9900K (8 cores, 16 threads, 3.6 GHz),
+64 GB, Windows 11 Pro 10.0.26100, desktop. It was shared with other work throughout: total CPU,
+sampled each second, averaged 76 % during the 1× run and 60–62 % during the others, browser
+included. 3× and 6× are DevTools CPU throttling — a stand-in for slower CPUs, not a measurement of
+any laptop. Each cell is median / worst; **bold** misses the target.
+
+| measure | target | 1× | 3× | 6× |
+|---|---|---|---|---|
+| cold start: navigation → first frame drawn, 10 runs | < 1 s | 125 / 232 ms | 287 / 441 ms | 718 / **1,274 ms** |
+| reset, Power up — setup runs 0 steps; 20 resets each | < 20 ms | 1.9 / 3.7 ms | 4.5 / 7.5 ms | 9.2 / **20.2 ms** |
+| reset, Before start — 0 steps | < 20 ms | 1.8 / **29.4 ms** | 2.7 / 7.1 ms | 9.2 / **36.8 ms** |
+| reset, Start ENG 1 — 400 steps (APU start) | < 20 ms | 4.7 / 17.0 ms | 10.6 / **36.6 ms** | **27.5 / 57.1 ms** |
+| reset, BLUE pump failure — 400 steps | < 20 ms | 4.7 / 12.5 ms | 12.1 / **27.3 ms** | **26.8 / 89.9 ms** |
+| reset, After start — 1,458 steps (APU and both engines) | < 20 ms | 11.7 / **24.3 ms** | **28.2 / 46.6 ms** | **69.0 / 96.1 ms** |
+| reset, Packs fail in cruise — 1,458 steps | < 20 ms | 12.0 / **24.0 ms** | **26.1 / 52.9 ms** | **70.9 / 137.5 ms** |
+| tick rate, 60 s on Packs fail in cruise: steps per wall second | 20 | 20.001 | 20.001 | **19.789** |
+| — frame gaps over 250 ms, each dropping simulated time | 0 | 0 | 0 | **9** |
+| — main thread busy (of which script) | — | 9.0 % (2.0 %) | 27.2 % (6.4 %) | 70.3 % (18.7 %) |
+
+A reset is the drill button's handler: a new session, the drill's setup, a repaint. An earlier 1×
+run at 58 % background load read cold start 97 / 122 ms and every reset within 20 ms (worst
+12.1 ms). Browser spawn to first frame, which includes Chrome starting on a new profile, was 794 ms
+median at 1× — context, not a target.
+
+What the numbers say:
+
+- On this desktop all three targets hold at the median. Three drills had a worst reset of 24–29 ms,
+  in the run during which the machine averaged 76 % busy.
+- Reset cost follows the setup, which runs the model forward synchronously before the first paint.
+  At 3× the engine drills take 26–28 ms at the median; at 6×, about 70 ms. Starting a drill from a
+  parked `.situ` (§8, action 4) would skip that run.
+- 20 Hz holds at 3×. At 6× the page drops 1 % of simulated time in nine stalls. Script — the model
+  and the paint code together — is about a quarter of the main thread's busy time at every speed;
+  the rest is the browser's own style, layout, paint and raster work, for a panel, ECAM and step
+  list redrawn twenty times a second. If the reference laptop cannot hold 20 Hz, cutting systems
+  will not recover much.
 
 ---
 
