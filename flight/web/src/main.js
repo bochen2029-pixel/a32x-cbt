@@ -15,7 +15,7 @@ import { Flight } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { runwayFromState } from './scene-math.js';
-import { softwareRendering, View } from './view.js';
+import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
 
 const params = new URLSearchParams(location.search);
 const airframe = params.get('airframe') || '';
@@ -27,11 +27,26 @@ const bench = { ticks: 0, ms: 0, wallMs: 0, done: benchTicks <= 0 };
 const hud = document.getElementById('hud');
 const status = document.getElementById('status');
 // Antialiasing doubles the cost of a frame drawn in software; on a GPU it is nearly free. aa=0|1 decides.
+// The view's tier: the floor where the CPU draws, the GPU tier elsewhere; tier=low|high decides, and
+// hour= sets the GPU tier's solar hour (time= names one: dawn, day, golden, dusk, night).
 const software = softwareRendering();
 const view = new View(document.getElementById('view'), params.get('time') || 'dusk',
-                      params.has('aa') ? params.get('aa') !== '0' : !software, { software });
+                      params.has('aa') ? params.get('aa') !== '0' : !software,
+                      { software, tier: params.get('tier'), hour: params.has('hour') ? Number(params.get('hour')) : null });
 let drawn = '';          // the airport the view drew, and the runway end the flight is on
-const overlay = new Overlay(document.getElementById('overlay'));
+const overlayCanvas = document.getElementById('overlay');
+const overlay = new Overlay(overlayCanvas);
+
+// The view's own keys, beside the hands' (hands.js uses none of these): cameras, the hour, the debrief.
+window.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.altKey || e.metaKey || !view.body) return;
+  if (/^[0-9]$/.test(e.key)) view.setCamera(CAMERAS[(Number(e.key) + 9) % 10]);
+  else if (e.key === 'v' || e.key === 'V') view.nextCamera();
+  else if (e.key === '[') view.moveHour(-0.25);
+  else if (e.key === ']') view.moveHour(0.25);
+  else if (e.key === 'k' || e.key === 'K') view.setDebrief(!view.debriefOn);
+  else if (e.key === 'l' || e.key === 'L') view.setTrail(!view.trailOn);
+});
 function resize() {
   const ratio = Math.min(2, window.devicePixelRatio || 1);
   view.resize(window.innerWidth, window.innerHeight);
@@ -105,6 +120,8 @@ function report() {
     view: {
       renderer: view.rendererName(),
       software,
+      tier: view.floor ? 'low' : 'high',
+      camera: view.mode,
       antialias: view.renderer.getContextAttributes().antialias,
       eye: view.camera.position.toArray().map((v) => +v.toFixed(2)),
       drawn: { calls: view.renderer.info.render.calls, triangles: view.renderer.info.render.triangles, points: view.renderer.info.render.points },
@@ -146,10 +163,10 @@ function show() {
       `${c.parkingBrake ? 'PARK BRK  ' : ''}${c.toeBrakes ? 'BRAKES  ' : ''}${c.speedbrake ? 'SPD BRK  ' : ''}` +
       `${c.spoilersArmed ? 'GND SPLR ARM  ' : ''}${c.rudderTrim ? `RUD TRIM ${c.rudderTrim > 0 ? 'L' : 'R'}  ` : ''}` +
       `${c.takeover ? 'TAKEOVER (no autopilot yet)' : ''}\n`) +
-    `${hands.prompt()}` + (hands.help ? `\n\n${KEY_HELP.join('\n')}` : '');
+    `${hands.prompt()}` + (hands.help ? `\n\n${[...KEY_HELP, ...VIEW_KEYS].join('\n')}` : '');
   const r = report();
   const cls = r.stepsDropped ? 'warn' : '';
-  status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n` +
+  status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n${view.describe()}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
     `<span class="${cls}">${r.stepsDropped} steps dropped</span>`;
 }
@@ -183,13 +200,15 @@ function frame(now) {
   }
   if (latest) {
     const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));
-    view.update(s.lat_deg, s.lon_deg, s.ra_ft, s.pitch_deg, s.roll_deg, s.heading_deg, s.t_s);
+    view.update(s, realMs / 1000);
     const t0 = performance.now();
     view.render();
     keep(renderMs, performance.now() - t0);
     if (realMs > 0) keep(frameMs, realMs);
+    // the overlay's symbols are conformal to the pilot's eye: drawn there only
+    overlayCanvas.style.visibility = view.overlayShown ? '' : 'hidden';
     const ils = s.loc_valid || s.gs_valid ? { loc: s.loc_valid ? s.loc_dots : null, gs: s.gs_valid ? s.gs_dots : null } : null;
-    overlay.draw(s, view.camera.fov, controls, ils);
+    if (view.overlayShown) overlay.draw(s, view.camera.fov, controls, ils);
   }
   show();
   if (!error) requestAnimationFrame(frame);
@@ -204,7 +223,14 @@ flight.start(airframe, scripted, scenario).then((ready) => {
   inputs = Float64Array.from(ready.inputs);  // the core's own start: FLT CTL pushbuttons pressed
   controls = controlsFromInputs(inputs, flight.input);
   try {
-    drawn = view.setRunway(runwayFromState(Object.fromEntries(flight.stateNames.map((n, i) => [n, ready.state[i]]))));
+    const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, ready.state[i]]));
+    drawn = view.setRunway(runwayFromState(s));
+    if (params.has('cam')) view.setCamera(params.get('cam'));
+    // the first frame's cost (shaders, the airport's geometry and textures) paid here, before the clock
+    // runs, not out of the flight's first steps
+    view.update(s, 0);   // its first update warms the view: View.warm
+    if (params.get('trail') === '1') view.setTrail(true);
+    if (params.get('debrief') === '1') view.setDebrief(true);
   } catch (e) {
     // a bad airport file stops the page, said where it can be seen (CLAUDE.md, 9)
     error = `the airport could not be drawn: ${e.message}`;

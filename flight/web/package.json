@@ -6,7 +6,7 @@
   "description": "The flyable simulator's page: the flight core in a worker, a joystick, a 1980s full-flight-sim view (P7)",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

@@ -1,0 +1,278 @@
+{
+ "name": "A320 for the out-the-window view",
+ "sources": {
+  "points": "flight/jsbsim/aircraft/A320-fit/A320-fit.xml, this project's own (GPLv3): the CG, EYEPOINT, gear contacts, thrusters and tail bumper, in its structural inches; test/visuals.test.mjs checks they still match",
+  "outline": "Airbus's published A320 outline (length 37.57 m, span 35.80 m with sharklets, fuselage 3.95 x 4.14 m, height 11.76 m) and photographs, shaped by eye; the flight deck windows after Wikimedia Commons photographs EZY_nose_close_up.jpg (CC BY 3.0) and N682TA Airbus A320 TACA Nose (CC BY-SA 3.0), used as reference only, nothing of them copied",
+  "livery": "this project's own house livery: no airline's marks"
+ },
+ "fromAirframeFile": {
+  "file": "flight/jsbsim/aircraft/A320-fit/A320-fit.xml",
+  "unit": "IN",
+  "cg": [
+   663.2,
+   0,
+   -40
+  ],
+  "eye": [
+   100,
+   -20,
+   50
+  ],
+  "noseGear": [
+   199,
+   0,
+   -138
+  ],
+  "mainGear": [
+   697,
+   149.4,
+   -142
+  ],
+  "engine": [
+   560,
+   226,
+   -85
+  ],
+  "tailBumper": [
+   1185,
+   0,
+   -41
+  ],
+  "aeroRef": [
+   655,
+   0,
+   -40
+  ],
+  "spanFt": 117.454
+ },
+ "outline": {
+  "lengthM": 37.57,
+  "fuselage": [
+   [
+    0,
+    -0.55,
+    -0.55,
+    0
+   ],
+   [
+    0.08,
+    -0.25,
+    -0.88,
+    0.34
+   ],
+   [
+    0.25,
+    0.04,
+    -1.15,
+    0.62
+   ],
+   [
+    0.6,
+    0.36,
+    -1.45,
+    0.95
+   ],
+   [
+    1.1,
+    0.66,
+    -1.72,
+    1.26
+   ],
+   [
+    1.5,
+    0.85,
+    -1.86,
+    1.45
+   ],
+   [
+    1.75,
+    0.98,
+    -1.92,
+    1.55
+   ],
+   [
+    2,
+    1.24,
+    -1.96,
+    1.64
+   ],
+   [
+    2.25,
+    1.48,
+    -1.99,
+    1.71
+   ],
+   [
+    2.6,
+    1.7,
+    -2.02,
+    1.79
+   ],
+   [
+    3.2,
+    1.88,
+    -2.05,
+    1.89
+   ],
+   [
+    4.2,
+    2.02,
+    -2.07,
+    1.955
+   ],
+   [
+    5.5,
+    2.07,
+    -2.07,
+    1.975
+   ],
+   [
+    24,
+    2.07,
+    -2.07,
+    1.975
+   ],
+   [
+    26.5,
+    2.05,
+    -1.8,
+    1.9
+   ],
+   [
+    29,
+    1.98,
+    -1.3,
+    1.7
+   ],
+   [
+    31,
+    1.88,
+    -0.85,
+    1.42
+   ],
+   [
+    33,
+    1.75,
+    -0.35,
+    1.08
+   ],
+   [
+    35,
+    1.58,
+    0.15,
+    0.7
+   ],
+   [
+    36.6,
+    1.45,
+    0.55,
+    0.36
+   ],
+   [
+    37.57,
+    1.25,
+    0.85,
+    0.12
+   ]
+  ],
+  "wing": {
+   "rootY": 1.6,
+   "kinkY": 6.3,
+   "tipY": 17.05,
+   "rootLE": 13,
+   "rootChord": 6.6,
+   "tipChord": 1.6,
+   "sweepLE": 27.5,
+   "dihedral": 5.1,
+   "rootZ": -1.25,
+   "thickness": [
+    0.15,
+    0.125,
+    0.108
+   ],
+   "washout": -2.5,
+   "flap": [
+    0.05,
+    0.7
+   ],
+   "aileron": [
+    0.74,
+    0.95
+   ],
+   "chordHinge": 0.74,
+   "spoilers": [
+    [
+     0.13,
+     0.25
+    ],
+    [
+     0.25,
+     0.37
+    ],
+    [
+     0.37,
+     0.49
+    ],
+    [
+     0.49,
+     0.61
+    ],
+    [
+     0.61,
+     0.73
+    ]
+   ],
+   "sharklet": {
+    "height": 2.43,
+    "cant": 12,
+    "chordRoot": 1.45,
+    "chordTip": 0.42,
+    "sweep": 38
+   }
+  },
+  "tailplane": {
+   "rootY": 0.6,
+   "tipY": 6.22,
+   "rootLE": 31.3,
+   "rootChord": 3.9,
+   "tipChord": 1.3,
+   "sweepLE": 32,
+   "dihedral": 6,
+   "z": 0.55,
+   "hinge": 0.7,
+   "pivot": 0.55
+  },
+  "fin": {
+   "rootZ": 1.75,
+   "tipZ": 8.15,
+   "rootLE": 28.6,
+   "rootChord": 5.9,
+   "tipChord": 1.95,
+   "sweepLE": 40,
+   "hinge": 0.68
+  },
+  "nacelle": {
+   "lip": 11.75,
+   "length": 4.95,
+   "maxRadius": 1.06,
+   "fanRadius": 0.865
+  },
+  "wheels": {
+   "main": 0.585,
+   "nose": 0.38,
+   "mainTrack": 0.46,
+   "noseTrack": 0.23
+  }
+ },
+ "livery": {
+  "base": "#f4f5f6",
+  "belly": "#b9bec4",
+  "line1": "#14284b",
+  "line2": "#1aa3a8",
+  "tail": "#14284b",
+  "tailMark": "#1aa3a8",
+  "cowl": "#14284b",
+  "title": "A32X",
+  "titleColour": "#14284b"
+ }
+}

@@ -5,6 +5,7 @@
 // the visuals study's KDFW mockup (fbw-desktop, 2026-11-01). GPLv3.
 
 import * as THREE from 'three';
+import { CURVE_GLSL, HAZE_GLSL } from './haze.js';
 
 // A fitting: where it is, what colour it shows in front of its axis and behind it (null: nothing), how
 // wide its beam is, its size in pixels, and how it flashes ([period s, phase s, on fraction]).
@@ -115,3 +116,91 @@ export function lightMaterial({ halo = 3, visibilityM = 30000, gain = 1, pixelRa
     toneMapped: false,
   });
 }
+
+// The GPU tier's material for the same fittings (view.js): each light dimmed by the atmosphere's own
+// transmittance (haze.js) rather than a fixed visibility, a PAPI lamp's colour chosen by the eye's
+// angle where the fitting carries one, and the logarithmic depth the GPU tier draws with.
+export function hazedLightMaterial(uniforms, { curve = true } = {}) {
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      ...uniforms,
+      uTime: uniforms.uTime || { value: 0 },
+      uPixelRatio: uniforms.uPixelRatio || { value: 1 },
+      uLightGain: uniforms.uLightGain || { value: 1 },
+      uHalo: uniforms.uHalo || { value: 3 },
+    },
+    vertexShader: /* glsl */ `
+      #include <common>
+      attribute vec3 colour;
+      attribute vec3 colourBack;
+      attribute vec3 axis;
+      attribute vec2 beam;
+      attribute float size;
+      attribute vec3 flash;
+      attribute float papi;
+      uniform float uTime;
+      uniform float uPixelRatio;
+      uniform float uLightGain;
+      uniform float uHalo;
+      varying vec3 vColour;
+      varying float vCore;
+      ${CURVE_GLSL}
+      ${HAZE_GLSL}
+      #include <logdepthbuf_pars_vertex>
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        ${curve ? 'w = curved(w);' : ''}
+        vec3 toEye = cameraPosition - w.xyz;
+        float d = max(length(toEye), 0.5);
+        vec3 e = toEye / d;
+        vec3 c = colour;
+        float k = 1.0;
+        if (dot(axis, axis) > 0.0) {
+          vec3 ax = normalize(mat3(modelMatrix) * axis);
+          float ca = dot(e, ax);
+          c = ca >= 0.0 ? colour : colourBack;
+          k = smoothstep(beam.y, beam.x, abs(ca));
+        }
+        if (papi > 0.0) {
+          float elev = degrees(asin(clamp(e.y, -1.0, 1.0)));
+          c = mix(vec3(1.0, 0.07, 0.05), vec3(1.0, 0.96, 0.88), smoothstep(papi - 0.04, papi + 0.04, elev));
+        }
+        if (flash.x > 0.0) {
+          float ph = fract((uTime - flash.y) / flash.x);
+          k *= ph < flash.z ? 1.0 : 0.0;
+        }
+        vec3 T = hazeTransmittance(w.xyz);
+        vColour = c * k * T * uLightGain;
+        float px = size * uPixelRatio * clamp(pow(900.0 / d, 0.35), 0.6, 2.4);
+        vCore = px;
+        // the sprite carries the halo too: three cores wide, or less where every pixel is the CPU's
+        gl_PointSize = max(px * uHalo, 1.0);
+        vec4 mv = viewMatrix * w;
+        gl_Position = projectionMatrix * mv;
+        #include <logdepthbuf_vertex>
+      }`,
+    fragmentShader: /* glsl */ `
+      #include <common>
+      varying vec3 vColour;
+      varying float vCore;
+      uniform float uHalo;
+      #include <logdepthbuf_pars_fragment>
+      void main() {
+        #include <logdepthbuf_fragment>
+        vec2 p = gl_PointCoord * 2.0 - 1.0;
+        float r2 = dot(p, p);
+        if (r2 > 1.0 || dot(vColour, vColour) < 1e-6) discard;
+        float k = uHalo * uHalo;   // the core the same size in pixels whatever the sprite's
+        float core = exp(-r2 * k * 3.33) * 1.6;
+        float halo = exp(-r2 * k * 0.55) * 0.22;
+        vec3 col = vColour * (core + halo);
+        gl_FragColor = vec4(col / (1.0 + col * 0.15), 1.0);
+      }`,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false,
+  });
+}
+
+// Colours of the fittings, as a viewer sees them (sRGB-ish, not tone mapped: lights are what they are).

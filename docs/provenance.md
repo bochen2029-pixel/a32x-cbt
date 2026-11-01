@@ -177,6 +177,27 @@ come from:
 The runways are real, and so are their places on the earth, as are KDFW's terminals and towers; the
 ILS on them is a textbook one. Nothing here is fit for navigation.
 
+### 1g · The view's sky, country and A320
+
+`flight/web/src` (`atmosphere.js`, `haze.js`, `scenery.js`, `terrain.js`, `city.js`, `airliner.js`,
+`cockpit.js`, `acmi.js`, `world-data.js`) and `flight/web/data` (`a320.json`, `dfw-region.json`,
+`dallas-skyline.json`) are ours, GPLv3, from the visuals study the operator approved on 2026-11-01. Every
+texture is painted by code when the page starts; no image, model or font file ships. Canvas text names
+system fonts (Arial, Consolas and their kin) and falls back to the browser's own.
+
+| source | licence | what is taken |
+|---|---|---|
+| `flight/jsbsim/aircraft/A320-fit/A320-fit.xml` (§1e) | GPLv3, ours | the drawn airframe's points: the CG, EYEPOINT, the nose and main gear contacts, the tail bumper and the engines' thrusters, in `a320.json`, held equal to the file by `flight/web/test/visuals.test.mjs`, so the wheels touch where `ra_ft` reads zero |
+| Airbus's published A320 dimensions | facts | length 37.57 m, span 35.80 m with sharklets, height 11.76 m, the fuselage's 3.95 × 4.14 m section: the outline in `a320.json` is shaped by eye to them |
+| Wikimedia Commons photographs, as reference only: "EZY nose close up" (CC BY 3.0) and "N682TA Airbus A320 TACA Nose (7466391972)" (CC BY-SA 3.0, Aeroprints.com) | — | the flight deck windows' layout and the nose's profile, looked at and shaped by eye; nothing of the photographs is copied or ships |
+| public maps, from general knowledge | — | `dfw-region.json`: the lakes', the Trinity's and ten freeways' coarse lines and the towns' centres, this project's estimates, approximate. To be redrawn from public-domain data (USGS's National Hydrography Dataset, the Census Bureau's TIGER roads) before anything relies on their shapes |
+| published building heights | facts | `dallas-skyline.json`: each tower's height (Reunion Tower 171 m and the 259 light fixtures of its dome, Bank of America Plaza 281 m, and eleven more); their positions approximate, from general knowledge; what marks each at night drawn by this project |
+| E. Bruneton and F. Neyret, *Precomputed Atmospheric Scattering* (2008), and Bruneton's reference implementation (2017) | as methods; the implementation's code (BSD-3-Clause) is not used | the atmosphere's model in `atmosphere.js`: Rayleigh, Mie and ozone extinction and their scale heights (physical constants), single scattering marched on the CPU into a 64 × 64 table; multiple scattering as an isotropic term set by eye |
+| this project | — | the haze over every surface (`haze.js`), the light points' shader, the terrain and its land cover generated from a seed, the city's towers, the house livery ("A32X", no airline's marks), the flight deck's shell and its placeholder pictures (P8 draws the real ones), the debrief |
+
+The sky is computed, not photographed, and the Dallas country is drawn coarsely on purpose: a 1980s
+visual system's register. Nothing here is fit for navigation.
+
 ---
 |---|---|
 | OurAirports, `runways.csv` (davidmegginson.github.io/ourairports-data), retrieved 2026-11-01 | public domain | LSZH (Zurich) runway 14: its end at 47.483101 N 8.53473 E, 1,402 ft, 137° true, 10,827 × 197 ft, the threshold displaced 492 ft. Six numbers copied by value into the source and cited there; no file is copied |

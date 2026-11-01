@@ -1,0 +1,176 @@
+{
+ "name": "Dallas skyline",
+ "sources": {
+  "heights": "roof or tip heights as commonly published (e.g. Reunion Tower 171 m and its 259 LED fixtures, Bank of America Plaza 281 m): facts, not anyone's expression",
+  "positions": "latitude and longitude of each tower from general knowledge: approximate",
+  "marks": "what marks each tower at night (outline, crosses, the Pegasus): this project's rendering of public sights"
+ },
+ "landmarks": [
+  {
+   "name": "Reunion Tower",
+   "lat": 32.7755,
+   "lon": -96.8089,
+   "h": 171,
+   "kind": "reunion"
+  },
+  {
+   "name": "Bank of America Plaza",
+   "lat": 32.7787,
+   "lon": -96.8019,
+   "h": 281,
+   "w": 46,
+   "d": 46,
+   "kind": "outline",
+   "colour": [
+    0.2,
+    1,
+    0.35
+   ]
+  },
+  {
+   "name": "Renaissance Tower",
+   "lat": 32.7804,
+   "lon": -96.8006,
+   "h": 270,
+   "w": 48,
+   "d": 34,
+   "kind": "cross",
+   "colour": [
+    1,
+    0.95,
+    0.85
+   ],
+   "roof": 216
+  },
+  {
+   "name": "Comerica Bank Tower",
+   "lat": 32.7812,
+   "lon": -96.7982,
+   "h": 240,
+   "w": 48,
+   "d": 48,
+   "kind": "gable"
+  },
+  {
+   "name": "JPMorgan Chase Tower",
+   "lat": 32.7854,
+   "lon": -96.7984,
+   "h": 225,
+   "w": 44,
+   "d": 44,
+   "kind": "keyhole"
+  },
+  {
+   "name": "Fountain Place",
+   "lat": 32.7841,
+   "lon": -96.8031,
+   "h": 219,
+   "w": 52,
+   "d": 52,
+   "kind": "prism",
+   "colour": [
+    0.4,
+    1,
+    0.6
+   ]
+  },
+  {
+   "name": "Trammell Crow Center",
+   "lat": 32.7875,
+   "lon": -96.8015,
+   "h": 209,
+   "w": 44,
+   "d": 44,
+   "kind": "crown"
+  },
+  {
+   "name": "KPMG Plaza",
+   "lat": 32.7815,
+   "lon": -96.7962,
+   "h": 210,
+   "w": 42,
+   "d": 42,
+   "kind": "crown"
+  },
+  {
+   "name": "Thanksgiving Tower",
+   "lat": 32.7834,
+   "lon": -96.8009,
+   "h": 197,
+   "w": 40,
+   "d": 40,
+   "kind": "box"
+  },
+  {
+   "name": "Ross Tower",
+   "lat": 32.7868,
+   "lon": -96.7998,
+   "h": 154,
+   "w": 38,
+   "d": 30,
+   "kind": "box"
+  },
+  {
+   "name": "Magnolia Hotel",
+   "lat": 32.7806,
+   "lon": -96.7994,
+   "h": 120,
+   "w": 26,
+   "d": 26,
+   "kind": "pegasus"
+  },
+  {
+   "name": "Hyatt Regency",
+   "lat": 32.7762,
+   "lon": -96.8077,
+   "h": 98,
+   "w": 90,
+   "d": 28,
+   "kind": "box",
+   "glass": 9075280
+  },
+  {
+   "name": "Omni Dallas Hotel",
+   "lat": 32.7752,
+   "lon": -96.8029,
+   "h": 98,
+   "w": 72,
+   "d": 34,
+   "kind": "omni"
+  }
+ ],
+ "clusters": [
+  {
+   "lat": 32.781,
+   "lon": -96.8,
+   "r": 650,
+   "n": 26,
+   "hMin": 80,
+   "hMax": 190
+  },
+  {
+   "lat": 32.793,
+   "lon": -96.806,
+   "r": 700,
+   "n": 16,
+   "hMin": 60,
+   "hMax": 150
+  },
+  {
+   "lat": 32.882,
+   "lon": -96.94,
+   "r": 900,
+   "n": 12,
+   "hMin": 50,
+   "hMax": 120
+  },
+  {
+   "lat": 32.7555,
+   "lon": -97.331,
+   "r": 600,
+   "n": 16,
+   "hMin": 60,
+   "hMax": 175
+  }
+ ]
+}

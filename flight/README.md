@@ -703,6 +703,28 @@ the eye; a runway no airport file holds is drawn as an airport of one. Over it, 
 ladder, the flight path, speed, altitude, V/S, radio height, heading, flaps, gear, and the ILS's
 localizer and glideslope scales.
 
+**Two tiers** (2026-11-01, from the visuals study the operator approved). Where a CPU draws every pixel —
+SwiftShader, or WARP, what Chrome on Windows falls back to with no usable GPU — the page draws the view
+above, unchanged: the floor, so the software budget cannot regress. Where a GPU draws, the same airport
+is seen through one atmosphere (`web/src/atmosphere.js`: Rayleigh, Mie and ozone scattering marched into
+a sky table) at any solar hour of 1 November, the haze over every surface, the country round DFW —
+prairie and suburb, its lakes and the Trinity, the metroplex's street lights and freeways — and Dallas's
+skyline, Reunion Tower's 259 lights among it (`web/data/dfw-region.json`, `dallas-skyline.json`;
+`docs/provenance.md` §1g). `tier=low|high` overrides the choice; `time=` names an hour (dawn, day,
+golden, dusk, night), `hour=` sets one, `[` and `]` move it. Both tiers draw the A320 outside
+(`web/data/a320.json`, its points the airframe file's own, so its wheels touch where `ra_ft` reads zero,
+every surface, the gear and the fans moved from the core's state), its flight deck at the file's
+EYEPOINT with placeholder tubes until P8, ten cameras on keys 1 to 9 and 0 (V steps through them; the
+overlay is drawn in the pilot's eye only), and a debrief on K: the flown path coloured by the gate's
+bands, the ILS as a tunnel, every runway's outline and the aircraft in vectors, on black; L draws the
+path in the normal view, and `trail=1`, `debrief=1` and `cam=` open the page on them. The floor builds the
+A320, its deck and the debrief when a camera or the debrief first asks for them, one pause then; the GPU
+tier builds them at the start. Before the flight's
+clock starts the view is warmed — its shaders compiled, its geometry and textures sent, the GPU waited
+for — so the first frame costs the flight no steps. Its `ctest` case,
+`the_view_draws_the_flight_model_s_airframe_under_its_sun`, makes fifty-three native cases, all passing
+with either airframe on MSVC 19.44.
+
 As measured, 2026-11-01, headless Chrome at 1440 × 900, with the desktop's CPU sampled each second:
 
 | what | result | desktop CPU |
@@ -714,13 +736,18 @@ As measured, 2026-11-01, headless Chrome at 1440 × 900, with the desktop's CPU 
 | the same with antialiasing | 67 ms median | 77 % mean |
 | a frame with KDFW drawn, lined up on 17C: on the GPU, on WARP, on SwiftShader | 7.4, 15.4 and 33.3 ms median: the floor as before | 64 % mean |
 | the same 2.5 nm out on its approach, on WARP and on SwiftShader | 15.2 and 16.7 ms median | 64 % mean |
+| the two tiers, lined up on 17C at dusk, 22 s: the GPU tier on the GPU (25 calls, 115,808 triangles, 59,799 lights); the floor on WARP and on SwiftShader (P7's 21 calls, 45,612 triangles, 6,322 lights) | 6.9, 13.9 and 33.4 ms median, 7.2, 55.4 and 66.7 ms p99; 0, 0 and 14 steps dropped, SwiftShader's all at its first frame, as before the tiers (10 to 24 there, with the desktop's load) | 2 to 25 % |
+| the GPU tier forced onto WARP and SwiftShader (`tier=high`): why it is not the floor | 35 and 150 ms median | 6 to 27 % |
 
 `web/tools/measure.mjs [--software | --warp]` repeats the frame measurements; WARP is what Chrome on
 Windows now falls back to with no usable GPU. The 2014 reference laptop has not
 been measured.
 
 The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach_the_controls`,
-`the_view_puts_the_eye_where_the_flight_is`, `kdfw_is_laid_out_as_ourairports_and_the_faa_have_it`, and
+`the_view_puts_the_eye_where_the_flight_is`, `kdfw_is_laid_out_as_ourairports_and_the_faa_have_it`,
+`the_view_draws_the_flight_model_s_airframe_under_its_sun` (the drawn airframe's points against
+A320-fit.xml, the data files refusing a broken row by name, the sun setting at DFW on 1 November at
+17:19 solar, the atmosphere finite and the low sun redder, the debrief's bands), and
 in the WebAssembly build `the_browser_module_flies` —
 the very file the page loads, in node: the scripted crew lands it at the native build's touchdown to the
 printed digit (the A320 from KDFW 17C: 1,023.84 s, −143.5 fpm), and its inputs replayed into a second instance give the same

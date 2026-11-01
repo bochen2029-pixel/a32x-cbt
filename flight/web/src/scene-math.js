@@ -41,3 +41,23 @@ export function eye(o, latDeg, lonDeg, radioHeightFt, pitchDeg, headingDeg) {
   const height = EYE.cgHeight + Math.max(0, radioHeightFt) * FT + EYE.forward * Math.sin(th) + EYE.up * Math.cos(th);
   return { x: p.east + along * Math.sin(psi), y: height, z: -(p.north + along * Math.cos(psi)) };
 }
+
+// A latitude and longitude as the world's [x, z], the form the scenery's builders take; and back.
+export function xz(o, latDeg, lonDeg) {
+  const p = localMetres(o, latDeg, lonDeg);
+  return [p.east, -p.north];
+}
+
+export function latLon(o, x, z) {
+  return [o.lat - z / o.mPerDegLat, o.lon + x / o.mPerDegLon];
+}
+
+// Where the sun is at a local solar hour on a day of the year: its elevation and azimuth (degrees) and
+// the unit vector toward it in the world's frame. Declination by Cooper's formula, good to a degree:
+// enough for the light, and the GPU tier's hours are solar, not clock time. Day 305 is 1 November.
+export function sunAt(hour, latDeg, day = 305) {
+  const dec = 23.44 * Math.sin((2 * Math.PI * (284 + day)) / 365) * DEG, phi = latDeg * DEG, H = (hour - 12) * 15 * DEG;
+  const e = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(H));
+  const A = Math.atan2(-Math.cos(dec) * Math.sin(H), Math.sin(dec) * Math.cos(phi) - Math.cos(dec) * Math.sin(phi) * Math.cos(H));
+  return { elevation: e / DEG, azimuth: A / DEG, dir: [Math.cos(e) * Math.sin(A), Math.sin(e), -Math.cos(e) * Math.cos(A)] };
+}
