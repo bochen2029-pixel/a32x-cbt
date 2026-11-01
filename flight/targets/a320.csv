@@ -10,8 +10,10 @@
 #   kind       target  - scored inside or outside its band, and counted
 #              context - scored beside its band, not counted: operational data, not capability
 #              pending - named, not yet measured
-#   group      stall, alpha, attitude, dynamics, performance
-#   condition  what the airframe is doing when measured (semicolons, not commas)
+#   group      stall, alpha, attitude, dynamics, performance, thrust
+#   condition  what the airframe is doing when measured (semicolons, not commas). A thrust or gradient
+#              row's condition is read by the scorer: the lever (TOGA, MCT, CL, idle), the configuration,
+#              a CAS in kt, static, or a Mach, and an altitude in ft, sea level or a flight level. ISA
 #   weight     tonnes the bare airframe is measured at. Empty: the airframe as loaded, which is how the
 #              flown rows and the short period are measured, or a row that does not depend on weight
 #   ref        empty: the band is lo..hi. vs1g:<config> or vls:<config>: the band is that speed at the
@@ -68,10 +70,55 @@
 #                       Dutch roll damping at least 0.08; short-period damping 0.30 to 2.00. Floors for
 #                       handling, not A320 data. The short period is the bare airframe's: in direct law the
 #                       pilot flies it as it is
+#   easa-tcds-e067      EASA type-certificate data sheet E.067, issue 02, 17 April 2018, CFM56-5 series: the
+#                       CFM56-5-A1, the A320-211's engine and the one our A320 carries, is rated 11,120 daN for
+#                       take-off (constant below 30 C) and 10,540 daN maximum continuous (below 25 C); static,
+#                       sea level, ISA, no air bled, no accessory load. The band of 1 % either way is ours
+#   anp-a320-211        Airbus's thrust for the A320-211 in the Aircraft Noise and Performance database,
+#                       version 2.3 (EUROCONTROL and ECAC, now kept by EASA, whose archive of it is public);
+#                       its data are developed by the manufacturer and reviewed by the FAA, EASA, the Volpe
+#                       Center and EUROCONTROL. One engine's corrected net thrust at a rating is
+#                       E + F Vc + Ga h + Gb h^2 times the pressure ratio, Vc in kt of CAS and h in ft (ECAC
+#                       Doc 29, equation B-1, as Commission Directive (EU) 2015/996, Annex II, Appendix B
+#                       gives it):
+#                         MaxTakeoff    (TOGA)   23652.9  -22.93379  0.295879   -5.46E-6
+#                         MaxClimb      (CL)     16859.1   -4.3786   0.183576    2.99E-6
+#                         IdleApproach  (idle)    2858.8  -14.73251  0.0965368  -6.79E-6
+#                       Below the flat-rating temperature; ANP is used below 10,000 ft and at airports up to
+#                       4,000 ft, and the rows stay there. Its take-off line meets zero speed 5 % under the
+#                       rating, so the static row is the certificate's. The bands, 3 % either way and 1 kN for
+#                       idle, are ours. A manufacturer's model, not a measurement
+#   cruise-thrust       Climb thrust where ANP does not reach, at the top of a climb: OpenAP's engine table
+#                       (junzis/openap, LGPL-3.0, engines.csv, from Svoboda's turbofan database, Aircraft
+#                       Design 3, 2000) gives the CFM56-5A3, the same engine rated 6 % higher for take-off,
+#                       22,241 N at Mach 0.8 and 35,000 ft; OpenAP's own fallback for an engine without that
+#                       datum, a fifth of rated thrust plus 890 N, gives the 5A1 23,130 N. The band, 21.1 to
+#                       24.3 kN, holds both with 5 % to spare: ours
+#   bartel-young        Bartel and Young's take-off thrust of a two-shaft turbofan against Mach (Journal of
+#                       Aircraft 45(4), 2008, equations 11 to 14, as OpenAP's thrust.py implements them) for
+#                       the CFM56-5A1's bypass ratio, 6.0 (ICAO's engine emissions databank, through OpenAP):
+#                       77.0 % of static thrust at Mach 0.25. A generic model of the engine class, independent
+#                       of ANP, so a wider band, 5 % either way: ours
+#   anp-gradient        The steady gradient ANP gives the A320-211 at 65 t: Doc 29's equation B-12 without its
+#                       factor K for an 8 kt headwind and the acceleration of a constant-CAS climb, so
+#                       sin gamma = 2 Fn / W - R, with the thrust above and Airbus's drag-to-lift ratio R for
+#                       the configuration: 0.071403 in CONF 1+F and 0.056281 clean on departure, 0.057558
+#                       clean on approach. The take-off speed is ANP's for CONF 1+F at this weight, C sqrt(W)
+#                       with C = 0.394884: 149 kt. Thrust and drag tested together. The A320-211 has wingtip
+#                       fences where ours has the sharklets of A32NX's A320neo, a few per cent less drag: the
+#                       band, 10 % either way, is ours
 #   wrap                OpenAP WRAP A320, ADS-B: the range of its fitted distribution (to_acc_tof,
-#                       to_v_lof, cl_vs_avg_pre_cas, de_vs_avg_after_cas). What airlines fly, mostly at
-#                       reduced thrust and mixed weights: context for an airframe flown at full climb
-#                       thrust and one weight, never a pass mark
+#                       to_v_lof, cl_vs_avg_pre_cas, de_vs_avg_after_cas). What airlines fly, and so not a
+#                       pass mark for capability. Take-off thrust is mostly reduced, toward the weight's share
+#                       of the regulated take-off weight and down to 25 % under the rating, and climb thrust
+#                       often 10 % under it after a reduced take-off (Directive (EU) 2015/996, Appendix B, from
+#                       flight data); weights run from light to heavy; and the climb and descent rates average
+#                       segments the circuit does not fly as one, the climb from the end of the initial climb to
+#                       the start of the constant-CAS climb near FL120, with the acceleration past FL100 in it,
+#                       the descent from the end of the constant-CAS descent, with its level-offs and slowing.
+#                       No one weight and thrust setting makes them comparable, so they stay context. The
+#                       thrust rows and the three gradients count the take-off, the climb and the idle
+#                       descent, at a stated weight and rating
 id,kind,group,measure,condition,weight,ref,lo,hi,unit,use,source
 vs1g-clean,target,stall,1-g stall speed,clean; gear up,48.5,vs1g:clean,-3,3,kt,fit,a32nx-speeds
 vs1g-conf1,target,stall,1-g stall speed,CONF 1 (slats only); gear up,48.5,vs1g:conf1,-3,3,kt,fit,a32nx-speeds
@@ -106,6 +153,30 @@ roll-rate,target,dynamics,steady roll rate at full lateral stick,normal law; 800
 roll-tau,target,dynamics,roll mode time constant,full lateral stick step; normal law; 8000 ft; 250 kt,,,,1.4,s,check,mil-f-8785c
 dutch-roll-zeta,target,dynamics,Dutch roll damping with the yaw damper,released after 3 s of 0.3 pedal; normal law; 8000 ft; 250 kt,,,0.08,,ratio,check,mil-f-8785c
 short-period,target,dynamics,short-period damping ratio,bare airframe trimmed then 2 deg of elevator for 1 s; controls otherwise fixed; clean; 8000 ft; 250 kt,,,0.30,2.00,ratio,check,mil-f-8785c
+thrust-toga-static,target,thrust,thrust of one engine,TOGA; static; sea level,,,110.09,112.31,kN,fit,easa-tcds-e067
+thrust-mct-static,target,thrust,thrust of one engine,MCT; static; sea level,,,104.35,106.45,kN,fit,easa-tcds-e067
+thrust-toga-100kt,target,thrust,thrust of one engine,TOGA; 100 kt; sea level,,,92.16,97.86,kN,fit,anp-a320-211
+thrust-toga-150kt,target,thrust,thrust of one engine,TOGA; 150 kt; sea level,,,87.21,92.61,kN,fit,anp-a320-211
+thrust-toga-150kt-4000ft,target,thrust,thrust of one engine,TOGA; 150 kt; 4000 ft,,,79.41,84.32,kN,fit,anp-a320-211
+thrust-cl-250kt-5000ft,target,thrust,thrust of one engine,CL; 250 kt; 5000 ft,,,60.16,63.88,kN,fit,anp-a320-211
+thrust-cl-300kt-10000ft,target,thrust,thrust of one engine,CL; 300 kt; 10000 ft,,,52.46,55.71,kN,fit,anp-a320-211
+thrust-cl-fl350,target,thrust,thrust of one engine,CL; Mach 0.80; FL350,,,21.10,24.30,kN,fit,cruise-thrust
+thrust-idle-140kt-1000ft,target,thrust,thrust of one engine,idle; 140 kt; 1000 ft,,,2.80,4.80,kN,fit,anp-a320-211
+thrust-idle-210kt-5000ft,target,thrust,thrust of one engine,idle; 210 kt; 5000 ft,,,-0.71,1.29,kN,fit,anp-a320-211
+thrust-idle-250kt-10000ft,target,thrust,thrust of one engine,idle; 250 kt; 10000 ft,,,-2.65,-0.65,kN,fit,anp-a320-211
+thrust-toga-50kt,target,thrust,thrust of one engine,TOGA; 50 kt; sea level,,,97.11,103.12,kN,check,anp-a320-211
+thrust-toga-180kt,target,thrust,thrust of one engine,TOGA; 180 kt; sea level,,,84.25,89.46,kN,check,anp-a320-211
+thrust-toga-100kt-4000ft,target,thrust,thrust of one engine,TOGA; 100 kt; 4000 ft,,,83.68,88.86,kN,check,anp-a320-211
+thrust-cl-200kt-2000ft,target,thrust,thrust of one engine,CL; 200 kt; 2000 ft,,,65.64,69.71,kN,check,anp-a320-211
+thrust-cl-250kt-8000ft,target,thrust,thrust of one engine,CL; 250 kt; 8000 ft,,,55.84,59.30,kN,check,anp-a320-211
+thrust-cl-280kt-7000ft,target,thrust,thrust of one engine,CL; 280 kt; 7000 ft,,,56.82,60.33,kN,check,anp-a320-211
+thrust-idle-180kt-2000ft,target,thrust,thrust of one engine,idle; 180 kt; 2000 ft,,,0.54,2.54,kN,check,anp-a320-211
+thrust-idle-250kt-5000ft,target,thrust,thrust of one engine,idle; 250 kt; 5000 ft,,,-2.89,-0.89,kN,check,anp-a320-211
+thrust-idle-210kt-8000ft,target,thrust,thrust of one engine,idle; 210 kt; 8000 ft,,,-0.66,1.34,kN,check,anp-a320-211
+thrust-lapse-m025,target,thrust,take-off thrust of one engine as a share of its static thrust,TOGA; Mach 0.25; sea level,,,73.16,80.87,%,check,bartel-young
+takeoff-gradient,target,performance,steady climb gradient at take-off thrust,TOGA; CONF 1+F; gear up; 149 kt; 1000 ft,65,,18.44,22.54,%,check,anp-gradient
+climb-gradient,target,performance,steady climb gradient at climb thrust,CL; clean; gear up; 250 kt; 6000 ft,65,,12.02,14.69,%,check,anp-gradient
+descent-gradient,target,performance,steady descent gradient at idle,idle; clean; gear up; 210 kt; 5000 ft,65,,-6.23,-5.10,%,check,anp-gradient
 to-accel,context,performance,mean acceleration from brake release to liftoff,TOGA; CONF 1+F; sea level,,,1.50,2.37,m/s2,check,wrap
 lof-speed,context,performance,ground speed at liftoff,CONF 1+F; sea level; no wind,,,145,187,kt,check,wrap
 climb-rate,context,performance,rate of climb at climb thrust,4000 to 7500 ft; up to 250 kt,,,1500,2530,ft/min,check,wrap

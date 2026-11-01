@@ -194,7 +194,7 @@ struct Airframe::Impl {
   // for measuring
   SGPropertyNode *trimAuthority = nullptr, *thsTrimAuthority = nullptr, *pitchTrim = nullptr, *elevatorPos = nullptr,
                  *stabiliserPos = nullptr, *clSquared = nullptr, *wingArea = nullptr, *alphaMax = nullptr,
-                 *alphaMin = nullptr, *lift = nullptr, *drag = nullptr, *qbar = nullptr;
+                 *alphaMin = nullptr, *lift = nullptr, *drag = nullptr, *qbar = nullptr, *thrust[2] = {};
   // read each tick
   SGPropertyNode *pressureAltitude = nullptr, *cas = nullptr, *tas = nullptr, *mach = nullptr, *hDot = nullptr,
                  *alpha = nullptr, *beta = nullptr, *pressure = nullptr, *theta = nullptr, *phi = nullptr,
@@ -236,6 +236,8 @@ struct Airframe::Impl {
     lift = node("forces/fwz-aero-lbs");  // wind axes, lift and drag both reported positive
     drag = node("forces/fwx-aero-lbs");
     qbar = node("aero/qbar-psf");
+    thrust[0] = node("propulsion/engine[0]/thrust-lbs");
+    thrust[1] = node("propulsion/engine[1]/thrust-lbs");
 
     pressureAltitude = node("atmosphere/pressure-altitude");
     cas = node("velocities/vc-kts");
@@ -615,6 +617,9 @@ TrimPoint Airframe::trimmed(double altitudeFt, double casKn, double mach, double
     t.thsDeg = t.pitchControlDeg / kThsAsElevator;
   }
   t.tla = tlaFor(m.throttle[0]->getDoubleValue());
+  // JSBSim's trim runs the engines in their trim phase, where thrust is already the steady thrust of
+  // the throttle it found
+  t.thrustLbs = m.thrust[0]->getDoubleValue() + m.thrust[1]->getDoubleValue();
   m.untrim();
   return t;
 }
@@ -641,4 +646,16 @@ PitchResponse Airframe::pitchPulse(double altitudeFt, double casKn, double pulse
   }
   m.untrim();
   return r;
+}
+
+double Airframe::engineThrustLbs(double altitudeFt, double casKn, double mach, double tla) {
+  Impl& m = *impl_;
+  m.configure(Configuration{});
+  m.place(altitudeFt, casKn, mach, 0, 2);
+  m.throttle[0]->setDoubleValue(throttleFor(tla));
+  m.throttle[1]->setDoubleValue(throttleFor(tla));
+  if (!m.fdm.RunIC()) die("JSBSim could not initialise for a thrust");
+  m.fdm.GetPropulsion()->GetSteadyState();
+  m.read();
+  return m.thrust[0]->getDoubleValue();
 }

@@ -4,13 +4,15 @@
 //   airframe_score                    the table, scored
 //   airframe_score --out score.csv    and written out
 //   airframe_score --check            exit 1 unless every target and context row was measured
+//   airframe_score --only-group thrust, --skip-group thrust
+//                                     one group of rows, or every group but one
 //
 // It scores; it does not gate. Outside a band is a fact about the airframe, not a failed build.
 //
 // Two kinds of measurement. The bare airframe, with no computers: JSBSim sweeps its lift curve, reads
-// its drag, trims it and pulses its elevator (airframe.h), at the weight the row names. The airframe
-// flown: one circuit through the A32NX laws at the weight it is loaded to, with a full-stick roll added
-// in cruise, timed as the gate's circuit is.
+// its drag, trims it, pulses its elevator and runs its engines to a steady thrust (airframe.h), at the
+// weight the row names. The airframe flown: one circuit through the A32NX laws at the weight it is
+// loaded to, with a full-stick roll added in cruise, timed as the gate's circuit is.
 
 #include <algorithm>
 #include <cctype>
@@ -37,6 +39,8 @@ constexpr double kLbsPerTonne = 2204.62;
 constexpr double kRho0 = 0.0023769;  // slug/ft3, sea level, ISA
 constexpr double kFpsPerKt = 1.687810;
 constexpr double kMsPerKt = 0.514444;
+constexpr double kKnPerLbf = 0.00444822;
+constexpr int kEngines = 2;  // both airframes are twins
 
 // When, after the circuit reaches cruise, the extra full-stick roll is flown: after the doublet (+20 to
 // +24 s), before the first turn (+40 s). The pedal kick is the circuit's own, +150 to +153 s; the steep
@@ -141,6 +145,78 @@ const Config* config(const std::string& name) {
   return nullptr;
 }
 
+// What a thrust or a gradient row's condition names, in its own column: the thrust lever's detent, the
+// configuration, the speed and the altitude. "TOGA; 150 kt; 4000 ft", "CL; Mach 0.80; FL350",
+// "idle; clean; gear up; 210 kt; 5000 ft". A word the parser does not know ends the run: the column is
+// the row's definition, and a row read wrongly would be scored wrongly.
+struct Condition {
+  double tla = kNaN;                 // 0 idle, 25 CL, 35 MCT, 45 TOGA
+  const Config* config = nullptr;    // named configurations only; a thrust row names none
+  double casKn = kNaN, mach = 0;     // a CAS, 0 for static, or a Mach
+  double altitudeFt = kNaN;
+};
+
+std::string trim(const std::string& s) {
+  const size_t a = s.find_first_not_of(' '), b = s.find_last_not_of(' ');
+  return a == std::string::npos ? "" : s.substr(a, b - a + 1);
+}
+
+Condition parseCondition(const std::string& id, const std::string& text) {
+  Condition c;
+  size_t from = 0;
+  while (from <= text.size()) {
+    const size_t semicolon = std::min(text.find(';', from), text.size());
+    const std::string word = trim(text.substr(from, semicolon - from));
+    from = semicolon + 1;
+    const char* w = word.c_str();
+    char unit[16] = "";
+    double v = 0;
+    if (word == "TOGA") {
+      c.tla = 45;
+    } else if (word == "MCT") {
+      c.tla = 35;
+    } else if (word == "CL") {
+      c.tla = 25;
+    } else if (word == "idle") {
+      c.tla = 0;
+    } else if (word == "static") {
+      c.casKn = 0;
+    } else if (word == "sea level") {
+      c.altitudeFt = 0;
+    } else if (word == "clean") {
+      c.config = config("clean");
+    } else if (word == "CONF 1+F") {
+      c.config = config("conf1f");
+    } else if (word == "gear up" || word == "gear down") {
+      if (!c.config || c.config->surfaces.gearDown != (word == "gear down")) {
+        std::fprintf(stderr, "a320.csv: %s: the gear and the configuration disagree\n", id.c_str());
+        std::exit(2);
+      }
+    } else if (std::sscanf(w, "Mach %lf", &v) == 1) {
+      c.mach = v;
+    } else if (std::sscanf(w, "FL%lf", &v) == 1) {
+      c.altitudeFt = 100 * v;
+    } else if (std::sscanf(w, "%lf %15s", &v, unit) == 2 && std::string(unit) == "kt") {
+      c.casKn = v;
+    } else if (std::sscanf(w, "%lf %15s", &v, unit) == 2 && std::string(unit) == "ft") {
+      c.altitudeFt = v;
+    } else {
+      std::fprintf(stderr, "a320.csv: %s: no meaning for \"%s\" in its condition\n", id.c_str(), word.c_str());
+      std::exit(2);
+    }
+  }
+  if (std::isnan(c.tla) || std::isnan(c.altitudeFt) || (std::isnan(c.casKn) && !(c.mach > 0))) {
+    std::fprintf(stderr, "a320.csv: %s: its condition names no lever, speed or altitude\n", id.c_str());
+    std::exit(2);
+  }
+  if (std::isnan(c.casKn)) c.casKn = 0;
+  return c;
+}
+
+bool endsWith(const std::string& s, const std::string& tail) {
+  return s.size() >= tail.size() && s.compare(s.size() - tail.size(), tail.size(), tail) == 0;
+}
+
 // "vls-alpha-full-65t" is "vls-alpha-full" measured at the weight its row names.
 std::string family(const std::string& id) {
   const size_t dash = id.rfind('-');
@@ -225,9 +301,36 @@ class Bare {
 
   double loadedLbs() const { return loadedLbs_; }
 
-  Measured measure(const std::string& id, const std::string& family, const std::string& measure, double lbs) {
+  Measured measure(const std::string& id, const std::string& family, const std::string& measure,
+                   const std::string& condition, const std::string& unit, double lbs) {
     if (std::abs(a_.state().weightLbs - lbs) > 0.5) a_.setWeightLbs(lbs);
     const double tonnes = lbs / kLbsPerTonne;
+    if (id.rfind("thrust-", 0) == 0) {
+      // one engine at the lever's detent, as the aircraft's thrust lever schedule sets it
+      const Condition c = parseCondition(id, condition);
+      const double thrust = a_.engineThrustLbs(c.altitudeFt, c.casKn, c.mach, c.tla);
+      const double mach = a_.state().mach;
+      if (unit == "%") {  // a share of the same lever's static thrust at the same altitude
+        const double still = a_.engineThrustLbs(c.altitudeFt, 0, 0, c.tla);
+        return {thrust / still * 100, fmt("%.0f lbf at Mach %.3f, %.0f lbf static", thrust, mach, still)};
+      }
+      return {thrust * kKnPerLbf, fmt("%.0f lbf at Mach %.3f", thrust, mach)};
+    }
+    if (endsWith(id, "-gradient")) {
+      // the lever's thrust, both engines, less the thrust a level trim needs, over the weight: the
+      // steady gradient on the energy method, sin gamma = (T - D) / W
+      const Condition c = parseCondition(id, condition);
+      if (!c.config) {
+        std::fprintf(stderr, "a320.csv: %s: a gradient needs a configuration\n", id.c_str());
+        std::exit(2);
+      }
+      const TrimPoint level = a_.trim(c.altitudeFt, c.casKn, c.mach, 0, c.config->surfaces);
+      if (!level.ok) return {kNaN, fmt("no level trim at %.0f kt", c.casKn)};
+      const double available = kEngines * a_.engineThrustLbs(c.altitudeFt, c.casKn, c.mach, c.tla);
+      return {(available - level.thrustLbs) / lbs * 100,
+              fmt("thrust %.0f lbf; a level trim needs %.0f lbf at alpha %.1f deg", available, level.thrustLbs,
+                  level.alphaDeg)};
+    }
     if (family.rfind("vs1g-", 0) == 0 && config(family.substr(5))) {
       const LiftPeak& p = peak(*config(family.substr(5)));
       const double vs1g = std::sqrt(2 * lbs / (kRho0 * a_.wingAreaFt2() * p.clMax)) / kFpsPerKt;
@@ -271,7 +374,7 @@ class Bare {
       if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
     }
     return family == "app-pitch-full" || family == "cruise-pitch" || family == "cruise-tla" || id == "drag-rise" ||
-           id == "short-period";
+           id == "short-period" || id.rfind("thrust-", 0) == 0 || endsWith(id, "-gradient");
   }
 
  private:
@@ -478,7 +581,7 @@ int instruments() {
 }  // namespace
 
 int main(int argc, char** argv) {
-  std::string targetsDir = FLIGHT_TARGETS_DIR, out;
+  std::string targetsDir = FLIGHT_TARGETS_DIR, out, onlyGroup, skipGroup;
   bool check = false, fitRowsOnly = false;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -492,6 +595,10 @@ int main(int argc, char** argv) {
       Airframe::setCoefficients(readCoefficients(argv[++i]));
     } else if (a == "--fit-rows") {
       fitRowsOnly = true;
+    } else if (a == "--only-group" && i + 1 < argc) {
+      onlyGroup = argv[++i];
+    } else if (a == "--skip-group" && i + 1 < argc) {
+      skipGroup = argv[++i];
     } else if (a == "--check") {
       check = true;
     } else if (a == "--instruments") {
@@ -499,14 +606,17 @@ int main(int argc, char** argv) {
     } else {
       std::printf(
           "airframe_score [--airframe 737|a320] [--coefficients file] [--targets dir] [--out score.csv]\n"
-          "               [--check] [--fit-rows] [--instruments]\n");
+          "               [--check] [--fit-rows] [--only-group G | --skip-group G] [--instruments]\n");
       return 2;
     }
   }
   const auto rows = readCsv(targetsDir + "/a320.csv");
   const Speeds speeds(targetsDir + "/a320-speeds.csv");
-  auto isFitRow = [](const std::map<std::string, std::string>& row) {
-    return row.at("kind") == "target" && row.at("use") == "fit";
+  // The rows this run is about: every row, or the fit rows, of a group or of every group but one. The
+  // fitter fits the aerodynamics and the engines apart, on their own rows.
+  auto wanted = [&](const std::map<std::string, std::string>& row) {
+    return (!fitRowsOnly || (row.at("kind") == "target" && row.at("use") == "fit")) &&
+           (onlyGroup.empty() || row.at("group") == onlyGroup) && (skipGroup.empty() || row.at("group") != skipGroup);
   };
 
   Airframe bare;
@@ -518,25 +628,28 @@ int main(int argc, char** argv) {
   };
   Measures m;
   Bare b(bare, speeds);
+  bool flown = false;  // whether any row wanted needs the circuit flown
   for (const auto& row : rows) {
     const std::string& id = row.at("id");
-    if (fitRowsOnly && !isFitRow(row)) continue;
+    if (!wanted(row)) continue;
     if (row.at("kind") != "pending" && Bare::measures(id, family(id))) {
-      m[id] = b.measure(id, family(id), row.at("measure"), rowLbs(row));
+      m[id] = b.measure(id, family(id), row.at("measure"), row.at("condition"), row.at("unit"), rowLbs(row));
     } else if (fitRowsOnly) {
       // the fitter evaluates thousands of candidates: a fit row that needs the circuit flown is a change
       // of plan, not something to slip in
       std::fprintf(stderr, "a320.csv: fit row %s is not measured on the bare airframe\n", id.c_str());
       return 2;
+    } else if (row.at("kind") != "pending") {
+      flown = true;
     }
   }
-  if (!fitRowsOnly) measureFlown(m);
+  if (flown) measureFlown(m);
 
   std::printf("A320 targets (%s/a320.csv) against JSBSim %s's %s\n", targetsDir.c_str(), JSBSIM_COMMIT,
               Airframe::model());
   std::printf("loaded to %.0f lb (%.1f t), CG %.1f %% MAC, and flown so; the bare airframe is measured at each row's weight\n\n",
               weight, tonnes, cg);
-  std::printf("%-19s %-7s %-5s %5s %-21s %9s  %-15s %s\n", "id", "kind", "use", "t", "band", "measured", "verdict",
+  std::printf("%-25s %-7s %-5s %5s %-21s %9s  %-15s %s\n", "id", "kind", "use", "t", "band", "measured", "verdict",
               "note");
 
   FILE* csv = out.empty() ? nullptr : std::fopen(out.c_str(), "w");
@@ -549,7 +662,7 @@ int main(int argc, char** argv) {
   int counted = 0, inside = 0, fitRows = 0, fitInside = 0, unmeasured = 0;
   double cost = 0;
   for (const auto& row : rows) {
-    if (fitRowsOnly && !isFitRow(row)) continue;
+    if (!wanted(row)) continue;
     const std::string& id = row.at("id");
     const std::string& kind = row.at("kind");
     const std::string& unit = row.at("unit");
@@ -598,7 +711,7 @@ int main(int argc, char** argv) {
         verdict = "(" + verdict + ")";
       }
     }
-    std::printf("%-19s %-7s %-5s %5s %-21s %9s  %-15s %s\n", id.c_str(), kind.c_str(), row.at("use").c_str(), t.c_str(),
+    std::printf("%-25s %-7s %-5s %5s %-21s %9s  %-15s %s\n", id.c_str(), kind.c_str(), row.at("use").c_str(), t.c_str(),
                 band.c_str(), value.c_str(), verdict.c_str(), note.c_str());
     if (csv) {
       std::fprintf(csv, "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s\n", id.c_str(), kind.c_str(), row.at("use").c_str(), t.c_str(),
@@ -612,7 +725,7 @@ int main(int argc, char** argv) {
     // and once more for the fitter to read: one value a line, at full precision
     std::printf("\n");
     for (const auto& row : rows) {
-      if (!isFitRow(row)) continue;
+      if (!wanted(row)) continue;
       const auto found = m.find(row.at("id"));
       std::printf("value %s %.17g\n", row.at("id").c_str(), found == m.end() ? kNaN : found->second.value);
     }

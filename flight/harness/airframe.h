@@ -79,6 +79,7 @@ struct TrimPoint {
   double pitchControlDeg = 0;  // the pitch control the trim needed, in elevator degrees (elevator + 1.8 THS)
   double thsDeg = 0;           // the stabiliser, with the elevator at rest as autotrim leaves it
   double tla = 0;              // thrust lever angle for the thrust the trim needed
+  double thrustLbs = 0;        // that thrust, all engines together
 };
 
 // The airframe's own lift and drag coefficients at a state, from its aerodynamics alone: no trim, pitch
@@ -156,6 +157,10 @@ class Airframe {
   // the stabiliser and the thrust left where the trim put them: the airframe's own pitch response, as
   // direct law would show it. Alpha is sampled every 20 ms for recordS seconds after the pulse.
   PitchResponse pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS);
+  // The thrust of one engine, lbf, with the levers at a thrust lever angle, at an altitude and a CAS or,
+  // when mach > 0, a Mach; a CAS of 0 is static. The engine model run to its steady state, as JSBSim's
+  // trim runs it, through the thrust lever schedule the aircraft flies with.
+  double engineThrustLbs(double altitudeFt, double casKn, double mach, double tla);
 
   Airframe(const Airframe&) = delete;
   Airframe& operator=(const Airframe&) = delete;
