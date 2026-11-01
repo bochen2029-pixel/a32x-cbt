@@ -1,7 +1,8 @@
 # A320 acceptance targets for the P7 airframe. GPLv3, like everything in flight/.
 #
-# The airframe that flies today is JSBSim's 737, a stand-in. A fitted A320 replaces it when it beats it
-# on this table (ROADMAP.md, P7: the swap point). `airframe_score` measures an airframe against every
+# The airframe that flies is our fitted A320 (flight/jsbsim/aircraft/A320-fit), which replaced JSBSim's
+# 737 on 2026-11-01 by beating it on this table (ROADMAP.md, P7: the swap point); the 737 stays
+# selectable, so a change to the table rescores both. `airframe_score` measures an airframe against every
 # row and prints where it lands; it scores, it does not gate.
 #
 # Columns

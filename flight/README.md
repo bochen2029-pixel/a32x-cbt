@@ -5,13 +5,13 @@ here. `app/` stays clear of it.
 
 **P6 passed; P7 has started.** The A32NX flight control computers — ELAC 1–2, SEC 1–3, FAC 1–2,
 FCDC 1–2, unmodified — run at 50 Hz in a world whose airframe is JSBSim, flying one of two aircraft:
-JSBSim's 737, the default, or an A320 of ours fitted to the A320's numbers. A scripted crew flies
-either through the computers from the runway, round a circuit and back onto the runway, headless, in
-normal law. The 737 is A320-class, not an A320: `docs/provenance.md` says why it is not JSBSim's A320.
-P6 passed against a point-mass stub; the same gate, unchanged, passes against both. The A320's numbers
-are written down (`targets/a320.csv`, 33 targets): our A320 is inside all 33, the 737 inside 8. The
-737 still flies by default, because the swap rule asks for every `ctest` case to pass with the A320
-flying, and with a crew scripted for the 737 the landing case does not ([below](#the-swap-not-made-yet)).
+an A320 of ours fitted to the A320's numbers, the default since 2026-11-01, or JSBSim's 737, which it
+replaced and which stays selectable. A scripted crew flies either through the computers from the
+runway, round a circuit and back onto the runway, headless, in normal law. The 737 is A320-class, not
+an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6 passed against a point-mass stub;
+the same gate, unchanged, passes against both. The A320's numbers are written down
+(`targets/a320.csv`, 33 targets): our A320 is inside all 33, the 737 inside 8, and the A320 replaced
+it under the swap rule ([below](#the-swap-made-2026-11-01)).
 
 ## Build and run
 
@@ -30,8 +30,8 @@ Run `flight/build/Release/law_harness --help` for the options; `--minutes 30 --g
 `--trace run.csv` writes the flight twice a second. `flight/build/Release/airframe_score` scores the
 airframe against the A320's targets (below); `--out score.csv` writes the table.
 
-`FLIGHT_AIRFRAME=a320` in the environment flies our A320 instead of the 737, in either program, and
-`airframe_score --airframe a320` scores it. Our A320 is `jsbsim/aircraft/A320-fit/A320-fit.xml`, read
+`FLIGHT_AIRFRAME=737` in the environment flies the 737 instead of our A320, in either program, and
+`airframe_score --airframe 737` scores it. Our A320 is `jsbsim/aircraft/A320-fit/A320-fit.xml`, read
 from this tree; its engines are JSBSim's CFM56_5, read from the clone. `flight/build/Release/airframe_fit`
 fits it (below), in a minute or two; `--write` puts the result into the aircraft file.
 
@@ -63,15 +63,19 @@ average, 15 to 51 %. The stub world took 1.0 s; JSBSim at 200 Hz is most of the 
 5.1 s, load not sampled. Same binary, same bytes; different compilers give different bytes, and the
 same verdicts.
 
-Fifteen `ctest` cases hold the parts the gate leans on, what the airframe adds, the scorer and the
-fitter. Two are negative controls that show the gate's checks can fail; two of the airframe's were
+The gate above is the 737's, as first measured. Our A320, flying by default, passes the same gate:
+normal law in pitch and roll for 100 % of 1,594 s of settled flight, 0 non-finite in 20,520,000 values,
+all computers healthy, a landing at 1,042.1 s at −143 fpm, 5.5° of pitch, 138 kt and 1.41 g; 5.18 s
+of wall time on MSVC 19.44, about 350 times real time.
+
+Seventeen `ctest` cases hold the parts the gate leans on, what the airframe adds, the scorer and the
+fitter, and keep the 737 flying. Two are negative controls that show the gate's checks can fail; two of the airframe's were
 shown able to fail by hand: reverse the yaw damper's sign and the aircraft departs and flies into the
 ground 40 s after liftoff; reverse the THS's and the stabiliser runs to its stop while the elevator
 holds 24° against it. The scorer's instruments and the fitter's optimiser were shown able to fail the
-same way (their rows below). All fifteen pass on MSVC 19.44 with the 737 flying; with our A320 flying,
-fourteen pass and `lands_inside_the_limits` does not ([below](#the-swap-not-made-yet)). GCC 13.3 on
-Ubuntu 24.04 (WSL) gives the same: fifteen with the 737, the same fourteen with the A320, the same
-scores, no warning in our code. The numbers in the table are the 737's.
+same way (their rows below). All seventeen pass on MSVC 19.44 with our A320 flying, and all seventeen
+again with `FLIGHT_AIRFRAME=737`. GCC 13.3 on Ubuntu 24.04 (WSL) gives the same verdicts and scores,
+with no warning in our code. Where a row gives one number, it is the 737's, measured before the swap.
 
 | case | what it shows |
 |---|---|
@@ -86,7 +90,9 @@ scores, no warning in our code. The numbers in the table are the 737's.
 | `lands_inside_the_limits` | the first landing, wings level, no bounce: the 737 at −77 fpm, 3.2° of pitch, 1.27 g; our A320 at −143 fpm, 5.5°, 1.41 g. Eighteen minutes, because the A320 descends at idle at about 1,030 fpm against the 737's 1,700 and lands 125 s later |
 | `airframe_is_scored_against_the_a320` | the scorer measures every target and context row; it fails only on a row it could not measure (shown with a planted bogus row), never on a row outside its band |
 | `scorer_instruments_read_the_737_right` | the scorer's instruments read the 737's own file back: its gear drag, 0.015; the Mach at which its drag table crosses 20 counts, 0.8170; a nose-down elevator pulse lowering alpha. Without the gear fix (Findings) it fails two of three |
-| `a320_is_scored_against_the_a320` | our A320 loads, flies the scorer's circuit, and every row is measured on it |
+| `the_737_is_scored_against_the_a320` | the 737 it replaced is still scored on every row, so the swap rule can always rescore both |
+| `the_737_flies_the_gate` | the P6 gate with the 737 flying (`FLIGHT_AIRFRAME=737`) |
+| `the_737_lands_inside_the_limits` | the landing case with the 737 flying |
 | `cma_es_finds_known_minima` | the fitter's optimiser on a sphere, a rotated ellipsoid of condition 10⁶ and Rosenbrock, each to 10⁻⁸ or better; with its covariance learning switched off it fails the last two |
 | `scanner_catches_a_planted_nan` | a NaN or infinity in an ELAC bus, a SEC analogue, a FAC bus and an FCDC bus — four of four caught |
 | `losing_all_air_data_ends_normal_law` | all three ADRs failed in flight: the laws go to alternate 2 and stay there |
@@ -251,16 +257,19 @@ thirteen fit rows fall almost one to one on thirteen of the free coefficients. T
 is its seeds, and the held-out rows above are what tests them. Before the fit, the seeds alone were
 inside 31 of 33.
 
-## The swap: not made yet
+## The swap: made, 2026-11-01
 
 The rule (`ROADMAP.md`, P7): a fitted A320 replaces the 737 when, scored on the same revision of the
 table, it is inside every target the 737 is inside and inside more of them in all, with its held-out
-rows reported apart, and the P6 gate and every `ctest` case pass with it flying. The first two hold:
-33 of 33 against 8 of 33, and all of the 737's eight. With the A320 flying, the P6 gate passes — 30
-minutes, normal law for 100 % of 1,592 s of settled flight, 0 non-finite in 20,520,000 values, a
-circuit flown; 5.11 to 5.30 s wall, 339 to 353 times real time, with the desktop 12 % busy on average
-(4 to 39 %, sampled each second) — and so do thirteen more cases. `lands_inside_the_limits` does not,
-for two reasons:
+rows reported apart, and the P6 gate and every `ctest` case pass with it flying. All of it holds: 33 of
+33 against 8 of 33, all of the 737's eight among them; the P6 gate with the A320 flying (5.11 to 5.30 s
+wall, 339 to 353 times real time, with the desktop 12 % busy on average, 4 to 39 %, sampled each
+second); and every `ctest` case, with either airframe flying. The operator approved it: *"yes do it"*.
+Our A320 flies by default (`kDefaultModel` in `harness/airframe.cpp`); the 737 stays selectable and
+keeps its own cases.
+
+The landing case passed only after the crew changed. Before, with the A320 flying, the gate and
+thirteen more cases passed and `lands_inside_the_limits` did not, for two reasons:
 
 - The crew was the 737's, until the change below. It flew the final approach at 145 kt — 1.28 VS for
   the 737, VLS + 16 for an A320 at 65 t — and flared with a gain set on the 737, whose lift rises with alpha at 4.35 per
@@ -276,8 +285,13 @@ A crew that lands both was found by sweeping 72 settings in scratch builds, and 
 (*The crew's numbers are technique*, below). With it, and the landing case run for 18 minutes, all
 fifteen cases pass with either airframe flying: the 737 lands at −77 fpm, 3.2° of pitch, 1.27 g; our
 A320 at −143 fpm, 5.5°, 1.41 g; both gates pass. Neighbouring settings show the scripted flare is
-sensitive: at 0.4 per g the 737 touches down at −0.1° of pitch. The swap itself is one line,
-`kDefaultModel` in `harness/airframe.cpp`.
+sensitive: at 0.4 per g the 737 touches down at −0.1° of pitch.
+
+What the swap leaves open, the next fit: thrust. The climb-rate context row reads 4,602 fpm against
+WRAP's 1,500 to 2,530. Nothing on the engine side has been fitted: the engines are JSBSim's generic
+CFM56_5, Aeromatic's lapse tables at 25,000 lb a side, driven by the harness's own thrust-lever
+schedule (climb thrust at 88 % of take-off thrust), which was drawn up for the 737 stand-in. The
+context rows are not counted, but they say where the airframe is least an A320 now.
 
 ## How it is built
 
@@ -442,9 +456,8 @@ From the A320 fit:
 `ROADMAP.md` §4, *P7 in detail*: a runway, an ILS and wind in the world; failures and the laws they
 reach; the protections exercised; the flight core as a library; WebAssembly; the joystick and the
 browser loop; a Three.js view; and the gate — a hand-flown ILS, stable and repeatable, with its
-measures and bands written down. The 737 flies until our fitted A320 meets the swap rule there, scored
-by `airframe_score` against `targets/a320.csv`: it meets all of it but the landing case, which waits
-on the crew ([above](#the-swap-not-made-yet)).
+measures and bands written down. Our fitted A320 flies all of it from here; the next fit is thrust
+([above](#the-swap-made-2026-11-01)).
 
 ## What is here
 

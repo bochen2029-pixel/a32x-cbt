@@ -3,10 +3,10 @@
 A computer-based trainer for an A320 fly-by-wire, built to run on a laptop with no GPU and no
 installer. This document is the plan and the honest state of it.
 
-Last written: 2026-11-01, at P7 (aero) — slice 1: the A32NX computers fly JSBSim's 737 headless, takeoff to
-landing; the A320 targets are complete, and an A320 of ours fitted to them is inside all 33 where the
-737 is inside 8. It has not replaced the 737: its landing waits on the scripted crew (§4, P7). The rest
-of P7 is planned in §4 and waits for the operator's agreement.
+Last written: 2026-11-01, at P7 (aero) — slice 1: the A32NX computers fly an airframe headless, takeoff to
+landing. The A320 targets are complete, and an A320 of ours fitted to them, inside all 33 where JSBSim's
+737 is inside 8, replaced the 737 under the swap rule on the operator's word (§4, P7). The rest of P7
+is planned in §4 and waits for the operator's agreement.
 
 ---
 
@@ -86,7 +86,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly JSBSim's 737 headless, takeoff to landing, normal law throughout; of 33 A320 targets the 737 is inside 8 and our fitted A320 all 33 [M], which flies the gate but not yet the landing case; the rest is planned below, not started |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 33 A320 targets where the 737 it replaced is inside 8 [M]; the rest is planned below, not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -207,7 +207,7 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
       swapping the airframe, are under *Decisions* below
 - [x] an A320 of ours (`flight/jsbsim/aircraft/A320-fit`), seeded from A32NX's MSFS model, OpenAP
       and textbook estimates, and fitted by CMA-ES on the fit rows (`airframe_fit`): inside 33 of 33,
-      the 737 inside 8 [M]. It flies the P6 gate; it does not yet pass the landing case (*Decisions*)
+      the 737 inside 8 [M]. It flies by default since 2026-11-01, under the swap rule (*Decisions*)
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
@@ -215,8 +215,8 @@ Known limits of slice 1, all of them the airframe's or the crew's:
   table) is 8.7° clean, far short of that, but 13.0 to 14.2° with slats out — at or past the peak, so
   a slowdown to α max with slats out can stall this airframe. In one badly flown climb during
   development, flaps running in at low speed, it went through its stall to 24° of alpha in normal law.
-  Only an A320 airframe cures that; ours lifts 3 to 5° past α max plus a degree, and waits on the
-  landing case (*Decisions*).
+  Only an A320 airframe cures that; ours lifts 3 to 5° past α max plus a degree, and flies by
+  default since 2026-11-01 (*Decisions*).
 - The 737's aerodynamics have no stabiliser, no slats, no roll spoilers and no aileron droop: the THS
   acts as 1.8 times its angle in elevator, and spoilers and speedbrakes act through the 737's coarse
   steps. The engines are JSBSim's turbine on a thrust lever schedule of ours, with no reverse, no
@@ -302,15 +302,20 @@ trainer's debrief does.
   33 — 13 of 13 fit rows, 20 of 20 held out** — and inside every row the 737 is inside. How much the
   held-out rows say is in `flight/README.md`: several test seeds estimated by hand with their bands in
   view, and two pass with almost nothing to spare.
-- **Not swapped yet.** With the A320 flying, the P6 gate and fourteen of fifteen `ctest` cases pass.
-  `lands_inside_the_limits` does not: the scripted crew, set on the 737, flies the approach at 145 kt
-  and flares the A320, whose lift rises faster with alpha, back off the runway after a 361 fpm
-  touchdown; and its first landing comes after the case's 16 minutes, because it descends at idle
-  inside WRAP's band where the 737 does not. A crew of Vapp 140 kt and a flare with more gain, more
-  pitch-rate damping and 1.0 per g of load factor lands both airframes, and with the case at 18
-  minutes all fifteen pass on either. That is a change to how the 737 is flown too, in
-  `harness/world.cpp`, outside the footprint of the fit; it is the operator's to take. With it, the
-  swap is one line.
+- **Taken 2026-11-01: the swap, under the rule.** Our fitted A320 is inside 33 of 33 targets and
+  every one of the 737's 8; with it flying, the P6 gate and all seventeen `ctest` cases pass, and all
+  seventeen pass again with the 737 selected. The operator approved it: *"yes do it"*. The A320 flies
+  by default; the 737 stays selectable (`FLIGHT_AIRFRAME=737`, `airframe_score --airframe 737`) and
+  keeps its own cases, so a change to the table can always rescore both. The landing case passed only
+  after the scripted crew changed: the 737's technique (145 kt, a flare tuned to its lift slope)
+  bounced the A320, whose lift rises faster with alpha in CONF FULL. One crew now flies both — 140 kt
+  and a flare that eases off as the pull is felt — and the 737 was re-baselined with it, before and
+  after recorded in `flight/README.md`. The crew's numbers are technique, not airframe data, and
+  `airframe_score` does not depend on them. The hand-flown gate on the A320 takes Vapp from the FAC's
+  VLS, as a pilot reads it off the speed tape.
+- The next fit: thrust. The climb-rate context row reads 4,602 fpm against WRAP's 1,500 to 2,530.
+  The engines are JSBSim's generic CFM56_5 (Aeromatic's lapse tables, 25,000 lb a side) on the
+  harness's thrust-lever schedule, drawn up for the 737 stand-in; neither has been fitted.
 - The harness keeps the airframe to one adapter (`harness/airframe.cpp`) and one aircraft file, so
   the swap stays small. Either airframe can fly: `FLIGHT_AIRFRAME=737|a320`.
 - Open — packaging. The browser product links A32NX, so it is GPLv3; `app/` stays MIT. Two

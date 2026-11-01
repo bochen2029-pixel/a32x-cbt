@@ -40,7 +40,7 @@ const Model kModels[] = {
     {"737", "737", "737", false, false, 5.0},
     {"a320", "A320 (ours, fitted)", "A320-fit", true, true, 9.5},
 };
-constexpr const char* kDefaultModel = "737";
+constexpr const char* kDefaultModel = "a320";  // since 2026-11-01, under the swap rule (ROADMAP.md, P7)
 
 const Model* findModel(const std::string& key) {
   for (const Model& m : kModels) {

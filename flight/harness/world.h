@@ -5,7 +5,7 @@
 // adirs.rs, landing_gear/mod.rs, a320_systems/.../sfcc/mod.rs): standard aeronautical signs,
 // accelerometers that include gravity, discrete bits where the producers put them. Actuators follow
 // the computers' orders at a finite rate, so position feedback agrees with command the way a healthy
-// servo makes it agree. The airframe is JSBSim's 737 (airframe.h): A320-class, not an A320. The crew
+// servo makes it agree. The airframe is our fitted A320 or JSBSim's 737 (airframe.h). The crew
 // is a script that flies it through the laws, closed loop, the way a pilot would.
 
 #pragma once

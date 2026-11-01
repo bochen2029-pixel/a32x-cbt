@@ -1,5 +1,5 @@
 // The law harness: ELAC 1-2, SEC 1-3, FAC 1-2 and FCDC 1-2 from A32NX, unmodified, stepped at 50 Hz
-// in a world whose airframe is JSBSim's 737 (world.h, airframe.h). GPLv3.
+// in a world whose airframe is JSBSim flying our fitted A320, or the 737 (world.h, airframe.h). GPLv3.
 //
 //   law_harness --minutes 30 --gate         the P6 gate: thirty simulated minutes, all of it checked
 //   law_harness --minutes 3 --check-determinism

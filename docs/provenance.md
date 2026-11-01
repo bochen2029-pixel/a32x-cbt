@@ -72,9 +72,9 @@ git -C ../jsbsim fetch --depth 1 origin 66f7fafc07fe13e7ede9db20873030fed2881713
 git -C ../jsbsim checkout FETCH_HEAD
 ```
 
-**The airframe that flies by default is JSBSim's 737, not its A320.** Both ship in the clone; they are
-data files, read at run time from it, unmodified. Beside the 737 flies an A320 of ours, fitted to the
-targets in §1d (§1e); it uses one more of the clone's files, an engine.
+**The airframe that flies by default is an A320 of ours (§1e), since 2026-11-01. Before it, JSBSim's
+737 flew, never its A320**, and the 737 stays selectable. Both ship in the clone; they are data files,
+read at run time from it, unmodified. Our A320 uses one more of the clone's files, an engine.
 
 | file | author, date | licence | used |
 |---|---|---|---|
@@ -91,11 +91,11 @@ transport's. An aeroplane that cannot be trimmed at approach speed cannot fly th
 ILS. The 737 trims from 130 kt with full flap to cruise at Mach 0.78 with 2–11° of elevator, and has
 ground effect, spoilers and plausible lateral-directional derivatives.
 
-So the aeroplane that flies by default is a 737-class airframe under the A320's flight control
+So the aeroplane that flew first was a 737-class airframe under the A320's flight control
 computers: A320-class in size, weight and speed, not an A320. That is said wherever its numbers are
 reported. The operator decided to fly it for P7 and replace it later with an A320 data set fitted to
-the targets in §1d; the rule for that swap is in `ROADMAP.md`, P7, and where the fitted A320 stands
-against it is in `flight/README.md`.
+the targets in §1d; the rule for that swap is in `ROADMAP.md`, P7. Our fitted A320 met it and replaced
+the 737 on 2026-11-01, on the operator's word; the scores are in `flight/README.md`.
 
 Both aircraft files carry the same note: built from public data and guesses, for education and
 entertainment, not endorsed by the manufacturer, not to be sold. This project sells nothing.

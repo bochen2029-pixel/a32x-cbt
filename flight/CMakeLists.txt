@@ -163,8 +163,12 @@ add_test(NAME airframe_is_scored_against_the_a320 COMMAND airframe_score --check
 # crosses 20 counts, a pitch pulse answered the right way round.
 add_test(NAME scorer_instruments_read_the_737_right COMMAND airframe_score --instruments)
 
-# Our A320 loads, flies the scorer's circuit, and every row is measured on it.
-add_test(NAME a320_is_scored_against_the_a320 COMMAND airframe_score --airframe a320 --check)
+# Our fitted A320 flies by default since 2026-11-01. The 737 it replaced stays selectable and keeps its
+# own cases, so the swap rule can always score both: it is scored, flies the gate, and lands.
+add_test(NAME the_737_is_scored_against_the_a320 COMMAND airframe_score --airframe 737 --check)
+add_test(NAME the_737_flies_the_gate COMMAND law_harness --minutes 30 --gate)
+add_test(NAME the_737_lands_inside_the_limits COMMAND law_harness --minutes 18 --expect landing)
+set_tests_properties(the_737_flies_the_gate the_737_lands_inside_the_limits PROPERTIES ENVIRONMENT "FLIGHT_AIRFRAME=737")
 
 # The fitter's optimiser finds known minima: a sphere, a rotated ellipsoid of condition 1e6, Rosenbrock.
 add_test(NAME cma_es_finds_known_minima COMMAND airframe_fit --selftest)
