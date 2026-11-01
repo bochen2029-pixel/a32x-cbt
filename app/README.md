@@ -13,12 +13,19 @@ npm run build:web   # typecheck, then bundle to web/app.js
 npm run check       # typecheck + the full suite, 160 tests
 npm run serve       # optional: http://127.0.0.1:8130
 npm run package     # bundle, then dist/a32x-cbt.zip — the download a user gets
+npm run measure     # cold start, scenario reset, tick rate — headless Chrome on file://
 ```
 
 The zip holds `index.html`, `app.js`, `data/`, `LICENSE` and `README.txt` (run instructions, the
 disclaimer, the PSX attribution) in one `a32x-cbt/` folder. The file list is explicit in
 `tools/package.mjs`, and the build is refused if a notice is missing or the page points at a file
 the zip does not carry. Same tree, same bytes: entries are dated `SOURCE_DATE_EPOCH`, else 1980-01-01.
+
+`npm run measure` opens the page the way a user does, from `file://`, in headless Chrome with
+software rendering, and watches it from outside — no probe is built into `app.js`. It needs Chrome,
+Chromium or Edge installed (or `CHROME` set to one); `-- --throttle 6` emulates a slower CPU, and
+`-- --help` lists the rest. It drives the browser over a pipe, so no port is opened, and every
+browser it starts is closed and its profile deleted.
 
 Node 24. TypeScript and esbuild are build-time only; there are no runtime dependencies.
 
@@ -53,6 +60,6 @@ npm run demo:depress    # the depressurisation drill
 | `src/scenario/` | save, parse, atomic apply |
 | `src/app/` | browser entry and draw model |
 | `web/` | the page, the bundle, `web/data/*.json`, and the `README.txt` that ships beside them |
-| `tools/` | build, serve, package (with its own zip writer) |
+| `tools/` | build, serve, package (with its own zip writer), measure, and the headless-Chrome driver they share |
 
 Read `../CLAUDE.md` before changing behaviour, and `../docs/conventions.md` for worked examples.
