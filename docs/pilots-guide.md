@@ -65,6 +65,7 @@ Plug it in and press any button: the page reads it through the browser's Gamepad
 gamepad flies as it is. For any other device press **M**: the page asks for each control in turn —
 move it, **Enter** confirms, **Escape** skips. Then **C** to calibrate: move every control to both its
 ends, and press **C** again. The mapping and the calibration are kept for that device, in that browser.
+Reverse thrust is a held button: D-pad up on a standard gamepad, or the one you choose in the mapping.
 
 ## The keyboard
 
@@ -73,6 +74,7 @@ ends, and press **C** again. The mapping and the calibration are kept for that d
 | ↑ ↓ ← → | the sidestick: ↓ pulls, ↑ pushes, ← → roll; it springs back when you let go |
 | Z  X | rudder, left and right |
 | PgUp  PgDn | thrust levers forward and back, with detents at CL, FLX/MCT and TOGA |
+| Shift + PgDn | reverse thrust, on the ground: with Shift held the levers go back past idle, clicking at reverse idle and at MAX REV; coming forward they stop at idle |
 | R  F | flaps, up and down a notch |
 | G | gear, up or down |
 | B | brakes, while held |
@@ -113,8 +115,8 @@ flaps FULL, gear down — and trimmed. The glide is 3°: about 318 ft a nautical
 threshold at 10 nm.
 
 **Hands off, it holds.** In normal law the sidestick asks for a change, not a position: let go and the
-aircraft holds its flight path and its bank. Fly the ILS with small, brief inputs, then let go and
-watch the flight path symbol settle.
+aircraft holds its flight path, and its bank up to 33° (beyond that, let go and it rolls back toward
+33°). Fly the ILS with small, brief inputs, then let go and watch the flight path symbol settle.
 
 **The beams.** The magenta diamonds show where each beam lies from you: the localizer's below, the
 glideslope's on the right. Fly *towards* the diamond to centre it. Two dots is full scale; the gate
@@ -125,9 +127,11 @@ target, *Vapp*, appears in magenta under the speed about 24 s after the start: t
 selectable speed (VLS) plus 5 kt. From the normal 10 nm start it is fixed at 134 kt as you pass
 1,000 ft above the threshold. Hold it between 5 kt below and 10 kt above.
 
-**The landing.** The radio height, in the middle, turns amber below 400 ft. From about 30 ft close
-the thrust levers and pull gently: the scripted crew touches down at about 160 fpm, the nose 5.8° up,
-330 m past the threshold. Keep straight on the centreline with the rudder, and stop with the brakes.
+**The landing.** The radio height, in the middle, turns amber below 400 ft. From about 30 ft begin a
+gentle, growing pull, and at 20 ft close the thrust levers (where the real A320 calls RETARD). The
+scripted crew flares that way and touches down at about 160 fpm, the nose 5.8° up, 330 m past the
+threshold. Keep straight on the centreline with the rudder; on the ground, Shift + PgDn pulls the
+levers into reverse thrust, and the brakes stop you.
 
 **Flare progressively.** A normal approach and flare reach about 8° of angle of attack, some 2° short
 of where the protection begins. An abrupt pull to full back stick near the ground, in CONF FULL, can
@@ -238,11 +242,11 @@ Everything after `index.html?` in the address, joined with `&`:
 |-------------|---------------|
 | `scenario=approach` | the ILS to 17C from 10 nm; its options follow, joined with `;` |
 | `…;distance=5` | from 5 nm instead (NM) |
-| `…;loc=1;gs=0.5` | start that many dots off the localizer and the glideslope |
+| `…;loc=1;gs=0.5` | start off the beams: `loc=1` a dot left of the localizer, `gs=0.5` half a dot low; negative values, right and high |
 | `…;cas=150` | at another speed (kt) |
 | `…;wind=227/15` | a wind, from 227° at 15 kt; `turbulence=` a severity |
 | `…;fail=green@420` | the instructor's failures, at a time in seconds: `adr1`–`3`, `ir1`–`3`, `green`, `blue`, `yellow`, `elac1`–`2`, `sec1`–`3`, joined with `+` to fail together, as in `fail=adr1+adr2+adr3@300,green@420` |
-| `scenario=air;alt=10000;cas=250` | level and trimmed over the threshold, to try the protections |
+| `scenario=air;alt=10000;cas=250` | level and trimmed over the threshold, to try the protections: `alt` from 2,000 ft above the field to 39,000 ft, `cas` 100 to 400 kt, `lever=0..4` for the flaps; with `crew=script`, `manoeuvre=hold`, `bank`, `pull`, `push`, `alpha` or `speed` flies a protection as a test pilot would |
 | `runway=LSZH14` | (in the scenario) Zurich's runway 14 instead of 17C |
 | `airframe=737` | JSBSim's 737 flies instead of our A320 (it is still drawn as an A320) |
 | `crew=script` | the scripted crew flies |
