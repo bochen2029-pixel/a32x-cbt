@@ -5,6 +5,16 @@
 // module and the worker together, as one string. A Blob made from it is a worker that loads nothing, so
 // the page runs from file:// with the network off.
 
+// The name a recording is saved under: the airframe the core flew (the file's '# airframe:' line), the
+// scenario or else the runway the flight started on, and the simulated seconds. Nothing in it but
+// letters, digits, '.', '_' and '-', so it is a file name on every system: wind=270/15 has a '/'.
+export function recordingName(text, scenario, seconds, airframe = 'a320') {
+  const safe = (v) => String(v).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  const key = safe((/^# airframe: *(\S+)/m.exec(text) || [])[1] || airframe) || 'a320';
+  const t = Number.isFinite(seconds) ? Math.max(0, Math.round(seconds)) : 0;
+  return `a32x-${key}-${safe(scenario) || 'flight'}-${String(t).padStart(4, '0')}s.csv`;
+}
+
 export class Flight {
   // onState(message) is called with each state the worker sends back.
   constructor(onState, onError) {

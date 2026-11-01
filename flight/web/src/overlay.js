@@ -92,6 +92,8 @@ export class Overlay {
       g.fillText(text, align === 'right' ? x - 6 * r : align === 'center' ? x : x + 6 * r, y);
     };
     box(cx - W * 0.3, cy, `${s.cas_kn.toFixed(0)} KT`, 'right');
+    // the speed the gate holds the pilot to, once the core has one: VLS + 5, frozen at 1,000 ft
+    if (Number.isFinite(s.vapp_kn)) box(cx - W * 0.3, cy + 28 * r, `${s.vapp_kn.toFixed(0)} VAPP`, 'right', '#ff40ff');
     box(cx + W * 0.3, cy, `${s.alt_ft.toFixed(0)} FT`, 'left');
     box(cx + W * 0.3, cy + 28 * r, `${s.vs_fpm >= 0 ? '+' : ''}${(s.vs_fpm / 100).toFixed(0)} V/S`, 'left');
     if (s.ra_ft < 2500) box(cx, cy + H * 0.22, `${s.ra_ft.toFixed(0)}`, 'center', s.ra_ft < 400 ? AMBER : GREEN);

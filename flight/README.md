@@ -1000,6 +1000,18 @@ on the A320, 4.69 m above the runway and 0.51 m left of the centreline, the left
 still needs is the page's own: the target speed marked, the debrief shown at the stop and the recording
 saved (fbw-desktop's change). Then the operator flies five.
 
+**The page's half** (2026-11-01). The overlay shows `vapp_kn` in magenta under the speed, `VAPP`, once
+the core has one, and the flight deck's placeholder PFD puts its bug there. When `judge_stable` is set
+a panel shows the verdict as `flight_debrief()` words it (until the worker passes those words on, the
+same verdict from the state's slots). Ctrl+S, or the panel's button, saves the worker's recording as it
+stands — the file `law_harness --replay` judges, the one a pilot hands in — named
+`a32x-<airframe>-<scenario, or the runway>-<seconds>s.csv`, letters, digits, `.`, `_` and `-` only; a
+worker that keeps none says so in the status line. The debrief's flown path (K, L) is coloured by
+`judge_in_bands` itself: green inside every band, red out, grey outside the window. And the page's
+clock now starts at the worker's first answer, not its first frame: a fresh core's first steps are slow,
+and their time is not the flight's. A new case, `a_saved_recording_is_one_file_named_for_its_flight`,
+makes fifty-eight native cases, all passing with either airframe on MSVC 19.44.
+
 New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `the_judge_finds_an_unflared_approach_not_stable` and `the_judge_has_nothing_to_judge_on_the_runway`,
 through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-seven native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-two under node, the WebAssembly build leaving out the five that start processes.

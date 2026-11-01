@@ -11,7 +11,7 @@
 
 import { Clock } from './clock.js';
 import { apply, controlsFromInputs, coreInputs, initialControls } from './controls.js';
-import { Flight } from './flight.js';
+import { Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { runwayFromState } from './scene-math.js';
@@ -32,13 +32,23 @@ const status = document.getElementById('status');
 const software = softwareRendering();
 const view = new View(document.getElementById('view'), params.get('time') || 'dusk',
                       params.has('aa') ? params.get('aa') !== '0' : !software,
-                      { software, tier: params.get('tier'), hour: params.has('hour') ? Number(params.get('hour')) : null });
+                      { software, tier: params.get('tier'), hour: params.has('hour') ? Number(params.get('hour')) : null,
+                        flying: airframe === '737' ? '737' : 'a320' });
 let drawn = '';          // the airport the view drew, and the runway end the flight is on
 const overlayCanvas = document.getElementById('overlay');
+const panel = document.getElementById('debrief'), verdict = document.getElementById('verdict');
+let shownVerdict = '';   // the verdict the panel shows
+let saved = '';          // what the last save did, for the status line
+document.getElementById('save').addEventListener('click', () => save());
 const overlay = new Overlay(overlayCanvas);
 
 // The view's own keys, beside the hands' (hands.js uses none of these): cameras, the hour, the debrief.
 window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    e.preventDefault();
+    save();
+    return;
+  }
   if (e.ctrlKey || e.altKey || e.metaKey || !view.body) return;
   if (/^[0-9]$/.test(e.key)) view.setCamera(CAMERAS[(Number(e.key) + 9) % 10]);
   else if (e.key === 'v' || e.key === 'V') view.nextCamera();
@@ -163,21 +173,61 @@ function show() {
       `${c.parkingBrake ? 'PARK BRK  ' : ''}${c.toeBrakes ? 'BRAKES  ' : ''}${c.speedbrake ? 'SPD BRK  ' : ''}` +
       `${c.spoilersArmed ? 'GND SPLR ARM  ' : ''}${c.rudderTrim ? `RUD TRIM ${c.rudderTrim > 0 ? 'L' : 'R'}  ` : ''}` +
       `${c.takeover ? 'TAKEOVER (no autopilot yet)' : ''}\n`) +
-    `${hands.prompt()}` + (hands.help ? `\n\n${[...KEY_HELP, ...VIEW_KEYS].join('\n')}` : '');
+    `${hands.prompt()}` + (hands.help ? `\n\n${[...KEY_HELP, ...VIEW_KEYS, 'Ctrl+S  save the recording'].join('\n')}` : '');
   const r = report();
   const cls = r.stepsDropped ? 'warn' : '';
   status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n${view.describe()}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
-    `<span class="${cls}">${r.stepsDropped} steps dropped</span>`;
+    `<span class="${cls}">${r.stepsDropped} steps dropped</span>` + (saved ? `\n${saved}` : '');
+  // the gate's verdict once the core has stopped judging, as the core words it (flight_debrief())
+  const judged = Number.isFinite(value('judge_stable'));
+  // a worker too old to send the core's words gets the verdict from the slots, said as plainly
+  const words = latest.debrief || (judged ? `${value('judge_stable') ? 'STABLE' : 'NOT STABLE'}, the touchdown ` +
+    `${value('judge_touchdown_m').toFixed(0)} m past the threshold` : '');
+  if (judged && words !== shownVerdict) {
+    shownVerdict = words;
+    verdict.textContent = words;
+  }
+  panel.hidden = !judged;
+}
+
+// The recording, saved as the one file a pilot hands in: the scenario, the airframe and every step's
+// inputs, which law_harness --replay judges as it stands. Named for the airframe, the scenario (or the
+// runway the flight started on) and the simulated seconds; only letters, digits, '.', '_' and '-'.
+async function save() {
+  if (!latest) return;
+  const reply = await Promise.race([flight.recording(), new Promise((resolve) => setTimeout(() => resolve(null), 3000))]);
+  if (!reply || typeof reply.text !== 'string' || !reply.text) {
+    saved = '<span class="bad">no recording: this core does not keep one</span>';
+    return;
+  }
+  const name = recordingName(reply.text, scenario || drawn, value('t_s'), airframe || 'a320');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([reply.text], { type: 'text/csv' }));
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  saved = `saved ${name} (${reply.steps} steps)`;
 }
 
 let last = 0;
+let started = false;     // the clock is running: the worker has answered once
+let kicked = false;      // the step that wakes the worker has been asked for
 let pending = 0;         // steps due but not yet asked for: the worker was still busy
 let droppedWaiting = 0;  // steps given up because the worker stayed busy past five
 let lastDropS = NaN;     // simulated time of the last frame that dropped steps
 function frame(now) {
   ++frames;
-  const realMs = last ? Math.min(now - last, 1000) : 0;
+  // The clock runs from the worker's first answer: a fresh core's first steps, JSBSim and the computers
+  // starting, are slow, and the time they take is not the flight's. Until then one step is asked for,
+  // outside the clock's count; the flight's own time and its recording are the same either way.
+  if (!started && latest && latest.type === 'state') {
+    started = true;
+    last = 0;
+  }
+  const realMs = started && last ? Math.min(now - last, 1000) : 0;
   last = now;
   // The clock decides the steps. While the worker still owes the last answer they wait, up to five;
   // past that they are dropped, as the clock drops its own.
@@ -197,6 +247,10 @@ function frame(now) {
   if (pending && flight.step(pending, scripted ? null : inputs.slice())) {
     ++requests;
     pending = 0;
+  }
+  if (!started && !kicked && flight.step(1, scripted ? null : inputs.slice())) {
+    kicked = true;
+    ++requests;
   }
   if (latest) {
     const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));

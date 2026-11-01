@@ -97,14 +97,10 @@ test('the atmosphere stays finite, blue overhead at noon, and reddens the low su
   for (const h of a.table) assert.ok(Number.isFinite(THREE.DataUtils.fromHalfFloat(h)));
 });
 
-test('the debrief judges the flown path by the P7 gate\'s bands', { skip: needsThree }, async () => {
-  const { BAND, judge } = await import('../src/acmi.js');
-  const steady = { thr_height_ft: 500, loc_dots: 0.1, gs_dots: 0.2, vs_fpm: -700, cas_kn: 140, roll_deg: 1, on_ground: 0 };
-  assert.equal(judge(steady, NaN), BAND.ok);
-  assert.equal(judge({ ...steady, loc_dots: 0.8 }, NaN), BAND.near);
-  assert.equal(judge({ ...steady, loc_dots: 1.2 }, NaN), BAND.out);
-  assert.equal(judge({ ...steady, vs_fpm: -1100 }, NaN), BAND.out);
-  assert.equal(judge({ ...steady, cas_kn: 152 }, 140), BAND.out, 'over Vapp + 10 kt, where Vapp is known');
-  assert.equal(judge({ ...steady, cas_kn: 152 }, NaN), BAND.ok, 'no speed band without a Vapp');
-  assert.equal(judge({ ...steady, thr_height_ft: 1500, loc_dots: 2 }, NaN), BAND.ok, 'judged from 1,000 ft down only');
+test('the debrief colours the flown path by the gate\'s own judgement, the core\'s', { skip: needsThree }, async () => {
+  const { BAND, bandOf } = await import('../src/acmi.js');
+  assert.equal(bandOf({ judge_in_bands: 1 }), BAND.ok, 'inside all its bands');
+  assert.equal(bandOf({ judge_in_bands: 0 }), BAND.out);
+  assert.equal(bandOf({ judge_in_bands: NaN }), BAND.outside, 'outside the window it judges');
+  assert.equal(bandOf({}), BAND.outside, 'a core without the judge judges nothing');
 });

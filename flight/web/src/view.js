@@ -11,7 +11,7 @@ import A320 from '../data/a320.json' with { type: 'json' };
 import SKYLINE from '../data/dallas-skyline.json' with { type: 'json' };
 import REGION from '../data/dfw-region.json' with { type: 'json' };
 import KDFW from '../data/kdfw.json' with { type: 'json' };
-import { Acmi, judge } from './acmi.js';
+import { Acmi, bandOf } from './acmi.js';
 import { Airliner, structuralMatrix } from './airliner.js';
 import { Airport } from './airport.js';
 import { airportFromRunway, findRunwayEnd, runwayFrame, validateAirport } from './airport-layout.js';
@@ -65,7 +65,9 @@ export function softwareRendering() {
 export class View {
   // software: WebGL is drawn by the CPU here (softwareRendering). tier: 'low' (the floor) or 'high' (the
   // GPU tier); unset, the floor where the CPU draws. hour: the GPU tier's solar hour; unset, time's.
-  constructor(canvas, time = 'dusk', antialias = true, { software = false, tier = null, hour = null } = {}) {
+  // flying: the airframe the core flies, 'a320' or '737'; the drawn model is an A320's either way.
+  constructor(canvas, time = 'dusk', antialias = true, { software = false, tier = null, hour = null, flying = 'a320' } = {}) {
+    this.flying = flying;
     this.floor = (tier || (software ? 'low' : 'high')) === 'low';
     this.t = TIMES[time] || TIMES.dusk;
     this.software = software;
@@ -95,6 +97,7 @@ export class View {
     }
     this.airframe = validateAirframe(A320);
     this.structural = structuralMatrix(this.airframe.cg);
+    this.cgNow = this.airframe.cg.slice();   // the CG the drawn structure hangs from (update)
     this.mode = 'eye';
     this.look = { yaw: 0, pitch: -10 };
     this.orbit = { yaw: 2.4, pitch: 0.14, dist: 80 };
@@ -298,7 +301,8 @@ export class View {
     this.scene.add(this.acmi.group);
     this.vector = new THREE.LineSegments(new THREE.EdgesGeometry(this.outline, 28), new THREE.LineBasicMaterial({ color: 0xf2f2f2 }));
     this.vector.visible = false;
-    this.airliner.root.add(this.vector);
+    this.vector.geometry.applyMatrix4(this.structural.clone().invert());   // into the structure's metres
+    this.airliner.structure.add(this.vector);
   }
 
   setDebrief(on) {
@@ -348,7 +352,7 @@ export class View {
     if (s.t_s - this.lastSample < 0.25) return;
     this.lastSample = s.t_s;
     const root = this.body;
-    const e = { t: s.t_s, p: root.position.toArray(), w: new THREE.Vector3(1, 0, 0).applyQuaternion(root.quaternion).toArray(), band: judge(s, NaN) };
+    const e = { t: s.t_s, p: root.position.toArray(), w: new THREE.Vector3(1, 0, 0).applyQuaternion(root.quaternion).toArray(), band: bandOf(s) };
     this.history.push(e);
     if (this.history.length > 60000) this.history.splice(0, 10000);   // four hours
     if (this.debriefOn || this.trailOn) this.trace(e);
@@ -383,7 +387,8 @@ export class View {
   describe() {
     const h = this.scenery?.hour;
     const hour = h === undefined ? '' : ` · ${String(Math.floor(h)).padStart(2, '0')}:${String(Math.floor((h % 1) * 60)).padStart(2, '0')} solar`;
-    return `${this.floor ? 'floor' : 'GPU'} tier · ${this.mode}${this.debriefOn ? ' · debrief' : ''}${hour}`;
+    const deck = this.mode === 'cockpit' && this.foreignDeck ? ' · an A320\'s deck, its eye' : '';
+    return `${this.floor ? 'floor' : 'GPU'} tier · ${this.mode}${deck}${this.debriefOn ? ' · debrief' : ''}${hour}`;
   }
 
   resize(width, height) {
@@ -397,10 +402,25 @@ export class View {
   update(s, dt = 0) {
     const body = this.body, root = this.airliner?.root;
     const [x, z] = xz(this.origin, s.lat_deg, s.lon_deg);
-    body.position.set(x, this.airframe.cgHeightM + Math.max(0, s.ra_ft) * FT, z);
+    // the CG over the ground as the core has it for the airframe flying (cg_height_m), so the wheels
+    // touch where ra_ft reads zero; the drawn A320's own where a core does not say
+    const own = this.flying !== '737';   // the drawn airframe is the one flying
+    const cgHeight = own && Number.isFinite(s.cg_height_m) ? s.cg_height_m : this.airframe.cgHeightM;
+    body.position.set(x, cgHeight + Math.max(0, s.ra_ft) * FT, z);
     body.rotation.set(s.pitch_deg * DEG, -s.heading_deg * DEG, -s.roll_deg * DEG);
     body.updateMatrixWorld();
     if (root) {
+      // The drawn A320 hangs from the CG the core flies, loaded with its fuel and payload, not the file's
+      // empty one: the core gives its eye about that CG in body axes, the file the eye in the structure,
+      // and the difference is the CG. So the deck's eyepoint is the core's eye, and the wheels stand
+      // where cg_height_m puts them. A 737 flying keeps the drawn A320's own.
+      const e = this.airframe.eye;
+      const cg = own && Number.isFinite(s.eye_fwd_m) ? [e[0] + s.eye_fwd_m, e[1] - s.eye_right_m, e[2] - s.eye_up_m] : this.airframe.cg;
+      if (Math.abs(cg[0] - this.cgNow[0]) + Math.abs(cg[1] - this.cgNow[1]) + Math.abs(cg[2] - this.cgNow[2]) > 1e-3) {
+        this.cgNow = cg;
+        this.structural = structuralMatrix(cg);
+        this.airliner.structure.matrix.copy(this.structural);
+      }
       root.position.copy(body.position);
       root.quaternion.copy(body.quaternion);
       root.updateMatrixWorld(true);
@@ -423,6 +443,7 @@ export class View {
     this.airport.update(cam, s.t_s);
     if (this.mode === 'cockpit') {
       this.tubes.distanceNm = Math.max(0, s.thr_along_m ?? 0) / 1852;   // runway.cpp: + before the threshold
+      this.tubes.vapp = Number.isFinite(s.vapp_kn) ? s.vapp_kn : 0;    // the speed the gate holds the pilot to
       if (this.lastTubes < 0) this.cockpit.draw(s, this.tubes);
       else this.cockpit.drawOne(this.lastTubes, s, this.tubes);
       ++this.lastTubes;
@@ -464,7 +485,10 @@ export class View {
         break;
       }
       case 'cockpit': {
-        // the left seat at the airframe file's own EYEPOINT; drag to turn the head
+        // the left seat: the flying airframe's own eye from the core, the one the pilot's eye uses, where
+        // the drawn deck is that airframe's; else (a 737 flying under the drawn A320) the deck's own eye,
+        // so the seat stays in the deck. Drag to turn the head.
+        this.foreignDeck = this.flying === '737';
         cam.position.fromArray(this.airframe.eye).applyMatrix4(this.structural).applyMatrix4(root.matrixWorld);
         const head = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.look.pitch * DEG, this.look.yaw * DEG, 0, 'YXZ'));
         cam.quaternion.copy(Q).multiply(head);

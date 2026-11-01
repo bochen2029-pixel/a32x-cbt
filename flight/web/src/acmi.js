@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 
 const NM = 1852;
-export const BAND = { ok: 0, near: 1, out: 2 };
-const BAND_COLOUR = [[0.25, 1.0, 0.45], [1.0, 0.72, 0.12], [1.0, 0.22, 0.16]];
+export const BAND = { ok: 0, out: 1, outside: 2 };
+const BAND_COLOUR = [[0.25, 1.0, 0.45], [1.0, 0.22, 0.16], [0.55, 0.6, 0.66]];
 
 export class Acmi {
   // runwayFrame: the primary runway's matrix (threshold at origin, landing -z); runway: its data;
@@ -135,17 +135,9 @@ export class Acmi {
   }
 }
 
-// The bands of the P7 gate (ROADMAP §4), judged between 1,000 ft and 50 ft above the threshold: inside,
-// near an edge (three quarters of the band used), or out.
-export function judge(s, vapp) {
-  const h = s.thr_height_ft ?? s.ra_ft;
-  if (!(h <= 1000 && h >= 50) || s.on_ground) return BAND.ok;
-  const used = Math.max(
-    Math.abs(s.loc_dots || 0) / 1,
-    Math.abs(s.gs_dots || 0) / 1,
-    Math.max(0, -(s.vs_fpm || 0)) / 1000,
-    !Number.isFinite(vapp) ? 0 : (s.cas_kn - vapp) > 0 ? (s.cas_kn - vapp) / 10 : (vapp - s.cas_kn) / 5,
-    Math.abs(s.roll_deg || 0) / 7,
-  );
-  return used > 1 ? BAND.out : used > 0.75 ? BAND.near : BAND.ok;
+// A sample as the gate judged it, from the core's own judge (judge_in_bands, flight/harness): outside
+// the window it judges (1,000 ft to 50 ft above the threshold), or in all of its bands there, or out.
+export function bandOf(s) {
+  const v = s.judge_in_bands;
+  return typeof v !== 'number' || Number.isNaN(v) ? BAND.outside : v ? BAND.ok : BAND.out;
 }
