@@ -22,6 +22,12 @@
 #include <string>
 #include <vector>
 
+#ifdef _WIN32
+#include <process.h>
+#else
+#include <unistd.h>
+#endif
+
 #include "Arinc429Utils.h"
 #include "core.h"
 #include "efcs.h"
@@ -665,6 +671,14 @@ std::string self(const char* argv0) {
   return std::string("\"") + argv0 + "\"";
 }
 
+long long processId() {
+#ifdef _WIN32
+  return _getpid();
+#else
+  return getpid();
+#endif
+}
+
 // A fresh process's digest, and its first touchdown when it had one. `extra` is appended to its
 // command line.
 bool childDigest(const char* argv0, double minutes, std::string& out, std::string* touchdown = nullptr,
@@ -754,7 +768,8 @@ int main(int argc, char** argv) {
   // The scripted crew's inputs recorded in one fresh process and flown back through the flight core,
   // as an outside crew, in another: the same bytes from every computer, and the same touchdown.
   if (opt.replayCheck) {
-    const std::string file = "replay-check.csv";
+    // A recording of this process's own: checks run side by side (ctest -j) write different files.
+    const std::string file = "replay-check-" + std::to_string(processId()) + ".csv";
     const std::string scenario = opt.scenario.empty() ? "" : " --scenario \"" + opt.scenario + "\"";
     std::string a, b, ta, tb;
     const bool ran = childDigest(argv[0], opt.minutes, a, &ta, scenario + " --record " + file) &&
@@ -764,6 +779,11 @@ int main(int argc, char** argv) {
     int failed = verdict("the replay gives the same bytes", ran && a == b, ran ? "digests " + a + " and " + b : "a child run failed");
     failed += verdict("and the same touchdown", ran && !ta.empty() && ta == tb,
                       ta.empty() ? std::string("no touchdown recorded") : ta + (ta == tb ? "" : "; replayed: " + tb));
+    if (failed) {
+      std::printf("the recording is kept: %s\n", file.c_str());
+    } else {
+      std::remove(file.c_str());
+    }
     std::printf("%s\n", failed ? "FAILED" : "PASSED");
     return failed ? 1 : 0;
   }
