@@ -1,7 +1,7 @@
 ---
 title: "Flying the A32X in the browser"
 subtitle: "A pilot's guide to the simulator, and to the P7 gate"
-date: "1 November 2026 · release 0.1.1"
+date: "1 November 2026"
 ---
 
 # What it is
@@ -28,7 +28,9 @@ yourself, or the release's own folder. The page loads the flight core, draws the
 the flight. Its top-right corner says which airport and runway it drew, which airframe is flying, who
 is flying it, and which build of the simulator this is, the commit it was made from (a build made from
 uncommitted changes, `+dirty`, is marked in amber: the gate does not take it); under that, how it
-draws, and how much each step of the flight costs.
+draws, and how much each step of the flight costs. The pictures in this guide were taken just before
+their release was cut, so the build their status line names is that one; yours names the build you are
+flying.
 
 To build it, `flight/README.md` ("The browser simulator") has the steps: the flight core through
 Emscripten, then `node tools/build.mjs --core <flight_core.js>` in `flight/web`.
