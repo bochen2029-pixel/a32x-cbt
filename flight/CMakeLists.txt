@@ -281,7 +281,8 @@ add_test(NAME without_reversers_nothing_deploys_in_flight COMMAND reverse_test a
 set_tests_properties(without_reversers_below_idle_is_idle without_reversers_nothing_deploys_in_flight
                      PROPERTIES ENVIRONMENT "FLIGHT_AIRFRAME=737")
 # On our A320, whose file has them: ground idle parked, the reversers out in 2 s on the ground and MAX REV
-# pushing it back; in flight nothing deploys, and the idle is approach idle.
+# pushing it back, the engines held at idle while the doors move either way; in flight nothing deploys,
+# and the idle is approach idle.
 add_test(NAME the_a320_reverses_on_the_ground COMMAND reverse_test ground)
 add_test(NAME the_a320_deploys_nothing_in_flight COMMAND reverse_test air)
 set_tests_properties(the_a320_reverses_on_the_ground the_a320_deploys_nothing_in_flight

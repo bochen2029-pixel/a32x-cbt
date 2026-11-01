@@ -324,7 +324,9 @@ struct Airframe::Impl {
   // Ground idle and the reversers, before a tick: approach idle in flight, ground idle with both main
   // gears on the ground, coming in as the engines spool down; a reverser deploys only on the ground with
   // its engine running and its lever below idle, and gives reverse idle until it is fully out. Then the
-  // throttle for each lever: forward on the schedule, or reverse from idle at -6 to MAX REV at -20.
+  // throttle for each lever: forward on the schedule, or reverse from idle at -6 to MAX REV at -20. A
+  // reverser not stowed holds its engine at idle whatever the lever asks, until it has stowed, so that
+  // forward thrust never goes out through doors still open.
   void engines(const AirframeControls& c, double dt) {
     const bool onGround = state.leftWow && state.rightWow;
     if (groundIdleSelect) {
@@ -341,6 +343,8 @@ struct Airframe::Impl {
         if (c.tla[e] < 0 && deployed[e] >= 1) {
           const double share = clamp((kRevIdleTla - c.tla[e]) / (kRevIdleTla - kMaxRevTla), 0, 1);
           setting = std::sqrt(share * reverseMax->getDoubleValue());
+        } else if (deployed[e] > 0) {
+          setting = 0;  // out, or on its way in: idle until it is stowed
         }
       }
       throttle[e]->setDoubleValue(setting);

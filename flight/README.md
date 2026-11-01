@@ -1417,7 +1417,10 @@ change were re-baselined once (below).
   left their bands.
 - The reversers deploy only on the ground, with the engine running and its lever below idle, in 2 s; give
   reverse idle until they are out; then reverse thrust to MAX REV, through JSBSim's direct thruster, its
-  thrust times the cosine of its reverser angle: +1 stowed, −efficiency deployed. The times are ours.
+  thrust times the cosine of its reverser angle: +1 stowed, −efficiency deployed. The times are ours. A
+  reverser not stowed holds its engine at idle whatever the lever asks, until it has stowed, as the
+  A320's FADEC does, so that forward thrust never goes out through doors still open: from MAX REV
+  straight to TOGA the engines run down for the 2 s the doors take, then spool up.
 - The state reports `ground_idle`, `reverser_1` and `reverser_2`.
 - The page: the reverse latches as a held control — Shift on the keyboard (Shift with PgDn pulls the
   levers into reverse), D-pad up on a standard gamepad, a step in the mapping wizard. The levers go
