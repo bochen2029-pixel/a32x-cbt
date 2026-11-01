@@ -1,12 +1,14 @@
 {
   "name": "a32x-flight-web",
+  "version": "0.1.0",
   "private": true,
   "license": "GPL-3.0-only",
   "type": "module",
   "description": "The flyable simulator's page: the flight core in a worker, a joystick, a 1980s full-flight-sim view (P7)",
   "scripts": {
     "build": "node tools/build.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "release": "node tools/release.mjs"
   },
   "dependencies": {
     "three": "0.186.1"

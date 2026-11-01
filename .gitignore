@@ -5,6 +5,7 @@ flight/build/
 flight/build-wasm/
 flight/build-web/
 flight/build-launcher/
+flight/dist/
 
 # deps
 node_modules/

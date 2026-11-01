@@ -1,0 +1,21 @@
+Airport data: public domain
+
+web\flight.js draws Dallas/Fort Worth International (KDFW) from its airport file, and web\core.js puts
+its runway 17C, and Zurich's runway 14 (LSZH), where they are on the earth. Their numbers come from:
+
+  OurAirports, runways.csv and airports.csv (https://davidmegginson.github.io/ourairports-data/),
+  retrieved 2026-11-01: KDFW's seven runways (each end's position, elevation, true heading and
+  displaced threshold, each runway's length and width), the field's elevation, and LSZH's runway 14.
+  OurAirports' data are in the public domain. The numbers were copied by value; no file is included.
+
+  The FAA's airport diagram AL-6039, Dallas-Fort Worth Intl, d-TPP cycle 2611, effective 29 October to
+  26 November 2026 (https://aeronav.faa.gov/d-tpp/2611/06039ad.pdf): KDFW's five terminals, its two
+  central terminal ramps and its three control towers, read off the chart and placed by its runways.
+  A work of the United States government, in the public domain (17 U.S.C. section 105). The chart
+  itself is not included.
+
+  As methods, not copied: the FAA's Advisory Circulars 150/5340-1 and 150/5340-30 for the runways'
+  markings and lights, and ICAO Annex 10, Volume I, for the ILS's geometry.
+
+The heights of the terminals and towers, the generic taxiways, the ILS on every runway (a 3 degree glide
+path, 50 ft over the threshold) and the PAPIs are this project's. Nothing here is fit for navigation.

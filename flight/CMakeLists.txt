@@ -390,6 +390,9 @@ if(FLIGHT_NODE)
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/recording-name.test.mjs")
   add_test(NAME the_debrief_logs_the_flight_s_moments_from_the_core_s_slots COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/events.test.mjs")
+  # The Windows release (web/tools/release.mjs) refuses to ship without every licence and notice it owes.
+  add_test(NAME the_release_refuses_to_ship_without_its_notices COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/release.test.mjs")
   if(EMSCRIPTEN)
     add_test(NAME the_browser_module_flies COMMAND "${FLIGHT_NODE}" --test "${CMAKE_CURRENT_SOURCE_DIR}/web/test/module.test.mjs")
     set_tests_properties(the_browser_module_flies PROPERTIES ENVIRONMENT "FLIGHT_CORE_JS=${CMAKE_CURRENT_BINARY_DIR}/flight_core.js")
