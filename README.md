@@ -74,7 +74,6 @@ other browsers and systems have not been tried.
 | `app/` | the systems trainer — systems, panel, ECAM, procedures. MIT. |
 | `flight/` | the flight simulator: the A32NX computers flying a JSBSim airframe, the browser shell (`flight/web`), and the tools that score and fit the airframe. GPLv3. |
 | `docs/` | provenance, architecture, and the design study of the PSX reference |
-| `tools/` | how to rebuild the PSX reference tree |
 | `reference/` | screenshots |
 
 ## Licence and provenance

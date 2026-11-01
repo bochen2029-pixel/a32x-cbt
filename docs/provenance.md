@@ -267,8 +267,8 @@ affiliated with Airbus, FlyByWire Simulations, or Aerowinx, and not suitable for
 ## 4 · What was verified, and how
 
 Every claim in `docs/architecture.md` marked `[R]` was read out of a running system rather than
-guessed. The PSX notes carry line-level references into a reference tree that is not in this
-repository — `tools/regen-psx-reference.md` explains how to rebuild it if you ever want it.
+guessed. The PSX notes were made from a study of a licensed copy; they describe its behaviour in
+our own words and carry no references into its code.
 
 The trainer's own behaviour is held by 182 tests. That is the evidence that matters day to day:
 `npm run test:all`.

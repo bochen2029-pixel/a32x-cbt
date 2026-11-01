@@ -31,7 +31,6 @@ five-approach rule; the page's half and the operator's five approaches remain.
   flight\         GPLv3. The A32NX port contract, and the flight control computers running headless
                   at 50 Hz: against a stub world for P6, flying a JSBSim airframe from P7.
   docs\           provenance, architecture, psx-notes\, conventions
-  tools\          regen-psx-reference.md
   reference\      two screenshots
 ```
 The `app/` / `flight/` split is enforced: `app/` links no A32NX code and carries no GPL
