@@ -493,6 +493,10 @@ const char* flight_state_text(int index) {
   return g_core && index >= 0 && index < static_cast<int>(kState.size()) ? g_core->stateText(index) : nullptr;
 }
 
+const char* flight_airframe(void) {
+  return Airframe::selected().c_str();
+}
+
 const char* flight_debrief(void) {
   static std::string text;
   if (!g_core) return nullptr;

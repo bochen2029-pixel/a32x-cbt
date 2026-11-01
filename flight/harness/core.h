@@ -58,6 +58,10 @@ const char* flight_state_text(int index);
 // Valid until the next call; null before flight_start.
 const char* flight_debrief(void);
 
+// The airframe flying, as flight_start names it ("a320", "737"): its argument, or the default it stood
+// for. A recording says it, so that it replays on the same airframe.
+const char* flight_airframe(void);
+
 #ifdef __cplusplus
 }
 

@@ -15,6 +15,7 @@ export class Flight {
     this.onState = onState;
     this.onError = onError;
     this.busy = false;
+    this.recordings = [];  // what recording() waits on, oldest first: the worker answers in order
     this.inputNames = [];
     this.stateNames = [];
     this.worker.onmessage = (e) => this.receive(e.data);
@@ -37,6 +38,14 @@ export class Flight {
     return true;
   }
 
+  // The flight so far, as law_harness --replay reads it: a promise of {text, steps}.
+  recording() {
+    return new Promise((resolve) => {
+      this.recordings.push(resolve);
+      this.worker.postMessage({ type: 'recording' });
+    });
+  }
+
   receive(m) {
     if (m.type === 'ready') {
       this.inputNames = m.inputNames;
@@ -48,6 +57,8 @@ export class Flight {
     } else if (m.type === 'state') {
       this.busy = false;
       this.onState(m);
+    } else if (m.type === 'recording') {
+      this.recordings.shift()(m);
     } else if (m.type === 'error') {
       this.busy = false;
       if (this.started && !this.inputNames.length) this.started.reject(new Error(m.message));

@@ -4,9 +4,12 @@
 //
 // Messages in:  {type: 'start', airframe, scripted, scenario}
 //               {type: 'step', ticks, inputs}   inputs: a Float64Array in the core's order, or null
-// Messages out: {type: 'ready', inputNames, stateNames, state, texts, inputs}
-//               {type: 'state', state, texts, inputs, ticks, ms}   ms: what the ticks cost in here
+//               {type: 'recording'}             at any time
+// Messages out: {type: 'ready', inputNames, stateNames, state, texts, inputs, debrief}
+//               {type: 'state', state, texts, inputs, debrief, ticks, ms}   ms: what the ticks cost in here
+//               {type: 'recording', text, steps}  the flight so far, as law_harness --replay reads it
 //               {type: 'error', message}
+// debrief is the gate's judge as text (core.h, flight_debrief), on every message.
 
 import { CoreSession } from './core-session.js';
 
@@ -17,7 +20,8 @@ let session = null;
 function report(type, extra) {
   const state = session.state();
   const inputs = session.inputs();
-  self.postMessage({ type, state, inputs, texts: session.stateTexts(), ...extra }, [state.buffer, inputs.buffer]);
+  self.postMessage({ type, state, inputs, texts: session.stateTexts(), debrief: session.debrief(), ...extra },
+                   [state.buffer, inputs.buffer]);
 }
 
 self.onmessage = async (event) => {
@@ -31,6 +35,8 @@ self.onmessage = async (event) => {
       const t0 = performance.now();
       session.step(m.ticks, m.inputs);
       report('state', { ticks: m.ticks, ms: performance.now() - t0 });
+    } else if (m.type === 'recording') {
+      self.postMessage({ type: 'recording', text: session.recording(), steps: session.steps });
     }
   } catch (e) {
     self.postMessage({ type: 'error', message: String(e && e.message ? e.message : e) });

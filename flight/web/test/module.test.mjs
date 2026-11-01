@@ -76,6 +76,33 @@ test('the scripted crew lands it, and a replay into a second instance matches ti
   assert.ok(a.msPerTick < 5, `a tick costs ${a.msPerTick.toFixed(3)} ms of its 20`);
 });
 
+test('the page records its flight as law_harness reads it, and the recording replays to the same verdict', { skip }, async () => {
+  const scenario = 'approach;distance=5';  // the 1,000 ft window entered with the FAC's VLS valid
+  const flown = new CoreSession(await createFlightCore(), airframe, true, scenario);
+  const ticks = 220 * 50;  // to the stop
+  for (let done = 0; done < ticks; done += 50) flown.step(50);
+  const text = flown.recording();
+  const lines = text.split('\n');
+  assert.equal(lines.pop(), '', 'ends with a newline');
+  assert.equal(lines[0], `# scenario: ${scenario}`);
+  assert.match(lines[1], /^# airframe: (a320|737)$/, 'the airframe the core flew, the default resolved');
+  if (airframe) assert.equal(lines[1], `# airframe: ${airframe}`);
+  assert.equal(lines[2], flown.inputNames.join(','));
+  assert.equal(lines.length - 3, ticks, 'a row a step');
+  assert.equal(flown.steps, ticks);
+  const verdict = flown.debrief();
+  assert.match(verdict, /\nSTABLE\n$/, `the scripted crew's approach is stable:\n${verdict}`);
+
+  // into a fresh instance, as a pilot's: on the airframe and from the start the header names
+  const replay = new CoreSession(await createFlightCore(), lines[1].slice(12), false, lines[0].slice(12));
+  for (const line of lines.slice(3)) replay.step(1, line.split(',').map(Number));
+  const a = flown.state(), b = replay.state();
+  a[flown.field.phase] = b[replay.field.phase] = 0;  // only the scripted crew keeps a phase
+  assert.deepEqual(Array.from(b), Array.from(a), 'the same state, slot for slot');
+  assert.equal(replay.debrief(), verdict, 'and the same verdict from the gate\'s judge');
+  assert.equal(replay.recording(), text, 'and its own recording is the same file');
+});
+
 test('from an approach start the scripted crew flies the ILS onto the runway it reports', { skip }, async () => {
   const s = new CoreSession(await createFlightCore(), airframe, true, 'approach;wind=270/15');
   const f = s.field;

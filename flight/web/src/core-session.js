@@ -22,6 +22,38 @@ export class CoreSession {
     this.input = Object.fromEntries(this.inputNames.map((n, i) => [n, i]));
     this.field = Object.fromEntries(this.stateNames.map((n, i) => [n, i]));
     this.texts = ['pitch_law', 'lateral_law', 'phase'];
+    // the recording (recording()): what the flight was started from, and the inputs that flew each step
+    this.scenario = scenario || '';
+    this.airframe = mod.UTF8ToString(mod._flight_airframe());
+    this.rows = new Float64Array(1024 * this.inputNames.length);
+    this.steps = 0;
+  }
+
+  // One row of the recording: the inputs that flew a step.
+  record(values) {
+    const n = this.inputNames.length;
+    if ((this.steps + 1) * n > this.rows.length) {
+      const grown = new Float64Array(this.rows.length * 2);
+      grown.set(this.rows);
+      this.rows = grown;
+    }
+    this.rows.set(values, this.steps * n);
+    ++this.steps;
+  }
+
+  // The flight so far as law_harness --replay reads it (flight/harness/main.cpp, Recording): what it was
+  // started from, the input names, then the inputs that flew each step, a row a step. Saved, it is what
+  // a pilot hands in: law_harness --replay FILE --expect ils judges it as the page's judge did.
+  recording() {
+    const n = this.inputNames.length;
+    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, this.inputNames.join(',')];
+    for (let k = 0; k < this.steps; ++k) lines.push(Array.from(this.rows.subarray(k * n, (k + 1) * n), String).join(','));
+    return lines.join('\n') + '\n';
+  }
+
+  // The gate's judge as text (core.h, flight_debrief): a line a band, then STABLE, NOT STABLE or flying.
+  debrief() {
+    return this.mod.UTF8ToString(this.mod._flight_debrief());
   }
 
   // The inputs as the core holds them: the caller's last, or the scripted crew's own.
@@ -30,8 +62,9 @@ export class CoreSession {
     return this.mod.HEAPF64.slice(at, at + this.inputNames.length);
   }
 
-  // Runs ticks steps of 20 ms. values, if given, are written to the inputs first: an array in the
-  // core's input order, or an object by name; a scripted crew ignores them.
+  // Runs ticks steps of 20 ms, and records the inputs that flew each. values, if given, are written to
+  // the inputs first: an array in the core's input order, or an object by name; a scripted crew ignores
+  // them, and is stepped one tick at a time so that what it did each tick is recorded.
   step(ticks, values) {
     if (values && !this.scripted) {
       const at = this.mod._flight_inputs() / 8;
@@ -45,7 +78,18 @@ export class CoreSession {
         }
       }
     }
-    return this.mod._flight_step(ticks);
+    if (this.scripted) {
+      let ran = 0;
+      for (let k = 0; k < ticks; ++k) {
+        ran += this.mod._flight_step(1);
+        this.record(this.inputs());
+      }
+      return ran;
+    }
+    const row = this.inputs();  // what flies every one of these ticks
+    const ran = this.mod._flight_step(ticks);
+    for (let k = 0; k < ran; ++k) this.record(row);
+    return ran;
   }
 
   // The state after the last step, as numbers in the core's order.

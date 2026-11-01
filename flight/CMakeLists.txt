@@ -210,7 +210,7 @@ if(EMSCRIPTEN)
   flight_warnings(flight_core)
   target_link_options(flight_core PRIVATE
     --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createFlightCore -sENVIRONMENT=worker,node -sSINGLE_FILE=1
-    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief"
+    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief,_flight_airframe"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPF64"
     ${FLIGHT_EMBED_OPTIONS})
   set_target_properties(flight_core PROPERTIES LINK_DEPENDS "${FLIGHT_EMBED_FILES}")
