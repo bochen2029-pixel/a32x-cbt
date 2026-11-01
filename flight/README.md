@@ -952,11 +952,17 @@ factor under 2.6 g, pitch 0 to 10°, 300 to 900 m past the threshold, within 5 m
 the rollout, within 5 m of it to the stop, and no bounce. Each band reports its worst and the height
 or the distance where it happened. *Stable* is every band held, once the aircraft has stopped.
 
-**Vapp** is Airbus's on the A320: the FAC's VLS + 5 kt, read until the window is entered at 1,000 ft and
-kept from there — 134 kt on the approach start's 65 t, its VLS 128.6 kt. On the 737 the FAC computes an
-A320's VLS, which sits on its 116 kt floor at the 737's 48.5 t, so the 737 keeps the scripted crew's
-140 kt; the airframe table says whose speeds the FAC's are. The scripted crew flies 140 kt either way,
-6.4 kt over the A320's Vapp, inside the band.
+**Vapp** is Airbus's on the A320: the FAC's VLS + 5 kt — 134 kt on the approach start's 65 t, its VLS
+128.6 kt at 1,000 ft. A32NX's FAC sends no VLS for the first 10 s of a flight, then sits on its 116 kt floor
+while it ramps its VS1g factor up from nothing at 0.1 a second, and reaches its value about 21 s in; so the
+judge has no Vapp until the VLS has settled — held within 0.2 kt for 3 s, or for 13 s on the floor, the
+longest that ramp can last — then follows it until the window opens and keeps it from there, or from its
+settling if the window opened first, as it does from 3.5 nm. The speed is held to Vapp from the moment it
+is fixed, in the verdict and in the in-band slot alike, so the debrief's trail and the verdict agree; a
+window flown with no Vapp at all fails the speed band, saying why. On the 737
+the FAC computes an A320's VLS, which sits on its floor at the 737's 48.5 t, so the 737 keeps the scripted
+crew's 140 kt; the airframe table says whose speeds the FAC's are. The scripted crew flies 140 kt either
+way, 6.4 kt over the A320's Vapp, inside the band.
 
 **Through the C API**, for the page: `flight_debrief()` gives the verdict as text, a line a band —
 `pass`, `FAIL`, or `....` while it cannot be judged yet — then STABLE, NOT STABLE or flying; and the
@@ -989,16 +995,14 @@ answers `{type: 'recording'}` at any time; `Flight.recording()` is its promise o
 recording says who flew it: `# crew: script` for the scripted crew (the page's `crew=script`, and every
 `law_harness --record`), `# crew: hands` for a person at the page's controls, with the device and the
 wall-clock time the page adds (`# hands:`, `# flown:`). `--repeatable` takes only hand-flown approaches for
-the gate, five different flights (a recording given twice is refused), and prints who flew each; `--check-repeatable`, on the scripted crew's five, also checks that the
-gate would refuse them as hand-flown. A
-recording made in the module replays into a fresh one to the same state and the same verdict, and the
-native build judges it alike: the scripted crew's approach from a dot left, flown in the module and
-saved, is STABLE with its touchdown 328.9 m past the threshold in both. The pilot's eye is the airframe's
-own: the core reports the definition's EYEPOINT from the CG (`eye_fwd_m`, `eye_right_m`, `eye_up_m`) and
-the CG's height on the gear (`cg_height_m`), and the eye camera, the PAPI and the overlay stand there —
-on the A320, 4.69 m above the runway and 0.51 m left of the centreline, the left seat. What the gate
-still needs is the page's own: the target speed marked, the debrief shown at the stop and the recording
-saved (fbw-desktop's change). Then the operator flies five.
+the gate, five different flights (a recording given twice is refused), and prints who flew each;
+`--check-repeatable`, on the scripted crew's five, also checks that the gate would refuse them as
+hand-flown. A recording made in the module replays into a fresh one to the same state and the same
+verdict, and the native build judges it alike: the scripted crew's approach from a dot left, flown in the
+module and saved, is STABLE with its touchdown 328.9 m past the threshold in both. The pilot's eye is the
+airframe's own: the core reports the definition's EYEPOINT from the CG (`eye_fwd_m`, `eye_right_m`,
+`eye_up_m`) and the CG's height on the gear (`cg_height_m`), and the eye camera, the PAPI and the overlay
+stand there — on the A320, 4.69 m above the runway and 0.51 m left of the centreline, the left seat.
 
 **The page's half** (2026-11-01). The overlay shows `vapp_kn` in magenta under the speed, `VAPP`, once
 the core has one, and the flight deck's placeholder PFD puts its bug there. When `judge_stable` is set
@@ -1023,9 +1027,38 @@ frame rate. In the debrief (K) the panel is open as the flight goes, and the mom
 flown path where they happened. Its case, `the_debrief_logs_the_flight_s_moments_from_the_core_s_slots`,
 states the times for an approach sampled three ways.
 
+**Flying the gate.** Five consecutive approaches, flown by hand in the browser with a joystick, each
+stable, their touchdowns within 150 m of their mean (`ROADMAP.md`, P7). For each:
+
+1. Open the page on the ILS, `index.html?scenario=approach`: 10 nm out on KDFW 17C's localizer and
+   glideslope, at 140 kt in CONF FULL with the gear down, trimmed, in still air. A new approach is a new
+   page: reload.
+2. Press a button on the joystick to take it; M maps it to the controls and C calibrates it, and the
+   mapping is kept for the next time. H lists every key.
+3. Fly the ILS by hand to a stop on the runway. The magenta VAPP mark under the speed comes about 24 s
+   after the start, once the FAC's VLS has settled: 134 kt. From 1,000 ft keep the localizer and the
+   glideslope within a dot, the speed within −5/+10 kt of the mark on the thrust levers, the sink under
+   1,000 fpm and the bank within 7°; then flare, touch down 300 to 900 m past the threshold within 5 m of
+   the centreline, and roll out on it to a stop on the brakes (B).
+4. At the stop the page shows the judge's verdict, band by band. Ctrl+S, or the panel's button, saves the
+   recording, named for the airframe, the scenario and the minute it was flown, so five saved in a row
+   sort in the order flown. Save every approach, stable or not: the gate takes five consecutive ones.
+
+Then the five are judged from their recordings, natively: `law_harness --repeatable a.csv b.csv c.csv
+d.csv e.csv` replays each in a fresh process and judges it as the page did; each must have been flown by
+hand in the page, the five must be different flights, each stable, their touchdowns within 150 m of their
+mean. One caution, from step 4: near the ground in CONF FULL, a sudden pull to full back stick can take
+this A320 past alpha max — A32NX's ELAC flies its protection on a lagged alpha, and our airframe's pitch at
+high alpha is not yet fitted — where a real A320 would hold it. Flare as on the line, progressively. And the
+five measure the handling of the airframe they are flown on: if the airframe fit (its own lane, CONF FULL's
+pitch response first) swaps the default airframe afterwards, P7 is not called passed until they are flown
+again on the one that ships.
+
 New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
-`the_judge_finds_an_unflared_approach_not_stable` and `the_judge_has_nothing_to_judge_on_the_runway`,
-through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-seven native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-two under node, the WebAssembly build leaving out the five that start processes.
+`the_judge_finds_an_unflared_approach_not_stable`, `the_judge_has_nothing_to_judge_on_the_runway` and
+`the_judge_waits_for_the_fac_s_vls_on_a_short_approach`, through the C API, natively and under node;
+`five_scripted_approaches_are_repeatable`. Sixty-one native cases pass with either airframe on MSVC 19.44
+and on GCC 13.3; fifty-six under node, the WebAssembly build leaving out the five that start processes.
 
 ## The Windows release (P7, packaging)
 
@@ -1105,8 +1138,8 @@ UTF-16 paths byte by byte instead.
 ## What P7 still has to build
 
 `ROADMAP.md` §4, *P7 in detail*: the gate — a hand-flown ILS, stable and repeatable, with its measures
-and bands written down. Its judge, its recordings and its repeatability are built (above); the page's
-half and five approaches flown by hand remain. The browser steps (5 to 8), the runway, ILS and wind (step 2), the failures and
+and bands written down. Its judge, its recordings, its repeatability and the page's half are built
+(above, with the runbook in *Flying the gate*); five approaches flown by hand remain, the operator's. The browser steps (5 to 8), the runway, ILS and wind (step 2), the failures and
 their laws (step 3) and the protections (step 4) are above, with what step 4 leaves open: the airframe's
 stall above Mach 0.3 and its transonic aerodynamics, to be fitted, and a fast entry into high alpha in
 CONF FULL. Our fitted A320 flies all of it from

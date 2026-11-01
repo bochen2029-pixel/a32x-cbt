@@ -14,7 +14,8 @@ and so is step 3: the instructor's failures, the laws A32NX's computers choose f
 a landing, direct law trimmed by hand; and step 4: the protections flown as a test pilot flies them,
 judged where they hold and where the airframe is fitted. The gate is next, and its judge is built: one
 in the flight core for the harness and the browser, recordings that replay by themselves, and the
-five-approach rule; the page's half and the operator's five approaches remain.
+five-approach rule; and the page's half: the target speed, the verdict at the stop, the recording saved.
+The operator's five approaches remain (`flight/README.md`, *Flying the gate*).
 
 ---
 
@@ -105,7 +106,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate in progress: its judge, recordings and repeatability built [M], the page's half and five hand-flown approaches to come |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate ready to fly: its judge, recordings, repeatability and the page's half built [M]; five hand-flown approaches to come, the operator's (flight/README.md, *Flying the gate*) |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started; planned (*P8 in detail*), to begin after P7's gate |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -318,8 +319,9 @@ slots for the target speed and for whether each step is inside the bands). Vapp 
 the FAC's VLS + 5 kt (134 kt at the approach start's 65 t); the 737, whose FAC computes an A320's VLS,
 keeps 140 kt. A recording says where it was flown from and replays to the same verdict from the file
 alone, and `--repeatable` applies the five-approach rule to five recordings; the scripted crew's five,
-from varied starts, pass it with their touchdowns within a metre of their mean. Left for the gate: the
-page shows the target speed and the debrief and saves the recording, and the operator flies five.
+from varied starts, pass it with their touchdowns within a metre of their mean. The page shows the target
+speed and the verdict at the stop and saves the recording (fbw-desktop's half); left for the gate, the
+operator flies five.
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
@@ -342,8 +344,11 @@ are the A320's; the rest are this project's and say so.
 
 *Stable* means no excursion outside a band between 1,000 ft and 50 ft, and a touchdown inside every
 touchdown band. *Repeatable* means five consecutive hand-flown approaches — joystick, browser — each
-of them stable, with their touchdown points within 150 m of their mean. Every approach's record must
-replay to the same verdict, which is house rule 7 applied to flight. The scripted crew passes the
+of them stable, with their touchdown points within 150 m of their mean, flown on the airframe that
+ships: the hand-flown gate measures this airframe's handling, so if the airframe fit swaps the default
+airframe after the five are flown, P7 is not called passed until they are flown again on the new one
+(fbw-parent's ruling, 2026-11-01). Every approach's record must replay to the same verdict, which is
+house rule 7 applied to flight. The scripted crew passes the
 same bands from varied starts before anyone is asked to, so the gate's numbers are known reachable
 on this airframe. The debrief prints each band's worst deviation and where it happened, as the
 trainer's debrief does.
