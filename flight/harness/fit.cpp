@@ -425,7 +425,8 @@ class Load {
 };
 
 // --- writing the fitted coefficients into the aircraft file -----------------------------------------
-// Only the value of each <property value="..." persistent="true">name</property>; every other byte stays.
+// Only the value of each <property value="..." persistent="true">name</property>, and only where it is
+// not already that number; every other byte stays.
 bool writeCoefficients(const std::string& path, const std::vector<Coefficient>& coefficients, const Vector& values) {
   std::ifstream in(path, std::ios::binary);
   std::stringstream buffer;
@@ -438,10 +439,12 @@ bool writeCoefficients(const std::string& path, const std::vector<Coefficient>& 
       std::fprintf(stderr, "%s declares no %s\n", path.c_str(), coefficients[i].name.c_str());
       return false;
     }
-    const size_t start = text.rfind("value=\"", end);
+    const size_t start = text.rfind("value=\"", end) + 7;
+    const double now = std::atof(text.substr(start, end - start).c_str());
+    if (std::abs(now - values[i]) <= 1e-12 * std::max(1.0, std::abs(values[i]))) continue;
     char buf[64];
     std::snprintf(buf, sizeof buf, "%.8g", values[i]);
-    text.replace(start + 7, end - start - 7, buf);
+    text.replace(start, end - start, buf);
   }
   std::ofstream out(path, std::ios::binary);
   out << text;
