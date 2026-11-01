@@ -14,6 +14,7 @@ npm run check       # typecheck + the full suite, 160 tests
 npm run serve       # optional: http://127.0.0.1:8130
 npm run package     # bundle, then dist/a32x-cbt.zip — the download a user gets
 npm run measure     # cold start, scenario reset, tick rate — headless Chrome on file://
+npm run gate        # package, unzip outside the repo, run it from file:// offline: the P5 gate
 ```
 
 The zip holds `index.html`, `app.js`, `data/`, `LICENSE` and `README.txt` (run instructions, the
@@ -26,6 +27,13 @@ software rendering, and watches it from outside — no probe is built into `app.
 Chromium or Edge installed (or `CHROME` set to one); `-- --throttle 6` emulates a slower CPU, and
 `-- --help` lists the rest. It drives the browser over a pipe, so no port is opened, and every
 browser it starts is closed and its profile deleted.
+
+`npm run gate` is what a stranger does: the zip is unzipped by the operating system's own tool into
+a temp folder outside the repository and opened from `file://` with the network off, in a fresh
+profile, three times. It passes only if the folder holds what it should, every request stays inside
+it, nothing throws, and the page works: six drills, the disclaimer, a painted panel, time moving, a
+switch answering a real click, a drill restarting, freeze holding. `-- --browser edge`, `-- --gpu`,
+`-- --loads N` vary it.
 
 Node 24. TypeScript and esbuild are build-time only; there are no runtime dependencies.
 
@@ -60,6 +68,6 @@ npm run demo:depress    # the depressurisation drill
 | `src/scenario/` | save, parse, atomic apply |
 | `src/app/` | browser entry and draw model |
 | `web/` | the page, the bundle, `web/data/*.json`, and the `README.txt` that ships beside them |
-| `tools/` | build, serve, package (with its own zip writer), measure, and the headless-Chrome driver they share |
+| `tools/` | build, serve, package (with its own zip writer), measure, the package gate, and the headless-Chrome driver they share |
 
 Read `../CLAUDE.md` before changing behaviour, and `../docs/conventions.md` for worked examples.

@@ -27,6 +27,7 @@
     "demo:depress": "node src/demo-depress.ts",
     "build:web": "npm run typecheck && node tools/build.mjs",
     "package": "npm run build:web && node tools/package.mjs",
+    "gate": "npm run package && node tools/verify-package.mjs",
     "test:package": "node --test tests/package.test.ts",
     "test:frames": "node --test tests/frames.test.ts",
     "measure": "node tools/measure.mjs",
