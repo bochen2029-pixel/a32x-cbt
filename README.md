@@ -42,7 +42,7 @@ npm run check      # typecheck + 182 tests
 | path | what |
 |---|---|
 | `app/` | the trainer — systems, panel, ECAM, procedures. Unencumbered. |
-| `flight/` | the aeroplane that flies: A32NX port contract and a headless proof. GPLv3, not yet running. |
+| `flight/` | the aeroplane that flies: the A32NX flight computers flying a JSBSim airframe, headless. GPLv3. |
 | `docs/` | provenance, architecture, and the design study of the PSX reference |
 | `tools/` | static server, and how to rebuild the PSX reference tree |
 | `reference/` | screenshots |
