@@ -1212,11 +1212,16 @@ flown trail; `judge_stable`, the verdict once stopped; and `judge_touchdown_m`.
 it takes both from the file, refuses a `--scenario` or `FLIGHT_AIRFRAME` that disagrees, and runs as
 long as the recording does. Every run with an approach ends with the judge's line,
 `judge: STABLE, touchdown 328.2 m past the threshold`, and the replay check now gives its replay only
-the file and asks for the same verdict as well as the same bytes.
+the file and asks for the same verdict as well as the same bytes. A recording also names the build that
+flew it, `# build: <commit>` — the commit the build was made from, asked of git at every build, with
+`+dirty` when files under `flight/` differ from it, or `unknown` where no commit can be named
+(`harness/build-id.cmake`; `flight_build()` in the C API) — and closes with the judge's verdict as it
+stood, a `# judged:` line for each line of the debrief, which a replay skips.
 
 **Repeatable.** `law_harness --repeatable a.csv b.csv c.csv d.csv e.csv` is the gate's last rule: each
 recording replayed in a fresh process and judged, five of them, each stable, their touchdown points
-within 150 m of their mean. `--check-repeatable` applies it to the scripted crew, five approaches
+within 150 m of their mean — once the five pass the build rules below, without which they are not
+replayed. `--check-repeatable` applies it to the scripted crew, five approaches
 recorded from varied starts — on the beams, a dot either side of the localizer and of the glideslope:
 all five STABLE, their touchdowns within a metre of their mean: 329 m past the threshold on the A320, 361 m on the 737.
 
@@ -1284,18 +1289,36 @@ stable, their touchdowns within 150 m of their mean (`ROADMAP.md`, P7). For each
 Then the five are judged from their recordings, natively: `law_harness --repeatable a.csv b.csv c.csv
 d.csv e.csv` replays each in a fresh process and judges it as the page did; each must have been flown by
 hand in the page, the five must be different flights, each stable, their touchdowns within 150 m of their
-mean. One caution, from step 4: near the ground in CONF FULL, a sudden pull to full back stick can take
-this A320 past alpha max — A32NX's ELAC flies its protection on a lagged alpha, and our airframe's pitch at
-high alpha is not yet fitted — where a real A320 would hold it. Flare as on the line, progressively. And the
-five measure the handling of the airframe they are flown on: if the airframe fit (its own lane, CONF FULL's
-pitch response first) swaps the default airframe afterwards, P7 is not called passed until they are flown
-again on the one that ships.
+mean. Two rules tie the five to the build that flew them (fbw-parent's, 2026-11-01, under the operator's
+delegation):
+
+1. **Judged on the build that flew them.** The five must come from one build, a commit's (not `+dirty`,
+   not `unknown`), and are judged with the `law_harness` built from that commit; `--repeatable` refuses
+   them otherwise, saying which rule and what to do. A later build can fly the same inputs differently — the airframe
+   fit's changes, and ground idle and reverse thrust, change the flight — and a recording replays to its
+   verdict only on the build that made it. A recording with no build line counts as v0.1.0's
+   (`1a672e9`).
+2. **Carried to a later build only if they still pass there.** A gate flown on one build counts for a
+   later release if its five recordings, replayed there, still pass every band, each stable; otherwise
+   it is flown again on the release. `law_harness --rejudge a.csv b.csv c.csv d.csv e.csv`, built from
+   the later release, replays the five there, judges them by every rule of the gate, and names every
+   band whose verdict differs from the one each recording was saved with.
+
+One caution, from step 4: near the ground in CONF FULL, a sudden pull to full back stick can take
+this A320 past alpha max, where a real A320 would hold it: A32NX's ELAC acts on an alpha lagged by 2 s,
+which keeps its protection swinging after a fast entry, and the airframe fit could not stop it
+(`flight/upstream-reports.md`, §4, posted to FlyByWire as a question). Flare as on the line,
+progressively.
 
 New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `the_judge_finds_an_unflared_approach_not_stable`, `the_judge_has_nothing_to_judge_on_the_runway` and
 `the_judge_waits_for_the_fac_s_vls_on_a_short_approach`, through the C API, natively and under node;
-`five_scripted_approaches_are_repeatable`. Sixty-one native cases pass with either airframe on MSVC 19.44
-and on GCC 13.3; fifty-six under node, the WebAssembly build leaving out the five that start processes.
+`five_scripted_approaches_are_repeatable`, which also tries the build rules on copies of its five,
+relabelled as only a test may: the gate refuses five flown on two builds and five flown on another build
+than its own, and `--rejudge` passes another build's five that are stable on this one and names the one
+band whose saved verdict a copy was given wrong. Sixty-four native cases pass with either airframe on
+MSVC 19.44 and on GCC 13.3; fifty-nine under node, the WebAssembly build leaving out the five that start
+processes.
 
 ## The Windows release (P7, packaging)
 

@@ -357,11 +357,12 @@ are the A320's; the rest are this project's and say so.
 
 *Stable* means no excursion outside a band between 1,000 ft and 50 ft, and a touchdown inside every
 touchdown band. *Repeatable* means five consecutive hand-flown approaches — joystick, browser — each
-of them stable, with their touchdown points within 150 m of their mean, flown on the airframe that
-ships: the hand-flown gate measures this airframe's handling, so if the airframe fit swaps the default
-airframe after the five are flown, P7 is not called passed until they are flown again on the new one
-(fbw-parent's ruling, 2026-11-01). Every approach's record must replay to the same verdict, which is
-house rule 7 applied to flight. The scripted crew passes the
+of them stable, with their touchdown points within 150 m of their mean, judged by the `law_harness` of
+the build that flew them, the build each recording names. The gate measures that build's airframe and
+laws: it counts for a later release only if the five recordings, replayed on it, still pass every band,
+each stable (`law_harness --rejudge`); otherwise they are flown again on the release (fbw-parent's rules,
+2026-11-01, in place of its earlier ruling that a change of the default airframe calls for them again).
+Every approach's record must replay to the same verdict, which is house rule 7 applied to flight. The scripted crew passes the
 same bands from varied starts before anyone is asked to, so the gate's numbers are known reachable
 on this airframe. The debrief prints each band's worst deviation and where it happened, as the
 trainer's debrief does.
