@@ -1009,6 +1009,16 @@
     title: "#d17bff"
   };
 
+  // src/app/frames.ts
+  function pacer(current) {
+    let last;
+    return (stamp) => {
+      const since = last === void 0 ? 0 : stamp - last;
+      last = stamp;
+      return current().advance(since);
+    };
+  }
+
   // src/ecam/line.ts
   var label = (text) => ({ level: "label", text });
   var title = (text) => ({ level: "title", text });
@@ -2848,11 +2858,9 @@
     actuate(session.d, c);
     paintAll();
   });
-  var last = performance.now();
-  function frame(now) {
-    const due2 = session.advance(now - last);
-    last = now;
-    if (due2 > 0) paintAll();
+  var pace = pacer(() => session);
+  function frame(stamp) {
+    if (pace(stamp) > 0) paintAll();
     requestAnimationFrame(frame);
   }
   paintAll();

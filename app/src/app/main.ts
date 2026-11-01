@@ -10,6 +10,7 @@ import { Session } from '../session/session.ts';
 import { parsePanel } from '../panel/schema.ts';
 import { actuate, hitTest, type Control, type Panel } from '../panel/controls.ts';
 import { scene, COLOURS, type Scene } from './draw.ts';
+import { pacer } from './frames.ts';
 import { linesOf, parseMessages, type Message } from '../ecam/warnings.ts';
 import { parsePages, renderPage, type PageSpec } from '../ecam/pageSchema.ts';
 import { powerUp } from '../training/powerup.ts';
@@ -249,11 +250,9 @@ canvas.addEventListener('click', (ev) => {
   paintAll();
 });
 
-let last = performance.now();
-function frame(now: number): void {
-  const due = session.advance(now - last);
-  last = now;
-  if (due > 0) paintAll();
+const pace = pacer(() => session);
+function frame(stamp: number): void {
+  if (pace(stamp) > 0) paintAll();
   requestAnimationFrame(frame);
 }
 
