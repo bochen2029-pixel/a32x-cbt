@@ -8,10 +8,10 @@
 #
 # Three points are corrected, not copied, because the source has typos its neighbours expose:
 #   vs1g conf1f at 70 t and 75 t: the source writes "117 + 0.8 + (m - 65)" and "121 + 0.8 + (m - 70)"
-#     where every neighbouring bracket multiplies; with "0.8 *" they read 121.0 and 125.0 (source
-#     gives 122.8 and 126.8, a 0.8 kt step at 65 t).
-#   vls conf3 at 80 t: the source writes "151 + m - 65" in the 75-80 t bracket, which jumps to 165;
-#     "151 + m - 75" joins its neighbours at 155.0.
+#     where every neighbouring bracket multiplies; with "0.8 *" they read 121.0 and 125.0. As written
+#     they give 122.8 and 126.8, 1.8 kt high, and the curve steps at the bracket edges.
+#   vls conf3 at 80 t: the source writes "151 + m - 65" in the 75-80 t bracket, 10 kt high across it
+#     (160 just above 75 t, 165 at 80 t); "151 + m - 75" joins its neighbours at 155.0.
 # Worth reporting upstream.
 kind,config,gear,t40,t45,t50,t55,t60,t65,t70,t75,t80
 vs1g,clean,up,124.0,131.0,138.0,145.0,150.0,156.0,161.0,166.0,172.0

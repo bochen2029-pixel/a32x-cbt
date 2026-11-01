@@ -7,7 +7,9 @@ here. `app/` stays clear of it.
 FCDC 1–2, unmodified — run at 50 Hz in a world whose airframe is JSBSim's 737. A scripted crew flies
 it through them from the runway, round a circuit and back onto the runway, headless, in normal law.
 The airframe is A320-class, not an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6
-passed against a point-mass stub; the same gate, unchanged, passes against JSBSim.
+passed against a point-mass stub; the same gate, unchanged, passes against JSBSim. The A320's numbers
+are written down beside it, and the 737 is scored against them, so that the fitted A320 meant to
+replace it later has a measured bar to clear.
 
 ## Build and run
 
@@ -23,7 +25,8 @@ The build compiles both upstreams where they stand and refuses any commit but A3
 JSBSim `66f7faf`. JSBSim builds into `flight/build/jsbsim`; nothing is written into either clone. The
 737's aircraft and engine files are read from the JSBSim clone at run time — its path is compiled in.
 Run `flight/build/Release/law_harness --help` for the options; `--minutes 30 --gate` is the P6 gate and
-`--trace run.csv` writes the flight twice a second.
+`--trace run.csv` writes the flight twice a second. `flight/build/Release/airframe_score` scores the
+airframe against the A320's targets (below); `--out score.csv` writes the table.
 
 ## The P6 gate on JSBSim, as measured
 
@@ -49,14 +52,15 @@ non-finite outputs: 0 of 20520000 values checked
 Timed three more times with the desktop's total CPU sampled each second: 4.75 to 4.89 s wall, 368 to
 379 times real time, while the machine (i9-9900K, 16 threads, shared with other work) ran at 28 % on
 average, 15 to 51 %. The stub world took 1.0 s; JSBSim at 200 Hz is most of the difference, about
-10 µs a frame. GCC 13.3 on Ubuntu 24.04 (WSL) gives the same verdicts and the same flight in 5.1 s,
-load not sampled. Same binary, same bytes; different compilers give different bytes, and the same
-verdicts.
+10 µs a frame. GCC 13.3 on Ubuntu 24.04 (WSL) gives the same verdicts and the same flight in 4.9 to
+5.1 s, load not sampled. Same binary, same bytes; different compilers give different bytes, and the
+same verdicts.
 
-Eleven `ctest` cases hold the parts the gate leans on and what the airframe adds. Two are negative
-controls that show the gate's checks can fail; two of the airframe's were shown able to fail by hand:
-reverse the yaw damper's sign and the aircraft departs and flies into the ground 40 s after liftoff;
-reverse the THS's and the stabiliser runs to its stop while the elevator holds 24° against it.
+Twelve `ctest` cases hold the parts the gate leans on, what the airframe adds, and the scorer. Two are
+negative controls that show the gate's checks can fail; two of the airframe's were shown able to fail
+by hand: reverse the yaw damper's sign and the aircraft departs and flies into the ground 40 s after
+liftoff; reverse the THS's and the stabiliser runs to its stop while the elevator holds 24° against
+it. All twelve pass on MSVC 19.44 and on GCC 13.3.
 
 | case | what it shows |
 |---|---|
@@ -69,22 +73,92 @@ reverse the THS's and the stabiliser runs to its stop while the elevator holds 2
 | `stabiliser_takes_the_trim` | in steady flight the elevator rests at 0.25° on average; the THS holds the trim, 2 to 3.5° nose up |
 | `yaw_damper_takes_out_a_pedal_kick` | three seconds of 0.3 left pedal raise 4.6° of sideslip; four seconds after release yaw rate and sideslip are under 0.1 |
 | `lands_inside_the_limits` | the first landing: −170 fpm, 3.7° of pitch, wings level, 1.80 g, no bounce |
+| `airframe_is_scored_against_the_a320` | the scorer measures every target and context row; it fails only on a row it could not measure (shown with a planted bogus row), never on a row outside its band |
 | `scanner_catches_a_planted_nan` | a NaN or infinity in an ELAC bus, a SEC analogue, a FAC bus and an FCDC bus — four of four caught |
 | `losing_all_air_data_ends_normal_law` | all three ADRs failed in flight: the laws go to alternate 2 and stay there |
 
 Every run, whatever it was asked, also fails if the airframe went below the runway: the world freezes
 at that instant, so the computers never see what JSBSim makes of an aeroplane under the ground.
 
+## The 737 against the A320's targets
+
+The operator chose to fly the 737 for P7 and swap in a fitted A320 later. `targets/a320.csv` is the
+bar for that swap: 21 targets an airframe is counted against, 4 context rows scored but not counted,
+1 named and not yet measured. Each row names its source in the file's header: A32NX's VS1g and VLS
+tables (`targets/a320-speeds.csv`, a community reconstruction of Airbus's, sampled on a weight grid),
+the ELAC's own α max and α prot, the lateral law's 15°/s, MIL-F-8785C's Level 1 floors for large
+aircraft, OpenAP WRAP's distributions fitted to ADS-B, and one band from pilot literature still to
+confirm. Twelve rows are marked *fit*, for a future optimiser to tune against; nine are *held out*,
+so that a fit which only memorises is caught. The rule for the swap is in `ROADMAP.md`, P7.
+
+`airframe_score` measures in two ways. The bare airframe, no computers: JSBSim sweeps the lift curve
+in each configuration (from which the 1-g stall speed at the airframe's weight) and trims it at the
+A320's VLS and approach speed and in cruise. The airframe flown: the gate's circuit through the
+A32NX laws, with a full-stick roll added in cruise, timing the roll, the Dutch roll after the
+circuit's pedal kick, the takeoff, the climb and the descent. It scores; it does not gate. Its
+`ctest` case fails only on a row it could not measure.
+
+Measured 2026-11-01, MSVC 19.44; GCC 13.3 gives the same values to two decimals. The `JSBSim:` line is
+JSBSim reporting the CONF 2 trim it cannot find, below that configuration's stall:
+
+```
+JSBSim:   Sorry, wdot doesn't appear to be trimmable
+A320 targets (flight/targets/a320.csv) against JSBSim 66f7faf's 737 at 106989 lb (48.5 t), CG 15.4 % MAC
+
+id                  kind    use   band                   measured  verdict         note
+vs1g-clean          target  fit   132.9..138.9 kt          150.31  outside +11.4   CL max 1.19, elevator neutral
+vs1g-conf1          target  fit   107.5..113.5 kt          150.31  outside +36.8   CL max 1.19, elevator neutral
+vs1g-conf1f         target  fit   98.53..104.5 kt          137.88  outside +33.4   CL max 1.42, elevator neutral
+vs1g-conf2          target  fit   96.53..102.5 kt          132.72  outside +30.2   CL max 1.53, elevator neutral
+vs1g-conf3          target  fit   94.53..100.5 kt          128.10  outside +27.6   CL max 1.64, elevator neutral
+vs1g-full           target  fit   88.53..94.53 kt          113.51  outside +19.0   CL max 2.09, elevator neutral
+stall-alpha-clean   target  fit   9.7.. deg                 13.25  inside          CL max 1.19
+stall-alpha-conf1   target  fit   14.6.. deg                13.25  outside -1.3    CL max 1.19
+stall-alpha-conf1f  target  fit   14.6.. deg                13.25  outside -1.3    CL max 1.42
+stall-alpha-conf2   target  fit   15.2.. deg                13.25  outside -1.9    CL max 1.53
+stall-alpha-conf3   target  fit   14.1.. deg                13.25  outside -0.8    CL max 1.64
+stall-alpha-full    target  fit   14.. deg                  13.25  outside -0.8    CL max 2.09
+vls-alpha-clean     target  check ..6.5 deg                  9.40  outside +2.9    at the A320's VLS, 174 kt
+vls-alpha-conf2     target  check ..11.9 deg                 none  outside         no trim at the A320's VLS, 123 kt
+vls-alpha-full      target  check ..10.6 deg                11.95  outside +1.3    at the A320's VLS, 116 kt
+app-pitch-full      target  check 1..4 deg                   7.08  outside +3.1    121 kt; alpha 10.1; THS -8.5 deg
+cruise-pitch        target  check 0..4 deg                   3.19  inside          alpha 3.2; THS -2.5 deg
+cruise-tla          target  check 0..25 deg                 18.27  inside
+roll-rate           target  check 13.5..16.5 deg/s          14.60  inside          mean over the second second of the step
+roll-tau            target  check ..1.4 s                    0.76  inside          time to 63 % of the steady rate
+dutch-roll-zeta     target  check 0.08.. ratio               0.83  inside          sideslip +4.58 then -0.04 deg; damped frequency 0.88 rad/s
+short-period        pending check ..                            -  pending
+to-accel            context check 1.5..2.37 m/s2             2.59  (outside +0.2)  31.3 s from brake release
+lof-speed           context check 145..187 kt              157.44  (inside)        157 kt CAS
+climb-rate          context check 1500..2530 ft/min       3962.64  (outside +1432.6) at 250 kt
+descent-rate        context check -1550..-840 ft/min     -1699.40  (outside -149.4) at 210 kt
+
+737: inside 6 of 21 targets (1 of 12 fit rows, 5 of 9 held-out rows); context rows are not counted
+```
+
+Read plainly: the 737 stalls 14 to 40 kt faster than an A320 of its weight, because its wing is
+smaller — 1,171 ft² against the A320's 1,320 — and lifts less: a CL max of 2.09 at full flap, where an
+A320 stalling at 92 kt at this weight has about 2.9, and 1.19 clean against about 1.3. It has no
+slats, so CONF 1 is clean to it. Its lift peaks at 13.25° in every configuration, short of the ELAC's
+slats-out α max plus a degree. So at the A320's own speeds it flies above α prot, or cannot fly at
+all. Its roll, its Dutch roll with the yaw damper and its cruise trim are inside their bands — which
+are floors and the law's own rate, not A320 flight-test numbers. The context rows are what airlines
+fly, at reduced thrust and heavier; this 737 climbs light at full climb thrust, and its 3,963 fpm is
+not a fault.
+
 ## How it is built
 
 | path | what |
 |---|---|
-| `CMakeLists.txt` | compiles the A32NX computers and JSBSim from their clones, our harness against them, and the tests |
+| `CMakeLists.txt` | compiles the A32NX computers and JSBSim from their clones, the world once (`flight_world`) for both programs, and the tests |
 | `harness/efcs.cpp` | the world adapter: `FlyByWireInterface`'s `updateElac`/`Sec`/`Fac`/`Fcdc` and `updateServoSolenoidStatus`, line for line, in the driver's order. Unchanged since P6 |
 | `harness/world.cpp` | the world: the crew, the servos, the SFCCs' slats and flaps, the sensors |
-| `harness/airframe.cpp` | the airframe: JSBSim loading the 737 from the clone, the surfaces mapped into its frame, the state read back |
+| `harness/airframe.cpp` | the airframe: JSBSim loading the 737 from the clone, the surfaces mapped into its frame, the state read back; and the bare airframe measured, its lift swept and trimmed |
 | `jsbsim/a32nx-surfaces.xml` | the JSBSim system that puts the A32NX servos in charge of the 737's surfaces |
 | `harness/main.cpp` | the runner: the non-finite scan, the law decoding, the gate, the expectations, the crash check |
+| `harness/score.cpp` | the scorer: the airframe measured bare (lift sweeps, trims) and flown (the circuit), against the targets |
+| `targets/a320.csv` | the A320's acceptance targets: band, fit or held out, and source, row by row |
+| `targets/a320-speeds.csv` | VS1g and VLS by configuration and weight, from A32NX's tables, three points corrected |
 
 **The adapter keeps the aircraft's staleness.** Each computer reads the others' last outputs when its
 turn comes, in the order ELAC 1, 2 → SEC 1, 2, 3 → FAC 1, 2 → FCDC 1, 2. So ELAC 1 sees ELAC 2 a tick
@@ -170,13 +244,25 @@ From P7's first slice:
   protection stops it far short of its stall; with slats out, α max is at or past it. In one badly
   flown climb during development, flaps running in at low speed, the 737 went through its stall to
   24° of alpha in normal law.
+- **A32NX's VS1g and VLS tables have three typos** (`NXSpeeds.ts`): CONF 1+F's stall speed writes
+  `117 + 0.8 + (m - 65)` and `121 + 0.8 + (m - 70)` where every neighbouring bracket multiplies — 1.8 kt
+  high at 70 and 75 t, with steps at the bracket edges; CONF 3's VLS writes `151 + m - 65` in the
+  75–80 t bracket — 10 kt high across it. `targets/a320-speeds.csv` corrects the three points and says
+  so. Worth reporting upstream.
+- **JSBSim's trim searches alpha up to 20° unless the aircraft sets limits**, and the 737 sets none.
+  Past the 737's 13.25° lift peak the search loses solutions it straddles: clean trims below about
+  185 kt failed until `Airframe::trim` held the search to the attached-flow side, by setting
+  `aero/alpha-max-rad` after `RunIC` (which resets it) and before `DoTrim` (which reads it).
+- **JSBSim's `aero/cl-squared` is a frame late**: it is formed from the lift of the frame before. A
+  lift sweep initialises twice at each alpha so the second frame reads its own lift.
 
 ## What P7 still has to build
 
-`ROADMAP.md` §4, *P7 in detail*: a runway and an ILS in the world, the flight core as a library,
-WebAssembly, the joystick and the browser loop, a Three.js view, and the gate — a hand-flown ILS,
-stable and repeatable, with its measures and bands written down. Whether a fitted A320 replaces the
-737 is still open there.
+`ROADMAP.md` §4, *P7 in detail*: a runway, an ILS and wind in the world; failures and the laws they
+reach; the protections exercised; the flight core as a library; WebAssembly; the joystick and the
+browser loop; a Three.js view; and the gate — a hand-flown ILS, stable and repeatable, with its
+measures and bands written down. The 737 flies until a fitted A320 meets the swap rule there, scored
+by `airframe_score` against `targets/a320.csv`; the fit is not started.
 
 ## What is here
 
