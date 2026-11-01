@@ -3,10 +3,10 @@
 A computer-based trainer for an A320 fly-by-wire, built to run on a laptop with no GPU and no
 installer. This document is the plan and the honest state of it.
 
-Last written: 2026-11-01, at P7 (aero) — slice 1: the A32NX computers fly an airframe headless, takeoff to
-landing. The A320 targets are complete, and an A320 of ours fitted to them, inside all 33 where JSBSim's
-737 is inside 8, replaced the 737 under the swap rule on the operator's word (§4, P7). The rest of P7
-is planned in §4 and waits for the operator's agreement.
+Last written: 2026-11-01, at P7. The flyable simulator is now the product (§3, §9); the systems
+trainer still ships on its own, MIT (P5's zip). P7's slice 1 flies the A32NX computers on an A320
+of ours, fitted to 33 cited targets, headless from takeoff to landing (§4, P7). The browser track
+(steps 5–8) and the thrust fit are under way.
 
 ---
 
@@ -52,7 +52,8 @@ obligation; `flight/` links it and is GPLv3. Keeping them apart is cheaper than 
 | browser: canvas panel, ECAM, live step list, debrief | done |
 
 **What it is not.** The systems are plausible abstractions, not A320 data. The panel is a
-placeholder grid, not traced geometry. There is no aero and no flight law, so nothing flies. It is
+placeholder grid, not traced geometry. `app/` has no aero and no flight law, so nothing flies in it;
+`flight/` flies the real laws on a fitted airframe, headless (P6, P7), not yet in a browser. It is
 not a type-rating device and must never be presented as one.
 
 **Runtime size.** 100 variables, ~2.8k lines of application code. The whole page is a few hundred
@@ -63,14 +64,25 @@ KB of JavaScript behind an HTTP server that has no dependencies.
 ## 3 · The fork, and the choice
 
 **A — systems trainer.** Flows, ECAM, drills, scoring, debrief. No aerodynamics, no flight laws.
-Ships in weeks. Teaches the part of an aircraft a trainee actually fails a check ride on.
+Teaches the part of an aircraft a trainee actually fails a check ride on. P5 ships it as a zip that
+runs straight off the disk.
 
-**B — flight trainer.** The real FBW law core from A32NX plus JSBSim. Unique — nobody has this in a
-browser — and months of work because of the driver, the aero and the displays.
+**B — flight simulator.** The real FBW law core from A32NX on a fitted JSBSim airframe, hand-flown
+with a joystick in the browser. Unique — nobody has this in a browser — and months of work because
+of the driver, the aero, the displays and the FMS.
 
-**Decision: A to completion first. B is a second product, not a later phase of the first.** A
-systems trainer with a real curriculum is a product; a half-finished flight model with four drills
-is not.
+**Decision, revised 2026-11-01: B is the product, and A is its systems and procedures layer.** The
+first decision here was *A to completion first; B a second product*. The operator has since set the
+target (§9): *"fully flyable from runway to runway"*, with all three laws and the protections, LNAV
+and VNAV, and a path through the world, the CBT's procedures and scoring on top. They left the
+rewrite to the recommendation: *"go with your own best recommendation for all"*. So:
+
+- The order of work is P7 (an airframe, then the browser, then a hand-flown ILS), then P8 (displays),
+  then P9 (FMS and guidance). Phases start on the operator's word, and each is done only when its
+  gate passes: half-built is still not a product.
+- A keeps shipping on its own (MIT, P5's zip), and the flyable artefact carries it (§4, P7:
+  packaging). Its content grows where that does not block B: content hunger never blocks code.
+- P5's open box, the 2014 laptop, now measures both: the trainer's tick and the flight core's 50 Hz.
 
 ---
 
@@ -88,7 +100,7 @@ A phase is done when its gate passes, not when the code exists.
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
 | P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 33 A320 targets where the 737 it replaced is inside 8 [M]; the rest is planned below, not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
-| P9 | **FMS** — route, performance, progress, DIR | one flight plan flies end to end | not started |
+| P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
 
 ### P5 in detail — the shipping gate
@@ -337,8 +349,11 @@ trainer's debrief does.
 
 - **Aero is the only novel physics.** JSBSim mitigates it; nothing else does. P6 exists to fail
   cheaply before P7.
-- **The FMS is the largest body of work** — ~40k lines in PSX [R]. Scope to route, performance,
-  progress, DIR. Skip the operational flight plan.
+- **The FMS is the largest body of work** — ~40k lines in PSX [R]. Scope to route, managed lateral
+  and vertical guidance (§9), performance, progress, DIR. Skip the operational flight plan.
+- **The browser has to hold 50 Hz.** The A32NX computers and JSBSim as WebAssembly, and a Three.js
+  view, on a laptop with integrated graphics and nothing installed. P7's step 6 measures that before
+  anything is built on it.
 - **Displays are second largest** — 121k lines of TypeScript in A32NX welded to an MSFS avionics
   library [M]. Rewrite, do not port.
 - **Content, not code, is the long pole in A.** 23 messages and 32 controls is a demo; an A320 needs
@@ -353,9 +368,17 @@ trainer's debrief does.
 **MVP = P5.** Six to twenty drills, graded, with rationale, on any laptop, no install. If the
 project stops the day after P5 it has still shipped something useful.
 
+**B is done when §9 is:** runway to runway, hand-flown with a joystick in the browser through the
+real A32NX laws; all three laws reached and the protections exercised; LNAV and VNAV flying a
+plan; on the reference laptop, with no install.
+
 Kill criteria, agreed in advance [B]:
 
-- P6 consumes more than ~10 sessions without a stable 30-minute run → ship A alone, keep B as a branch.
+- P6 consumes more than ~10 sessions without a stable 30-minute run → ship A alone, keep B as a
+  branch. *Not triggered: P6 passed in its first session.*
+- WebAssembly cannot hold 50 Hz with headroom on the reference laptop → stop and put the choice to the
+  operator — a native flight core beside the browser, or fewer computers — never a longer step.
+  *Added 2026-11-01, with §3's revision.*
 - P2 stalls because the data is not available → cut the message set to what is known and keep moving.
   Content hunger must never block code.
 - The reference laptop cannot hold 20 Hz with the full system set → cut systems, never the tick rate.
@@ -382,11 +405,20 @@ Kill criteria, agreed in advance [B]:
 
 ## 8 · Next five actions
 
-1. `git init` and the trainer/flight split, before anything else grows.
-2. P5 gate: a build that runs without Node on the reference machine.
-3. Grow content: the message set toward 60, the panel toward the full overhead.
-4. A scenario picker so a drill starts from a saved `.situ` rather than `setup.ts` code.
-5. Then P6 again, deliberately, with the harness and a 30-minute run as its gate.
+Rewritten 2026-11-01 with §3. Of the list it replaced, `git init` and P6 are done; the P5 gate passed
+everywhere but the reference machine (item 4 below); growing content and a scenario picker wait in
+A's backlog.
+
+1. **P7's browser track, under way:** step 5 (the flight core as a library), 6 (WebAssembly, on a
+   pinned Emscripten), 7 (joystick), 8 (the Three.js view).
+2. **The thrust fit, under way** in its own worktree: takeoff, climb and idle against cited targets,
+   swapped in only under the swap rule.
+3. **P7's steps 2–4 on the fitted A320:** a real runway with an ILS and wind; failures that reach
+   every law; the protections driven and held. Then the gate: five hand-flown ILS approaches,
+   joystick, browser.
+4. **The 2014 laptop:** P5's open box, and step 6's 50 Hz with headroom, measured on the same machine.
+5. **Then P8 and P9:** displays from law state, then the FMS with LNAV and VNAV on §9's navigation
+   data. A's content grows alongside where it blocks nothing.
 
 ---
 
@@ -397,8 +429,8 @@ actually be fully flyable from runway to runway, takeoff to landing"* — on an 
 rudimentary graphics *"like back to airliner full motion sims of the 1980s"* in Three.js, and
 joystick support, because *"flying with keyboard arrow keys"* is not acceptable.
 
-That sharpens §3: B is not optional decoration on A. §3's "A to completion first" was written before
-this and has not been re-decided here.
+That sharpens §3: B is not optional decoration on A. §3 was re-decided on this basis the same day:
+B is the product.
 
 - [ ] **Joystick, first-class.** The Gamepad API: pitch and roll to the sidestick, twist or pedals
       to the rudder, a throttle axis to the thrust levers; buttons for takeover / autopilot

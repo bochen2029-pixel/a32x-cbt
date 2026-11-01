@@ -1,7 +1,9 @@
 # A32X CBT
 
 A computer-based trainer for an A320 fly-by-wire, built to run on a laptop with no graphics card and
-no installer. Systems, ECAM, flows and graded drills — not a flight simulator.
+no installer. What ships today is the systems trainer: systems, ECAM, flows and graded drills. What
+it is becoming is a flight simulator: the real A32NX flight laws on a fitted A320, hand-flown with a
+joystick in the browser. That part flies headless in `flight/` and is not in a browser yet.
 
 ![the trainer](reference/ui-panel-and-drills.png)
 
@@ -19,9 +21,10 @@ the trainee into a different one.
 
 ## What it is not
 
-No aerodynamics and no fly-by-wire laws, so nothing flies. The systems are plausible abstractions,
-not A320 data. The panel is a layout grid, not traced geometry. See `ROADMAP.md` for phases P6–P10,
-which add the real law core, JSBSim and the displays.
+The trainer that ships has no aerodynamics and no fly-by-wire laws, so nothing flies in it. The
+systems are plausible abstractions, not A320 data. The panel is a layout grid, not traced geometry.
+See `ROADMAP.md` for phases P6–P10: the real law core (P6, passed), an airframe and the browser
+(P7, under way), the displays and the FMS.
 
 ## Run it
 
