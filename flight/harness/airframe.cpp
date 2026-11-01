@@ -36,11 +36,12 @@ struct Model {
   bool ours;            // flight/jsbsim/aircraft, or the JSBSim clone's aircraft/
   bool stabiliser;      // a stabiliser of its own; otherwise the THS acts through the elevator
   double dropHeightFt;  // CG above the runway at the start, wheels just clear of it
+  bool ownSpeeds;       // the FAC computes an A320's speeds (VLS, VS1g): this aircraft's own only on an A320
 };
 
 const Model kModels[] = {
-    {"737", "737", "737", false, false, 5.0},
-    {"a320", "A320 (ours, fitted)", "A320-fit", true, true, 9.5},
+    {"737", "737", "737", false, false, 5.0, false},
+    {"a320", "A320 (ours, fitted)", "A320-fit", true, true, 9.5, true},
 };
 constexpr const char* kDefaultModel = "a320";  // since 2026-11-01, under the swap rule (ROADMAP.md, P7)
 
@@ -408,6 +409,10 @@ void Airframe::select(const std::string& key) {
 
 const std::string& Airframe::selected() {
   return selectedKey();
+}
+
+bool Airframe::facSpeedsAreItsOwn() {
+  return selectedModel().ownSpeeds;
 }
 
 const char* Airframe::model() {

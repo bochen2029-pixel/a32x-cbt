@@ -121,7 +121,7 @@ function(flight_warnings target)
   endif()
 endfunction()
 
-set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp harness/runway.cpp)
+set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp harness/runway.cpp harness/judge.cpp)
 add_library(flight_world STATIC
   ${FLIGHT_WORLD}
   harness/core.cpp)  # the step loop behind a C API: start, inputs, step, state
@@ -152,6 +152,13 @@ target_link_libraries(ils_test PRIVATE flight_world)
 set_target_properties(ils_test PROPERTIES LINKER_LANGUAGE CXX)
 flight_warnings(ils_test)
 flight_node_program(ils_test)
+
+# The gate's judge through the C API, as the browser reads it.
+add_executable(judge_test harness/judge_test.c)
+target_link_libraries(judge_test PRIVATE flight_world)
+set_target_properties(judge_test PROPERTIES LINKER_LANGUAGE CXX)
+flight_warnings(judge_test)
+flight_node_program(judge_test)
 
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
@@ -203,7 +210,7 @@ if(EMSCRIPTEN)
   flight_warnings(flight_core)
   target_link_options(flight_core PRIVATE
     --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createFlightCore -sENVIRONMENT=worker,node -sSINGLE_FILE=1
-    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text"
+    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPF64"
     ${FLIGHT_EMBED_OPTIONS})
   set_target_properties(flight_core PROPERTIES LINK_DEPENDS "${FLIGHT_EMBED_FILES}")
@@ -230,6 +237,12 @@ add_test(NAME the_c_api_flies COMMAND core_test)
 add_test(NAME ils_on_the_beams COMMAND ils_test "approach" 0 0)
 add_test(NAME ils_a_dot_off_the_localizer COMMAND ils_test "approach$<SEMICOLON>loc=1" 1 0)
 add_test(NAME ils_a_dot_low COMMAND ils_test "approach$<SEMICOLON>distance=8$<SEMICOLON>gs=1" 0 1)
+# The gate's judge (judge.h) as the browser reads it, through the C API: the scripted crew's approach
+# judged STABLE; nobody's, which holds the beams and never flares, NOT STABLE on its touchdown; and no
+# approach to judge from the runway.
+add_test(NAME the_judge_finds_the_scripted_approach_stable COMMAND judge_test scripted)
+add_test(NAME the_judge_finds_an_unflared_approach_not_stable COMMAND judge_test hands-off)
+add_test(NAME the_judge_has_nothing_to_judge_on_the_runway COMMAND judge_test runway)
 
 # The scripted crew flies KDFW 17C's ILS from 10 nm to a stop, judged by the hand-flown ILS's bands
 # (ROADMAP.md, P7): on the beams, a dot off each of them either way, 10 kt fast and slow, a 15 kt

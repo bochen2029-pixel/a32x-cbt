@@ -52,6 +52,12 @@ const char* flight_state_name(int index);  // null past the last
 // A field's value as a word, for the fields that are names (laws, phase); null for the rest.
 const char* flight_state_text(int index);
 
+// The gate's judge of an approach start (judge.h; ROADMAP.md, P7: how a hand-flown ILS is judged), as
+// text: a line a band, "pass", "FAIL" or "...." while it cannot be judged yet, each with its worst and
+// where it happened; then STABLE, NOT STABLE or flying. The same judge as law_harness --expect ils.
+// Valid until the next call; null before flight_start.
+const char* flight_debrief(void);
+
 #ifdef __cplusplus
 }
 
@@ -59,6 +65,7 @@ const char* flight_state_text(int index);
 #include <string>
 #include <vector>
 
+#include "judge.h"
 #include "world.h"
 
 class Efcs;
@@ -78,6 +85,8 @@ class FlightCore {
 
   World& world() { return world_; }
   const World& world() const { return world_; }
+  // The gate's judge, observed after every step.
+  const ApproachJudge& judge() const { return judge_; }
   Efcs& efcs();
   bool scripted() const { return world_.scripted; }
 
@@ -95,5 +104,6 @@ class FlightCore {
  private:
   World world_;
   std::vector<double> inputs_;
+  ApproachJudge judge_;
 };
 #endif

@@ -119,6 +119,9 @@ class Airframe {
   static const std::string& selected();
   // What reports call the selected aircraft, after "JSBSim <commit>'s".
   static const char* model();
+  // Whether the speeds the FAC computes (VLS, VS1g: an A320's, from its weight and CG) are the selected
+  // aircraft's own. On the 737 they are an A320's, and nothing should fly by them.
+  static bool facSpeedsAreItsOwn();
   // Coefficients loaded over the aircraft definition's own, by property name, for the fitter: every
   // Airframe built from now on gets them. A name the aircraft does not declare ends the process.
   static void setCoefficients(const std::vector<std::pair<std::string, double>>& coefficients);

@@ -48,7 +48,13 @@ const std::vector<const char*> kState = {
     "thr_along_m",  "thr_right_m",  "thr_height_ft",
     // the runway, fixed for the flight: its landing threshold, and the pavement past and before it
     "rwy_lat_deg",  "rwy_lon_deg",  "rwy_elev_ft",   "rwy_heading_deg", "rwy_length_m",
-    "rwy_width_m",  "rwy_displaced_m"};
+    "rwy_width_m",  "rwy_displaced_m",
+    // the gate's judge (judge.h): the FAC's VLS (NaN when it transmits none) and the approach speed the
+    // pilot is held to; whether this step is inside the stabilised window (0 or 1) and inside every band
+    // of it (NaN outside the window); the verdict once the aircraft has stopped (1 stable, 0 not, NaN
+    // before); and the first touchdown's distance past the threshold
+    "vls_kn",       "vapp_kn",      "judge_window",  "judge_in_bands", "judge_stable",
+    "judge_touchdown_m"};
 
 int slot(const std::vector<const char*>& names, const char* name) {
   for (size_t k = 0; k < names.size(); ++k) {
@@ -129,6 +135,7 @@ std::vector<double> g_state;
 
 FlightCore::FlightCore(bool scripted, const WorldStart& start) : world_(start) {
   world_.scripted = scripted;
+  judge_.begin(world_);
   toInputs(world_.crew, inputs_);
   if (!scripted) {
     // A crew at the controls finds the FLT CTL pushbuttons pressed: in the inputs, not the crew, so the
@@ -148,6 +155,7 @@ void FlightCore::step(const std::function<void()>& between) {
   if (!world_.scripted) fromInputs(inputs_, world_.crew);
   world_.step(kDt, e.orders());
   if (world_.scripted) toInputs(world_.crew, inputs_);
+  judge_.observe(world_, e.transmitted());
 }
 
 const std::vector<const char*>& FlightCore::inputNames() {
@@ -278,8 +286,14 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            r.headingDeg,
                            r.lengthM - r.displacedM,
                            r.widthM,
-                           r.displacedM};
-  static_assert(sizeof values / sizeof values[0] == 54, "one value per state slot");
+                           r.displacedM,
+                           judge_.vlsKn(),
+                           judge_.vappKn(),
+                           judge_.inWindow() ? 1.0 : 0.0,
+                           judge_.inWindow() ? (judge_.inBands() ? 1.0 : 0.0) : NAN,
+                           judge_.active() && judge_.finished() ? (judge_.stable() ? 1.0 : 0.0) : NAN,
+                           judge_.touchdown().pastM};
+  static_assert(sizeof values / sizeof values[0] == 60, "one value per state slot");
   s.assign(std::begin(values), std::end(values));
 }
 
@@ -469,6 +483,13 @@ const char* flight_state_name(int index) {
 
 const char* flight_state_text(int index) {
   return g_core && index >= 0 && index < static_cast<int>(kState.size()) ? g_core->stateText(index) : nullptr;
+}
+
+const char* flight_debrief(void) {
+  static std::string text;
+  if (!g_core) return nullptr;
+  text = g_core->judge().debrief();
+  return text.c_str();
 }
 
 }  // extern "C"

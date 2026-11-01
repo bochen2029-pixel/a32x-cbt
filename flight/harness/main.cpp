@@ -147,16 +147,6 @@ struct Options {
 };
 
 // The worst a measure reached, and the height above the threshold (or the distance past it) where.
-struct Worst {
-  double value = NAN, at = NAN;
-  void add(double v, double where) {
-    if (std::isnan(value) || v > value) {
-      value = v;
-      at = where;
-    }
-  }
-};
-
 struct Results {
   long long ticks = 0;
   double wallSeconds = 0;
@@ -215,15 +205,8 @@ struct Results {
   // the RUD TRIM test, at the end of its hands-off window: what the engaged FAC ordered (+ left) and read
   // back, the rudder (+ left) and the sideslip (+ nose left of the flight path); then the trim after RESET
   double trimOrder = NAN, trimReadBack = NAN, trimRudder = NAN, trimBeta = NAN, trimAfterReset = NAN;
-  // an ILS approach: the stabilised window from 1,000 ft above the threshold to 50 ft before the first
-  // touchdown, each measure's worst and the height where; then the touchdown and rollout on the runway
-  bool ilsApproach = false;
-  long long ilsTicks = 0;
-  Worst ilsLocDots, ilsGsDots, ilsSinkFpm, ilsBankDeg, ilsFastKn, ilsSlowKn, ilsLoadDev;
-  double ilsUnconfiguredAtFt = NAN;
-  double touchdownPastM = NAN, touchdownOffM = NAN;  // from the threshold, and from the centreline (+ right)
-  double landingRunwayHalfWidthM = NAN;
-  Worst rolloutOffM;                                  // where: metres past the threshold
+  // an ILS approach, as the gate's judge saw it (judge.h): the core's own, copied at the end of the run
+  ApproachJudge judge;
 };
 
 // A crew recording: a line of input values per tick, the columns named by the first line in the flight
@@ -390,12 +373,6 @@ Results run(const Options& opt, FILE* trace) {
       if (!wasOnGround && world.onGround()) {
         ++r.touchdowns;
         r.landings.push_back({t, lastAirborneVs, world.pitchDeg(), world.rollDeg(), world.casKn(), world.loadFactor()});
-        if (world.ilsApproach() && r.landings.size() == 1) {
-          const IlsReading ir = world.ils();
-          r.touchdownPastM = -ir.alongM;
-          r.touchdownOffM = ir.rightM;
-          r.landingRunwayHalfWidthM = world.runway().widthM / 2;
-        }
       }
       wasOnGround = world.onGround();
       if (!world.onGround()) lastAirborneVs = world.verticalSpeedFpm();
@@ -429,27 +406,6 @@ Results run(const Options& opt, FILE* trace) {
       }
     });
     if (!opt.record.empty()) recording.write(core.inputs());
-
-    if (world.ilsApproach()) {
-      r.ilsApproach = true;
-      const IlsReading ir = world.ils();
-      const double ft = ir.heightM / 0.3048;
-      if (r.landings.empty() && !world.onGround() && ft <= 1000 && ft >= 50) {
-        const double vapp = World::approachSpeedKn();
-        ++r.ilsTicks;
-        r.ilsLocDots.add(std::abs(ir.locDots), ft);
-        r.ilsGsDots.add(std::abs(ir.gsDots), ft);
-        r.ilsSinkFpm.add(-world.verticalSpeedFpm(), ft);
-        r.ilsBankDeg.add(std::abs(world.rollDeg()), ft);
-        r.ilsLoadDev.add(std::abs(world.loadFactor() - 1), ft);
-        r.ilsFastKn.add(world.casKn() - vapp, ft);
-        r.ilsSlowKn.add(vapp - world.casKn(), ft);
-        const bool configured = world.crew.flapLever == 4 && world.flapDeg() > 39.5 &&
-                                world.airframeState().gearPosition >= 0.999;
-        if (!configured && std::isnan(r.ilsUnconfiguredAtFt)) r.ilsUnconfiguredAtFt = ft;
-      }
-      if (!r.landings.empty() && world.groundSpeedKn() > 1) r.rolloutOffM.add(std::abs(ir.rightM), -ir.alongM);
-    }
 
     const Transmitted& tx = efcs.transmitted();
     const Surfaces& s = world.surfaces;
@@ -534,6 +490,7 @@ Results run(const Options& opt, FILE* trace) {
   r.digest = digest.h;
   r.unhealthyAtEnd = unhealthyList(efcs.transmitted());
   r.crashedAt = world.crashedAt();
+  r.judge = core.judge();
   return r;
 }
 
@@ -715,40 +672,15 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
     failed += landingChecks(r);
   } else if (which == "ils") {
     // A hand-flown ILS's bands (ROADMAP.md, P7: how a hand-flown ILS is judged), here applied to the
-    // scripted crew: stabilised from 1,000 ft above the threshold to 50 ft, then the touchdown and the
-    // rollout against the runway. Each band prints its worst and where it happened.
-    const double vapp = World::approachSpeedKn();
-    auto worst = [](const Worst& w, const char* unit) {
-      return std::isnan(w.value) ? std::string("never measured") : fmt("worst %.2f ", w.value) + unit + fmt(" at %.0f ft", w.at);
-    };
-    failed += verdict("an approach start", r.ilsApproach, opt.scenario.empty() ? "no --scenario" : opt.scenario);
-    failed += verdict("the stabilised window was flown, 1,000 ft to 50 ft", r.ilsTicks * kDt > 60,
-                      fmt("%.0f s of it", r.ilsTicks * kDt));
-    failed += verdict("localizer within 1 dot", r.ilsLocDots.value <= 1, worst(r.ilsLocDots, "dots"));
-    failed += verdict("glideslope within 1 dot", r.ilsGsDots.value <= 1, worst(r.ilsGsDots, "dots"));
-    failed += verdict("sink rate under 1,000 fpm", r.ilsSinkFpm.value < 1000, worst(r.ilsSinkFpm, "fpm"));
-    failed += verdict("gear down and CONF FULL from 1,000 ft", std::isnan(r.ilsUnconfiguredAtFt),
-                      std::isnan(r.ilsUnconfiguredAtFt) ? std::string("throughout") : fmt("not at %.0f ft", r.ilsUnconfiguredAtFt));
-    failed += verdict("speed within Vapp -5/+10 kt", r.ilsFastKn.value <= 10 && r.ilsSlowKn.value <= 5,
-                      fmt("Vapp %.0f kt; %+.1f to ", vapp, -r.ilsSlowKn.value) + fmt("%+.1f kt", r.ilsFastKn.value));
-    failed += verdict("bank within 7 deg", r.ilsBankDeg.value <= 7, worst(r.ilsBankDeg, "deg"));
-    failed += verdict("normal law on the approach", r.flightTicks > 0 && share(r.pitchLawTicks, "normal", r.flightTicks) == 1 &&
-                      share(r.lateralLawTicks, "normal", r.flightTicks) == 1, r.firstNonNormalAt < 0 ? "throughout" : r.firstNonNormal);
-    failed += verdict("a landing", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
-    if (!r.landings.empty()) {
-      const auto& l = r.landings.front();
-      int bounces = 0;
-      for (const auto& b : r.landings) bounces += b.at > l.at && b.at - l.at < 30;
-      failed += verdict("sink rate at touchdown under 360 fpm", l.sinkFpm > -360, fmt("%.0f fpm", l.sinkFpm));
-      failed += verdict("load factor at touchdown under 2.6 g", l.peakG < 2.6, fmt("peak %.2f g", l.peakG));
-      failed += verdict("pitch at touchdown 0 to 10 deg", l.pitch > 0 && l.pitch < 10, fmt("%.1f deg", l.pitch));
-      failed += verdict("touchdown 300 to 900 m past the threshold", r.touchdownPastM >= 300 && r.touchdownPastM <= 900,
-                        fmt("%.0f m", r.touchdownPastM));
-      failed += verdict("on the centreline at touchdown, within 5 m", std::abs(r.touchdownOffM) <= 5,
-                        fmt("%+.1f m (+ right)", r.touchdownOffM));
-      failed += verdict("and through the rollout", r.rolloutOffM.value <= 5,
-                        fmt("worst %.1f m, ", r.rolloutOffM.value) + fmt("%.0f m past the threshold", r.rolloutOffM.at));
-      failed += verdict("and it stayed down", bounces == 0, fmt("%.0f bounces", bounces));
+    // scripted crew: the gate's own judge (judge.h), the one the browser's debrief reads, then the
+    // computers' law, which the gate takes for granted and this harness checks.
+    failed += verdict("an approach start", r.judge.active(), opt.scenario.empty() ? "no --scenario" : opt.scenario);
+    for (const Band& b : r.judge.verdict()) {
+      failed += verdict(b.name.c_str(), b.pass, b.detail);
+      if (b.name == "bank within 7 deg") {
+        failed += verdict("normal law on the approach", r.flightTicks > 0 && share(r.pitchLawTicks, "normal", r.flightTicks) == 1 &&
+                          share(r.lateralLawTicks, "normal", r.flightTicks) == 1, r.firstNonNormalAt < 0 ? "throughout" : r.firstNonNormal);
+      }
     }
   } else if (which == "turbulence") {
     // Light turbulence on the approach: the gusts are felt — the load factor strays 0.12 to 0.28 g from
@@ -759,18 +691,19 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
     // well. Which gusts a run meets is the standard library's: JSBSim draws them from
     // std::default_random_engine and std::normal_distribution, whose algorithms differ between MSVC,
     // libstdc++ and libc++, so the same seed flies different gusts on each. The touchdown is printed.
-    failed += verdict("an approach start in turbulence", r.ilsApproach && opt.scenario.find("turbulence") != std::string::npos,
+    const Worst& gusts = r.judge.loadDeviation();
+    failed += verdict("an approach start in turbulence", r.judge.active() && opt.scenario.find("turbulence") != std::string::npos,
                       opt.scenario.empty() ? "no --scenario" : opt.scenario);
-    failed += verdict("the gusts are felt: the load factor strays past 0.05 g on the approach", r.ilsLoadDev.value > 0.05,
-                      std::isnan(r.ilsLoadDev.value) ? std::string("never measured")
-                                                     : fmt("worst %.2f g from one at %.0f ft", r.ilsLoadDev.value, r.ilsLoadDev.at));
+    failed += verdict("the gusts are felt: the load factor strays past 0.05 g on the approach", gusts.value > 0.05,
+                      std::isnan(gusts.value) ? std::string("never measured")
+                                              : fmt("worst %.2f g from one at %.0f ft", gusts.value, gusts.at));
     failed += verdict("normal law on the approach", r.flightTicks > 0 && share(r.pitchLawTicks, "normal", r.flightTicks) == 1 &&
                       share(r.lateralLawTicks, "normal", r.flightTicks) == 1, r.firstNonNormalAt < 0 ? "throughout" : r.firstNonNormal);
-    failed += verdict("a landing", !r.landings.empty(), fmt("%.0f touchdowns", static_cast<double>(r.landings.size())));
-    if (!r.landings.empty()) {
-      const auto& l = r.landings.front();
-      failed += verdict("on the runway", std::abs(r.touchdownOffM) <= r.landingRunwayHalfWidthM && r.touchdownPastM > 0,
-                        fmt("%.0f m past the threshold, ", r.touchdownPastM) + fmt("%+.1f m from the centreline (+ right)", r.touchdownOffM));
+    failed += verdict("a landing", r.judge.touchdowns() > 0, fmt("%.0f touchdowns", r.judge.touchdowns()));
+    if (r.judge.touchdowns() > 0) {
+      const ApproachJudge::Touchdown& l = r.judge.touchdown();
+      failed += verdict("on the runway", std::abs(l.offM) <= r.judge.runwayHalfWidthM() && l.pastM > 0,
+                        fmt("%.0f m past the threshold, ", l.pastM) + fmt("%+.1f m from the centreline (+ right)", l.offM));
       std::printf("  info  touchdown at %.0f fpm, peak %.2f g, pitch %.1f deg: not judged in gusts\n", l.sinkFpm, l.peakG, l.pitch);
     }
   } else if (which == "law-degrades") {
