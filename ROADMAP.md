@@ -318,8 +318,17 @@ trainer's debrief does.
   harness's thrust-lever schedule, drawn up for the 737 stand-in; neither has been fitted.
 - The harness keeps the airframe to one adapter (`harness/airframe.cpp`) and one aircraft file, so
   the swap stays small. Either airframe can fly: `FLIGHT_AIRFRAME=737|a320`.
-- Open — packaging. The browser product links A32NX, so it is GPLv3; `app/` stays MIT. Two
-  artefacts, or one GPLv3 artefact that carries the trainer: decide before step 6 ships anything.
+- **Taken 2026-11-01: packaging.** The operator left it to the recommendation: *"go with your own
+  best recommendation for all"*. Two artefacts. `a32x-cbt.zip` stays as P5 built it: the systems
+  trainer alone, MIT. The flyable simulator ships as one GPLv3 artefact that carries the trainer: the
+  A32NX computers and JSBSim as WebAssembly, the browser shell, and `app/`'s MIT code under its own
+  notice. MIT code may travel inside a GPLv3 work; GPLv3 code may not travel inside `app/`. So the
+  browser shell and everything that loads the flight module live under `flight/`; the flight side
+  may import from `app/`, and `app/` never imports from `flight/`. Every distributed build of the
+  GPLv3 artefact comes with its Corresponding Source from the same place, a source archive made by
+  the same packaging step: our source and build scripts, the exact upstream sources compiled into it
+  (A32NX `66021c2`, JSBSim `66f7faf`, the pinned Emscripten named) and every licence text and notice.
+  Nothing is published anywhere without the operator's word.
 - Not changed: P8's displays come after this gate. Step 8's overlay is not a PFD.
 
 ---

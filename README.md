@@ -50,8 +50,9 @@ npm run check      # typecheck + 182 tests
 ## Provenance in one line
 
 No third-party source is vendored. `app/` is original TypeScript; the behaviour in it was worked out
-by study. `flight/` links GPLv3 FlyByWire A32NX and carries that licence. Full detail and the
-position taken on each source: `docs/provenance.md`.
+by study. `flight/` links GPLv3 FlyByWire A32NX and carries that licence. Two artefacts follow from
+that: the systems trainer's zip, MIT, and the flyable simulator, GPLv3, which carries the trainer
+and ships with its source. Full detail and the position taken on each source: `docs/provenance.md`.
 
 ## For an agent working here
 

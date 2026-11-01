@@ -150,12 +150,28 @@ is ours.
 | dependency | scope | licence | vendored? |
 |---|---|---|---|
 | TypeScript | build only, `npm run build:web` | Apache-2.0 | no, `npm i` |
+| esbuild | build only, bundles `app/web/app.js`; its three-line class-field helper ships inside it | MIT | no, `npm i` |
 | JSBSim | `flight/` from P7 | LGPL-2.1 | no, cloned separately, `66f7faf` |
 | JSBSim's 737 and CFM56 data | `flight/` from P7, read at run time | GPL; LGPL-2.1 | no, read from the JSBSim clone |
 | JSBSim's CFM56_5 data | `flight/`, our A320's engines, read at run time | LGPL-2.1 | no, read from the JSBSim clone |
 | FlyByWire A32NX | `flight/` from P6 | GPLv3 | no, cloned separately, `66021c2` |
 
 Runtime dependencies in `app/`: **none.** It is Node built-ins and a browser.
+
+### 2a · What ships, and under which licence
+
+Decided 2026-11-01 (`ROADMAP.md` §4, P7: *packaging*). Two artefacts:
+
+| artefact | holds | licence |
+|---|---|---|
+| `a32x-cbt.zip` (P5) | the systems trainer: `app/` built, its data, `LICENSE`, `README.txt` | MIT |
+| the flyable simulator (from P7) | the A32NX computers and JSBSim as WebAssembly, the browser shell from `flight/`, and the trainer's MIT code under its own notice | GPLv3 |
+
+The second carries the first's code, never the reverse: `app/` imports nothing from `flight/`.
+Every distributed build of it comes with its Corresponding Source from the same place — our source
+and build scripts and the exact upstream sources compiled into it — and with every licence text and
+notice: GPLv3, A32NX's notices, LGPL-2.1 for JSBSim, the aircraft files' headers, MIT for Three.js
+and for the trainer. Nothing is published without the operator's word.
 
 ---
 
