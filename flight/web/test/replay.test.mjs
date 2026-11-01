@@ -5,7 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { escapeHtml, looksLikeRecording, pack, replayStatus, replayUrl, replayVerdict, unpack, wrap } from '../src/replay.js';
+import { escapeHtml, looksLikeRecording, pack, REPLAY_TICKS, replayStatus, replayTicks, replayUrl, replayVerdict, unpack, wrap } from '../src/replay.js';
 
 // a recording as core-session.js writes one, with the page's own header lines and the judge's at its end
 const recording = (rows = 3) => ['# scenario: approach;distance=5', '# airframe: a320', '# crew: hands', '# build: 369e135',
@@ -62,6 +62,17 @@ test("the replay's verdict against the one saved with it: the same, each band ch
   assert.equal(replayVerdict({ comparable: true, same: false, changed: [] }), 'the same bands as when it was saved, their figures otherwise');
   assert.match(replayVerdict({ comparable: false, same: false, changed: [] }), /saved without a verdict/, 'a recording older than 0.1.1');
   assert.deepEqual(wrap('one two three four', 9), ['one two', 'three', 'four']);
+});
+
+test('a replay flies a dozen ticks a frame, but a tick a frame in the flare and while the reversers move', () => {
+  assert.equal(replayTicks({ on_ground: 0, ra_ft: 1500 }), REPLAY_TICKS, 'on the approach');
+  assert.equal(replayTicks({ on_ground: 0, ra_ft: 45 }), 1, 'in the flare');
+  assert.equal(replayTicks({ on_ground: 1, ra_ft: 0 }), REPLAY_TICKS, 'on the ground');
+  assert.equal(replayTicks(null), REPLAY_TICKS, 'before the first state');
+  assert.equal(replayTicks({ on_ground: NaN, ra_ft: NaN }), REPLAY_TICKS);
+  assert.equal(replayTicks({ on_ground: 1, ra_ft: 0, reverser_1: 0.4, reverser_2: 0.4 }), 1, 'the doors moving');
+  assert.equal(replayTicks({ on_ground: 1, ra_ft: 0, reverser_1: 1, reverser_2: 0.98 }), 1, 'one still moving');
+  assert.equal(replayTicks({ on_ground: 1, ra_ft: 0, reverser_1: 1, reverser_2: 1 }), REPLAY_TICKS, 'both open');
 });
 
 test('what a recording says reaches the page as text, never as markup', () => {

@@ -8,6 +8,19 @@ export const STORE = 'a32x-replay';      // sessionStorage: the recording, packe
 export const REPLAY_TICKS = 13;           // the ticks a frame asks for in a replay, 0.26 s of the flight: a dozen times
                                           // its pace at 50 frames a second, and every frame a sample for the view,
                                           // which keeps one each quarter second of the flight (view.js, record)
+export const REPLAY_FLARE_FT = 60;        // below this, in the air, a replay steps a tick a frame (replayTicks)
+
+// The ticks a replay's frame asks for, given the state it last flew: REPLAY_TICKS; but one, as the flight itself was
+// seen, in the air below REPLAY_FLARE_FT, so that the log's touchdown, whose sink and pitch are the last sample's in
+// the air (events.js), is the touchdown's own and not a quarter second before it, and while a reverser's doors move,
+// so that its deployed and stowed lines fall where the flight's did. The flare plays at its own pace; the doors take
+// two seconds each way. A state not known yet flies REPLAY_TICKS.
+export function replayTicks(s) {
+  if (!s) return REPLAY_TICKS;
+  const transit = (v) => v > 0.001 && v < 0.999;
+  const flare = !(s.on_ground > 0.5) && s.ra_ft < REPLAY_FLARE_FT;
+  return flare || transit(s.reverser_1) || transit(s.reverser_2) ? 1 : REPLAY_TICKS;
+}
 
 // Whether a text is a recording as the page saves one (core-session.js, recording): its header's first line names the
 // scenario, and a line of input names follows the header lines.

@@ -16,7 +16,7 @@ import { buildNote, Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { centre, drag, wheel } from './pointer.js';
-import { escapeHtml, looksLikeRecording, pack, REPLAY_TICKS, replayStatus, replayUrl, replayVerdict, STORE, unpack } from './replay.js';
+import { escapeHtml, looksLikeRecording, pack, replayStatus, replayTicks, replayUrl, replayVerdict, STORE, unpack } from './replay.js';
 import { runwayFromState } from './scene-math.js';
 import { drawTimeline, momentAt, Playhead, readout, sampleAt, timeAt } from './timeline.js';
 import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
@@ -422,8 +422,9 @@ function frame(now) {
   // The clock decides the steps. While the worker still owes the last answer they wait, up to five;
   // past that they are dropped, as the clock drops its own.
   const droppedBefore = clock.dropped + droppedWaiting;
-  // a replay flies as fast as a frame's REPLAY_TICKS allow, not on the clock, and nothing of it is dropped
-  if (replayMode) pending = flight.ended ? 0 : REPLAY_TICKS;
+  // a replay flies as fast as a frame's ticks allow (replayTicks), not on the clock, and nothing of it is dropped
+  if (replayMode) pending = flight.ended ? 0 : replayTicks(latest ? {
+    on_ground: value('on_ground'), ra_ft: value('ra_ft'), reverser_1: value('reverser_1'), reverser_2: value('reverser_2') } : null);
   else pending += clock.advance(realMs);
   if (!replayMode && pending > clock.maxCatchUp) {
     droppedWaiting += pending - clock.maxCatchUp;
