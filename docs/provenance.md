@@ -106,8 +106,10 @@ The file that puts the A32NX servos in charge of the airframe's surfaces,
 ### 1d · The A320's acceptance targets — numbers, cited
 
 `flight/targets/a320.csv` and `a320-speeds.csv` hold the numbers an airframe is scored against
-(`airframe_score`). They are ours and GPLv3, like everything in `flight/`. No flight-test data and no
-Airbus document stands behind them, and none is claimed: every row names one of these sources.
+(`airframe_score`). They are ours and GPLv3, like everything in `flight/`. No flight-test data stands
+behind them, and none is claimed. One source carries the manufacturer's own numbers: the ANP database,
+whose A320-211 entry Airbus developed for noise modelling and EUROCONTROL and EASA publish. Every row
+names one of these sources.
 
 | source | licence | what is taken | how |
 |---|---|---|---|
@@ -117,13 +119,25 @@ Airbus document stands behind them, and none is claimed: every row names one of 
 | A32NX MSFS flight model, `flight_model.cfg` (§1a clone) | GPLv3 | the second weight: the A320-251N it carries has a maximum zero-fuel weight of 64.3 t and a maximum landing weight of 67.4 t; rows are repeated at 65 t | cited by value |
 | AAIB India, final report on the serious incident to A320-271N VT-WGR at Bengaluru, 11 November 2019 | a public investigation report | a recorded approach: 65.2 t, CG 30.6 % MAC, CONF FULL, on the ILS glide slope at VLS + 8 kt, pitch +2.5° at 1,000 ft and +2.5 to +3.5° down to 220 ft, from Airbus's analysis of the flight data recorder quoted in the report | cited by value; the band's 0.5° either way is ours |
 | OpenAP's drag model (`junzis/openap`, `openap/drag.py`; Sun, Hoekstra and Ellerbroek, *Aerospace* 7(8) 104, 2020), after Gur, Mason and Schetz, *Journal of Aircraft* 47(4), 2010 | LGPL-3.0; the paper's equations | the drag rise: Korn's drag-divergence Mach (technology factor 0.95, OpenAP's default thickness 0.12, the A320's 25° of sweep from OpenAP's `a320.yml`) and Lock's fourth-power rise above a critical Mach 0.108 below it; at a lift coefficient of 0.5 the rise reaches 20 counts at Mach 0.827 | computed from the published equations; no code copied. A model, not a measurement, and the file says so |
-| OpenAP WRAP, A320 (Sun, Ellerbroek and Hoekstra, *Transportation Research Part C*, 2019; `junzis/openap`) | LGPL-3.0 | the ranges of its ADS-B fits for takeoff acceleration, liftoff speed, climb and descent rate, and its typical cruise | four ranges and a typical cruise Mach and level cited, units converted; no file copied. The four ranges are context rows, not counted |
+| OpenAP WRAP, A320 (Sun, Ellerbroek and Hoekstra, *Transportation Research Part C*, 2019; `junzis/openap`) | LGPL-3.0 | the ranges of its ADS-B fits for takeoff acceleration, liftoff speed, climb and descent rate, and its typical cruise | four ranges and a typical cruise Mach and level cited, units converted; no file copied. The four ranges are context rows, not counted: they are what airlines fly, at reduced thrust and mixed weights |
 | MIL-F-8785C, *Flying Qualities of Piloted Airplanes* (US DoD, 1980) | public domain | Level 1 floors for large aircraft: roll-mode time constant at most 1.4 s, Dutch-roll damping at least 0.08, short-period damping 0.30 to 2.00 | cited |
+| EASA type-certificate data sheet E.067, issue 02, 17 April 2018, CFM56-5 series | a public certification document | the CFM56-5-A1's ratings: 11,120 daN take-off, 10,540 daN maximum continuous, static, sea level, ISA, no air bled | cited by value |
+| The Aircraft Noise and Performance (ANP) database, version 2.3, A320-211 / CFM56-5A1 (EUROCONTROL and ECAC; the archive tables EASA publishes) | public; its data are developed by the manufacturer and reviewed by the FAA, EASA, the Volpe Center and EUROCONTROL | Airbus's thrust coefficients for the MaxTakeoff, MaxClimb and IdleApproach ratings; its drag-to-lift ratios for CONF 1+F and clean; its take-off speed coefficient for CONF 1+F | cited by value; thrust and gradients computed with the equations below; no file copied |
+| Commission Directive (EU) 2015/996, Annex II, Appendix B: ECAC Doc 29's flight-performance method | EU law, public | equation B-1, corrected net thrust from the ANP coefficients; B-12, the climb gradient; B-15, the take-off speed; its guidance on reduced take-off and climb thrust, read for the WRAP rows | cited |
+| OpenAP's engine table (`junzis/openap`, `openap/data/engine/engines.csv`, from Svoboda's turbofan database, *Aircraft Design* 3, 2000, and ICAO's engine emissions databank) and its thrust model (`openap/thrust.py`) | LGPL-3.0 | the CFM56-5A3's thrust at Mach 0.8 and 35,000 ft, and the model's fallback for an engine without it, the CFM56-5A1; the CFM56-5A1's bypass ratio, 6.0 | cited by value; no file copied |
+| Bartel and Young, "Simplified Thrust and Fuel Consumption Models for Modern Two-Shaft Turbofan Engines", *Journal of Aircraft* 45(4), 2008, as OpenAP implements it | the paper's equations | take-off thrust against Mach for a bypass ratio of 6.0 | computed from the published equations; no code copied |
 | pilot literature | — | cruise attitude; the approach attitude it gave first is now inside the recorded one above | a wide band, marked in the file as not confirmed against Airbus's FCTM. To confirm |
 
 The margins and the bands' widths that no source gives — ±3 kt on a stall speed, 1° above α max,
-0.5° around a recorded attitude, 0.02 of Mach around a modelled drag rise — are this project's, and
-the file says so where it uses them.
+0.5° around a recorded attitude, 0.02 of Mach around a modelled drag rise, 1 % around a rating, 3 %
+around ANP's thrust and 1 kN around its idle, 5 % around a generic model, 10 % around a gradient
+from another airframe's drag — are this project's, and the file says so where it uses them.
+
+The ANP entry is the A320-211, with the CFM56-5A1 our A320 carries and wingtip fences where ours has
+sharklets. ANP's thrust is kept below 10,000 ft, where Doc 29 uses it; above that one row stands on
+OpenAP's figures. A32NX's FMS carries its own model of the A320neo's LEAP-1A26, a community
+reconstruction; our A320 keeps the CFM56-5A1, whose manufacturer's numbers are public, and that model
+is not used.
 
 ### 1e · Our A320 — seeds and fit
 
