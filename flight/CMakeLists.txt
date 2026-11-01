@@ -253,3 +253,16 @@ endif()
 # Negative controls: the gate's two checks are shown able to fail.
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)
 add_test(NAME losing_all_air_data_ends_normal_law COMMAND law_harness --minutes 8 --fail-adr-at 240 --expect law-degrades)
+
+# The page's own tests (flight/web), in node: its clock wherever node is found, and in the WebAssembly
+# build the browser's module itself, the very file the page loads.
+find_program(FLIGHT_NODE NAMES node nodejs)
+if(FLIGHT_NODE)
+  add_test(NAME the_page_clock_keeps_50_hz COMMAND "${FLIGHT_NODE}" --test "${CMAKE_CURRENT_SOURCE_DIR}/web/test/clock.test.mjs")
+  if(EMSCRIPTEN)
+    add_test(NAME the_browser_module_flies COMMAND "${FLIGHT_NODE}" --test "${CMAKE_CURRENT_SOURCE_DIR}/web/test/module.test.mjs")
+    set_tests_properties(the_browser_module_flies PROPERTIES ENVIRONMENT "FLIGHT_CORE_JS=${CMAKE_CURRENT_BINARY_DIR}/flight_core.js")
+  endif()
+else()
+  message(STATUS "node not found: the page's tests (flight/web) are not registered")
+endif()

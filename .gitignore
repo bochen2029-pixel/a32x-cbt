@@ -2,6 +2,8 @@
 *.tsbuildinfo
 app/dist/
 flight/build/
+flight/build-wasm/
+flight/build-web/
 
 # deps
 node_modules/
