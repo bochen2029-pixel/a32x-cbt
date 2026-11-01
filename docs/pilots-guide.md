@@ -100,6 +100,7 @@ Reverse thrust is a held button: D-pad up on a standard gamepad, or the one you 
 | K | the debrief, on and off |
 | L | the flown path, in the normal view |
 | Ctrl+S | save the flight's recording |
+| Ctrl+O | open a saved recording and watch it again (or drop the file on the page) |
 | drag | look round the flight deck (2); swing round the aircraft (4, and the debrief) |
 | wheel | zoom; in the orbit camera, closer and further |
 | double click | the head and the zoom set back |
@@ -249,6 +250,15 @@ Five that passed count for a later release only if they still pass on it:
 built from that release, replays them there, judges them by every rule of the gate, and names every
 band whose verdict differs from the one each recording was saved with. If any of the five is no longer
 stable, they are flown again on the release.
+
+**Watching a flight again.** **Ctrl+O**, or the debrief panel's *open a recording* button, opens a
+saved recording in the page; so does dropping the file anywhere on it. The page starts again from the
+recording's own scenario and aircraft and flies it at about a dozen times its pace, at its own pace in
+the flare and while the reversers move, then opens the debrief over the whole flight, timeline and
+all. The panel sets the replay's verdict against the one saved with the recording: on the build that
+flew it, the same, line for line. Flown on another build, the status line says so in amber, and the
+panel names every band whose verdict changed, as `--rejudge` does. A replay is not saved again: its
+recording is the file you opened.
 
 # Starting elsewhere
 

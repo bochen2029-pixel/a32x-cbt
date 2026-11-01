@@ -1023,8 +1023,14 @@ along its foot (`web/src/timeline.js`), in the manner of Tacview's: the flight a
 its moments marked, and a playhead to drag back through it, step a second at a time (`,` `.`, ten with Shift),
 or play at the flight's pace (Space); the aircraft is drawn in cyan where the playhead holds it, the camera
 follows it, the panel lights the moment, and a moment clicked in the panel goes there; LIVE at the bar's end
-follows the flight again. It reads the page's own samples of the flight, four a second, interpolated, not a
-replay of a saved recording through the core. L draws the
+follows the flight again. It reads the page's own samples of the flight, four a second, interpolated. A saved
+recording opens in the page with Ctrl+O, the panel's button or a file dropped on it (`web/src/replay.js`), from
+`file://` too: the page reloads and the worker flies it again through the core from its own scenario and on its
+own airframe (`core-session.js`, `Replay`), a dozen ticks a frame but one at a time in the flare and while the
+reversers move, so the log's moments fall where the flight's did; at its end the debrief opens over it, and the
+panel sets its verdict against the one saved with it, the same line for line on the build that flew it, else
+each band that changed, as `--rejudge` names them. A recording flown on another build is said so in amber. A
+replay is not saved again. L draws the
 path in the normal view, and `trail=1`, `debrief=1` and `cam=` open the page on them. The floor builds the
 A320, its deck and the debrief when a camera or the debrief first asks for them, one pause then; the GPU
 tier builds them at the start. Before the flight's
