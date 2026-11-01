@@ -1,8 +1,8 @@
 // The debrief view, after the ACMI of the 1990s and Tacview today: the flown path as a ribbon that keeps
 // the wings' bank, coloured by the stabilised-approach bands the P7 gate judges; the ILS as a wire tunnel
 // of one-dot boxes every half mile; drop lines to the ground; the world as a vector grid on black. It
-// draws the flight's states as the page kept them, four a second. Tags on the tracks and an event log
-// are still to come. GPLv3.
+// draws the flight's states as the page kept them, four a second, and tags on the path the moments the
+// flight's log found (events.js). GPLv3.
 
 import * as THREE from 'three';
 
@@ -17,6 +17,8 @@ export class Acmi {
     this.group = new THREE.Group();
     this.wire = new THREE.Group();
     this.group.add(this.wire);
+    this.tags = new THREE.Group();   // the log's moments, where they happened (tag)
+    this.group.add(this.tags);
     this.max = 8000;
     this.count = 0;
     const g = new THREE.BufferGeometry();
@@ -51,6 +53,46 @@ export class Acmi {
     this.lastDrop = -1e9;
     this.ribbon.geometry.setDrawRange(0, 0);
     this.dropLines.geometry.setDrawRange(0, 0);
+  }
+
+  // A tag on the path: a word where something happened, the same size at any range and over everything,
+  // as a debrief's labels are; its left edge marks the place. Red for out of the bands, a bounce or a
+  // crash, green for back in them, white for a gate, amber for the rest.
+  tag(x, y, z, text, kind) {
+    const font = 'bold 22px Consolas, "Cascadia Mono", ui-monospace, monospace';
+    const c = document.createElement('canvas');
+    let g = c.getContext('2d');
+    g.font = font;
+    const w = Math.ceil(g.measureText(text).width) + 16, h = 30;
+    c.width = w;
+    c.height = h;
+    g = c.getContext('2d');
+    const colour = /out|bounce|crash/.test(text) ? '#ff5a4a' : /in the bands/.test(text) ? '#40ff70' : kind === 'gate' ? '#e8f0e8' : '#ffb000';
+    g.fillStyle = 'rgba(0, 0, 0, 0.62)';
+    g.fillRect(0, 0, w, h);
+    g.fillStyle = colour;
+    g.fillRect(0, 0, 3, h);
+    g.font = font;
+    g.textBaseline = 'middle';
+    g.fillText(text, 9, h / 2 + 1);
+    const map = new THREE.CanvasTexture(c);
+    map.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map, depthTest: false, depthWrite: false, transparent: true, sizeAttenuation: false, toneMapped: false,
+    }));
+    sprite.center.set(0, -0.3);   // up and to the right of the place
+    sprite.scale.set((0.026 * w) / h, 0.026, 1);
+    sprite.position.set(x, y, z);
+    sprite.renderOrder = 20;
+    this.tags.add(sprite);
+  }
+
+  clearTags() {
+    for (const s of this.tags.children) {
+      s.material.map.dispose();
+      s.material.dispose();
+    }
+    this.tags.clear();
   }
 
   // A sample of the flown path: the CG, the right wing's direction, the band status, the time.

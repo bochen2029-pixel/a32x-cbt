@@ -11,6 +11,7 @@
 
 import { Clock } from './clock.js';
 import { apply, controlsFromInputs, coreInputs, initialControls } from './controls.js';
+import { FlightLog } from './events.js';
 import { Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
@@ -37,6 +38,9 @@ const view = new View(document.getElementById('view'), params.get('time') || 'du
 let drawn = '';          // the airport the view drew, and the runway end the flight is on
 const overlayCanvas = document.getElementById('overlay');
 const panel = document.getElementById('debrief'), verdict = document.getElementById('verdict');
+const eventsBox = document.getElementById('events');
+const log = new FlightLog();   // the flight's moments, from the core's slots (events.js)
+let shownLog = 0;              // the log's version the panel shows
 let shownVerdict = '';   // the verdict the panel shows
 let saved = '';          // what the last save did, for the status line
 document.getElementById('save').addEventListener('click', () => save());
@@ -184,11 +188,16 @@ function show() {
   // a worker too old to send the core's words gets the verdict from the slots, said as plainly
   const words = latest.debrief || (judged ? `${value('judge_stable') ? 'STABLE' : 'NOT STABLE'}, the touchdown ` +
     `${value('judge_touchdown_m').toFixed(0)} m past the threshold` : '');
-  if (judged && words !== shownVerdict) {
+  const open = judged || view.debriefOn;   // once judged; and in the debrief (K) as it flies
+  if (open && words !== shownVerdict) {
     shownVerdict = words;
     verdict.textContent = words;
   }
-  panel.hidden = !judged;
+  if (open && log.version !== shownLog) {
+    shownLog = log.version;
+    eventsBox.textContent = log.text();
+  }
+  panel.hidden = !open;
 }
 
 // The recording, saved as the one file a pilot hands in: the scenario, the airframe and every step's
@@ -259,6 +268,8 @@ function frame(now) {
   if (latest) {
     const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));
     view.update(s, realMs / 1000);
+    log.observe(s, latest.texts);
+    view.tags(log.events);
     const t0 = performance.now();
     view.render();
     keep(renderMs, performance.now() - t0);

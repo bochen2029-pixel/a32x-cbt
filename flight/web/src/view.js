@@ -302,7 +302,28 @@ export class View {
     this.vector = new THREE.LineSegments(new THREE.EdgesGeometry(this.outline, 28), new THREE.LineBasicMaterial({ color: 0xf2f2f2 }));
     this.vector.visible = false;
     this.vector.geometry.applyMatrix4(this.structural.clone().invert());   // into the structure's metres
-    this.airliner.structure.add(this.vector);
+    // hung as the structure is, from the CG flying (update), but beside it: the debrief hides the structure
+    this.vector.matrixAutoUpdate = false;
+    this.vector.matrix.copy(this.structural);
+    this.airliner.root.add(this.vector);
+  }
+
+  // The flight's log (events.js) as tags on the flown path, each where the aircraft was at that moment;
+  // a log that starts again, as a restarted flight's does, clears them. The floor tier tags once it has
+  // built the debrief.
+  tags(events) {
+    if (!this.acmi) return;
+    this.tagged ||= 0;
+    if (events.length < this.tagged) {
+      this.acmi.clearTags();
+      this.tagged = 0;
+    }
+    for (; this.tagged < events.length; ++this.tagged) {
+      const e = events[this.tagged];
+      if (!e.tag || !Number.isFinite(e.lat)) continue;
+      const [x, z] = xz(this.origin, e.lat, e.lon);
+      this.acmi.tag(x, (this.cgHeight ?? this.airframe.cgHeightM) + e.raFt * FT, z, e.tag, e.kind);
+    }
   }
 
   setDebrief(on) {
@@ -407,6 +428,7 @@ export class View {
     const own = this.flying !== '737';   // the drawn airframe is the one flying
     const cgHeight = own && Number.isFinite(s.cg_height_m) ? s.cg_height_m : this.airframe.cgHeightM;
     body.position.set(x, cgHeight + Math.max(0, s.ra_ft) * FT, z);
+    this.cgHeight = cgHeight;
     body.rotation.set(s.pitch_deg * DEG, -s.heading_deg * DEG, -s.roll_deg * DEG);
     body.updateMatrixWorld();
     if (root) {
@@ -420,6 +442,7 @@ export class View {
         this.cgNow = cg;
         this.structural = structuralMatrix(cg);
         this.airliner.structure.matrix.copy(this.structural);
+        this.vector?.matrix.copy(this.structural);
       }
       root.position.copy(body.position);
       root.quaternion.copy(body.quaternion);

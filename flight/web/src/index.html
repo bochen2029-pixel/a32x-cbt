@@ -18,6 +18,9 @@
   #status .warn { color: var(--warn); }
   #debrief { position: fixed; left: 12px; top: 12px; white-space: pre; padding: 8px 10px;
     background: rgba(0,0,0,0.62); border: 1px solid rgba(160,200,160,0.3); border-radius: 4px; }
+  #debrief { font-size: 12px; max-height: calc(100% - 170px); overflow: auto; }
+  #events { margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(160,200,160,0.25);
+    max-height: 30vh; overflow: auto; }
   #debrief button { font: inherit; color: var(--fg); background: rgba(40,60,45,0.8);
     border: 1px solid rgba(160,200,160,0.4); border-radius: 3px; margin-top: 8px; cursor: pointer; }
 </style>
@@ -27,7 +30,7 @@
 <canvas id="overlay"></canvas>
 <div id="hud"></div>
 <div id="status">loading the flight core…</div>
-<div id="debrief" hidden><div id="verdict"></div><button id="save" type="button">save the recording (Ctrl+S)</button></div>
+<div id="debrief" hidden><div id="verdict"></div><div id="events"></div><button id="save" type="button">save the recording (Ctrl+S)</button></div>
 <script src="core.js"></script>
 <script src="flight.js"></script>
 </body>

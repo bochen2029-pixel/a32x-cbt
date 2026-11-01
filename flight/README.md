@@ -1012,6 +1012,17 @@ clock now starts at the worker's first answer, not its first frame: a fresh core
 and their time is not the flight's. A new case, `a_saved_recording_is_one_file_named_for_its_flight`,
 makes fifty-eight native cases, all passing with either airframe on MSVC 19.44.
 
+**The debrief's log** (`web/src/events.js`). Under the verdict, the panel lists the flight's moments,
+each found from the core's own slots: the 1,000, 500, 100 and 50 ft gates above the threshold, each
+with the speed against Vapp, the sink, where the aircraft stood on the beams (left or right of the
+localizer, low or high on the glideslope) and the bank; leaving the gate's bands and coming back, as
+`judge_in_bands` has it; the gear and the flight laws as they change; the touchdown at the judge's own
+distance, a bounce, 80 kt and the stop, each with how far past the threshold; then the verdict. A
+crossing's time is interpolated between the samples either side of it, so it does not depend on the
+frame rate. In the debrief (K) the panel is open as the flight goes, and the moments are tagged on the
+flown path where they happened. Its case, `the_debrief_logs_the_flight_s_moments_from_the_core_s_slots`,
+states the times for an approach sampled three ways.
+
 New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `the_judge_finds_an_unflared_approach_not_stable` and `the_judge_has_nothing_to_judge_on_the_runway`,
 through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-seven native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-two under node, the WebAssembly build leaving out the five that start processes.
