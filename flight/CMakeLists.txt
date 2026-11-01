@@ -105,7 +105,8 @@ endfunction()
 add_library(flight_world STATIC
   harness/efcs.cpp
   harness/world.cpp
-  harness/airframe.cpp)
+  harness/airframe.cpp
+  harness/core.cpp)  # the step loop behind a C API: start, inputs, step, state
 target_link_libraries(flight_world PUBLIC a32nx_efcs libJSBSim)
 target_include_directories(flight_world PUBLIC harness)
 target_compile_definitions(flight_world PRIVATE
@@ -118,6 +119,12 @@ add_executable(law_harness harness/main.cpp)
 target_link_libraries(law_harness PRIVATE flight_world)
 target_compile_definitions(law_harness PRIVATE A32NX_COMMIT="${A32NX_COMMIT}" JSBSIM_COMMIT="${JSBSIM_COMMIT}")
 flight_warnings(law_harness)
+
+# The flight core's C API, called from C.
+add_executable(core_test harness/core_test.c)
+target_link_libraries(core_test PRIVATE flight_world)
+set_target_properties(core_test PROPERTIES LINKER_LANGUAGE CXX)
+flight_warnings(core_test)
 
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
@@ -142,6 +149,11 @@ add_test(NAME p6_gate_30_minutes COMMAND law_harness --minutes 30 --gate)
 
 # The same run twice gives the same bytes: nothing reads a wall clock or an uninitialised value.
 add_test(NAME deterministic COMMAND law_harness --minutes 3 --check-determinism)
+
+# The flight core takes its crew from outside: the scripted crew's inputs, recorded and flown back
+# through it, give the same bytes and the same touchdown.
+add_test(NAME replay_reaches_the_same_touchdown COMMAND law_harness --minutes 18 --check-replay)
+add_test(NAME the_c_api_flies COMMAND core_test)
 
 # The parts of a flight the gate leans on, each checked on its own.
 add_test(NAME computers_come_up COMMAND law_harness --minutes 1 --expect power-up)

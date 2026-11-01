@@ -3,8 +3,11 @@
 //
 //   law_harness --minutes 30 --gate         the P6 gate: thirty simulated minutes, all of it checked
 //   law_harness --minutes 3 --check-determinism
+//   law_harness --minutes 18 --check-replay  the scripted crew recorded, then replayed as an outside crew
 //   law_harness --minutes 6 --expect normal-law
 //   law_harness --minutes 30 --trace run.csv
+//
+// It steps the world through the flight core (core.h), the same loop the browser's module runs.
 //
 // Every tick, every word on every computer's output bus and every analogue output is checked for
 // NaN and infinity. Laws are read the way the aircraft reads them: from the FCDC's EFCS status word.
@@ -20,7 +23,9 @@
 #include <vector>
 
 #include "Arinc429Utils.h"
+#include "core.h"
 #include "efcs.h"
+#include "laws.h"
 #include "world.h"
 
 #ifdef _WIN32
@@ -35,46 +40,6 @@ constexpr double kDt = 0.02;  // 50 Hz, the rate the computers are built for
 // The RUD TRIM test, in seconds after the start of cruise: after the doublet and before the turn, the
 // switch held left for six seconds, the stick neutral until the hands come back, then RESET.
 constexpr double kTrimFrom = 26, kTrimTo = 32, kTrimHandsOffTo = 40;
-
-enum class PitchLawState { Normal, Alternate1, Alternate2, Direct, None };
-enum class LateralLawState { Normal, Direct, None };
-
-const char* name(PitchLawState l) {
-  switch (l) {
-    case PitchLawState::Normal: return "normal";
-    case PitchLawState::Alternate1: return "alternate-1";
-    case PitchLawState::Alternate2: return "alternate-2";
-    case PitchLawState::Direct: return "direct";
-    case PitchLawState::None: return "none";
-  }
-  return "?";
-}
-
-const char* name(LateralLawState l) {
-  switch (l) {
-    case LateralLawState::Normal: return "normal";
-    case LateralLawState::Direct: return "direct";
-    case LateralLawState::None: return "none";
-  }
-  return "?";
-}
-
-// fcdc/Fcdc.cpp getBusOutputs: label 040 bits 11-17
-PitchLawState pitchLaw(const base_arinc_429& w) {
-  if (!Arinc429Utils::isNo(w)) return PitchLawState::None;
-  if (Arinc429Utils::bitFromValue(w, 11)) return PitchLawState::Normal;
-  if (Arinc429Utils::bitFromValue(w, 12)) return PitchLawState::Alternate1;
-  if (Arinc429Utils::bitFromValue(w, 13)) return PitchLawState::Alternate2;
-  if (Arinc429Utils::bitFromValue(w, 15)) return PitchLawState::Direct;
-  return PitchLawState::None;
-}
-
-LateralLawState lateralLaw(const base_arinc_429& w) {
-  if (!Arinc429Utils::isNo(w)) return LateralLawState::None;
-  if (Arinc429Utils::bitFromValue(w, 16)) return LateralLawState::Normal;
-  if (Arinc429Utils::bitFromValue(w, 17)) return LateralLawState::Direct;
-  return LateralLawState::None;
-}
 
 // --- the non-finite scan -------------------------------------------------------------------------
 // Every output bus is nothing but ARINC 429 words and every analogue block nothing but doubles, so a
@@ -144,15 +109,6 @@ struct Digest {
   }
 };
 
-bool allHealthy(const Transmitted& t) {
-  bool ok = true;
-  for (int i = 0; i < 2; ++i) ok = ok && t.elacDiscrete[i].digital_output_validated;
-  for (int i = 0; i < 3; ++i) ok = ok && !t.secDiscrete[i].sec_failed;
-  for (int i = 0; i < 2; ++i) ok = ok && t.facDiscrete[i].fac_healthy;
-  for (int i = 0; i < 2; ++i) ok = ok && t.fcdcDiscrete[i].fcdcValid;
-  return ok;
-}
-
 std::string unhealthyList(const Transmitted& t) {
   std::string s;
   for (int i = 0; i < 2; ++i) if (!t.elacDiscrete[i].digital_output_validated) s += " ELAC" + std::to_string(i + 1);
@@ -175,9 +131,11 @@ struct Options {
   bool gate = false;
   bool digestOnly = false;
   bool determinism = false;
+  bool replayCheck = false;
   double failAdrAt = -1;
   std::string expect;
   std::string trace;
+  std::string record, replay;  // a crew recording to write from the scripted crew, or to fly from
 };
 
 struct Results {
@@ -224,11 +182,70 @@ struct Results {
   double trimOrder = NAN, trimReadBack = NAN, trimRudder = NAN, trimBeta = NAN, trimAfterReset = NAN;
 };
 
+// A crew recording: a line of input values per tick, the columns named by the first line in the flight
+// core's order (core.h), every value written so that it reads back as the same double. A run recorded
+// from the scripted crew and replayed through the core as an outside crew must give the same bytes.
+class Recording {
+ public:
+  bool open(const std::string& path, bool write) {
+    f_ = std::fopen(path.c_str(), write ? "w" : "r");
+    if (!f_) return fail("cannot " + std::string(write ? "write " : "read ") + path);
+    std::string names;
+    for (const char* n : FlightCore::inputNames()) names += (names.empty() ? "" : ",") + std::string(n);
+    if (write) {
+      std::fprintf(f_, "%s\n", names.c_str());
+      return true;
+    }
+    char line[4096];
+    if (!std::fgets(line, sizeof line, f_) || std::string(line, std::strcspn(line, "\r\n")) != names) {
+      return fail(path + ": its columns are not this core's inputs (" + names + ")");
+    }
+    return true;
+  }
+  void write(const std::vector<double>& v) {
+    for (size_t k = 0; k < v.size(); ++k) std::fprintf(f_, k ? ",%.17g" : "%.17g", v[k]);
+    std::fprintf(f_, "\n");
+  }
+  bool read(std::vector<double>& v) {
+    char line[4096];
+    if (!std::fgets(line, sizeof line, f_)) return fail("the recording ended before the run did");
+    char* p = line;
+    for (double& x : v) {
+      char* end = nullptr;
+      x = std::strtod(p, &end);
+      if (end == p) return fail("a malformed line in the recording");
+      p = *end == ',' ? end + 1 : end;
+    }
+    return true;
+  }
+  ~Recording() {
+    if (f_) std::fclose(f_);
+  }
+  const std::string& error() const { return error_; }
+
+ private:
+  bool fail(const std::string& why) {
+    if (error_.empty()) error_ = why;
+    return false;
+  }
+  FILE* f_ = nullptr;
+  std::string error_;
+};
+
 Results run(const Options& opt, FILE* trace) {
-  World world;
+  Recording recording;
+  const bool replaying = !opt.replay.empty();
+  if (replaying || !opt.record.empty()) {
+    if (!recording.open(replaying ? opt.replay : opt.record, !replaying)) {
+      std::printf("%s\n", recording.error().c_str());
+      std::exit(2);
+    }
+  }
+  FlightCore core(!replaying);
+  World& world = core.world();
   world.adrFailAt = opt.failAdrAt;
   if (opt.expect == "rudder-trim") world.trimTest = {kTrimFrom, kTrimTo, kTrimHandsOffTo, +1};
-  Efcs& efcs = Efcs::instance();
+  Efcs& efcs = core.efcs();
   Results r;
   Digest digest;
 
@@ -249,47 +266,58 @@ Results run(const Options& opt, FILE* trace) {
 
   const auto start = std::chrono::steady_clock::now();
   for (long long k = 0; k < ticks; ++k) {
-    efcs.tick(world, kDt);
+    if (replaying && !recording.read(core.inputs())) {
+      std::printf("%s, at %.2f s\n", recording.error().c_str(), world.time());
+      std::exit(2);
+    }
+    double t = 0;
+    bool healthy = false, settledInFlight = false;
+    PitchLawState pl = PitchLawState::None;
+    LateralLawState ll = LateralLawState::None;
+
+    // The computers have acted and the world has not yet moved: what they transmitted, and the world
+    // they acted on.
+    core.step([&] {
+      const Transmitted& tx = efcs.transmitted();
+      t = world.time();
+
+      r.scan.check(tx, t);
+      digest.add(tx);
+
+      // health: the switches go on at 1 s; give the slowest self-test 20 s
+      healthy = allHealthy(tx);
+      if (t < 1.0 && healthy) r.healthyBeforeSwitches = true;
+      if (healthy && r.healthyFrom < 0) r.healthyFrom = t;
+      if (t > 21 && !healthy) ++r.unhealthyTicksAfterUp;
+
+      // laws, in flight: from five seconds after liftoff until the flare
+      pl = pitchLaw(tx.fcdcBus[0].efcs_status_word_1);
+      ll = lateralLaw(tx.fcdcBus[0].efcs_status_word_1);
+      if (wasOnGround && !world.onGround()) liftoffAt = t;
+      if (!wasOnGround && world.onGround()) {
+        ++r.touchdowns;
+        r.landings.push_back({t, lastAirborneVs, world.pitchDeg(), world.rollDeg(), world.casKn(), world.loadFactor()});
+      }
+      wasOnGround = world.onGround();
+      if (!world.onGround()) lastAirborneVs = world.verticalSpeedFpm();
+      settledInFlight = !world.onGround() && liftoffAt >= 0 && t - liftoffAt > 5 && world.phase() != Phase::Flare;
+      if (settledInFlight) {
+        ++r.flightTicks;
+        ++r.pitchLawTicks[name(pl)];
+        ++r.lateralLawTicks[name(ll)];
+        if ((pl != PitchLawState::Normal || ll != LateralLawState::Normal) && r.firstNonNormalAt < 0) {
+          r.firstNonNormalAt = t;
+          r.firstNonNormal = std::string("pitch ") + name(pl) + ", lateral " + name(ll) + " in " + phaseName(world.phase());
+        }
+        if (opt.failAdrAt >= 0 && t > opt.failAdrAt + 5) {
+          ++r.afterFailureTicks;
+          ++r.afterFailurePitchLaw[name(pl)];
+        }
+      }
+    });
+    if (!opt.record.empty()) recording.write(core.inputs());
+
     const Transmitted& tx = efcs.transmitted();
-    const double t = world.time();
-
-    r.scan.check(tx, t);
-    digest.add(tx);
-
-    // health: the switches go on at 1 s; give the slowest self-test 20 s
-    const bool healthy = allHealthy(tx);
-    if (t < 1.0 && healthy) r.healthyBeforeSwitches = true;
-    if (healthy && r.healthyFrom < 0) r.healthyFrom = t;
-    if (t > 21 && !healthy) ++r.unhealthyTicksAfterUp;
-
-    // laws, in flight: from five seconds after liftoff until the flare
-    const PitchLawState pl = pitchLaw(tx.fcdcBus[0].efcs_status_word_1);
-    const LateralLawState ll = lateralLaw(tx.fcdcBus[0].efcs_status_word_1);
-    if (wasOnGround && !world.onGround()) liftoffAt = t;
-    if (!wasOnGround && world.onGround()) {
-      ++r.touchdowns;
-      r.landings.push_back({t, lastAirborneVs, world.pitchDeg(), world.rollDeg(), world.casKn(), world.loadFactor()});
-    }
-    wasOnGround = world.onGround();
-    if (!world.onGround()) lastAirborneVs = world.verticalSpeedFpm();
-    const bool settledInFlight = !world.onGround() && liftoffAt >= 0 && t - liftoffAt > 5 &&
-                                 world.phase() != Phase::Flare;
-    if (settledInFlight) {
-      ++r.flightTicks;
-      ++r.pitchLawTicks[name(pl)];
-      ++r.lateralLawTicks[name(ll)];
-      if ((pl != PitchLawState::Normal || ll != LateralLawState::Normal) && r.firstNonNormalAt < 0) {
-        r.firstNonNormalAt = t;
-        r.firstNonNormal = std::string("pitch ") + name(pl) + ", lateral " + name(ll) + " in " + phaseName(world.phase());
-      }
-      if (opt.failAdrAt >= 0 && t > opt.failAdrAt + 5) {
-        ++r.afterFailureTicks;
-        ++r.afterFailurePitchLaw[name(pl)];
-      }
-    }
-
-    world.step(kDt, efcs.orders());
-
     const Surfaces& s = world.surfaces;
     const double state[] = {world.altitudeFt(), world.tasKn(), world.pitchDeg(), world.rollDeg(), world.loadFactor(),
                             world.headingDeg(), s.elevator[0], s.elevator[1], s.ths, s.aileron[0], s.aileron[1]};
@@ -523,23 +551,29 @@ std::string self(const char* argv0) {
   return std::string("\"") + argv0 + "\"";
 }
 
-bool childDigest(const char* argv0, double minutes, std::string& out) {
-  const std::string cmd = self(argv0) + " --digest --minutes " + fmt("%.3f", minutes);
+// A fresh process's digest, and its first touchdown when it had one. `extra` is appended to its
+// command line.
+bool childDigest(const char* argv0, double minutes, std::string& out, std::string* touchdown = nullptr,
+                 const std::string& extra = "") {
+  const std::string cmd = self(argv0) + " --digest --minutes " + fmt("%.3f", minutes) + extra;
   FILE* p = popen(cmd.c_str(), "r");
   if (!p) return false;
   char line[256];
   while (std::fgets(line, sizeof line, p)) {
     if (std::strncmp(line, "digest ", 7) == 0) out = std::string(line + 7, std::strcspn(line + 7, "\r\n"));
+    if (touchdown && std::strncmp(line, "touchdown ", 10) == 0 && touchdown->empty()) {
+      *touchdown = std::string(line, std::strcspn(line, "\r\n"));
+    }
   }
   return pclose(p) == 0 && !out.empty();
 }
 
 void usage() {
   std::printf(
-      "law_harness [--minutes N] [--gate] [--check-determinism] [--trace file.csv] [--digest]\n"
+      "law_harness [--minutes N] [--gate] [--check-determinism] [--check-replay] [--trace file.csv] [--digest]\n"
       "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|rudder-trim|landing|\n"
       "                      law-degrades|scanner-catches-nan]\n"
-      "            [--fail-adr-at SECONDS]\n");
+      "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv]\n");
 }
 
 }  // namespace
@@ -559,6 +593,9 @@ int main(int argc, char** argv) {
     else if (a == "--gate") opt.gate = true;
     else if (a == "--digest") opt.digestOnly = true;
     else if (a == "--check-determinism") opt.determinism = true;
+    else if (a == "--check-replay") opt.replayCheck = true;
+    else if (a == "--record") opt.record = next("--record");
+    else if (a == "--replay") opt.replay = next("--replay");
     else if (a == "--expect") opt.expect = next("--expect");
     else if (a == "--fail-adr-at") opt.failAdrAt = std::atof(next("--fail-adr-at").c_str());
     else if (a == "--trace") opt.trace = next("--trace");
@@ -581,11 +618,32 @@ int main(int argc, char** argv) {
     return 2;
   }
 
+  if (!opt.record.empty() && !opt.replay.empty()) {
+    std::printf("--record writes what the scripted crew does, --replay flies a recording: one or the other\n");
+    return 2;
+  }
+
   if (opt.determinism) {
     std::string a, b;
     const bool ran = childDigest(argv[0], opt.minutes, a) && childDigest(argv[0], opt.minutes, b);
     std::printf("A32NX %s, two fresh processes, %.1f simulated minutes each\n", A32NX_COMMIT, opt.minutes);
     return verdict("the same run gives the same bytes", ran && a == b, ran ? "digests " + a + " and " + b : "a child run failed");
+  }
+
+  // The scripted crew's inputs recorded in one fresh process and flown back through the flight core,
+  // as an outside crew, in another: the same bytes from every computer, and the same touchdown.
+  if (opt.replayCheck) {
+    const std::string file = "replay-check.csv";
+    std::string a, b, ta, tb;
+    const bool ran = childDigest(argv[0], opt.minutes, a, &ta, " --record " + file) &&
+                     childDigest(argv[0], opt.minutes, b, &tb, " --replay " + file);
+    std::printf("A32NX %s, %s, %.1f simulated minutes recorded and replayed in fresh processes\n", A32NX_COMMIT,
+                Airframe::model(), opt.minutes);
+    int failed = verdict("the replay gives the same bytes", ran && a == b, ran ? "digests " + a + " and " + b : "a child run failed");
+    failed += verdict("and the same touchdown", ran && !ta.empty() && ta == tb,
+                      ta.empty() ? std::string("no touchdown recorded") : ta + (ta == tb ? "" : "; replayed: " + tb));
+    std::printf("%s\n", failed ? "FAILED" : "PASSED");
+    return failed ? 1 : 0;
   }
 
   FILE* trace = nullptr;
@@ -601,6 +659,11 @@ int main(int argc, char** argv) {
 
   if (opt.digestOnly) {
     std::printf("digest %016llx\n", static_cast<unsigned long long>(r.digest));
+    if (!r.landings.empty()) {
+      const auto& l = r.landings.front();
+      std::printf("touchdown at %.2f s: sink %.1f fpm, pitch %.2f deg, bank %.2f deg, %.1f kt, peak %.3f g\n", l.at,
+                  l.sinkFpm, l.pitch, l.bank, l.cas, l.peakG);
+    }
     return r.scan.bad == 0 && r.crashedAt < 0 ? 0 : 1;
   }
 

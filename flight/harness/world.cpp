@@ -145,7 +145,7 @@ World::World() : airframe_(std::make_unique<Airframe>()) {
 
 void World::step(double dt, const Orders& orders) {
   t_ += dt;
-  fly(dt);
+  if (scripted) fly(dt);
   actuate(dt, orders);
   if (crashedAt_ < 0) {
     airframe(dt);

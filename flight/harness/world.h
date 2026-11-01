@@ -93,6 +93,9 @@ class World {
   bool noseGearDownlocked() const { return air().gearPosition >= kDownlocked; }
   double wheelSpeedKn() const { return air().wheelSpeedKn; }
 
+  // The crew is this world's own script unless scripted is false; then crew is whatever the caller
+  // set before the step — a recording, or a person at the controls (core.h).
+  bool scripted = true;
   Crew crew;
   Surfaces surfaces;
 
@@ -118,6 +121,7 @@ class World {
   double flightPathDeg() const { return air().flightPathDeg; }
   double flapDeg() const { return flapDeg_; }
   bool onGround() const { return mainGearCompressed(); }
+  const AirframeState& airframeState() const { return air(); }
 
   // When the airframe went below the runway, or -1. JSBSim's 737 touches the ground only with its
   // gear; anything lower has flown into it. The world freezes there: what JSBSim makes of an
