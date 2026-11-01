@@ -33,7 +33,7 @@ function monotone(xs, ys) {
   };
 }
 
-function profile(stations) {
+export function profile(stations) {
   const xs = stations.map((s) => s[0]);
   const crown = monotone(xs, stations.map((s) => s[1]));
   const keel = monotone(xs, stations.map((s) => s[2]));
@@ -42,6 +42,33 @@ function profile(stations) {
     const c = crown(x), k = keel(x);
     return { waist: (c + k) / 2, hz: Math.max(1e-3, (c - k) / 2), hw: Math.max(0, half(x)) };
   };
+}
+
+// The fuselage as the debrief draws it in vectors, in the structure's metres: eight lines along it, every 45 degrees
+// round, and six frames across it, from the same stations as the painted fuselage (profile). A body this smooth gives
+// an edge finder nothing (its faces turn by 11 degrees, the debrief's edges need 28), so without these the debrief's
+// aircraft was wings, tail, engines and gear with nothing joining them.
+export const FUSELAGE_LINES = 8, FUSELAGE_FRAMES = [0.06, 0.18, 0.34, 0.5, 0.66, 0.82], FRAME_SIDES = 32;
+export function fuselageLines(stations, length) {
+  const prof = profile(stations), pos = [];
+  const P = (x, a) => {
+    const p = prof(x);
+    return [x, p.hw * Math.sin(a), p.waist + p.hz * Math.cos(a)];
+  };
+  const xs = [];   // dense at the nose, as the painted fuselage is
+  for (let k = 0; k <= 24; ++k) xs.push(6 * (1 - Math.cos((k / 24) * Math.PI / 2)));
+  for (let k = 1; k <= 40; ++k) xs.push(6 + (length - 6) * (k / 40));
+  for (let j = 0; j < FUSELAGE_LINES; ++j) {
+    const a = (j / FUSELAGE_LINES) * 2 * Math.PI;
+    for (let i = 0; i < xs.length - 1; ++i) pos.push(...P(xs[i], a), ...P(xs[i + 1], a));
+  }
+  for (const f of FUSELAGE_FRAMES) {
+    const x = f * length;
+    for (let j = 0; j < FRAME_SIDES; ++j) pos.push(...P(x, (j / FRAME_SIDES) * 2 * Math.PI), ...P(x, ((j + 1) / FRAME_SIDES) * 2 * Math.PI));
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  return g;
 }
 
 // The fuselage as two halves, left and right, each unrolled onto its own half of the livery: x along
@@ -707,6 +734,11 @@ export class Airliner {
 
   // Every visible part merged into one geometry in the model's frame, coloured per vertex by its
   // material: for the aircraft parked at the gates (instanced) and the debrief's vector outline.
+  // The fuselage's lines for the debrief's vectors (fuselageLines).
+  fuselageWire() {
+    return fuselageLines(this.A.fuselage, this.A.length);
+  }
+
   staticGeometry() {
     this.root.updateMatrixWorld(true);
     const inv = this.root.matrixWorld.clone().invert(), parts = [];

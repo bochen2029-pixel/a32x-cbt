@@ -7,6 +7,7 @@
 // three.js (MIT), bundled. GPLv3.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import A320 from '../data/a320.json' with { type: 'json' };
 import SKYLINE from '../data/dallas-skyline.json' with { type: 'json' };
 import REGION from '../data/dfw-region.json' with { type: 'json' };
@@ -301,9 +302,12 @@ export class View {
     this.acmi.group.visible = false;
     this.acmi.wire.visible = false;
     this.scene.add(this.acmi.group);
-    this.vector = new THREE.LineSegments(new THREE.EdgesGeometry(this.outline, 28), new THREE.LineBasicMaterial({ color: 0xf2f2f2 }));
+    const edges = new THREE.EdgesGeometry(this.outline, 28);
+    edges.applyMatrix4(this.structural.clone().invert());   // into the structure's metres
+    // and the fuselage's own lines, which its smooth body cannot give the edges (airliner.js, fuselageWire)
+    this.vector = new THREE.LineSegments(mergeGeometries([edges, this.airliner.fuselageWire()]),
+      new THREE.LineBasicMaterial({ color: 0xf2f2f2 }));
     this.vector.visible = false;
-    this.vector.geometry.applyMatrix4(this.structural.clone().invert());   // into the structure's metres
     // hung as the structure is, from the CG flying (update), but beside it: the debrief hides the structure
     this.vector.matrixAutoUpdate = false;
     this.vector.matrix.copy(this.structural);
