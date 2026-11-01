@@ -199,6 +199,13 @@ where you were outside them, **grey** outside the 1,000 ft to 50 ft window. The 
 the path where they happened. Drag to swing round, the wheel to come closer. **L** draws the same path
 in the normal view.
 
+Along the debrief's foot runs a timeline: the flight as a bar, coloured as the path is, its moments
+marked. Drag along it to go back through the flight: the aircraft is drawn in cyan where it was then,
+the camera follows it, and the bar says where you were and how you stood, height, speed against Vapp,
+sink, the beams and the bank. **,** and **.** step a second (with Shift, ten), **Space** plays it at the
+flight's own pace, and clicking a moment in the panel, the touchdown say, takes you there. **LIVE**, at
+the bar's right end, follows the flight again.
+
 ![The debrief (K) after the stop: the aircraft's outline at the end of its rollout, the path behind
 it, the moments tagged.](guide/debrief.jpg)
 

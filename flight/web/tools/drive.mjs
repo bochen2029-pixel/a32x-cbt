@@ -47,7 +47,7 @@ export function keyOf(code) {
   const letter = /^Key([A-Z])$/.exec(code);
   if (letter) return letter[1].toLowerCase();
   return { ShiftLeft: 'Shift', ShiftRight: 'Shift', ControlLeft: 'Control', ControlRight: 'Control', BracketLeft: '[',
-    BracketRight: ']', Space: ' ', Escape: 'Escape', Enter: 'Enter' }[code] ?? code;
+    BracketRight: ']', Comma: ',', Period: '.', Slash: '/', Space: ' ', Escape: 'Escape', Enter: 'Enter' }[code] ?? code;
 }
 
 const candidates = [

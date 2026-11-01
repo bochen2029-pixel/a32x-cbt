@@ -439,6 +439,8 @@ if(FLIGHT_NODE)
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/pointer.test.mjs")
   add_test(NAME the_reversers_show_as_the_engine_display_shows_them COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/reverse.test.mjs")
+  add_test(NAME the_debrief_timeline_holds_the_flight_where_it_was COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/timeline.test.mjs")
   add_test(NAME the_pilots_guide_ships_as_a_page_with_its_pictures COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/guide-html.test.mjs")
   if(EMSCRIPTEN)

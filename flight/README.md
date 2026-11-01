@@ -948,7 +948,13 @@ its flight deck at the file's EYEPOINT with placeholder tubes until P8 (REV boxe
 amber in transit and green deployed, as on the overlay; the upper row of tubes low enough that the glareshield
 hides none of them from the eye), ten cameras on keys 1 to 9 and 0 (V steps through them; the
 overlay is drawn in the pilot's eye only), and a debrief on K: the flown path coloured by the gate's
-bands, the ILS as a tunnel, every runway's outline and the aircraft in vectors, on black; L draws the
+bands, the ILS as a tunnel, every runway's outline and the aircraft in vectors, on black, with a timeline
+along its foot (`web/src/timeline.js`), in the manner of Tacview's: the flight as a bar coloured by the bands,
+its moments marked, and a playhead to drag back through it, step a second at a time (`,` `.`, ten with Shift),
+or play at the flight's pace (Space); the aircraft is drawn in cyan where the playhead holds it, the camera
+follows it, the panel lights the moment, and a moment clicked in the panel goes there; LIVE at the bar's end
+follows the flight again. It reads the page's own samples of the flight, four a second, interpolated, not a
+replay of a saved recording through the core. L draws the
 path in the normal view, and `trail=1`, `debrief=1` and `cam=` open the page on them. The floor builds the
 A320, its deck and the debrief when a camera or the debrief first asks for them, one pause then; the GPU
 tier builds them at the start. Before the flight's

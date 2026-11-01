@@ -698,8 +698,11 @@ guidance, a real path through the world — with the CBT's procedures and scorin
 - [ ] **A 3D debrief in the manner of ACMI/Tacview**: the flown trail coloured by the gate's bands, a
       timeline and an event log, built on the deterministic replay (house rule 7). Relayed the same
       day by the same session. Begun in `c8415a1`: ten cameras, a debrief view (K) and the flown trail
-      (L). Not built: the event log and its tags, and the trail coloured by the gate's bands, which
-      waits on the page side of the gate's judge (P7).
+      (L); the trail coloured by the gate's bands and the event log with its tags since, and the
+      timeline (`flight/web/src/timeline.js`: scrub, step and play the flight back in the debrief, the
+      aircraft where it was, the panel's moments clickable). Not built: a saved recording opened in the
+      page and replayed through the core, so a flight can be debriefed after the page that flew it is
+      closed (the page's worker would replay its inputs; the timeline reads the page's own samples).
 - [ ] **Aerodynamics from CFD, later** — the operator's idea, 2026-11-01, relayed by the same session:
       tune the A320 model with open-source CFD (OpenFOAM and others), since the A320 flies well under
       Mach 1, on geometry modelled from Airbus's public dimensions and external drawings. Not

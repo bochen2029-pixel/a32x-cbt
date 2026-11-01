@@ -23,6 +23,14 @@
     max-height: 30vh; overflow: auto; }
   #debrief button { font: inherit; color: var(--fg); background: rgba(40,60,45,0.8);
     border: 1px solid rgba(160,200,160,0.4); border-radius: 3px; margin-top: 8px; cursor: pointer; }
+  /* the debrief's timeline along the foot (timeline.js); in the debrief the HUD moves up over it */
+  #timeline { position: fixed; left: 12px; bottom: 12px; width: calc(100% - 24px); height: 54px; cursor: pointer;
+    touch-action: none; }
+  body.debrief #hud { bottom: 76px; }
+  body.debrief #debrief { max-height: calc(100% - 250px); }
+  #events div { cursor: pointer; }
+  #events div:hover { background: rgba(160,200,160,0.12); }
+  #events div.at { background: rgba(79,216,255,0.2); color: #cfefff; }
   #notice { position: fixed; left: 50%; top: 6px; transform: translateX(-50%); font-size: 11px;
     color: var(--dim); white-space: nowrap; pointer-events: none; text-shadow: 0 0 3px #000; }
 </style>
@@ -31,6 +39,7 @@
 <canvas id="view"></canvas>
 <canvas id="overlay"></canvas>
 <div id="hud"></div>
+<canvas id="timeline" hidden></canvas>
 <div id="status">loading the flight core…</div>
 <div id="notice">Unofficial. Not affiliated with Airbus, FlyByWire Simulations or Aerowinx. Not for type training.</div>
 <div id="debrief" hidden><div id="verdict"></div><div id="events"></div><button id="save" type="button">save the recording (Ctrl+S)</button></div>

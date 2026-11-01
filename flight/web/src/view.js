@@ -20,6 +20,7 @@ import { ambient, haze } from './haze.js';
 import { hazedLightMaterial, lightMaterial } from './lights.js';
 import { eye, origin, xz } from './scene-math.js';
 import { HOURS, Scenery } from './scenery.js';
+import { sampleState } from './timeline.js';
 import { validateAirframe, validateRegion, validateSkyline } from './world-data.js';
 
 const DEG = Math.PI / 180;
@@ -40,7 +41,7 @@ const SKY_M = 35000;
 // The cameras, on keys 1 to 9 and 0 in this order; V steps through them. The pilot's eye, the one the
 // overlay is drawn for, comes first.
 export const CAMERAS = ['eye', 'cockpit', 'chase', 'orbit', 'tower', 'flyby', 'cabin', 'skyline', 'side', 'satellite'];
-export const VIEW_KEYS = ['1-9 0  cameras, V the next', '[ ]  the hour, back / on (GPU)', 'K  debrief', 'L  the flown path',
+export const VIEW_KEYS = ['1-9 0  cameras, V the next', '[ ]  the hour, back / on (GPU)', 'K  debrief: drag the bar at its foot, , . a second (< > ten), Space plays; click a moment', 'L  the flown path',
   'mouse  drag: look round the deck (2), swing round (4); wheel: zoom; double click: back'];
 
 // A deterministic pseudo-random sequence, so the scene is the same every time.
@@ -307,6 +308,14 @@ export class View {
     this.vector.matrixAutoUpdate = false;
     this.vector.matrix.copy(this.structural);
     this.airliner.root.add(this.vector);
+    // the aircraft where the debrief's playhead holds it (setHead): the same outline, in the playhead's colour
+    this.ghost = new THREE.Group();
+    this.ghostLines = new THREE.LineSegments(this.vector.geometry, new THREE.LineBasicMaterial({ color: 0x4fd8ff }));
+    this.ghostLines.matrixAutoUpdate = false;
+    this.ghostLines.matrix.copy(this.structural);
+    this.ghost.add(this.ghostLines);
+    this.ghost.visible = false;
+    this.scene.add(this.ghost);
   }
 
   // The flight's log (events.js) as tags on the flown path, each where the aircraft was at that moment;
@@ -325,6 +334,19 @@ export class View {
       const [x, z] = xz(this.origin, e.lat, e.lon);
       this.acmi.tag(x, (this.cgHeight ?? this.airframe.cgHeightM) + e.raFt * FT, z, e.tag, e.kind);
     }
+  }
+
+  // The debrief's playhead (timeline.js): the aircraft drawn in vectors where a sample of the flight puts it, and
+  // the cameras centred there; null, the flight as it goes.
+  setHead(sample) {
+    this.focus = null;
+    if (!this.ghost) return;
+    this.ghost.visible = Boolean(sample) && this.debriefOn;
+    if (!this.ghost.visible) return;
+    this.ghost.position.fromArray(sample.p);
+    this.ghost.quaternion.fromArray(sample.q);
+    this.ghost.updateMatrixWorld(true);
+    this.focus = { position: this.ghost.position, quaternion: this.ghost.quaternion, heading: sample.s?.heading_deg };
   }
 
   setDebrief(on) {
@@ -364,7 +386,7 @@ export class View {
   }
 
   // A sample of the flight every quarter second: where the CG was, which way the right wing pointed, the
-  // gate's band. A clock that runs back (a restart) starts the record again.
+  // gate's band, the attitude, and what the debrief's timeline reads out (timeline.js). A clock that runs back (a restart) starts the record again.
   record(s) {
     if (s.t_s < this.lastSample) {
       this.history.length = 0;
@@ -374,7 +396,9 @@ export class View {
     if (s.t_s - this.lastSample < 0.25) return;
     this.lastSample = s.t_s;
     const root = this.body;
-    const e = { t: s.t_s, p: root.position.toArray(), w: new THREE.Vector3(1, 0, 0).applyQuaternion(root.quaternion).toArray(), band: bandOf(s) };
+    const q = root.quaternion;
+    const e = { t: s.t_s, p: root.position.toArray(), w: new THREE.Vector3(1, 0, 0).applyQuaternion(q).toArray(), band: bandOf(s),
+      q: [q.x, q.y, q.z, q.w], s: sampleState(s) };
     this.history.push(e);
     if (this.history.length > 60000) this.history.splice(0, 10000);   // four hours
     if (this.debriefOn || this.trailOn) this.trace(e);
@@ -444,6 +468,7 @@ export class View {
         this.structural = structuralMatrix(cg);
         this.airliner.structure.matrix.copy(this.structural);
         this.vector?.matrix.copy(this.structural);
+        this.ghostLines?.matrix.copy(this.structural);
       }
       root.position.copy(body.position);
       root.quaternion.copy(body.quaternion);
@@ -495,8 +520,10 @@ export class View {
   }
 
   placeCamera(s, dt) {
-    const cam = this.camera, root = this.body, P = root.position, Q = root.quaternion;
-    const hdg = s.heading_deg * DEG;
+    // centred on the aircraft; in the debrief, where its playhead holds it (setHead)
+    const cam = this.camera, root = this.body, f = this.debriefOn ? this.focus : null;
+    const P = f ? f.position : root.position, Q = f ? f.quaternion : root.quaternion;
+    const hdg = (f && Number.isFinite(f.heading) ? f.heading : s.heading_deg) * DEG;
     const fwd = new THREE.Vector3(Math.sin(hdg), 0, -Math.cos(hdg)), right = new THREE.Vector3(Math.cos(hdg), 0, Math.sin(hdg));
     const clear = (v) => Math.max(v.y, this.height(v.x, v.z) + 2);
     let fov = 45, near = this.floor ? 1 : 0.3;

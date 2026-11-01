@@ -5,6 +5,7 @@
 // flight's log found (events.js). GPLv3.
 
 import * as THREE from 'three';
+import { tagColour } from './events.js';
 
 const NM = 1852;
 export const BAND = { ok: 0, out: 1, outside: 2 };
@@ -67,7 +68,7 @@ export class Acmi {
     c.width = w;
     c.height = h;
     g = c.getContext('2d');
-    const colour = /out|bounce|crash/.test(text) ? '#ff5a4a' : /in the bands/.test(text) ? '#40ff70' : kind === 'gate' ? '#e8f0e8' : '#ffb000';
+    const colour = tagColour(text, kind);
     g.fillStyle = 'rgba(0, 0, 0, 0.62)';
     g.fillRect(0, 0, w, h);
     g.fillStyle = colour;

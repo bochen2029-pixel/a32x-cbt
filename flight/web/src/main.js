@@ -11,12 +11,13 @@
 
 import { Clock } from './clock.js';
 import { apply, controlsFromInputs, coreInputs, initialControls } from './controls.js';
-import { FlightLog } from './events.js';
+import { eventLine, FlightLog } from './events.js';
 import { buildNote, Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { centre, drag, wheel } from './pointer.js';
 import { runwayFromState } from './scene-math.js';
+import { drawTimeline, momentAt, Playhead, readout, sampleAt, timeAt } from './timeline.js';
 import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
 
 const params = new URLSearchParams(location.search);
@@ -42,6 +43,41 @@ const panel = document.getElementById('debrief'), verdict = document.getElementB
 const eventsBox = document.getElementById('events');
 const log = new FlightLog();   // the flight's moments, from the core's slots (events.js)
 let shownLog = 0;              // the log's version the panel shows
+let shownAt = -1;              // the moment the panel lights: where the debrief's playhead is
+
+// The debrief's timeline along its foot (timeline.js): a drag moves the playhead through the flight, LIVE at the
+// bar's right end follows the flight again, and a moment clicked in the panel opens the debrief there.
+const timelineCanvas = document.getElementById('timeline');
+const timelineCtx = timelineCanvas.getContext('2d');
+const TIMELINE_H = 54;          // CSS pixels, as index.html sizes the bar
+let timelineRatio = 1;
+const playhead = new Playhead();
+let scrubbing = false;
+function scrub(e) {
+  const box = timelineCanvas.getBoundingClientRect();
+  playhead.playing = false;
+  playhead.seek(timeAt(e.clientX - box.left, box.width, view.history), view.history);
+}
+timelineCanvas.addEventListener('pointerdown', (e) => {
+  scrubbing = true;
+  try {
+    timelineCanvas.setPointerCapture(e.pointerId);   // the drag goes on past the bar's ends
+  } catch {
+    // a pointer the browser does not track: the drag works without the capture
+  }
+  scrub(e);
+});
+timelineCanvas.addEventListener('pointermove', (e) => {
+  if (scrubbing) scrub(e);
+});
+for (const end of ['pointerup', 'pointercancel']) timelineCanvas.addEventListener(end, () => { scrubbing = false; });
+eventsBox.addEventListener('click', (e) => {
+  const line = e.target.closest('[data-t]');
+  if (!line || !view.body) return;
+  if (!view.debriefOn) view.setDebrief(true);
+  playhead.playing = false;
+  playhead.seek(Number(line.dataset.t), view.history);
+});
 let shownVerdict = '';   // the verdict the panel shows
 let saved = '';          // what the last save did, for the status line
 document.getElementById('save').addEventListener('click', () => save());
@@ -79,6 +115,17 @@ window.addEventListener('keydown', (e) => {
     return;
   }
   if (e.ctrlKey || e.altKey || e.metaKey || !view.body) return;
+  // the debrief's playhead: a second back or on, ten with Shift (< >); Space plays or pauses
+  if (view.debriefOn && [',', '.', '<', '>'].includes(e.key)) {
+    playhead.step((e.key === ',' || e.key === '<' ? -1 : 1) * (e.shiftKey ? 10 : 1), view.history);
+    return;
+  }
+  if (view.debriefOn && e.key === ' ') {
+    e.preventDefault();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();   // not the save button too
+    playhead.toggle(view.history);
+    return;
+  }
   if (/^[0-9]$/.test(e.key)) view.setCamera(CAMERAS[(Number(e.key) + 9) % 10]);
   else if (e.key === 'v' || e.key === 'V') view.nextCamera();
   else if (e.key === '[') view.moveHour(-0.25);
@@ -90,6 +137,9 @@ function resize() {
   const ratio = Math.min(2, window.devicePixelRatio || 1);
   view.resize(window.innerWidth, window.innerHeight);
   overlay.resize(window.innerWidth, window.innerHeight, ratio);
+  timelineRatio = ratio;
+  timelineCanvas.width = Math.max(1, Math.round((window.innerWidth - 24) * ratio));
+  timelineCanvas.height = Math.round(TIMELINE_H * ratio);
 }
 window.addEventListener('resize', resize);
 resize();
@@ -197,6 +247,16 @@ globalThis.flightDebug = {
     set(view, 'zoom', zoom);
     return view.mode;
   },
+  // the debrief's playhead (timeline.js): to a time of the flight (Infinity: live); play or pause; what it shows
+  seek(t) {
+    playhead.playing = false;
+    playhead.seek(t, view.history);
+    return playhead.t;
+  },
+  play: () => (playhead.toggle(view.history), playhead.playing),
+  head: () => ({ t: playhead.t, playing: playhead.playing,
+    readout: readout(playhead.live ? view.history.at(-1) : sampleAt(view.history, playhead.t)) }),
+  moments: () => log.events.map((e) => ({ t: e.t, kind: e.kind, text: e.text })),
 };
 
 const FLAPS = ['0', '1', '2', '3', 'FULL'];
@@ -243,7 +303,20 @@ function show() {
   }
   if (open && log.version !== shownLog) {
     shownLog = log.version;
-    eventsBox.textContent = log.text();
+    eventsBox.replaceChildren(...log.events.map((e) => {
+      const line = document.createElement('div');
+      line.textContent = eventLine(e);
+      line.dataset.t = String(e.t);
+      return line;
+    }));
+    shownAt = -2;
+  }
+  // the moment the debrief's playhead is at, lit in the panel
+  const at = view.debriefOn && !playhead.live ? momentAt(log.events, playhead.t) : -1;
+  if (open && at !== shownAt) {
+    shownAt = at;
+    [...eventsBox.children].forEach((line, k) => line.classList.toggle('at', k === at));
+    if (at >= 0) eventsBox.children[at]?.scrollIntoView({ block: 'nearest' });
   }
   panel.hidden = !open;
 }
@@ -315,6 +388,11 @@ function frame(now) {
   }
   if (latest) {
     const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));
+    // the debrief's playhead, played on at the flight's pace, and live outside the debrief; the view draws the
+    // aircraft where it holds it
+    if (view.debriefOn) playhead.advance(realMs / 1000, view.history);
+    else if (!playhead.live) playhead.goLive();
+    view.setHead(playhead.live ? null : sampleAt(view.history, playhead.t));
     view.update(s, realMs / 1000);
     log.observe(s, latest.texts);
     view.tags(log.events);
@@ -326,6 +404,15 @@ function frame(now) {
     overlayCanvas.style.visibility = view.overlayShown ? '' : 'hidden';
     const ils = s.loc_valid || s.gs_valid ? { loc: s.loc_valid ? s.loc_dots : null, gs: s.gs_valid ? s.gs_dots : null } : null;
     if (view.overlayShown) overlay.draw(s, view.camera.fov, controls, ils);
+    // the debrief's timeline, along its foot; the HUD moves up over it (index.html)
+    timelineCanvas.hidden = !view.debriefOn;
+    document.body.classList.toggle('debrief', view.debriefOn);
+    if (view.debriefOn) {
+      drawTimeline(timelineCtx, timelineCanvas.width, timelineCanvas.height, timelineRatio, {
+        history: view.history, events: log.events, head: playhead.t, playing: playhead.playing,
+        sample: playhead.live ? view.history.at(-1) : sampleAt(view.history, playhead.t),
+      });
+    }
   }
   show();
   if (!error) requestAnimationFrame(frame);

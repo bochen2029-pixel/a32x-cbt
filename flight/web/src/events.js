@@ -14,6 +14,17 @@ const SETTLE_S = 3;            // the computers power up in a start's first seco
 const fmt = (v, digits = 0) => Number(v).toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 const finite = Number.isFinite;
 
+// A moment's colour in the debrief, by its tag, on the path and on the timeline's bar alike: red for out of the
+// bands, a bounce or a crash, green for back in them, white for a gate, amber for the rest.
+export function tagColour(tag, kind) {
+  return /out|bounce|crash/.test(tag) ? '#ff5a4a' : /in the bands/.test(tag) ? '#40ff70' : kind === 'gate' ? '#e8f0e8' : '#ffb000';
+}
+
+// A moment as the panel prints it: the simulated time, then what happened.
+export function eventLine(e) {
+  return `${e.t.toFixed(1).padStart(7)} s  ${e.text}`;
+}
+
 // Where the aircraft stands against the beams, as a pilot says it. core.h: loc_dots and gs_dots are where
 // each beam lies from the aircraft, + right and + up; so + is left of the localizer, below the glideslope.
 export function beams(s) {
@@ -188,8 +199,8 @@ export class FlightLog {
     for (const k of out(s)) this.reversersOut.add(k);
   }
 
-  // The log as a panel prints it: the simulated time, then the moment.
+  // The log as a panel prints it, a line a moment (eventLine).
   text() {
-    return this.events.map((e) => `${e.t.toFixed(1).padStart(7)} s  ${e.text}`).join('\n');
+    return this.events.map(eventLine).join('\n');
   }
 }
