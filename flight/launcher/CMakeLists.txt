@@ -11,7 +11,7 @@
 # write the time, and a Release build carries no debug information, so no build path goes in either.
 
 cmake_minimum_required(VERSION 3.25)
-project(a32x_launcher VERSION 0.1.0 LANGUAGES CXX RC)
+project(a32x_launcher VERSION 0.1.1 LANGUAGES CXX RC)
 
 if(NOT WIN32 OR NOT MSVC)
   message(FATAL_ERROR "A32X.exe is a Windows program, built with MSVC (Visual Studio 2022).")

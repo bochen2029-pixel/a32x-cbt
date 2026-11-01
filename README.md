@@ -60,10 +60,10 @@ Two artefacts, as `ROADMAP.md` sets them (*Decisions*, packaging):
 
 - **`a32x-cbt.zip`**: the systems trainer alone, MIT. `npm run package` in `app/` builds it and
   `npm run gate` checks it.
-- **`a32x-sim-0.1.0-win64.zip`**: the flight simulator for Windows, GPLv3. `A32X.exe`, a launcher of
+- **`a32x-sim-0.1.1-win64.zip`**: the flight simulator for Windows, GPLv3. `A32X.exe`, a launcher of
   ours, opens the page beside it in Microsoft Edge as an app window, or in the default browser; the
   trainer rides along under its own MIT notice, with every licence and notice. Beside it,
-  **`a32x-sim-0.1.0-source.zip`**, its Corresponding Source: this repository at the commit and the
+  **`a32x-sim-0.1.1-source.zip`**, its Corresponding Source: this repository at the commit and the
   exact A32NX and JSBSim sources compiled into it, with Emscripten 6.0.12 named. `npm run release` in
   `flight/web` builds both, the first from the second, and `npm run release:gate` checks them
   (`flight/README.md`, *The Windows release*). Built and checked; not published.

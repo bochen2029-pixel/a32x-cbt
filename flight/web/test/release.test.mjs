@@ -15,7 +15,7 @@ import { bareWindowsProblems, readPe } from '../tools/pe.mjs';
 import {
   BINARY, BINARY_FILES, BINARY_NOTICES, DISCLAIMER, SOURCE, UPSTREAM, archive, checkBinary, checkSource, cmakePins,
   embeddedFiles, fill, firstParagraph, libraryNotices, linkedLibraries, leaks, notice, pageReferences, templateValues,
-  xmlHeader,
+  VERSION, xmlHeader,
 } from '../tools/release-contents.mjs';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
@@ -283,6 +283,16 @@ test("a link's system libraries map to their notices, and one with no known lice
   assert.deepEqual(libraryNotices(names), owed);
   assert.throws(() => libraryNotices([...names, 'z-mt']), /links -lz-mt, whose licence the release does not know/);
   assert.throws(() => linkedLibraries('nothing linked'), /no wasm-ld command/);
+});
+
+// The release's version lives in three places: package.json names the zips, the lockfile repeats it,
+// and the launcher's CMake project stamps it into A32X.exe's version information. They move together.
+test('the zips, the lockfile and A32X.exe carry one version', () => {
+  const lock = JSON.parse(read('../package-lock.json'));
+  assert.equal(lock.version, VERSION, 'package-lock.json');
+  assert.equal(lock.packages[''].version, VERSION, "package-lock.json's root package");
+  const launcher = /project\(a32x_launcher VERSION (\d+\.\d+\.\d+)\b/.exec(read('../../launcher/CMakeLists.txt'))?.[1];
+  assert.equal(launcher, VERSION, 'flight/launcher/CMakeLists.txt');
 });
 
 test('a page names what it loads', () => {
