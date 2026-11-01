@@ -222,6 +222,11 @@ test('the templates ask only for what the release knows, and say what a user and
     assert.ok(source.includes(said), said);
   }
   assert.throws(() => fill('built @WHEN@', values, 'x.txt'), /x\.txt asks for @WHEN@, which the release does not know/);
+  // filled with values as long as the real ones (a commit is forty characters), no line runs wide
+  for (const [name, text] of [['README.txt', readme], ['README-source.txt', source], ['airport-data.txt', read('../release/airport-data.txt')]]) {
+    const wide = text.split(/\r?\n/).filter((l) => l.length > 104); // a checkout may have made them CRLF
+    assert.deepEqual(wide, [], `${name}: lines past 104 columns`);
+  }
 });
 
 test('flight/CMakeLists.txt accepts the commits the release ships, and embeds files whose headers it can carry', () => {

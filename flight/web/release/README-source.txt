@@ -2,22 +2,23 @@ A32X CBT flight simulator @VERSION@: the Corresponding Source
 
 Unofficial. Not affiliated with Airbus, FlyByWire Simulations or Aerowinx. Not for type training.
 
-This archive is the Corresponding Source, as the GNU General Public License version 3 defines it, of
-@BINARY@.zip: the source of every file in that zip that was built, and the scripts that built
-it. The release step (a32x-cbt/flight/web/tools/release.mjs) wrote this archive first and then built
-the other from it, unzipped, so the two correspond by construction.
+This archive is the Corresponding Source, as the GNU General Public License version 3 defines it,
+of @BINARY@.zip: the source of every file in that zip that was built, and the scripts
+that built it. The release step (a32x-cbt/flight/web/tools/release.mjs) wrote this archive first and
+then built the other from it, unzipped, so the two correspond by construction.
 
 WHAT IS HERE
-  a32x-cbt/         A32X CBT at commit @COMMIT@ (@COMMIT_DATE@): every file in
-                    the repository at that commit. flight/ is GPLv3 (a32x-cbt/flight/LICENSE); the rest
-                    is MIT (a32x-cbt/LICENSE).
+  a32x-cbt/         A32X CBT: every file in the repository at commit
+                    @COMMIT@ (@COMMIT_DATE@). flight/ is GPLv3
+                    (a32x-cbt/flight/LICENSE); the rest is MIT (a32x-cbt/LICENSE).
   upstream/a32nx/   FlyByWire A32NX, @A32NX_REPOSITORY@, at
-                    @A32NX_COMMIT@: the A320's flight-control code, which is what
-                    is compiled (fbw-a32nx/src/wasm/fbw_a320/), and the repository's licence, GPLv3. The
-                    rest of that repository, 1.4 GB of aircraft for Microsoft Flight Simulator, is not.
-  upstream/jsbsim/  JSBSim, @JSBSIM_REPOSITORY@, at @JSBSIM_COMMIT@
-                    (@JSBSIM_TAG@), whole. LGPL-2.1 (COPYING); its aircraft and engine files carry their
-                    own headers.
+                    @A32NX_COMMIT@: the A320's flight-control code,
+                    which is what is compiled (fbw-a32nx/src/wasm/fbw_a320/), and the repository's
+                    licence, GPLv3. The rest of that repository, 1.4 GB of aircraft for Microsoft
+                    Flight Simulator, is not.
+  upstream/jsbsim/  JSBSim, @JSBSIM_REPOSITORY@, at
+                    @JSBSIM_COMMIT@ (@JSBSIM_TAG@), whole. LGPL-2.1
+                    (COPYING); its aircraft and engine files carry their own headers.
   upstream/three/   three.js @THREE_VERSION@ as npm publishes it: the files the page bundles into
                     web/flight.js, its licence (MIT) and its package.json.
 

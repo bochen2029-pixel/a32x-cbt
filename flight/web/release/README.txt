@@ -18,8 +18,8 @@ RUN IT
 
 FLY IT
   A joystick or gamepad, through the browser: a standard gamepad flies straight away, and any other
-  device is mapped from your own hands (M) and calibrated (C), both remembered per device. Press a
-  button on it first: the browser shows a page no controller until one is touched.
+  device is mapped from your own hands (M) and calibrated (C), both remembered per device. Press one
+  of its buttons first: until then the browser keeps it from the page.
   The keyboard is the fallback (H lists the keys): the arrows for the stick, Z X rudder, PgUp PgDn the
   thrust levers (CL, MCT and TOGA detents), R F flaps, G gear, B brakes, P parking brake, S speedbrake,
   A ground spoilers, T Y U the rudder trim and its reset.
@@ -27,9 +27,9 @@ FLY IT
   crew fly, ?airframe=737 flies JSBSim's 737 in place of our A320, ?time=night or ?time=day sets the
   light.
 
-  What it is not, yet: there are no cockpit displays, no autopilot and no FMS, and the view is a plain
-  picture in the manner of a 1980s full-flight simulator. The airframe is fitted to public numbers,
-  not to Airbus's data.
+  What it is not, yet: there are no cockpit displays, no autopilot and no FMS. The view is drawn as a
+  1980s full-flight simulator drew it, more plainly where there is no graphics card. The airframe is
+  fitted to public numbers, not to Airbus's data.
 
 THE SYSTEMS TRAINER
   trainer\index.html: systems, ECAM, flows and graded drills, as its own zip ships it. Double-click it,
@@ -50,12 +50,12 @@ LICENCE AND SOURCE
   with musl, libc++ and dlmalloc, and three.js (MIT): notices\ holds each one's licence. The trainer is
   MIT (trainer\LICENSE).
 
-  Its Corresponding Source is @SOURCE@.zip, offered from the same place as this zip: our source
-  and build scripts at commit @COMMIT@, and the exact A32NX and JSBSim sources compiled into
-  web\core.js. Its README.txt says how to build every file here from it.
+  Its Corresponding Source is @SOURCE@.zip, offered from the same place as this zip:
+  our source and build scripts at the commit this was built from, and the exact A32NX and JSBSim
+  sources compiled into web\core.js. Its README.txt says how to build every file here from it.
 
-  Built from commit @COMMIT@ (@COMMIT_DATE@), with A32NX @A32NX_SHORT@, JSBSim @JSBSIM_TAG@ (@JSBSIM_SHORT@),
-  Emscripten @EMSCRIPTEN@ and three.js @THREE_VERSION@.
+  Built from commit @COMMIT@ (@COMMIT_DATE@),
+  with A32NX @A32NX_SHORT@, JSBSim @JSBSIM_TAG@ (@JSBSIM_SHORT@), Emscripten @EMSCRIPTEN@ and three.js @THREE_VERSION@.
 
 ATTRIBUTION
   The runways come from OurAirports and KDFW's buildings from the FAA's airport diagram, both public
