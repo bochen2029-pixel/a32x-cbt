@@ -1,18 +1,25 @@
-// The airframe: JSBSim flying an aircraft definition read from the pinned clone, with the A32NX
-// servos positioning its surfaces. GPLv3; JSBSim is LGPL-2.1, linked and never copied.
+// The airframe: JSBSim flying an aircraft definition, with the A32NX servos positioning its surfaces.
+// GPLv3; JSBSim is LGPL-2.1, linked and never copied.
 //
 // Everything that crosses this boundary is in the A32NX computers' frame and in the units the
 // aircraft's own instruments use — degrees, knots, feet, g — so world.cpp never sees JSBSim and
 // JSBSim never sees the computers. airframe.cpp is the one place the two frames meet.
 //
-// The aircraft definition is JSBSim's 737 (docs/provenance.md says why not its A320): an A320-class
-// airframe, not an A320. Its own flight controls still run, and a system of ours
-// (flight/jsbsim/a32nx-surfaces.xml) overrides their outputs in the same pass, so the aerodynamics
-// see the servos' positions and nothing else.
+// Two aircraft definitions can fly (select() below):
+// - "737": JSBSim's 737, read unmodified from the pinned clone (docs/provenance.md says why not its
+//   A320): an A320-class airframe, not an A320. It has one pitch control with the trim folded in, no
+//   slats and no roll spoilers, so the stabiliser acts through its elevator and the rest is dropped.
+// - "a320": an A320 of ours, flight/jsbsim/aircraft/A320-fit, fitted to flight/targets/a320.csv. It
+//   takes the stabiliser, the slats and each wing's spoilers as they are.
+// Each one's own flight controls still run, and a system of ours (flight/jsbsim/a32nx-surfaces.xml)
+// overrides their outputs in the same pass, so the aerodynamics see the servos' positions and nothing
+// else.
 
 #pragma once
 
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
 // What the world hands the airframe for one tick.
@@ -23,6 +30,7 @@ struct AirframeControls {
   double aileron[2] = {0, 0};   // left, right; + trailing edge down
   double spoiler[2][5] = {};    // left, right, spoilers 1..5; extended is negative
   double rudder = 0;            // + trailing edge left: the computers' yaw damper and pedal sense
+  double slat = 0;              // slat surface angle
   double flap = 0;              // flap surface angle
   // The rest of the aeroplane.
   double tla[2] = {0, 0};       // thrust lever angle, deg: 0 idle, 25 CL, 35 MCT, 45 TOGA
@@ -56,6 +64,11 @@ struct AirframeState {
 };
 
 // The bare airframe measured, for scoring it against targets (score.cpp).
+struct Configuration {
+  double slatDeg = 0, flapDeg = 0;  // surface angles
+  bool gearDown = false;
+};
+
 struct LiftPeak {
   double clMax = 0, alphaDeg = 0;
 };
@@ -64,7 +77,7 @@ struct TrimPoint {
   bool ok = false;  // JSBSim's trim converged
   double alphaDeg = 0, pitchDeg = 0;
   double pitchControlDeg = 0;  // the pitch control the trim needed, in elevator degrees (elevator + 1.8 THS)
-  double thsDeg = 0;           // the same as THS alone, the elevator at rest as autotrim leaves it
+  double thsDeg = 0;           // the stabiliser, with the elevator at rest as autotrim leaves it
   double tla = 0;              // thrust lever angle for the thrust the trim needed
 };
 
@@ -82,6 +95,17 @@ struct PitchResponse {
 
 class Airframe {
  public:
+  // Which aircraft definition every Airframe built from now on loads: "737" or "a320". Unless this is
+  // called, FLIGHT_AIRFRAME in the environment says, and unless that does, the default. An unknown
+  // name ends the process.
+  static void select(const std::string& key);
+  static const std::string& selected();
+  // What reports call the selected aircraft, after "JSBSim <commit>'s".
+  static const char* model();
+  // Coefficients loaded over the aircraft definition's own, by property name, for the fitter: every
+  // Airframe built from now on gets them. A name the aircraft does not declare ends the process.
+  static void setCoefficients(const std::vector<std::pair<std::string, double>>& coefficients);
+
   // Loads the aircraft, puts it on a sea-level runway at 47 N 8 E heading 360 with engines at idle
   // and brakes on, and lets it settle on its gear. A load failure is reported and ends the process.
   Airframe();
@@ -92,8 +116,9 @@ class Airframe {
 
   const AirframeState& state() const;
 
-  static const char* model();
   double wingAreaFt2() const;
+  // A property of the loaded aircraft, by name, for the fitter's record; NaN if it has none.
+  double property(const std::string& name) const;
 
   // Measurements. Each one re-initialises JSBSim: use them on an airframe that is not flying.
   // The weight they are made at: the total brought to this by changing the empty weight, which keeps
@@ -101,11 +126,12 @@ class Airframe {
   void setWeightLbs(double lbs);
   // The lift coefficient against alpha at 1,000 ft and 150 kt, elevator at neutral, swept from 0 to
   // 25 deg in quarter degrees: where it peaks.
-  LiftPeak liftPeak(double flapDeg, bool gearDown);
+  LiftPeak liftPeak(const Configuration& c);
   // Lift and drag coefficients, wings level, no sideslip, at an altitude, Mach and alpha.
-  AeroPoint aero(double altitudeFt, double mach, double alphaDeg, double flapDeg, bool gearDown);
-  // JSBSim's longitudinal trim, wings level, on a flight path, at a CAS or, when mach > 0, a Mach.
-  TrimPoint trim(double altitudeFt, double casKn, double mach, double gammaDeg, double flapDeg, bool gearDown);
+  AeroPoint aero(double altitudeFt, double mach, double alphaDeg, const Configuration& c);
+  // JSBSim's longitudinal trim, wings level, on a flight path, at a CAS or, when mach > 0, a Mach. The
+  // trim works the stabiliser where the aircraft has one, and the 737's elevator otherwise.
+  TrimPoint trim(double altitudeFt, double casKn, double mach, double gammaDeg, const Configuration& c);
   // Trimmed clean in level flight, then the elevator moved by pulseDeg for pulseS seconds and returned,
   // the stabiliser and the thrust left where the trim put them: the airframe's own pitch response, as
   // direct law would show it. Alpha is sampled every 20 ms for recordS seconds after the pulse.

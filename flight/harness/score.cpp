@@ -126,13 +126,13 @@ using Measures = std::map<std::string, Measured>;
 
 struct Config {
   std::string name;
-  double flapDeg;
-  bool gearDown;
+  Configuration surfaces;
 };
 
-// flap surface angles per configuration; CONF 1 is slats alone, which the 737's tables do not see
-const Config kConfigs[] = {{"clean", 0, false}, {"conf1", 0, false}, {"conf1f", 10, false},
-                           {"conf2", 15, false}, {"conf3", 20, true},  {"full", 40, true}};
+// slat and flap surface angles per configuration (a320_systems hydraulic/mod.rs). CONF 1 is slats
+// alone, which the 737's tables do not see: to the 737 it is clean.
+const Config kConfigs[] = {{"clean", {0, 0, false}},  {"conf1", {18, 0, false}}, {"conf1f", {18, 10, false}},
+                           {"conf2", {22, 15, false}}, {"conf3", {22, 20, true}}, {"full", {27, 40, true}}};
 
 const Config* config(const std::string& name) {
   for (const Config& c : kConfigs) {
@@ -158,16 +158,17 @@ Measured dragRise(Airframe& a) {
   constexpr double kCl = 0.5, kRise = 0.0020, kAltitudeFt = 35000;
   double alpha = 2;
   // the alpha for the lift coefficient, by secant from the last one found; NaN if it does not converge
+  const Configuration clean;
   auto cdAt = [&](double mach) {
     double a0 = alpha, a1 = alpha + 0.5;
-    AeroPoint p0 = a.aero(kAltitudeFt, mach, a0, 0, false), p1 = a.aero(kAltitudeFt, mach, a1, 0, false);
+    AeroPoint p0 = a.aero(kAltitudeFt, mach, a0, clean), p1 = a.aero(kAltitudeFt, mach, a1, clean);
     for (int k = 0; k < 12 && std::abs(p1.cl - kCl) > 1e-6; ++k) {
       if (p1.cl == p0.cl) return kNaN;
       const double a2 = a1 + (kCl - p1.cl) * (a1 - a0) / (p1.cl - p0.cl);
       a0 = a1;
       p0 = p1;
       a1 = a2;
-      p1 = a.aero(kAltitudeFt, mach, a1, 0, false);
+      p1 = a.aero(kAltitudeFt, mach, a1, clean);
     }
     if (std::abs(p1.cl - kCl) > 1e-4) return kNaN;
     alpha = a1;
@@ -239,8 +240,8 @@ class Bare {
     if (family.rfind("vls-alpha-", 0) == 0 && config(family.substr(10))) {
       const Config& c = *config(family.substr(10));
       const double vls = speeds_.at("vls:" + c.name, tonnes);
-      const TrimPoint t = a_.trim(1000, vls, 0, 0, c.flapDeg, c.gearDown);
-      return t.ok ? Measured{t.alphaDeg, fmt("at the A320's VLS, %.0f kt", vls)}
+      const TrimPoint t = a_.trim(1000, vls, 0, 0, c.surfaces);
+      return t.ok ? Measured{t.alphaDeg, fmt("at the A320's VLS, %.0f kt; THS %.1f deg", vls, t.thsDeg)}
                   : Measured{kNaN, fmt("no trim at the A320's VLS, %.0f kt", vls)};
     }
     if (family == "app-pitch-full") {
@@ -248,12 +249,12 @@ class Bare {
       const size_t at = measure.find("VLS + ");
       if (at == std::string::npos) return {kNaN, "the row names no speed above VLS"};
       const double vapp = speeds_.at("vls:full", tonnes) + std::atof(measure.c_str() + at + 6);
-      const TrimPoint t = a_.trim(1000, vapp, 0, -3, 40, true);
+      const TrimPoint t = a_.trim(1000, vapp, 0, -3, config("full")->surfaces);
       return t.ok ? Measured{t.pitchDeg, fmt("%.0f kt; alpha %.1f; THS %.1f deg", vapp, t.alphaDeg, t.thsDeg)}
                   : Measured{kNaN, fmt("no trim at %.0f kt", vapp)};
     }
     if (family == "cruise-pitch" || family == "cruise-tla") {
-      const TrimPoint t = a_.trim(35000, 0, 0.78, 0, 0, false);
+      const TrimPoint t = a_.trim(35000, 0, 0.78, 0, config("clean")->surfaces);
       if (!t.ok) return {kNaN, "no trim"};
       return family == "cruise-pitch" ? Measured{t.pitchDeg, fmt("alpha %.1f; THS %.1f deg", t.alphaDeg, t.thsDeg)}
                                       : Measured{t.tla, ""};
@@ -277,7 +278,7 @@ class Bare {
   const LiftPeak& peak(const Config& c) {
     const auto it = peaks_.find(c.name);
     if (it != peaks_.end()) return it->second;
-    return peaks_[c.name] = a_.liftPeak(c.flapDeg, c.gearDown);
+    return peaks_[c.name] = a_.liftPeak(c.surfaces);
   }
 
   Airframe& a_;
@@ -396,20 +397,65 @@ void measureFlown(Measures& m) {
   }
 }
 
+// How far a fit row lies from where a fit should put it, for the fitter: 0 at the centre of a two-sided
+// band and 1 at its edge, growing as the square beyond it; for a one-sided limit, 0 a unit clear of it
+// (a degree of alpha), 1 on it. A row with no value costs as much as five half-bands out.
+double fitCost(double v, double lo, double hi) {
+  if (std::isnan(v)) return 25;
+  if (!std::isnan(lo) && !std::isnan(hi)) {
+    const double u = (v - (lo + hi) / 2) / ((hi - lo) / 2);
+    return u * u;
+  }
+  if (!std::isnan(lo)) {
+    const double u = std::max(0.0, lo + 1 - v);
+    return u * u;
+  }
+  if (!std::isnan(hi)) {
+    const double u = std::max(0.0, v - (hi - 1));
+    return u * u;
+  }
+  return 0;
+}
+
+// Coefficients for the airframe, one "property value" a line, '#' for comments: what the fitter
+// hands a candidate.
+std::vector<std::pair<std::string, double>> readCoefficients(const std::string& path) {
+  std::ifstream in(path);
+  if (!in) {
+    std::fprintf(stderr, "cannot read %s\n", path.c_str());
+    std::exit(2);
+  }
+  std::vector<std::pair<std::string, double>> c;
+  std::string line;
+  while (std::getline(in, line)) {
+    if (line.empty() || line[0] == '#' || line == "\r") continue;
+    char name[256];
+    double value = 0;
+    if (std::sscanf(line.c_str(), "%255s %lf", name, &value) != 2) {
+      std::fprintf(stderr, "%s: not \"property value\": %s\n", path.c_str(), line.c_str());
+      std::exit(2);
+    }
+    c.emplace_back(name, value);
+  }
+  return c;
+}
+
 int verdict(const char* what, bool ok, const std::string& detail) {
   std::printf("  %s  %s - %s\n", ok ? "pass" : "FAIL", what, detail.c_str());
   return ok ? 0 : 1;
 }
 
 // The instruments checked against answers the 737's own file gives, so that a number the scorer prints
-// is the airframe's and not the instrument's. Run on the 737.
+// is the airframe's and not the instrument's. Always on the 737, whichever airframe flies.
 int instruments() {
+  Airframe::select("737");
   Airframe a;
   int failed = 0;
   // 737.xml: CDgear = 0.015 times the gear position. Down, up, down: a gear left in transit by one
   // measurement shows in the next.
-  const double down = a.aero(10000, 0.5, 2, 0, true).cd, up = a.aero(10000, 0.5, 2, 0, false).cd,
-               again = a.aero(10000, 0.5, 2, 0, true).cd;
+  const Configuration gearDown{0, 0, true}, gearUp{0, 0, false};
+  const double down = a.aero(10000, 0.5, 2, gearDown).cd, up = a.aero(10000, 0.5, 2, gearUp).cd,
+               again = a.aero(10000, 0.5, 2, gearDown).cd;
   failed += verdict("a measurement puts the gear where it asks",
                     std::abs(down - up - 0.015) < 1e-5 && std::abs(down - again) < 1e-9,
                     fmt("gear drag %.5f, the file's 0.015; down twice %.5f and %.5f", down - up, down, again));
@@ -433,24 +479,35 @@ int instruments() {
 
 int main(int argc, char** argv) {
   std::string targetsDir = FLIGHT_TARGETS_DIR, out;
-  bool check = false;
+  bool check = false, fitRowsOnly = false;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--out" && i + 1 < argc) {
       out = argv[++i];
     } else if (a == "--targets" && i + 1 < argc) {
       targetsDir = argv[++i];
+    } else if (a == "--airframe" && i + 1 < argc) {
+      Airframe::select(argv[++i]);
+    } else if (a == "--coefficients" && i + 1 < argc) {
+      Airframe::setCoefficients(readCoefficients(argv[++i]));
+    } else if (a == "--fit-rows") {
+      fitRowsOnly = true;
     } else if (a == "--check") {
       check = true;
     } else if (a == "--instruments") {
       return instruments();
     } else {
-      std::printf("airframe_score [--targets dir] [--out score.csv] [--check] [--instruments]\n");
+      std::printf(
+          "airframe_score [--airframe 737|a320] [--coefficients file] [--targets dir] [--out score.csv]\n"
+          "               [--check] [--fit-rows] [--instruments]\n");
       return 2;
     }
   }
   const auto rows = readCsv(targetsDir + "/a320.csv");
   const Speeds speeds(targetsDir + "/a320-speeds.csv");
+  auto isFitRow = [](const std::map<std::string, std::string>& row) {
+    return row.at("kind") == "target" && row.at("use") == "fit";
+  };
 
   Airframe bare;
   const double weight = bare.state().weightLbs, tonnes = weight / kLbsPerTonne, cg = bare.state().cgPercentMac;
@@ -463,11 +520,17 @@ int main(int argc, char** argv) {
   Bare b(bare, speeds);
   for (const auto& row : rows) {
     const std::string& id = row.at("id");
+    if (fitRowsOnly && !isFitRow(row)) continue;
     if (row.at("kind") != "pending" && Bare::measures(id, family(id))) {
       m[id] = b.measure(id, family(id), row.at("measure"), rowLbs(row));
+    } else if (fitRowsOnly) {
+      // the fitter evaluates thousands of candidates: a fit row that needs the circuit flown is a change
+      // of plan, not something to slip in
+      std::fprintf(stderr, "a320.csv: fit row %s is not measured on the bare airframe\n", id.c_str());
+      return 2;
     }
   }
-  measureFlown(m);
+  if (!fitRowsOnly) measureFlown(m);
 
   std::printf("A320 targets (%s/a320.csv) against JSBSim %s's %s\n", targetsDir.c_str(), JSBSIM_COMMIT,
               Airframe::model());
@@ -484,7 +547,9 @@ int main(int argc, char** argv) {
   if (csv) std::fprintf(csv, "id,kind,use,weight,lo,hi,unit,measured,verdict,note\n");
 
   int counted = 0, inside = 0, fitRows = 0, fitInside = 0, unmeasured = 0;
+  double cost = 0;
   for (const auto& row : rows) {
+    if (fitRowsOnly && !isFitRow(row)) continue;
     const std::string& id = row.at("id");
     const std::string& kind = row.at("kind");
     const std::string& unit = row.at("unit");
@@ -527,6 +592,7 @@ int main(int argc, char** argv) {
         if (row.at("use") == "fit") {
           ++fitRows;
           fitInside += in;
+          cost += fitCost(v, lo, hi);
         }
       } else {
         verdict = "(" + verdict + ")";
@@ -542,6 +608,17 @@ int main(int argc, char** argv) {
     }
   }
   if (csv) std::fclose(csv);
+  if (fitRowsOnly) {
+    // and once more for the fitter to read: one value a line, at full precision
+    std::printf("\n");
+    for (const auto& row : rows) {
+      if (!isFitRow(row)) continue;
+      const auto found = m.find(row.at("id"));
+      std::printf("value %s %.17g\n", row.at("id").c_str(), found == m.end() ? kNaN : found->second.value);
+    }
+    std::printf("fit rows: inside %d of %d\ncost %.17g\n", fitInside, fitRows, cost);
+    return unmeasured ? 1 : 0;
+  }
   std::printf("\n%s: inside %d of %d targets (%d of %d fit rows, %d of %d held-out rows); context rows are not counted\n",
               Airframe::model(), inside, counted, fitInside, fitRows, inside - fitInside, counted - fitRows);
   if (unmeasured) std::printf("%d rows were not measured\n", unmeasured);

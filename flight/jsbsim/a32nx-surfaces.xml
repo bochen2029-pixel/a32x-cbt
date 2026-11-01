@@ -8,12 +8,15 @@
   already in JSBSim's frame and units (harness/airframe.cpp says how). Nothing here computes a law;
   the laws are the A32NX computers'.
 
-  Every output is a surface position the aircraft definitions in the JSBSim clone read: flaps by
-  angle (the A320) and by fraction (the 737), speedbrake and ground spoilers by fraction.
+  Every output is a surface position an aircraft definition reads: flaps by angle and by fraction,
+  speedbrake and ground spoilers by fraction (the 737); and for an airframe that has them (our A320,
+  flight/jsbsim/aircraft/A320-fit), the stabiliser as a surface of its own, the slats by angle, and the
+  spoilers of each wing by the share of their full extension.
 
-  One input is for measuring the airframe, not flying it: a32nx/trim-authority-rad lets JSBSim's own
-  trim routine, which works the pitch trim command, move the elevator. It is zero in flight, so in
-  flight the elevator is the servos' alone.
+  Two inputs are for measuring the airframe, not flying it: a32nx/trim-authority-rad and
+  a32nx/ths-trim-authority-rad let JSBSim's own trim routine, which works the pitch trim command, move
+  the elevator (the 737, whose trim is folded into it) or the stabiliser. Both are zero in flight, so
+  in flight the surfaces are the servos' alone.
 -->
 <system name="A32NX surfaces">
 
@@ -26,6 +29,11 @@
   <property value="0">a32nx/flap-norm</property>
   <property value="0">a32nx/speedbrake-norm</property>
   <property value="0">a32nx/ground-spoiler-norm</property>
+  <property value="0">a32nx/ths-rad</property>
+  <property value="0">a32nx/ths-trim-authority-rad</property>
+  <property value="0">a32nx/slat-deg</property>
+  <property value="0">a32nx/left-spoiler-norm</property>
+  <property value="0">a32nx/right-spoiler-norm</property>
 
   <channel name="A32NX surfaces">
 
@@ -82,6 +90,37 @@
       <input>a32nx/ground-spoiler-norm</input>
       <gain>1</gain>
       <output>fcs/spoiler-pos-norm</output>
+    </pure_gain>
+
+    <fcs_function name="a32nx-stabilizer">
+      <function>
+        <sum>
+          <property>a32nx/ths-rad</property>
+          <product>
+            <property>a32nx/ths-trim-authority-rad</property>
+            <property>fcs/pitch-trim-cmd-norm</property>
+          </product>
+        </sum>
+      </function>
+      <output>fcs/stabilizer-pos-rad</output>
+    </fcs_function>
+
+    <pure_gain name="a32nx-slats">
+      <input>a32nx/slat-deg</input>
+      <gain>1</gain>
+      <output>fcs/slat-pos-deg</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-left-spoilers">
+      <input>a32nx/left-spoiler-norm</input>
+      <gain>1</gain>
+      <output>fcs/left-spoiler-pos-norm</output>
+    </pure_gain>
+
+    <pure_gain name="a32nx-right-spoilers">
+      <input>a32nx/right-spoiler-norm</input>
+      <gain>1</gain>
+      <output>fcs/right-spoiler-pos-norm</output>
     </pure_gain>
 
   </channel>

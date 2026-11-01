@@ -1,0 +1,1036 @@
+<?xml version="1.0"?>
+<!--
+  An A320 for JSBSim, fitted to the project's acceptance targets. GPLv3, like everything in flight/.
+
+  Written for this project; not derived from JSBSim's own A320 or 737 files. The engines are JSBSim's
+  CFM56_5 (25,000 lb, the A320-211's CFM56-5A1), read at run time from the pinned clone as the 737 reads
+  its CFM56. The surfaces are positioned by the A32NX servos through flight/jsbsim/a32nx-surfaces.xml,
+  which JSBSim loads after this file.
+
+  Where the numbers come from:
+    geometry          A32NX's MSFS flight model (fbw-a32nx/.../FlyByWire_A320_NEO/flight_model.cfg,
+                      GPLv3): wing area and span with sharklets, tail areas; MAC 4.1935 m from OpenAP's
+                      a320.yml (LGPL-3.0)
+    weight, inertia   the same file's weight and balance, an airline's A320-251N: operating empty weight
+                      42.5 t at 30 % MAC, empty moments of inertia. MSFS names its axes differently: its
+                      pitch, roll and yaw moments are JSBSim's iyy, ixx and izz
+    loading           ours: 65.0 t, CG 28 % MAC; payload 14.5 t, fuel 8.0 t in A32NX's tank layout
+    aerodynamics      the coefficients below, each a property under aero/fit/. A seed is what a value
+                      started from before the fit and where the seed came from; see
+                      flight/jsbsim/aircraft/A320-fit/seeds.csv. The fitter (flight/harness/fit.cpp)
+                      rewrites the values here and nothing else
+    ground effect     ours, from textbook theory: lift by the effective aspect ratio of a wing over its
+                      image (DATCOM's lift-curve slope), induced drag by McCormick's factor
+                      (16 h/b)^2 / (1 + (16 h/b)^2)
+
+  Frames. Structure: x aft from the nose, y right, z up, inches. Surfaces as JSBSim reads them:
+  elevator, stabiliser and aileron positive trailing edge down, the aileron as the left aileron's share
+  of the differential; rudder positive trailing edge left. Spoilers as the share of full extension on
+  each wing, all five panels at 50 deg being 1.
+
+  Built from public data and estimates, for education and entertainment; not endorsed by Airbus, not
+  to be sold. This project sells nothing.
+-->
+<fdm_config name="A320-fit" version="2.0" release="ALPHA"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="http://jsbsim.sourceforge.net/JSBSim.xsd">
+
+  <fileheader>
+    <author> the A32X CBT project </author>
+    <license licenseName="GPL-3.0" licenseURL="https://www.gnu.org/licenses/gpl-3.0.html"/>
+    <filecreationdate>2026-11-01</filecreationdate>
+    <version>1</version>
+    <description> An A320 fitted to flight/targets/a320.csv </description>
+  </fileheader>
+
+  <metrics>
+    <wingarea unit="FT2"> 1317.47 </wingarea>
+    <wingspan unit="FT"> 117.454 </wingspan>
+    <chord unit="FT"> 13.758 </chord>
+    <htailarea unit="FT2"> 333.7 </htailarea>
+    <htailarm unit="FT"> 55.0 </htailarm>
+    <vtailarea unit="FT2"> 231.5 </vtailarea>
+    <vtailarm unit="FT"> 51.0 </vtailarm>
+    <!-- the quarter chord of the MAC, whose leading edge is at 613.7 in -->
+    <location name="AERORP" unit="IN">
+      <x> 655.0 </x>
+      <y> 0 </y>
+      <z> -40 </z>
+    </location>
+    <location name="EYEPOINT" unit="IN">
+      <x> 100 </x>
+      <y> -20 </y>
+      <z> 50 </z>
+    </location>
+    <location name="VRP" unit="IN">
+      <x> 0 </x>
+      <y> 0 </y>
+      <z> 0 </z>
+    </location>
+  </metrics>
+
+  <mass_balance negated_crossproduct_inertia="true">
+    <ixx unit="SLUG*FT2"> 989005 </ixx>
+    <iyy unit="SLUG*FT2"> 2453714 </iyy>
+    <izz unit="SLUG*FT2"> 3166138 </izz>
+    <ixy unit="SLUG*FT2"> 0 </ixy>
+    <ixz unit="SLUG*FT2"> 1000 </ixz>
+    <iyz unit="SLUG*FT2"> 0 </iyz>
+    <emptywt unit="LBS"> 93697 </emptywt>
+    <location name="CG" unit="IN">
+      <x> 663.2 </x>
+      <y> 0 </y>
+      <z> -40 </z>
+    </location>
+    <pointmass name="Cabin">
+      <weight unit="LBS"> 27778 </weight>
+      <location unit="IN">
+        <x> 650 </x>
+        <y> 0 </y>
+        <z> -10 </z>
+      </location>
+    </pointmass>
+    <pointmass name="Forward hold">
+      <weight unit="LBS"> 2205 </weight>
+      <location unit="IN">
+        <x> 450 </x>
+        <y> 0 </y>
+        <z> -60 </z>
+      </location>
+    </pointmass>
+    <pointmass name="Aft hold">
+      <weight unit="LBS"> 1984 </weight>
+      <location unit="IN">
+        <x> 900 </x>
+        <y> 0 </y>
+        <z> -60 </z>
+      </location>
+    </pointmass>
+  </mass_balance>
+
+  <!-- nose, left main, right main: the order the harness reads them in; then a tail bumper that touches
+       the runway at 11.7 deg of pitch with the gear extended, the A320's tail-strike attitude -->
+  <ground_reactions>
+    <contact name="Nose gear" type="BOGEY">
+      <location unit="IN">
+        <x> 199 </x>
+        <y> 0 </y>
+        <z> -138 </z>
+      </location>
+      <static_friction> 0.80 </static_friction>
+      <dynamic_friction> 0.50 </dynamic_friction>
+      <rolling_friction> 0.02 </rolling_friction>
+      <spring_coeff unit="LBS/FT"> 60000 </spring_coeff>
+      <damping_coeff unit="LBS/FT/SEC"> 6000 </damping_coeff>
+      <damping_coeff_rebound unit="LBS/FT/SEC"> 12000 </damping_coeff_rebound>
+      <max_steer unit="DEG"> 75 </max_steer>
+      <brake_group> NONE </brake_group>
+      <retractable> 1 </retractable>
+    </contact>
+    <contact name="Left main gear" type="BOGEY">
+      <location unit="IN">
+        <x> 697 </x>
+        <y> -149.4 </y>
+        <z> -142 </z>
+      </location>
+      <static_friction> 0.80 </static_friction>
+      <dynamic_friction> 0.50 </dynamic_friction>
+      <rolling_friction> 0.02 </rolling_friction>
+      <spring_coeff unit="LBS/FT"> 110000 </spring_coeff>
+      <damping_coeff unit="LBS/FT/SEC"> 9000 </damping_coeff>
+      <damping_coeff_rebound unit="LBS/FT/SEC"> 45000 </damping_coeff_rebound>
+      <max_steer unit="DEG"> 0 </max_steer>
+      <brake_group> LEFT </brake_group>
+      <retractable> 1 </retractable>
+    </contact>
+    <contact name="Right main gear" type="BOGEY">
+      <location unit="IN">
+        <x> 697 </x>
+        <y> 149.4 </y>
+        <z> -142 </z>
+      </location>
+      <static_friction> 0.80 </static_friction>
+      <dynamic_friction> 0.50 </dynamic_friction>
+      <rolling_friction> 0.02 </rolling_friction>
+      <spring_coeff unit="LBS/FT"> 110000 </spring_coeff>
+      <damping_coeff unit="LBS/FT/SEC"> 9000 </damping_coeff>
+      <damping_coeff_rebound unit="LBS/FT/SEC"> 45000 </damping_coeff_rebound>
+      <max_steer unit="DEG"> 0 </max_steer>
+      <brake_group> RIGHT </brake_group>
+      <retractable> 1 </retractable>
+    </contact>
+    <contact name="Tail" type="STRUCTURE">
+      <location unit="IN">
+        <x> 1185 </x>
+        <y> 0 </y>
+        <z> -41 </z>
+      </location>
+      <static_friction> 0.50 </static_friction>
+      <dynamic_friction> 0.40 </dynamic_friction>
+      <spring_coeff unit="LBS/FT"> 400000 </spring_coeff>
+      <damping_coeff unit="LBS/FT/SEC"> 40000 </damping_coeff>
+    </contact>
+  </ground_reactions>
+
+  <propulsion>
+    <engine file="CFM56_5">
+      <feed>0</feed>
+      <feed>1</feed>
+      <feed>3</feed>
+      <thruster file="direct">
+        <location unit="IN">
+          <x> 560 </x>
+          <y> -226 </y>
+          <z> -85 </z>
+        </location>
+        <orient unit="DEG">
+          <roll> 0 </roll>
+          <pitch> 0 </pitch>
+          <yaw> 0 </yaw>
+        </orient>
+      </thruster>
+    </engine>
+    <engine file="CFM56_5">
+      <feed>0</feed>
+      <feed>2</feed>
+      <feed>4</feed>
+      <thruster file="direct">
+        <location unit="IN">
+          <x> 560 </x>
+          <y> 226 </y>
+          <z> -85 </z>
+        </location>
+        <orient unit="DEG">
+          <roll> 0 </roll>
+          <pitch> 0 </pitch>
+          <yaw> 0 </yaw>
+        </orient>
+      </thruster>
+    </engine>
+    <!-- A32NX's tanks, its gallons at 6.7 lb each: centre 2179, inner 1816, outer 228 -->
+    <tank type="FUEL" number="0">
+      <location unit="IN">
+        <x> 604 </x>
+        <y> 0 </y>
+        <z> -50 </z>
+      </location>
+      <type> JET-A </type>
+      <priority> 1 </priority>
+      <capacity unit="LBS"> 14599 </capacity>
+      <contents unit="LBS"> 2577 </contents>
+    </tank>
+    <tank type="FUEL" number="1">
+      <location unit="IN">
+        <x> 646 </x>
+        <y> -156 </y>
+        <z> -45 </z>
+      </location>
+      <type> JET-A </type>
+      <priority> 2 </priority>
+      <capacity unit="LBS"> 12167 </capacity>
+      <contents unit="LBS"> 6000 </contents>
+    </tank>
+    <tank type="FUEL" number="2">
+      <location unit="IN">
+        <x> 646 </x>
+        <y> 156 </y>
+        <z> -45 </z>
+      </location>
+      <type> JET-A </type>
+      <priority> 2 </priority>
+      <capacity unit="LBS"> 12167 </capacity>
+      <contents unit="LBS"> 6000 </contents>
+    </tank>
+    <tank type="FUEL" number="3">
+      <location unit="IN">
+        <x> 753 </x>
+        <y> -324 </y>
+        <z> -30 </z>
+      </location>
+      <type> JET-A </type>
+      <priority> 3 </priority>
+      <capacity unit="LBS"> 1528 </capacity>
+      <contents unit="LBS"> 1528 </contents>
+    </tank>
+    <tank type="FUEL" number="4">
+      <location unit="IN">
+        <x> 753 </x>
+        <y> 324 </y>
+        <z> -30 </z>
+      </location>
+      <type> JET-A </type>
+      <priority> 3 </priority>
+      <capacity unit="LBS"> 1528 </capacity>
+      <contents unit="LBS"> 1528 </contents>
+    </tank>
+  </propulsion>
+
+  <!-- The gear is this file's own; every surface is the A32NX servos', through a32nx-surfaces.xml,
+       which also writes the inputs declared here -->
+  <flight_control name="A320-fit">
+    <property value="0">fcs/slat-pos-deg</property>
+    <property value="0">fcs/stabilizer-pos-rad</property>
+    <property value="0">fcs/left-spoiler-pos-norm</property>
+    <property value="0">fcs/right-spoiler-pos-norm</property>
+
+    <channel name="Landing gear">
+      <kinematic name="Gear">
+        <input>gear/gear-cmd-norm</input>
+        <traverse>
+          <setting>
+            <position> 0 </position>
+            <time> 0 </time>
+          </setting>
+          <setting>
+            <position> 1 </position>
+            <time> 8 </time>
+          </setting>
+        </traverse>
+        <output>gear/gear-pos-norm</output>
+      </kinematic>
+    </channel>
+  </flight_control>
+
+  <aerodynamics>
+
+    <!-- ===== The coefficients the fitter tunes. Per rad unless named in degrees. ===== -->
+
+    <!-- lift: the slope, the lift at zero alpha, the lift peak and the width of its rounding, by
+         configuration; the peak's alpha follows from them -->
+    <property value="5.7" persistent="true">aero/fit/cl-alpha</property>
+    <property value="0.10" persistent="true">aero/fit/cl-alpha-flap</property>
+    <property value="0.20" persistent="true">aero/fit/cl0-clean</property>
+    <property value="0.20" persistent="true">aero/fit/cl0-conf1</property>
+    <property value="0.55" persistent="true">aero/fit/cl0-conf1f</property>
+    <property value="0.68" persistent="true">aero/fit/cl0-conf2</property>
+    <property value="0.80" persistent="true">aero/fit/cl0-conf3</property>
+    <property value="1.10" persistent="true">aero/fit/cl0-full</property>
+    <property value="1.335" persistent="true">aero/fit/clmax-clean</property>
+    <property value="1.90" persistent="true">aero/fit/clmax-conf1</property>
+    <property value="2.25" persistent="true">aero/fit/clmax-conf1f</property>
+    <property value="2.40" persistent="true">aero/fit/clmax-conf2</property>
+    <property value="2.55" persistent="true">aero/fit/clmax-conf3</property>
+    <property value="2.953" persistent="true">aero/fit/clmax-full</property>
+    <property value="4.0" persistent="true">aero/fit/stall-width-clean-deg</property>
+    <property value="4.0" persistent="true">aero/fit/stall-width-conf1-deg</property>
+    <property value="4.0" persistent="true">aero/fit/stall-width-conf1f-deg</property>
+    <property value="4.0" persistent="true">aero/fit/stall-width-conf2-deg</property>
+    <property value="4.0" persistent="true">aero/fit/stall-width-conf3-deg</property>
+    <property value="4.0" persistent="true">aero/fit/stall-width-full-deg</property>
+    <property value="0.25" persistent="true">aero/fit/poststall-drop</property>
+    <property value="0.60" persistent="true">aero/fit/clmax-mach</property>
+    <property value="0.456" persistent="true">aero/fit/cl-de</property>
+    <property value="0.912" persistent="true">aero/fit/cl-ih</property>
+    <property value="7.0" persistent="true">aero/fit/cl-q</property>
+    <property value="0.60" persistent="true">aero/fit/cl-spoiler</property>
+    <property value="1.0" persistent="true">aero/fit/ground-effect</property>
+
+    <!-- drag: the polar, its increments, and the Mach at which the rise begins at a lift coefficient
+         of 0.5 -->
+    <property value="0.018" persistent="true">aero/fit/cd0</property>
+    <property value="0.039" persistent="true">aero/fit/cd-k</property>
+    <property value="0.004" persistent="true">aero/fit/cd-conf1</property>
+    <property value="0.012" persistent="true">aero/fit/cd-conf1f</property>
+    <property value="0.020" persistent="true">aero/fit/cd-conf2</property>
+    <property value="0.030" persistent="true">aero/fit/cd-conf3</property>
+    <property value="0.050" persistent="true">aero/fit/cd-full</property>
+    <property value="0.017" persistent="true">aero/fit/cd-gear</property>
+    <property value="0.703" persistent="true">aero/fit/mcrit-cl05</property>
+    <property value="0.06" persistent="true">aero/fit/cd-spoiler</property>
+    <property value="0.4" persistent="true">aero/fit/cd-beta</property>
+
+    <!-- pitch, about the quarter chord -->
+    <property value="-0.06" persistent="true">aero/fit/cm0-clean</property>
+    <property value="-0.07" persistent="true">aero/fit/cm0-conf1</property>
+    <property value="-0.13" persistent="true">aero/fit/cm0-conf1f</property>
+    <property value="-0.17" persistent="true">aero/fit/cm0-conf2</property>
+    <property value="-0.20" persistent="true">aero/fit/cm0-conf3</property>
+    <property value="-0.27" persistent="true">aero/fit/cm0-full</property>
+    <property value="-1.5" persistent="true">aero/fit/cm-alpha</property>
+    <property value="-32" persistent="true">aero/fit/cm-q</property>
+    <property value="-12" persistent="true">aero/fit/cm-alphadot</property>
+    <property value="-1.82" persistent="true">aero/fit/cm-de</property>
+    <property value="-3.65" persistent="true">aero/fit/cm-ih</property>
+    <property value="0.02" persistent="true">aero/fit/cm-spoiler</property>
+    <property value="3.0" persistent="true">aero/fit/cm-mach-tuck</property>
+    <property value="0.22" persistent="true">aero/fit/cm-ground</property>
+
+    <!-- roll and yaw -->
+    <property value="-1.0" persistent="true">aero/fit/cy-beta</property>
+    <property value="0.25" persistent="true">aero/fit/cy-dr</property>
+    <property value="-0.10" persistent="true">aero/fit/cl-beta</property>
+    <property value="-0.08" persistent="true">aero/fit/cl-beta-cl</property>
+    <property value="-0.45" persistent="true">aero/fit/cl-p</property>
+    <property value="0.03" persistent="true">aero/fit/cl-r</property>
+    <property value="0.25" persistent="true">aero/fit/cl-r-cl</property>
+    <property value="0.04" persistent="true">aero/fit/cl-da</property>
+    <property value="0.04" persistent="true">aero/fit/cl-sp</property>
+    <property value="0.03" persistent="true">aero/fit/cl-dr</property>
+    <property value="0.15" persistent="true">aero/fit/cn-beta</property>
+    <property value="-0.30" persistent="true">aero/fit/cn-r</property>
+    <property value="-0.02" persistent="true">aero/fit/cn-p</property>
+    <property value="-0.10" persistent="true">aero/fit/cn-p-cl</property>
+    <property value="-0.004" persistent="true">aero/fit/cn-da</property>
+    <property value="-0.01" persistent="true">aero/fit/cn-sp</property>
+    <property value="-0.11" persistent="true">aero/fit/cn-dr</property>
+
+    <!-- ===== The model. Each function is evaluated once a frame, in the order written, so a
+         function only reads functions above it. ===== -->
+
+    <!-- configuration: slats out, 0 to 1 as they reach CONF 1's 18 deg; flaps by angle -->
+    <function name="aero/a320/slats-out">
+      <min>
+        <v> 1 </v>
+        <max>
+          <v> 0 </v>
+          <quotient>
+            <p> fcs/slat-pos-deg </p>
+            <v> 18 </v>
+          </quotient>
+        </max>
+      </min>
+    </function>
+
+    <!-- The lift-curve slope against Mach, from DATCOM's formula for this wing (aspect ratio 10.47,
+         22.5 deg of half-chord sweep, section slope 0.95 of 2 pi), as a share of its value at Mach
+         0.2; falling past the drag rise -->
+    <function name="aero/a320/k-mach">
+      <table>
+        <independentVar> velocities/mach </independentVar>
+        <tableData>
+          0.00  0.986
+          0.20  1.000
+          0.30  1.019
+          0.40  1.047
+          0.50  1.088
+          0.60  1.146
+          0.70  1.228
+          0.75  1.283
+          0.78  1.322
+          0.80  1.351
+          0.82  1.384
+          0.85  1.350
+          0.90  1.150
+          1.00  1.000
+        </tableData>
+      </table>
+    </function>
+
+    <!-- A value by configuration: clean when the slats are in, otherwise the slats-out value at the
+         flap angle (CONF 1, 1+F, 2, 3, FULL at 0, 10, 15, 20, 40 deg), blended as the slats move -->
+    <function name="aero/a320/cl0">
+      <sum>
+        <p> aero/fit/cl0-clean </p>
+        <product>
+          <p> aero/a320/slats-out </p>
+          <difference>
+            <interpolate1d>
+              <p> fcs/flap-pos-deg </p>
+              <v> 0 </v>  <p> aero/fit/cl0-conf1 </p>
+              <v> 10 </v> <p> aero/fit/cl0-conf1f </p>
+              <v> 15 </v> <p> aero/fit/cl0-conf2 </p>
+              <v> 20 </v> <p> aero/fit/cl0-conf3 </p>
+              <v> 40 </v> <p> aero/fit/cl0-full </p>
+            </interpolate1d>
+            <p> aero/fit/cl0-clean </p>
+          </difference>
+        </product>
+      </sum>
+    </function>
+
+    <function name="aero/a320/clmax-low-speed">
+      <sum>
+        <p> aero/fit/clmax-clean </p>
+        <product>
+          <p> aero/a320/slats-out </p>
+          <difference>
+            <interpolate1d>
+              <p> fcs/flap-pos-deg </p>
+              <v> 0 </v>  <p> aero/fit/clmax-conf1 </p>
+              <v> 10 </v> <p> aero/fit/clmax-conf1f </p>
+              <v> 15 </v> <p> aero/fit/clmax-conf2 </p>
+              <v> 20 </v> <p> aero/fit/clmax-conf3 </p>
+              <v> 40 </v> <p> aero/fit/clmax-full </p>
+            </interpolate1d>
+            <p> aero/fit/clmax-clean </p>
+          </difference>
+        </product>
+      </sum>
+    </function>
+
+    <function name="aero/a320/stall-width-rad">
+      <product>
+        <v> 0.0174533 </v>
+        <sum>
+          <p> aero/fit/stall-width-clean-deg </p>
+          <product>
+            <p> aero/a320/slats-out </p>
+            <difference>
+              <interpolate1d>
+                <p> fcs/flap-pos-deg </p>
+                <v> 0 </v>  <p> aero/fit/stall-width-conf1-deg </p>
+                <v> 10 </v> <p> aero/fit/stall-width-conf1f-deg </p>
+                <v> 15 </v> <p> aero/fit/stall-width-conf2-deg </p>
+                <v> 20 </v> <p> aero/fit/stall-width-conf3-deg </p>
+                <v> 40 </v> <p> aero/fit/stall-width-full-deg </p>
+              </interpolate1d>
+              <p> aero/fit/stall-width-clean-deg </p>
+            </difference>
+          </product>
+        </sum>
+      </product>
+    </function>
+
+    <!-- The peak falls above Mach 0.3, toward the buffet boundary -->
+    <function name="aero/a320/clmax">
+      <difference>
+        <p> aero/a320/clmax-low-speed </p>
+        <product>
+          <p> aero/fit/clmax-mach </p>
+          <max>
+            <v> 0 </v>
+            <difference>
+              <p> velocities/mach </p>
+              <v> 0.3 </v>
+            </difference>
+          </max>
+        </product>
+      </difference>
+    </function>
+
+    <!-- The low-speed slope, steeper as the Fowler flaps add chord -->
+    <function name="aero/a320/cl-alpha">
+      <product>
+        <p> aero/fit/cl-alpha </p>
+        <sum>
+          <v> 1 </v>
+          <product>
+            <p> aero/fit/cl-alpha-flap </p>
+            <quotient>
+              <p> fcs/flap-pos-deg </p>
+              <v> 40 </v>
+            </quotient>
+          </product>
+        </sum>
+      </product>
+    </function>
+
+    <function name="aero/a320/lift-slope">
+      <product>
+        <p> aero/a320/k-mach </p>
+        <p> aero/a320/cl-alpha </p>
+      </product>
+    </function>
+
+    <function name="aero/a320/cl-linear">
+      <product>
+        <p> aero/a320/k-mach </p>
+        <sum>
+          <p> aero/a320/cl0 </p>
+          <product>
+            <p> aero/a320/cl-alpha </p>
+            <p> aero/alpha-rad </p>
+          </product>
+        </sum>
+      </product>
+    </function>
+
+    <!-- Where the straight line would reach the peak; the curve rounds over a width centred there,
+         joining the line with its own slope and topping out at the peak -->
+    <function name="aero/a320/alpha-hit-rad">
+      <quotient>
+        <difference>
+          <quotient>
+            <p> aero/a320/clmax </p>
+            <p> aero/a320/k-mach </p>
+          </quotient>
+          <p> aero/a320/cl0 </p>
+        </difference>
+        <p> aero/a320/cl-alpha </p>
+      </quotient>
+    </function>
+
+    <function name="aero/a320/alpha-break-rad">
+      <difference>
+        <p> aero/a320/alpha-hit-rad </p>
+        <product>
+          <v> 0.5 </v>
+          <p> aero/a320/stall-width-rad </p>
+        </product>
+      </difference>
+    </function>
+
+    <function name="aero/a320/alpha-peak-rad">
+      <sum>
+        <p> aero/a320/alpha-hit-rad </p>
+        <product>
+          <v> 0.5 </v>
+          <p> aero/a320/stall-width-rad </p>
+        </product>
+      </sum>
+    </function>
+
+    <!-- Wing and body: the line; the rounding; past the peak, a loss growing toward a share of the
+         peak over a few degrees -->
+    <function name="aero/a320/cl-wing">
+      <ifthen>
+        <le>
+          <p> aero/alpha-rad </p>
+          <p> aero/a320/alpha-break-rad </p>
+        </le>
+        <p> aero/a320/cl-linear </p>
+        <ifthen>
+          <le>
+            <p> aero/alpha-rad </p>
+            <p> aero/a320/alpha-peak-rad </p>
+          </le>
+          <difference>
+            <p> aero/a320/clmax </p>
+            <quotient>
+              <product>
+                <p> aero/a320/lift-slope </p>
+                <pow>
+                  <difference>
+                    <p> aero/a320/alpha-peak-rad </p>
+                    <p> aero/alpha-rad </p>
+                  </difference>
+                  <v> 2 </v>
+                </pow>
+              </product>
+              <product>
+                <v> 2 </v>
+                <p> aero/a320/stall-width-rad </p>
+              </product>
+            </quotient>
+          </difference>
+          <product>
+            <p> aero/a320/clmax </p>
+            <difference>
+              <v> 1 </v>
+              <product>
+                <p> aero/fit/poststall-drop </p>
+                <difference>
+                  <v> 1 </v>
+                  <exp>
+                    <quotient>
+                      <difference>
+                        <p> aero/a320/alpha-peak-rad </p>
+                        <p> aero/alpha-rad </p>
+                      </difference>
+                      <v> 0.0524 </v>
+                    </quotient>
+                  </exp>
+                </difference>
+              </product>
+            </difference>
+          </product>
+        </ifthen>
+      </ifthen>
+    </function>
+
+    <!-- Ground effect on lift: the lift-curve slope of the wing over its image, as a share of the
+         slope in free air, the excess scaled by aero/fit/ground-effect -->
+    <function name="aero/a320/k-lift-ground">
+      <sum>
+        <v> 1 </v>
+        <product>
+          <p> aero/fit/ground-effect </p>
+          <table>
+            <independentVar> aero/h_b-mac-ft </independentVar>
+            <tableData>
+              0.000  0.185
+              0.020  0.166
+              0.050  0.108
+              0.075  0.071
+              0.100  0.048
+              0.150  0.025
+              0.200  0.015
+              0.300  0.007
+              0.500  0.002
+              1.000  0.000
+            </tableData>
+          </table>
+        </product>
+      </sum>
+    </function>
+
+    <!-- Spoilers, both wings together: the share of full extension -->
+    <function name="aero/a320/spoilers">
+      <product>
+        <v> 0.5 </v>
+        <sum>
+          <p> fcs/left-spoiler-pos-norm </p>
+          <p> fcs/right-spoiler-pos-norm </p>
+        </sum>
+      </product>
+    </function>
+
+    <!-- The airframe's lift coefficient -->
+    <function name="aero/a320/cl">
+      <sum>
+        <product>
+          <p> aero/a320/cl-wing </p>
+          <p> aero/a320/k-lift-ground </p>
+          <difference>
+            <v> 1 </v>
+            <product>
+              <p> aero/fit/cl-spoiler </p>
+              <p> aero/a320/spoilers </p>
+            </product>
+          </difference>
+        </product>
+        <product>
+          <p> aero/fit/cl-de </p>
+          <p> fcs/elevator-pos-rad </p>
+        </product>
+        <product>
+          <p> aero/fit/cl-ih </p>
+          <p> fcs/stabilizer-pos-rad </p>
+        </product>
+        <product>
+          <p> aero/fit/cl-q </p>
+          <p> aero/ci2vel </p>
+          <p> velocities/q-aero-rad_sec </p>
+        </product>
+      </sum>
+    </function>
+
+    <!-- Drag of the flaps and slats by configuration, nothing when clean -->
+    <function name="aero/a320/cd-config">
+      <product>
+        <p> aero/a320/slats-out </p>
+        <interpolate1d>
+          <p> fcs/flap-pos-deg </p>
+          <v> 0 </v>  <p> aero/fit/cd-conf1 </p>
+          <v> 10 </v> <p> aero/fit/cd-conf1f </p>
+          <v> 15 </v> <p> aero/fit/cd-conf2 </p>
+          <v> 20 </v> <p> aero/fit/cd-conf3 </p>
+          <v> 40 </v> <p> aero/fit/cd-full </p>
+        </interpolate1d>
+      </product>
+    </function>
+
+    <!-- Ground effect on induced drag: McCormick's (16 h/b)^2 / (1 + (16 h/b)^2) -->
+    <function name="aero/a320/k-induced-ground">
+      <table>
+        <independentVar> aero/h_b-mac-ft </independentVar>
+        <tableData>
+          0.000  0.000
+          0.020  0.093
+          0.050  0.390
+          0.075  0.590
+          0.100  0.719
+          0.150  0.852
+          0.200  0.911
+          0.300  0.958
+          0.500  0.985
+          1.000  0.996
+          2.000  1.000
+        </tableData>
+      </table>
+    </function>
+
+    <!-- Compressibility: Lock's fourth-power rise above a critical Mach that falls with lift as Korn's
+         equation has it for 25 deg of sweep, 0.1 / cos^3(25 deg) per unit of lift coefficient -->
+    <function name="aero/a320/cd-wave">
+      <product>
+        <v> 20 </v>
+        <pow>
+          <max>
+            <v> 0 </v>
+            <difference>
+              <p> velocities/mach </p>
+              <difference>
+                <p> aero/fit/mcrit-cl05 </p>
+                <product>
+                  <v> 0.1343 </v>
+                  <difference>
+                    <p> aero/a320/cl </p>
+                    <v> 0.5 </v>
+                  </difference>
+                </product>
+              </difference>
+            </difference>
+          </max>
+          <v> 4 </v>
+        </pow>
+      </product>
+    </function>
+
+    <axis name="LIFT">
+      <function name="aero/coefficient/CL">
+        <description> Lift </description>
+        <product>
+          <p> aero/qbar-psf </p>
+          <p> metrics/Sw-sqft </p>
+          <p> aero/a320/cl </p>
+        </product>
+      </function>
+    </axis>
+
+    <axis name="DRAG">
+      <function name="aero/coefficient/CD">
+        <description> Drag: profile, configuration, gear, induced, compressibility, spoilers, sideslip,
+                      and past the stall the drag of separated flow </description>
+        <product>
+          <p> aero/qbar-psf </p>
+          <p> metrics/Sw-sqft </p>
+          <sum>
+            <p> aero/fit/cd0 </p>
+            <p> aero/a320/cd-config </p>
+            <product>
+              <p> aero/fit/cd-gear </p>
+              <p> gear/gear-pos-norm </p>
+            </product>
+            <product>
+              <p> aero/fit/cd-k </p>
+              <p> aero/a320/k-induced-ground </p>
+              <pow>
+                <p> aero/a320/cl </p>
+                <v> 2 </v>
+              </pow>
+            </product>
+            <p> aero/a320/cd-wave </p>
+            <product>
+              <p> aero/fit/cd-spoiler </p>
+              <p> aero/a320/spoilers </p>
+            </product>
+            <product>
+              <p> aero/fit/cd-beta </p>
+              <pow>
+                <p> aero/beta-rad </p>
+                <v> 2 </v>
+              </pow>
+            </product>
+            <product>
+              <v> 1.2 </v>
+              <pow>
+                <sin>
+                  <max>
+                    <v> 0 </v>
+                    <difference>
+                      <p> aero/alpha-rad </p>
+                      <p> aero/a320/alpha-peak-rad </p>
+                    </difference>
+                  </max>
+                </sin>
+                <v> 2 </v>
+              </pow>
+            </product>
+          </sum>
+        </product>
+      </function>
+    </axis>
+
+    <axis name="SIDE">
+      <function name="aero/coefficient/CY">
+        <description> Side force: sideslip and rudder </description>
+        <product>
+          <p> aero/qbar-psf </p>
+          <p> metrics/Sw-sqft </p>
+          <sum>
+            <product>
+              <p> aero/fit/cy-beta </p>
+              <p> aero/beta-rad </p>
+            </product>
+            <product>
+              <p> aero/fit/cy-dr </p>
+              <p> fcs/rudder-pos-rad </p>
+            </product>
+          </sum>
+        </product>
+      </function>
+    </axis>
+
+    <axis name="ROLL">
+      <function name="aero/coefficient/Cl">
+        <description> Roll: dihedral effect growing with lift, damping, yaw rate, ailerons, the
+                      spoilers' difference between the wings, rudder </description>
+        <product>
+          <p> aero/qbar-psf </p>
+          <p> metrics/Sw-sqft </p>
+          <p> metrics/bw-ft </p>
+          <sum>
+            <product>
+              <sum>
+                <p> aero/fit/cl-beta </p>
+                <product>
+                  <p> aero/fit/cl-beta-cl </p>
+                  <p> aero/a320/cl </p>
+                </product>
+              </sum>
+              <p> aero/beta-rad </p>
+            </product>
+            <product>
+              <p> aero/fit/cl-p </p>
+              <p> aero/bi2vel </p>
+              <p> velocities/p-aero-rad_sec </p>
+            </product>
+            <product>
+              <sum>
+                <p> aero/fit/cl-r </p>
+                <product>
+                  <p> aero/fit/cl-r-cl </p>
+                  <p> aero/a320/cl </p>
+                </product>
+              </sum>
+              <p> aero/bi2vel </p>
+              <p> velocities/r-aero-rad_sec </p>
+            </product>
+            <product>
+              <p> aero/fit/cl-da </p>
+              <p> fcs/left-aileron-pos-rad </p>
+            </product>
+            <product>
+              <v> -1 </v>
+              <p> aero/fit/cl-sp </p>
+              <difference>
+                <p> fcs/left-spoiler-pos-norm </p>
+                <p> fcs/right-spoiler-pos-norm </p>
+              </difference>
+            </product>
+            <product>
+              <p> aero/fit/cl-dr </p>
+              <p> fcs/rudder-pos-rad </p>
+            </product>
+          </sum>
+        </product>
+      </function>
+    </axis>
+
+    <axis name="PITCH">
+      <function name="aero/coefficient/Cm">
+        <description> Pitch about the quarter chord: configuration, alpha, damping, elevator,
+                      stabiliser, spoilers, a nose-down tuck past Mach 0.78, and near the ground the
+                      nose-down moment of the downwash the ground takes away from the tail: the wing's
+                      downwash, 2 CL / (pi A), shrinks by the share McCormick's factor takes off induced
+                      drag, and the tail lifts that much more; cm-ground is the tail volume and lift
+                      slope over pi A </description>
+        <product>
+          <p> aero/qbar-psf </p>
+          <p> metrics/Sw-sqft </p>
+          <p> metrics/cbarw-ft </p>
+          <sum>
+            <sum>
+              <p> aero/fit/cm0-clean </p>
+              <product>
+                <p> aero/a320/slats-out </p>
+                <difference>
+                  <interpolate1d>
+                    <p> fcs/flap-pos-deg </p>
+                    <v> 0 </v>  <p> aero/fit/cm0-conf1 </p>
+                    <v> 10 </v> <p> aero/fit/cm0-conf1f </p>
+                    <v> 15 </v> <p> aero/fit/cm0-conf2 </p>
+                    <v> 20 </v> <p> aero/fit/cm0-conf3 </p>
+                    <v> 40 </v> <p> aero/fit/cm0-full </p>
+                  </interpolate1d>
+                  <p> aero/fit/cm0-clean </p>
+                </difference>
+              </product>
+            </sum>
+            <product>
+              <p> aero/fit/cm-alpha </p>
+              <p> aero/alpha-rad </p>
+            </product>
+            <product>
+              <p> aero/fit/cm-q </p>
+              <p> aero/ci2vel </p>
+              <p> velocities/q-aero-rad_sec </p>
+            </product>
+            <product>
+              <p> aero/fit/cm-alphadot </p>
+              <p> aero/ci2vel </p>
+              <p> aero/alphadot-rad_sec </p>
+            </product>
+            <product>
+              <p> aero/fit/cm-de </p>
+              <p> fcs/elevator-pos-rad </p>
+            </product>
+            <product>
+              <p> aero/fit/cm-ih </p>
+              <p> fcs/stabilizer-pos-rad </p>
+            </product>
+            <product>
+              <p> aero/fit/cm-spoiler </p>
+              <p> aero/a320/spoilers </p>
+            </product>
+            <product>
+              <v> -1 </v>
+              <p> aero/fit/cm-mach-tuck </p>
+              <pow>
+                <max>
+                  <v> 0 </v>
+                  <difference>
+                    <p> velocities/mach </p>
+                    <v> 0.78 </v>
+                  </difference>
+                </max>
+                <v> 2 </v>
+              </pow>
+            </product>
+            <product>
+              <v> -1 </v>
+              <p> aero/fit/cm-ground </p>
+              <difference>
+                <v> 1 </v>
+                <p> aero/a320/k-induced-ground </p>
+              </difference>
+              <p> aero/a320/cl-wing </p>
+            </product>
+          </sum>
+        </product>
+      </function>
+    </axis>
+
+    <axis name="YAW">
+      <function name="aero/coefficient/Cn">
+        <description> Yaw: weathercock, roll rate growing with lift, damping, aileron adverse yaw,
+                      spoiler drag, rudder </description>
+        <product>
+          <p> aero/qbar-psf </p>
+          <p> metrics/Sw-sqft </p>
+          <p> metrics/bw-ft </p>
+          <sum>
+            <product>
+              <p> aero/fit/cn-beta </p>
+              <p> aero/beta-rad </p>
+            </product>
+            <product>
+              <sum>
+                <p> aero/fit/cn-p </p>
+                <product>
+                  <p> aero/fit/cn-p-cl </p>
+                  <p> aero/a320/cl </p>
+                </product>
+              </sum>
+              <p> aero/bi2vel </p>
+              <p> velocities/p-aero-rad_sec </p>
+            </product>
+            <product>
+              <p> aero/fit/cn-r </p>
+              <p> aero/bi2vel </p>
+              <p> velocities/r-aero-rad_sec </p>
+            </product>
+            <product>
+              <p> aero/fit/cn-da </p>
+              <p> fcs/left-aileron-pos-rad </p>
+            </product>
+            <product>
+              <p> aero/fit/cn-sp </p>
+              <difference>
+                <p> fcs/left-spoiler-pos-norm </p>
+                <p> fcs/right-spoiler-pos-norm </p>
+              </difference>
+            </product>
+            <product>
+              <p> aero/fit/cn-dr </p>
+              <p> fcs/rudder-pos-rad </p>
+            </product>
+          </sum>
+        </product>
+      </function>
+    </axis>
+
+  </aerodynamics>
+
+</fdm_config>

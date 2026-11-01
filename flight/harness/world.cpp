@@ -45,23 +45,34 @@ double wrap180(double deg) {
   return deg - 180.0;
 }
 
-// The SFCCs' slat and flap pick-off angles at each lever position, CONF 1+F's flap angle, and the flap
-// surface angle each flap pick-off angle means (a320_systems hydraulic/mod.rs).
+// The SFCCs' slat and flap pick-off angles at each lever position, CONF 1+F's flap angle, and the
+// surface angle each pick-off angle means (a320_systems hydraulic/mod.rs).
 const double kSlatFppu[5] = {0, 222.27, 272.27, 272.27, 334.16};
 const double kFlapFppu[5] = {0, 0, 145.51, 168.35, 251.97};
 constexpr double kFlap1FFppu = 120.22;
 const double kFlapFppuBreak[12] = {0, 35.66, 69.32, 89.7, 105.29, 120.22, 145.51, 168.35, 189.87, 210.69, 231.25, 251.97};
 const double kFlapSurfaceDeg[12] = {0, 0, 2.5, 5, 7.5, 10, 15, 20, 25, 30, 35, 40};
+const double kSlatFppuBreak[6] = {0, 66.83, 167.08, 222.27, 272.27, 334.16};
+const double kSlatSurfaceDeg[6] = {0, 5.4, 13.5, 18, 22, 27};
 
-double flapSurfaceDeg(double fppu) {
-  if (fppu <= kFlapFppuBreak[0]) return kFlapSurfaceDeg[0];
-  for (int k = 1; k < 12; ++k) {
-    if (fppu <= kFlapFppuBreak[k]) {
-      const double f = (fppu - kFlapFppuBreak[k - 1]) / (kFlapFppuBreak[k] - kFlapFppuBreak[k - 1]);
-      return kFlapSurfaceDeg[k - 1] + f * (kFlapSurfaceDeg[k] - kFlapSurfaceDeg[k - 1]);
+template <int N>
+double surfaceDeg(double fppu, const double (&breaks)[N], const double (&degrees)[N]) {
+  if (fppu <= breaks[0]) return degrees[0];
+  for (int k = 1; k < N; ++k) {
+    if (fppu <= breaks[k]) {
+      const double f = (fppu - breaks[k - 1]) / (breaks[k] - breaks[k - 1]);
+      return degrees[k - 1] + f * (degrees[k] - degrees[k - 1]);
     }
   }
-  return kFlapSurfaceDeg[11];
+  return degrees[N - 1];
+}
+
+double flapSurfaceDeg(double fppu) {
+  return surfaceDeg(fppu, kFlapFppuBreak, kFlapSurfaceDeg);
+}
+
+double slatSurfaceDeg(double fppu) {
+  return surfaceDeg(fppu, kSlatFppuBreak, kSlatSurfaceDeg);
 }
 
 constexpr double kRudderPedalDeg = 25;    // full pedal (a320_systems: rudder travel 50 deg, end to end)
@@ -412,6 +423,7 @@ void World::airframe(double dt) {
     c.brake[side] = crew.brakes;
   }
   c.rudder = surfaces.rudder;
+  c.slat = slatSurfaceDeg(slatFppu_);
   c.flap = flapDeg_;
   c.noseWheel = -crew.pedals * kPedalSteeringDeg;  // left pedal turns the nose wheel left
   c.gearDown = crew.gearDown;

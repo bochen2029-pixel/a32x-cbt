@@ -1,0 +1,91 @@
+# The coefficients of A320-fit.xml before the fit: where each started, how far the fitter may move it,
+# and why it started there. GPLv3, like everything in flight/.
+#
+# Columns
+#   property  the coefficient, a property the aircraft file declares under aero/fit/
+#   seed      its value before the fit; the fitter's prior is centred here
+#   sigma     the prior's width: a move of one sigma costs the fit as much as 0.02 of a fit row's
+#             half-band. The fitter searches in units of sigma
+#   lo, hi    hard limits: outside them the coefficient is not physical
+#   source    where the seed comes from:
+#               datcom      our estimate by the textbook methods (DATCOM's lift-curve slope; tail volume
+#                           and downwash for the tail's terms; Etkin and Reid) from the geometry in the
+#                           aircraft file: aspect ratio 10.47, 25 deg of sweep, tail 333.7 ft2 at 55 ft,
+#                           tail lift slope 4.0, efficiency 0.9, downwash gradient 0.4
+#               a32nx       A32NX's MSFS flight model (flight_model.cfg, GPLv3), the value or what it implies
+#               openap      OpenAP's A320 drag polar (junzis/openap, LGPL-3.0, dragpolar/a320.yml), fitted
+#                           to ADS-B by Sun, Hoekstra and Ellerbroek
+#               estimate    ours, from what transports of this size have; said in the note
+#             "checked against" names a held-out row of a320.csv the estimate was compared with while
+#             it was made. Those seeds are not blind to those rows: the fitter is, the person who wrote
+#             the seed was not. Said here so the score is read for what it is
+property,seed,sigma,lo,hi,source,note
+aero/fit/cl-alpha,5.7,0.5,3.5,8.0,datcom,wing 4.74 per rad at Mach 0.2 plus fuselage and tail
+aero/fit/cl-alpha-flap,0.10,0.05,0.0,0.4,estimate,the Fowler flaps' chord extension at FULL
+aero/fit/cl0-clean,0.20,0.10,-0.2,0.8,estimate,zero-lift body alpha near -2 deg; checked against vls-alpha-clean and cruise-pitch
+aero/fit/cl0-conf1,0.20,0.10,-0.2,0.8,estimate,slats change the lift at zero alpha little
+aero/fit/cl0-conf1f,0.55,0.10,0.0,1.5,datcom,single-slotted Fowler flap at 10 deg; checked against vls-alpha-conf2
+aero/fit/cl0-conf2,0.68,0.10,0.0,1.5,datcom,flap at 15 deg; checked against vls-alpha-conf2
+aero/fit/cl0-conf3,0.80,0.10,0.0,1.8,datcom,flap at 20 deg
+aero/fit/cl0-full,1.10,0.15,0.3,2.0,datcom,flap at 40 deg; checked against vls-alpha-full and app-pitch-full
+aero/fit/clmax-clean,1.335,0.15,0.9,1.8,a32nx,flaps_up_stall_speed 171 KTAS at the 79 t maximum weight
+aero/fit/clmax-conf1,1.90,0.20,1.2,2.6,estimate,between the clean and FULL seeds
+aero/fit/clmax-conf1f,2.25,0.20,1.5,3.0,estimate,between the clean and FULL seeds
+aero/fit/clmax-conf2,2.40,0.20,1.6,3.2,estimate,between the clean and FULL seeds
+aero/fit/clmax-conf3,2.55,0.20,1.7,3.3,estimate,between the clean and FULL seeds
+aero/fit/clmax-full,2.953,0.20,2.0,3.6,a32nx,full_flaps_stall_speed 115 KTAS at the 79 t maximum weight
+aero/fit/stall-width-clean-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
+aero/fit/stall-width-conf1-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
+aero/fit/stall-width-conf1f-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
+aero/fit/stall-width-conf2-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
+aero/fit/stall-width-conf3-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
+aero/fit/stall-width-full-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
+aero/fit/poststall-drop,0.25,0.10,0.0,0.6,estimate,share of the peak lost past the stall
+aero/fit/clmax-mach,0.60,0.20,0.0,1.5,estimate,peak lift near 1.0 at Mach 0.78 where buffet begins near 0.8
+aero/fit/cl-de,0.456,0.10,0.1,1.0,datcom,elevator effectiveness 0.5 of the tail's lift slope
+aero/fit/cl-ih,0.912,0.15,0.3,1.6,datcom,the whole stabiliser
+aero/fit/cl-q,7.0,2.0,0.0,15,datcom,tail lift from pitch rate
+aero/fit/cl-spoiler,0.60,0.15,0.2,0.9,estimate,share of lift all spoilers at 50 deg dump; A32NX lift_coef_spoilers -0.47
+aero/fit/ground-effect,1.0,0.3,0.0,2.0,datcom,1 is the lift-curve slope of the wing over its image
+aero/fit/cd0,0.018,0.002,0.012,0.026,openap,A32NX drag_coef_zero_lift 0.01865
+aero/fit/cd-k,0.039,0.004,0.025,0.06,openap,Oswald factor 0.80; A32NX oswald_efficiency_factor 0.70
+aero/fit/cd-conf1,0.004,0.003,0.0,0.03,estimate,slats out
+aero/fit/cd-conf1f,0.012,0.005,0.0,0.05,estimate,flaps 10 deg
+aero/fit/cd-conf2,0.020,0.006,0.0,0.06,estimate,flaps 15 deg
+aero/fit/cd-conf3,0.030,0.008,0.0,0.08,estimate,flaps 20 deg
+aero/fit/cd-full,0.050,0.010,0.01,0.12,estimate,flaps 40 deg; A32NX drag_coef_flaps 0.13 in MSFS's terms
+aero/fit/cd-gear,0.017,0.004,0.005,0.04,openap,A32NX drag_coef_gear 0.037 in MSFS's terms
+aero/fit/mcrit-cl05,0.703,0.03,0.60,0.85,a32nx,its drag_coef_zero_lift_mach_tab reaches 20 counts at Mach 0.803
+aero/fit/cd-spoiler,0.06,0.02,0.01,0.15,estimate,all spoilers at 50 deg; A32NX drag_coef_spoilers 0.058
+aero/fit/cd-beta,0.4,0.2,0.0,1.5,estimate,drag of sideslip per rad squared
+aero/fit/cm0-clean,-0.06,0.03,-0.2,0.1,estimate,trimmed stabiliser a degree or two nose up in cruise
+aero/fit/cm0-conf1,-0.07,0.03,-0.2,0.1,estimate,slats out
+aero/fit/cm0-conf1f,-0.13,0.04,-0.35,0.05,estimate,flaps nose down less the tail's extra downwash
+aero/fit/cm0-conf2,-0.17,0.04,-0.4,0.05,estimate,flaps nose down less the tail's extra downwash
+aero/fit/cm0-conf3,-0.20,0.05,-0.45,0.05,estimate,flaps nose down less the tail's extra downwash
+aero/fit/cm0-full,-0.27,0.06,-0.6,0.0,estimate,flaps nose down less the tail's extra downwash
+aero/fit/cm-alpha,-1.5,0.3,-3.0,-0.3,datcom,neutral point near 50 % MAC
+aero/fit/cm-q,-32,6,-60,-10,datcom,the tail's damping
+aero/fit/cm-alphadot,-12,4,-30,0,datcom,the tail's downwash lag
+aero/fit/cm-de,-1.82,0.3,-3.0,-0.8,datcom,elevator effectiveness 0.5 of the tail's lift slope
+aero/fit/cm-ih,-3.65,0.5,-5.5,-2.0,datcom,the whole stabiliser
+aero/fit/cm-spoiler,0.02,0.02,-0.05,0.08,a32nx,pitch_moment_spoilers 0.023
+aero/fit/cm-mach-tuck,3.0,1.5,0.0,8.0,estimate,a nose-down tuck past Mach 0.78
+aero/fit/cm-ground,0.22,0.08,0.0,0.5,datcom,downwash 2 CL / (pi A) at the tail removed near the ground by McCormick's factor
+aero/fit/cy-beta,-1.0,0.2,-1.8,-0.4,estimate,fuselage and fin
+aero/fit/cy-dr,0.25,0.06,0.05,0.5,datcom,rudder of half the fin's chord
+aero/fit/cl-beta,-0.10,0.03,-0.25,0.0,estimate,5 deg of dihedral on a low wing
+aero/fit/cl-beta-cl,-0.08,0.03,-0.2,0.0,estimate,sweep's share; grows with lift
+aero/fit/cl-p,-0.45,0.08,-0.8,-0.2,datcom,roll damping of a wing of aspect ratio 10
+aero/fit/cl-r,0.03,0.03,-0.05,0.15,estimate,the fin's share
+aero/fit/cl-r-cl,0.25,0.05,0.1,0.4,datcom,about a quarter of the lift coefficient
+aero/fit/cl-da,0.04,0.01,0.01,0.1,estimate,ailerons on the outer wing
+aero/fit/cl-sp,0.04,0.015,0.0,0.1,estimate,spoilers 2 to 5 on one wing
+aero/fit/cl-dr,0.03,0.01,0.0,0.06,datcom,the rudder's side force acting above the roll axis
+aero/fit/cn-beta,0.15,0.03,0.05,0.3,estimate,fin and fuselage
+aero/fit/cn-r,-0.30,0.06,-0.6,-0.1,estimate,the fin's damping
+aero/fit/cn-p,-0.02,0.02,-0.1,0.05,estimate,the fin's share
+aero/fit/cn-p-cl,-0.10,0.03,-0.25,0.0,datcom,about an eighth of the lift coefficient
+aero/fit/cn-da,-0.004,0.003,-0.02,0.01,estimate,adverse yaw of the ailerons
+aero/fit/cn-sp,-0.01,0.005,-0.03,0.0,estimate,spoiler drag yaws into the turn
+aero/fit/cn-dr,-0.11,0.02,-0.2,-0.04,datcom,rudder of half the fin's chord
