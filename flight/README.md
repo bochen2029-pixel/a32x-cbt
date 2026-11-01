@@ -1316,8 +1316,8 @@ New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `five_scripted_approaches_are_repeatable`, which also tries the build rules on copies of its five,
 relabelled as only a test may: the gate refuses five flown on two builds and five flown on another build
 than its own, and `--rejudge` passes another build's five that are stable on this one and names the one
-band whose saved verdict a copy was given wrong. Sixty-six native cases pass with either airframe on
-MSVC 19.44 and on GCC 13.3; sixty-one under node, the WebAssembly build leaving out the five that start
+band whose saved verdict a copy was given wrong. Sixty-eight native cases pass with either airframe on
+MSVC 19.44 and on GCC 13.3; sixty-three under node, the WebAssembly build leaving out the five that start
 processes.
 
 ## The Windows release (P7, packaging)
@@ -1404,10 +1404,9 @@ fit's; the harness and the page are built, and act only on an airframe whose fil
 the share of an engine's thrust its reverser turns forward; `propulsion/fit/reverse-max`, MAX REV's setting
 as the fraction of the way from idle to take-off thrust; and `propulsion/a320/ground-idle`, which the
 harness writes and the engine file weighs its idle thrust by. Our A320 declares the first three since
-`0ff9296`, provisional until cited (0.03, 0.3, 0.7), so the reversers work for a pilot on the ground; the
-fourth, which turns ground idle on, is the fit's next commit, and lands with the crews' reverse below, so
-that the scripted flights change once and are re-baselined once. Until then no scripted flight changes:
-the reference digests and every scripted ILS line are as before.
+`0ff9296`, provisional until cited (0.03, 0.3, 0.7), and the fourth, which turns ground idle on, since
+`5243e00`; the scripted crews use reverse on the landing roll since the same merge, and the flights both
+change were re-baselined once (below).
 
 - The thrust levers reach the A320's reverse range, `tla_1` and `tla_2` from −20 (MAX REV) to 45, with
   reverse idle at −6, A32NX's own detents; the computers read the levers and see it.
@@ -1426,10 +1425,44 @@ the reference digests and every scripted ILS line are as before.
   forward; a throttle axis spans the reverse range while they are held.
 
 New `ctest` cases on JSBSim's 737, which has no reversers: `without_reversers_below_idle_is_idle` and
-`without_reversers_nothing_deploys_in_flight`. The same test on our A320 proves the mechanics, and is
-registered for it with the crews' reverse; checked with the fit's numbers in a throwaway copy, it passes.
-The scripted crews' use of reverse on the landing roll — MAX REV at touchdown, reverse idle from 70 kt,
-idle by taxi speed — lands with ground idle, since together they change the flight.
+`without_reversers_nothing_deploys_in_flight`; and on our A320, `the_a320_reverses_on_the_ground` and
+`the_a320_deploys_nothing_in_flight`, the same test where the data is declared.
+
+### Ground idle and reverse on the landing roll, re-baselined
+
+The airframe fit's `5243e00` turns ground idle on, and with it the scripted crews land as Airbus's procedure
+has it: MAX REV with the main gear down, reverse idle from 70 kt, and by taxi speed the levers at idle and
+the reversers stowed (`world.cpp`, `rolloutTla`). The two landed together, verified together, so that the
+scripted flights change once (fbw-parent's ruling, 2026-11-01). Each comparison below is made compiler for
+compiler: the table's on MSVC 19.44, the ILS cases' lines and the landing roll on GCC 13.3.
+
+- The scripted ILS approaches touch down as before on either airframe, at the same time, sink rate,
+  pitch, bank and speed in every case. One figure moves: in `approach;wind=270/15` the A320's peak load
+  factor, the judge's highest over the 2 s after contact, is 1.66 g where it was 1.65 g, the reversers
+  coming out at reverse idle and ground idle coming in within those 2 s. Two crosswind cases find their
+  worst rollout offset 2 m sooner. Every case passes, as before.
+- A flight that starts on the runway now starts at ground idle, parked on the brakes, so its take-off
+  spools up from lower and what follows moves a little: the P6 gate's touchdown comes 0.4 s later.
+- The A320's landing roll from KDFW 17C's ILS, touchdown 328.2 m past the threshold, to a stop: 1,249.7 m
+  in 35.0 s before, 1,048.5 m in 29.7 s after, the reversers out 4 s after touchdown (measured through the
+  C API by a diagnostic program kept out of the repository). The 737's, 1,208.3 m in 33.5 s, is
+  unchanged: it has no reversers and one idle.
+- The 737's flights are unchanged in every figure printed, but its digests move wherever a flight reaches
+  its landing roll: the SEC transmits the thrust lever angles (`thrust_lever_angle_1_deg` and `_2_deg` on
+  its output bus), the digest hashes every word the computers transmit, and the crew now holds the levers
+  in reverse on the landing roll. The SEC's ground spoiler logic reads the levers too, but at idle its
+  condition is already met. Its 3-minute digest, which ends before any landing, is unchanged.
+
+| MSVC 19.44 | before | after |
+|---|---|---|
+| A320: P6 gate, 30 min, from the runway (`law_harness --minutes 30 --gate`) | `61e7d489affdea04`; touchdown 1,024.52 s, −143.3 fpm, 5.40°, 1.405 g | `e8229862cf485896`; touchdown 1,024.88 s, −147.5 fpm, 5.49°, 1.411 g |
+| A320: P6 gate, 30 min, the `reference` start (`law_harness --scenario reference --minutes 30`) | `b1b19cdaa79cd525`; touchdown 1,077.52 s, −152.4 fpm, 5.62°, 1.453 g | `46fa67d4da79c64c`; touchdown 1,077.90 s, −157.3 fpm, 5.70°, 1.452 g |
+| A320: determinism case, 3 min (`law_harness --minutes 3`) | `49081a3518e03464` | `62a0facde230c012` |
+| A320: the scripted ILS from 10 nm (`law_harness --scenario approach --minutes 6`) | `559c63ff8fc547f2`; touchdown 254.02 s, −158.2 fpm, 5.78°, 1.458 g | `75a386b0608b9257`; touchdown 254.02 s, −158.2 fpm, 5.78°, 1.458 g |
+| 737: P6 gate, 30 min, from the runway (`law_harness --minutes 30 --gate`) | `8813ad7001f5ef3e`; touchdown 868.66 s, −61.9 fpm, 2.83°, 1.286 g | `5d1fdd20c83cd1b7`; touchdown 868.66 s, −61.9 fpm, 2.83°, 1.286 g |
+| 737: P6 gate, 30 min, the `reference` start (`law_harness --scenario reference --minutes 30`) | `76c7767895d921d4`; touchdown 916.56 s, −77.4 fpm, 3.25°, 1.271 g | `275232cf63a21228`; touchdown 916.56 s, −77.4 fpm, 3.25°, 1.271 g |
+| 737: determinism case, 3 min (`law_harness --minutes 3`) | `2f8d97e51914a9f0` | `2f8d97e51914a9f0` |
+| 737: the scripted ILS from 10 nm (`law_harness --scenario approach --minutes 6`) | `c79bb4ba3a2bfde7`; touchdown 254.50 s, −89.8 fpm, 3.53°, 1.369 g | `00bdd1fa7588bf9f`; touchdown 254.50 s, −89.8 fpm, 3.53°, 1.369 g |
 
 ## What P7 still has to build
 

@@ -253,9 +253,9 @@ Known limits of slice 1, all of them the airframe's or the crew's:
 - The 737's aerodynamics have no stabiliser, no slats, no roll spoilers and no aileron droop: the THS
   acts as 1.8 times its angle in elevator, and spoilers and speedbrakes act through the 737's coarse
   steps. Its engines are JSBSim's CFM56 on a thrust lever schedule of ours; our A320's are its own,
-  fitted. Neither has FADEC or autothrust. Our A320 has reverse thrust, after 0.1.0, by hand on the
-  ground, on provisional data; its one idle is still Airbus's approach idle, ground idle landing with the
-  scripted crews' reverse (`flight/README.md`). The FMGC is a stub that reports weight and CG.
+  fitted. Neither has FADEC or autothrust. Our A320 has reverse thrust and a ground idle, after 0.1.1,
+  on provisional data, and the scripted crews use reverse on the landing roll (`flight/README.md`). The
+  FMGC is a stub that reports weight and CG.
 - The crew flies on truth, not instruments. No wind, ISA, and a sea-level runway that is everywhere.
   The position is real: JSBSim moves the aircraft over a WGS84 earth and the IRs report it.
 
