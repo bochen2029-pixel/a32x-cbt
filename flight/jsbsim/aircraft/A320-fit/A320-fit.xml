@@ -17,8 +17,9 @@
     loading           ours: 65.0 t, CG 28 % MAC; payload 14.5 t, fuel 8.0 t in A32NX's tank layout
     aerodynamics      the coefficients below, each a property under aero/fit/. A seed is what a value
                       started from before the fit and where the seed came from; see
-                      flight/jsbsim/aircraft/A320-fit/seeds.csv. The fitter (flight/harness/fit.cpp)
-                      rewrites the values here and nothing else
+                      flight/jsbsim/aircraft/A320-fit/seeds.csv, and for what lies past the stall
+                      poststall-seeds.csv. The fitter (flight/harness/fit.cpp) rewrites the values here
+                      and nothing else
     thrust            the engines' lapse and the thrust lever schedule, each a property under
                       propulsion/fit/, seeded and fitted the same way; see thrust-seeds.csv
     ground effect     ours, from textbook theory: lift by the effective aspect ratio of a wing over its
@@ -334,7 +335,8 @@
     <property value="3.9670948" persistent="true">aero/fit/stall-width-conf2-deg</property>
     <property value="3.9796589" persistent="true">aero/fit/stall-width-conf3-deg</property>
     <property value="4.0094895" persistent="true">aero/fit/stall-width-full-deg</property>
-    <property value="0.25" persistent="true">aero/fit/poststall-drop</property>
+    <property value="0.40955062" persistent="true">aero/fit/poststall-drop</property>
+    <property value="9.1795749" persistent="true">aero/fit/poststall-width-deg</property>
     <property value="0.60" persistent="true">aero/fit/clmax-mach</property>
     <property value="0.456" persistent="true">aero/fit/cl-de</property>
     <property value="0.912" persistent="true">aero/fit/cl-ih</property>
@@ -371,6 +373,10 @@
     <property value="0.02" persistent="true">aero/fit/cm-spoiler</property>
     <property value="3.0" persistent="true">aero/fit/cm-mach-tuck</property>
     <property value="0.22" persistent="true">aero/fit/cm-ground</property>
+    <!-- past the stall: the moment's nose-down break, and the tail's power fading with alpha -->
+    <property value="0.14827876" persistent="true">aero/fit/cm-stall</property>
+    <property value="0.12122696" persistent="true">aero/fit/tail-fade</property>
+    <property value="10.952949" persistent="true">aero/fit/tail-fade-from-deg</property>
 
     <!-- roll and yaw -->
     <property value="-1.0" persistent="true">aero/fit/cy-beta</property>
@@ -588,7 +594,7 @@
     </function>
 
     <!-- Wing and body: the line; the rounding; past the peak, a loss growing toward a share of the
-         peak over a few degrees -->
+         peak, poststall-drop, over a width of degrees, poststall-width-deg -->
     <function name="aero/a320/cl-wing">
       <ifthen>
         <le>
@@ -634,7 +640,10 @@
                         <p> aero/a320/alpha-peak-rad </p>
                         <p> aero/alpha-rad </p>
                       </difference>
-                      <v> 0.0524 </v>
+                      <product>
+                        <v> 0.0174533 </v>
+                        <p> aero/fit/poststall-width-deg </p>
+                      </product>
                     </quotient>
                   </exp>
                 </difference>
@@ -682,6 +691,52 @@
       </product>
     </function>
 
+    <!-- High alpha, the tail's share of its power: the elevator and the stabiliser lose effectiveness past
+         an alpha, first as the tail meets the wing's wake and then as its own flow separates, as wind
+         tunnel data on a transport show it (Foster et al., AIAA 2005-5933); tail-fade of it per 10 deg
+         past tail-fade-from-deg, and never below a quarter, since the elevator stays effective at every
+         alpha measured there (how much stays is our estimate) -->
+    <function name="aero/a320/k-tail">
+      <max>
+        <v> 0.25 </v>
+        <difference>
+          <v> 1 </v>
+          <product>
+            <p> aero/fit/tail-fade </p>
+            <v> 0.1 </v>
+            <max>
+              <v> 0 </v>
+              <difference>
+                <p> aero/alpha-deg </p>
+                <p> aero/fit/tail-fade-from-deg </p>
+              </difference>
+            </max>
+          </product>
+        </difference>
+      </max>
+    </function>
+
+    <!-- The stall's pitch break, 0 to 1: from where the lift curve begins to round into its peak, growing
+         over a few degrees; the pitching moment breaks nose down by cm-stall as the wing stalls, as NASA's
+         Generic Transport Model's does (NASA/TM-2011-217169, figure 33) -->
+    <function name="aero/a320/stall-break">
+      <difference>
+        <v> 1 </v>
+        <exp>
+          <quotient>
+            <min>
+              <v> 0 </v>
+              <difference>
+                <p> aero/a320/alpha-break-rad </p>
+                <p> aero/alpha-rad </p>
+              </difference>
+            </min>
+            <v> 0.0524 </v>
+          </quotient>
+        </exp>
+      </difference>
+    </function>
+
     <!-- The airframe's lift coefficient -->
     <function name="aero/a320/cl">
       <sum>
@@ -698,10 +753,12 @@
         </product>
         <product>
           <p> aero/fit/cl-de </p>
+          <p> aero/a320/k-tail </p>
           <p> fcs/elevator-pos-rad </p>
         </product>
         <product>
           <p> aero/fit/cl-ih </p>
+          <p> aero/a320/k-tail </p>
           <p> fcs/stabilizer-pos-rad </p>
         </product>
         <product>
@@ -917,12 +974,13 @@
 
     <axis name="PITCH">
       <function name="aero/coefficient/Cm">
-        <description> Pitch about the quarter chord: configuration, alpha, damping, elevator,
-                      stabiliser, spoilers, a nose-down tuck past Mach 0.78, and near the ground the
-                      nose-down moment of the downwash the ground takes away from the tail: the wing's
-                      downwash, 2 CL / (pi A), shrinks by the share McCormick's factor takes off induced
-                      drag, and the tail lifts that much more; cm-ground is the tail volume and lift
-                      slope over pi A </description>
+        <description> Pitch about the quarter chord: configuration, alpha, damping, elevator and
+                      stabiliser (both fading at high alpha with the tail's power), spoilers, the stall's
+                      nose-down break, a nose-down tuck past Mach 0.78, and near the ground the nose-down
+                      moment of the downwash the ground takes away from the tail: the wing's downwash,
+                      2 CL / (pi A), shrinks by the share McCormick's factor takes off induced drag, and
+                      the tail lifts that much more; cm-ground is the tail volume and lift slope over
+                      pi A </description>
         <product>
           <p> aero/qbar-psf </p>
           <p> metrics/Sw-sqft </p>
@@ -961,11 +1019,18 @@
             </product>
             <product>
               <p> aero/fit/cm-de </p>
+              <p> aero/a320/k-tail </p>
               <p> fcs/elevator-pos-rad </p>
             </product>
             <product>
               <p> aero/fit/cm-ih </p>
+              <p> aero/a320/k-tail </p>
               <p> fcs/stabilizer-pos-rad </p>
+            </product>
+            <product>
+              <v> -1 </v>
+              <p> aero/fit/cm-stall </p>
+              <p> aero/a320/stall-break </p>
             </product>
             <product>
               <p> aero/fit/cm-spoiler </p>

@@ -40,7 +40,6 @@ aero/fit/stall-width-conf1f-deg,4.0,1.5,0.5,10,estimate,degrees over which the l
 aero/fit/stall-width-conf2-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
 aero/fit/stall-width-conf3-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
 aero/fit/stall-width-full-deg,4.0,1.5,0.5,10,estimate,degrees over which the lift curve rounds into its peak
-aero/fit/poststall-drop,0.25,0.10,0.0,0.6,estimate,share of the peak lost past the stall
 aero/fit/clmax-mach,0.60,0.20,0.0,1.5,estimate,peak lift near 1.0 at Mach 0.78 where buffet begins near 0.8
 aero/fit/cl-de,0.456,0.10,0.1,1.0,datcom,elevator effectiveness 0.5 of the tail's lift slope
 aero/fit/cl-ih,0.912,0.15,0.3,1.6,datcom,the whole stabiliser

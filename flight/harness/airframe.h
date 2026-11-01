@@ -100,6 +100,10 @@ struct AeroPoint {
 struct PitchResponse {
   bool ok = false;                  // the trim before the pulse converged
   std::vector<double> t, alphaDeg;  // from the end of the pulse: seconds, alpha less its trimmed value
+  double trimAlphaDeg = 0, mach = 0, qbarPsf = 0;  // the trim it started from
+  // the whole of it, from the start of the pulse, every 20 ms: seconds, alpha less its trimmed value,
+  // body pitch rate, and the elevator moved from where the trim left it
+  std::vector<double> fromStart, alphaFromStartDeg, qDegS, elevatorDeg;
 };
 
 // Where the airframe begins. By default, as since P7's slice 1: on the gear at 47 N 8 E (a latitude
@@ -161,13 +165,21 @@ class Airframe {
   LiftPeak liftPeak(const Configuration& c);
   // Lift and drag coefficients, wings level, no sideslip, at an altitude, Mach and alpha.
   AeroPoint aero(double altitudeFt, double mach, double alphaDeg, const Configuration& c);
+  // The lift coefficient at an alpha, where liftPeak() sweeps: 1,000 ft, 150 kt, elevator at neutral.
+  double liftAt(const Configuration& c, double alphaDeg);
+  // The aerodynamic pitching moment coefficient about the centre of gravity at an alpha, at 1,000 ft in
+  // steady level flight at 1 g, with the elevator and the stabiliser where asked (degrees, + trailing edge
+  // down, + nose down) and no pitch rate: the static moment a pilot holding that elevator meets.
+  double pitchMomentAt(const Configuration& c, double alphaDeg, double elevatorDeg, double thsDeg);
   // JSBSim's longitudinal trim, wings level, on a flight path, at a CAS or, when mach > 0, a Mach. The
   // trim works the stabiliser where the aircraft has one, and the 737's elevator otherwise.
   TrimPoint trim(double altitudeFt, double casKn, double mach, double gammaDeg, const Configuration& c);
-  // Trimmed clean in level flight, then the elevator moved by pulseDeg for pulseS seconds and returned,
-  // the stabiliser and the thrust left where the trim put them: the airframe's own pitch response, as
-  // direct law would show it. Alpha is sampled every 20 ms for recordS seconds after the pulse.
-  PitchResponse pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS);
+  // Trimmed in level flight, clean unless a configuration is given, then the elevator moved by pulseDeg
+  // for pulseS seconds and returned, the stabiliser and the thrust left where the trim put them: the
+  // airframe's own pitch response, as direct law would show it. Alpha is sampled every 20 ms for recordS
+  // seconds after the pulse.
+  PitchResponse pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS,
+                           const Configuration& c = Configuration{});
   // The thrust of one engine, lbf, with the levers at a thrust lever angle, at an altitude and a CAS or,
   // when mach > 0, a Mach; a CAS of 0 is static. The engine model run to its steady state, as JSBSim's
   // trim runs it, through the thrust lever schedule the aircraft flies with.

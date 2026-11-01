@@ -4,12 +4,20 @@
 //   airframe_fit                  fit the aerodynamics and report; the aircraft file is left alone
 //   airframe_fit --write          and write the fitted coefficients into it
 //   airframe_fit --thrust         the engines instead: their lapse and the thrust lever schedule
+//   airframe_fit --poststall      past the stall instead: the pitch break, the tail's fade with alpha
+//                                 and the lift beyond the peak
+//   airframe_fit --from-file      start from the aircraft file's values, the last fit, not the seeds;
+//                                 the prior stays on the seeds, and what no fit row answers to keeps
+//                                 the file's value
 //   airframe_fit --selftest       the optimiser alone, on functions whose minima are known
 //
-// The aerodynamics and the engines are fitted apart, each on its own rows (the thrust group, or every
-// group but it) and from its own seeds (seeds.csv, thrust-seeds.csv). No row of one answers to the
-// other's numbers, and a candidate carries only the numbers being fitted: the rest are the aircraft
-// file's, as the last fit of them left it.
+// The aerodynamics, the engines and what lies past the stall are fitted apart, each on its own rows (the
+// thrust group, the poststall group, or every group but those) and from its own seeds (seeds.csv,
+// thrust-seeds.csv, poststall-seeds.csv). A candidate carries only the numbers being fitted: the rest are
+// the aircraft file's, as the last fit of them left it. No fit row of the aerodynamics answers to the
+// others' numbers. The rows past the stall answer to the aerodynamics' pitch numbers as well, which
+// their fit holds where they are: what happens beyond the stall is not to move the pitch of normal
+// flight, which none of those rows measures.
 //
 // Parameter identification, not controller learning: the controller stays the A32NX computers. A
 // candidate is a full set of coefficients, handed to `airframe_score --airframe a320 --coefficients FILE
@@ -459,6 +467,29 @@ bool writeCoefficients(const std::string& path, const std::vector<Coefficient>& 
   return static_cast<bool>(out);
 }
 
+// And back: each coefficient's value in the aircraft file, where the last fit left it.
+bool readCoefficients(const std::string& path, const std::vector<Coefficient>& coefficients, Vector& values) {
+  std::ifstream in(path, std::ios::binary);
+  std::stringstream buffer;
+  buffer << in.rdbuf();
+  const std::string text = buffer.str();
+  values.clear();
+  for (const Coefficient& c : coefficients) {
+    const size_t end = text.find("\" persistent=\"true\">" + c.name + "</property>");
+    if (end == std::string::npos) {
+      std::fprintf(stderr, "%s declares no %s\n", path.c_str(), c.name.c_str());
+      return false;
+    }
+    const size_t start = text.rfind("value=\"", end) + 7;
+    values.push_back(std::atof(text.substr(start, end - start).c_str()));
+    if (values.back() < c.lo || values.back() > c.hi) {
+      std::fprintf(stderr, "%s holds %s at %g, outside its limits\n", path.c_str(), c.name.c_str(), values.back());
+      return false;
+    }
+  }
+  return true;
+}
+
 std::string sibling(const char* argv0, const char* name) {
   std::filesystem::path p(argv0);
   const std::string ext = p.extension().string();
@@ -469,7 +500,7 @@ std::string sibling(const char* argv0, const char* name) {
 
 int main(int argc, char** argv) {
   int generations = 200, lambda = 16;
-  bool write = false, thrust = false;
+  bool write = false, thrust = false, poststall = false, fromFile = false;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
     if (a == "--selftest") {
@@ -478,22 +509,35 @@ int main(int argc, char** argv) {
       write = true;
     } else if (a == "--thrust") {
       thrust = true;
+    } else if (a == "--poststall") {
+      poststall = true;
+    } else if (a == "--from-file") {
+      fromFile = true;
     } else if (a == "--generations" && i + 1 < argc) {
       generations = std::atoi(argv[++i]);
     } else if (a == "--population" && i + 1 < argc) {
       lambda = std::atoi(argv[++i]);
     } else {
-      std::printf("airframe_fit [--thrust] [--generations N] [--population N] [--write] | --selftest\n");
+      std::printf("airframe_fit [--thrust | --poststall] [--from-file] [--generations N] [--population N] [--write] | --selftest\n");
       return 2;
     }
+  }
+  if (thrust && poststall) {
+    std::fprintf(stderr, "airframe_fit: --thrust or --poststall, not both\n");
+    return 2;
   }
 
   const std::string here = std::string(FLIGHT_JSBSIM_DIR) + "/aircraft/A320-fit/";
   const std::string aircraft = here + "A320-fit.xml";
-  const std::vector<Coefficient> coefficients = readSeeds(here + (thrust ? "thrust-seeds.csv" : "seeds.csv"));
+  const std::vector<Coefficient> coefficients =
+      readSeeds(here + (thrust ? "thrust-seeds.csv" : poststall ? "poststall-seeds.csv" : "seeds.csv"));
   const std::string scorer = sibling(argv[0], "airframe_score");
-  const std::string rows = thrust ? "--only-group thrust" : "--skip-group thrust";
-  const std::filesystem::path work = std::filesystem::path(argv[0]).parent_path() / (thrust ? "fit-thrust" : "fit");
+  const std::string rows = thrust      ? "--only-group thrust"
+                           : poststall ? "--only-group poststall"
+                                       : "--skip-group thrust --skip-group poststall";
+  const char* what = thrust ? "the engines" : poststall ? "past the stall" : "the aerodynamics";
+  const std::filesystem::path work =
+      std::filesystem::path(argv[0]).parent_path() / (thrust ? "fit-thrust" : poststall ? "fit-poststall" : "fit");
   std::filesystem::create_directories(work);
   const auto started = std::chrono::steady_clock::now();
   const Load load;
@@ -501,14 +545,17 @@ int main(int argc, char** argv) {
 
   Vector seed;
   for (const Coefficient& c : coefficients) seed.push_back(c.seed);
+  // Where the search starts: the seeds, or with --from-file where the last fit left the aircraft file.
+  Vector start = seed;
+  if (fromFile && !readCoefficients(aircraft, coefficients, start)) return 2;
 
   // 1. Which coefficients the fit rows answer to: each moved by its prior's width, toward the middle of
-  //    its limits, against the seed.
-  Matrix probes{seed};
+  //    its limits, against the start.
+  Matrix probes{start};
   for (size_t i = 0; i < coefficients.size(); ++i) {
-    Vector p = seed;
+    Vector p = start;
     const Coefficient& c = coefficients[i];
-    p[i] = c.seed + c.sigma <= c.hi ? c.seed + c.sigma : c.seed - c.sigma;
+    p[i] = start[i] + c.sigma <= c.hi ? start[i] + c.sigma : start[i] - c.sigma;
     probes.push_back(p);
   }
   std::vector<Score> screened;
@@ -516,29 +563,30 @@ int main(int argc, char** argv) {
     const Matrix batch(probes.begin() + k, probes.begin() + std::min(probes.size(), k + lambda));
     for (const Score& s : scoreAll(scorer, rows, work, coefficients, batch)) screened.push_back(s);
   }
-  const Score& atSeed = screened[0];
-  if (!atSeed.ok) {
-    std::fprintf(stderr, "airframe_score failed on the seeds\n");
+  const char* from = fromFile ? "the aircraft file's values" : "the seeds";
+  const Score& atStart = screened[0];
+  if (!atStart.ok) {
+    std::fprintf(stderr, "airframe_score failed on %s\n", from);
     return 2;
   }
   std::vector<size_t> free;
   for (size_t i = 0; i < coefficients.size(); ++i) {
     const Score& s = screened[i + 1];
     bool moves = !s.ok;
-    for (const auto& [id, v] : atSeed.values) {
+    for (const auto& [id, v] : atStart.values) {
       const auto it = s.values.find(id);
       if (it == s.values.end() || std::abs(it->second - v) > 1e-9 * std::max(1.0, std::abs(v))) moves = true;
     }
     if (moves) free.push_back(i);
   }
-  std::printf("A32X CBT A320 fit, %s: %zu coefficients, %zu of them answered to by the fit rows (%d rows); the rest held at their seeds\n",
-              thrust ? "the engines" : "the aerodynamics", coefficients.size(), free.size(), atSeed.rows);
-  std::printf("at the seeds: cost %.4f, fit rows inside %d of %d\n", atSeed.cost, atSeed.inside, atSeed.rows);
+  std::printf("A32X CBT A320 fit, %s: %zu coefficients, %zu of them answered to by the fit rows (%d rows); the rest held at %s\n",
+              what, coefficients.size(), free.size(), atStart.rows, from);
+  std::printf("at %s: cost %.4f, fit rows inside %d of %d\n", from, atStart.cost, atStart.inside, atStart.rows);
   for (size_t i : free) std::printf("  free  %s\n", coefficients[i].name.c_str());
 
-  // 2. CMA-ES over the free ones, in prior widths from the seed.
+  // 2. CMA-ES over the free ones, in prior widths from the seed, starting from the start.
   auto expand = [&](const Vector& x, double& outside) {
-    Vector p = seed;
+    Vector p = start;
     outside = 0;
     for (size_t j = 0; j < free.size(); ++j) {
       const Coefficient& c = coefficients[free[j]];
@@ -557,10 +605,15 @@ int main(int argc, char** argv) {
 
   FILE* log = std::fopen((work / "fit-log.csv").string().c_str(), "w");
   if (log) std::fprintf(log, "generation,evaluations,best_objective,best_cost,inside,sigma,spread,seconds\n");
-  Cmaes es(Vector(free.size(), 0.0), 0.5, lambda, kRandomSeed);
-  Score best = atSeed;
-  double bestObjective = atSeed.cost;
-  Vector bestP = seed;
+  Vector x0(free.size());
+  for (size_t j = 0; j < free.size(); ++j) {
+    const Coefficient& c = coefficients[free[j]];
+    x0[j] = (start[free[j]] - c.seed) / c.sigma;
+  }
+  Cmaes es(x0, 0.5, lambda, kRandomSeed);
+  Score best = atStart;
+  double bestObjective = atStart.cost + prior(x0);
+  Vector bestP = start;
   int evaluations = static_cast<int>(probes.size()), stale = 0;
   while (es.generation() < generations) {
     const Matrix& xs = es.ask();
@@ -598,22 +651,22 @@ int main(int argc, char** argv) {
               es.generation(), evaluations, elapsed(), 100 * load.busy());
   std::printf("objective %.6f (cost %.6f, prior %.6f); fit rows inside %d of %d\n\n", bestObjective, best.cost,
               bestObjective - best.cost, best.inside, best.rows);
-  std::printf("%-34s %10s %10s %8s  %s\n", "coefficient", "seed", "fitted", "widths", "seed from");
+  std::printf("%-34s %10s %10s %10s %8s  %s\n", "coefficient", "seed", "start", "fitted", "widths", "seed from");
   for (size_t i : free) {
     const Coefficient& c = coefficients[i];
-    std::printf("%-34s %10.5g %10.5g %+8.2f  %s\n", c.name.c_str(), c.seed, bestP[i], (bestP[i] - c.seed) / c.sigma,
-                c.source.c_str());
+    std::printf("%-34s %10.5g %10.5g %10.5g %+8.2f  %s\n", c.name.c_str(), c.seed, start[i], bestP[i],
+                (bestP[i] - c.seed) / c.sigma, c.source.c_str());
   }
-  std::printf("\n%-20s %12s %12s\n", "fit row", "at the seed", "fitted");
-  for (const auto& [id, v] : best.values) std::printf("%-20s %12.4f %12.4f\n", id.c_str(), atSeed.values.at(id), v);
+  std::printf("\n%-24s %12s %12s\n", "fit row", "at the start", "fitted");
+  for (const auto& [id, v] : best.values) std::printf("%-24s %12.4f %12.4f\n", id.c_str(), atStart.values.at(id), v);
 
   {
     std::ofstream out(work / "fit-result.csv");
-    out << "coefficient,seed,fitted,sigma,free\n";
+    out << "coefficient,seed,start,fitted,sigma,free\n";
     for (size_t i = 0; i < coefficients.size(); ++i) {
       const bool isFree = std::find(free.begin(), free.end(), i) != free.end();
-      out << coefficients[i].name << "," << coefficients[i].seed << "," << bestP[i] << "," << coefficients[i].sigma << ","
-          << (isFree ? "yes" : "no") << "\n";
+      out << coefficients[i].name << "," << coefficients[i].seed << "," << start[i] << "," << bestP[i] << ","
+          << coefficients[i].sigma << "," << (isFree ? "yes" : "no") << "\n";
     }
   }
   if (write) {

@@ -1,0 +1,23 @@
+# What lies past the stall in A320-fit.xml, before the fit: where each coefficient started, how far the
+# fitter may move it, and why it started there. GPLv3, like everything in flight/. The columns are
+# seeds.csv's, and so are the source keys.
+#
+# The pitching moment breaks nose down as the wing stalls, by cm-stall, from where the lift curve begins
+# to round into its peak; the tail's power, the elevator's and the stabiliser's, fades by tail-fade every
+# 10 deg past tail-fade-from-deg, to no less than a quarter; past the peak the lift falls toward a share
+# poststall-drop below it over poststall-width-deg. `airframe_fit --poststall` fits them on the fit rows of
+# the poststall group of flight/targets/a320.csv and on nothing else: the pitch of normal flight, which
+# those rows answer to as well, is held where the aerodynamic fit left it.
+#
+# Sources beyond seeds.csv's
+#   tcm-gtm       NASA's Transport Class Model on its Generic Transport Model's wind tunnel data (Hueschen,
+#                 NASA/TM-2011-217169, public domain), read off its figures; the source of rows of a320.csv
+#
+# None of these seeds was compared with a held-out row while it was made. The two lift numbers were set
+# before the post-stall rows existed; the other three were written with the poststall rows' sources open.
+property,seed,sigma,lo,hi,source,note
+aero/fit/poststall-drop,0.25,0.10,0.0,0.6,estimate,share of the peak lost past the stall
+aero/fit/poststall-width-deg,3.0,2.0,1.0,15,estimate,degrees over which that loss grows; the value the lift curve used before it was a coefficient
+aero/fit/cm-stall,0.20,0.08,0.0,0.6,tcm-gtm,the nose-down break across the stall of the GTM with its flaps up (figure 33): 0.20 below its line before the stall 6 deg past the lift peak
+aero/fit/tail-fade,0.45,0.20,0.0,1.0,a32nx,its pitch_moment_delta_elevator_aoa_table: 0.693 at 10 deg and 0.381 at 20 deg; the share of its power at 10 deg lost by 20
+aero/fit/tail-fade-from-deg,10,3,4,16,estimate,where the tail meets the wing's wake: past the 8.3 deg of a flare (A32NX's table fades from 0 deg)

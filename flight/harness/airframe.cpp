@@ -211,7 +211,8 @@ struct Airframe::Impl {
   // for measuring
   SGPropertyNode *trimAuthority = nullptr, *thsTrimAuthority = nullptr, *pitchTrim = nullptr, *elevatorPos = nullptr,
                  *stabiliserPos = nullptr, *clSquared = nullptr, *wingArea = nullptr, *alphaMax = nullptr,
-                 *alphaMin = nullptr, *lift = nullptr, *drag = nullptr, *qbar = nullptr, *thrust[2] = {};
+                 *alphaMin = nullptr, *lift = nullptr, *drag = nullptr, *pitchMoment = nullptr, *qbar = nullptr,
+                 *thrust[2] = {};
   // read each tick
   SGPropertyNode *pressureAltitude = nullptr, *cas = nullptr, *tas = nullptr, *mach = nullptr, *hDot = nullptr,
                  *alpha = nullptr, *beta = nullptr, *pressure = nullptr, *theta = nullptr, *phi = nullptr,
@@ -258,6 +259,7 @@ struct Airframe::Impl {
     alphaMin = node("aero/alpha-min-rad");
     lift = node("forces/fwz-aero-lbs");  // wind axes, lift and drag both reported positive
     drag = node("forces/fwx-aero-lbs");
+    pitchMoment = node("moments/m-aero-lbsft");  // body axes, about the centre of gravity, + nose up
     qbar = node("aero/qbar-psf");
     thrust[0] = node("propulsion/engine[0]/thrust-lbs");
     thrust[1] = node("propulsion/engine[1]/thrust-lbs");
@@ -688,6 +690,52 @@ AeroPoint Airframe::aero(double altitudeFt, double mach, double alphaDeg, const 
   return {m.lift->getDoubleValue() / qs, m.drag->getDoubleValue() / qs};
 }
 
+double Airframe::liftAt(const Configuration& c, double alphaDeg) {
+  Impl& m = *impl_;
+  m.configure(c);
+  m.place(kMeasureAltitudeFt, kMeasureCasKn, 0, 0, alphaDeg);
+  if (!m.fdm.RunIC() || !m.fdm.RunIC()) die("JSBSim could not initialise for a lift point");
+  return std::sqrt(m.clSquared->getDoubleValue());
+}
+
+double Airframe::pitchMomentAt(const Configuration& c, double alphaDeg, double elevatorDeg, double thsDeg) {
+  Impl& m = *impl_;
+  m.configure(c);
+  // at idle, whatever an earlier measurement left on the levers: thrust across the flight path would
+  // turn it, and give the alpha a rate
+  m.throttle[0]->setDoubleValue(0);
+  m.throttle[1]->setDoubleValue(0);
+  // in JSBSim's frame, as step() puts them: the 737 takes the stabiliser through its elevator
+  if (m.model.stabiliser) {
+    m.elevator->setDoubleValue(elevatorDeg * kRad);
+    m.ths->setDoubleValue(thsDeg * kRad);
+  } else {
+    m.elevator->setDoubleValue((elevatorDeg + kThsAsElevator * thsDeg) * kRad);
+  }
+  // In steady level flight at 1 g: at the speed where the lift, the elevator's share included, and the
+  // idle thrust's share across the flight path carry the weight. Off it the initial condition
+  // accelerates, JSBSim's alpha rate is not zero, and the moment would carry the airframe's alpha-rate
+  // damping. The speed found from the lift at 150 kt, then again from the lift at the speed found, which
+  // Mach moves a little. Twice each, as for the lift sweep: an aircraft's functions may read
+  // aero/cl-squared, which is a frame late. At 1,000 ft and these speeds the dynamic pressure goes as the
+  // square of the CAS near enough.
+  double cas = kMeasureCasKn;
+  for (int pass = 0; pass < 3; ++pass) {
+    m.place(kMeasureAltitudeFt, cas, 0, 0, alphaDeg);
+    if (!m.fdm.RunIC() || !m.fdm.RunIC()) die("JSBSim could not initialise for a pitching moment");
+    if (pass == 2) break;
+    const double thrust = m.thrust[0]->getDoubleValue() + m.thrust[1]->getDoubleValue();
+    const double carried = m.weight->getDoubleValue() - thrust * std::sin(alphaDeg * kRad);
+    const double cl = m.lift->getDoubleValue() / (m.qbar->getDoubleValue() * m.wingArea->getDoubleValue());
+    const double qbar1g = carried / (m.wingArea->getDoubleValue() * std::max(cl, 0.05));
+    cas = clamp(cas * std::sqrt(qbar1g / m.qbar->getDoubleValue()), 60, 350);
+  }
+  const double moment = m.pitchMoment->getDoubleValue();
+  const double qsc = m.qbar->getDoubleValue() * m.wingArea->getDoubleValue() * m.mac->getDoubleValue();
+  m.configure(c);  // the surfaces back at neutral for whatever is measured next
+  return moment / qsc;
+}
+
 TrimPoint Airframe::trim(double altitudeFt, double casKn, double mach, double gammaDeg, const Configuration& c) {
   const LiftPeak peak = liftPeak(c);
   return trimmed(altitudeFt, casKn, mach, gammaDeg, c, peak.alphaDeg);
@@ -716,24 +764,40 @@ TrimPoint Airframe::trimmed(double altitudeFt, double casKn, double mach, double
   return t;
 }
 
-PitchResponse Airframe::pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS) {
+PitchResponse Airframe::pitchPulse(double altitudeFt, double casKn, double pulseDeg, double pulseS, double recordS,
+                                  const Configuration& c) {
   Impl& m = *impl_;
-  const Configuration clean;
-  const LiftPeak peak = liftPeak(clean);
-  m.configure(clean);
+  const LiftPeak peak = liftPeak(c);
+  m.configure(c);
   PitchResponse r;
   r.ok = m.trimHere(altitudeFt, casKn, 0, 0, peak.alphaDeg);
   if (r.ok) {
     const double trimmedAlpha = m.state.alphaDeg;
-    m.elevator->setDoubleValue(pulseDeg * kRad);  // on top of the pitch control the trim holds
-    m.run(pulseS);
-    m.elevator->setDoubleValue(0);
+    r.trimAlphaDeg = trimmedAlpha;
+    r.mach = m.state.mach;
+    r.qbarPsf = m.qbar->getDoubleValue();
     constexpr double kSample = 0.02;
+    auto sample = [&](double t, double elevatorDeg) {
+      r.fromStart.push_back(t);
+      r.alphaFromStartDeg.push_back(m.state.alphaDeg - trimmedAlpha);
+      r.qDegS.push_back(m.state.qDegS);
+      r.elevatorDeg.push_back(elevatorDeg);
+    };
+    sample(0, pulseDeg);
+    m.elevator->setDoubleValue(pulseDeg * kRad);  // on top of the pitch control the trim holds
+    const int pulseSamples = static_cast<int>(std::lround(pulseS / kSample));
+    for (int k = 1; k <= pulseSamples; ++k) {
+      m.run(kSample);
+      m.read();
+      sample(k * kSample, k < pulseSamples ? pulseDeg : 0);
+    }
+    m.elevator->setDoubleValue(0);
     for (int k = 1; k * kSample <= recordS + 1e-9; ++k) {
       m.run(kSample);
       m.read();
       r.t.push_back(k * kSample);
       r.alphaDeg.push_back(m.state.alphaDeg - trimmedAlpha);
+      sample(pulseS + k * kSample, 0);
     }
   }
   m.untrim();

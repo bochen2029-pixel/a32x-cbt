@@ -4,15 +4,18 @@
 //   airframe_score                    the table, scored
 //   airframe_score --out score.csv    and written out
 //   airframe_score --check            exit 1 unless every target and context row was measured
-//   airframe_score --only-group thrust, --skip-group thrust
-//                                     one group of rows, or every group but one
+//   airframe_score --only-group thrust, --skip-group thrust [--skip-group poststall]
+//                                     one group of rows, or every group but those skipped
+//   airframe_score --instruments, --instruments-pitch
+//                                     the instruments checked against what the aircraft files say
 //
 // It scores; it does not gate. Outside a band is a fact about the airframe, not a failed build.
 //
 // Two kinds of measurement. The bare airframe, with no computers: JSBSim sweeps its lift curve, reads
-// its drag, trims it, pulses its elevator and runs its engines to a steady thrust (airframe.h), at the
-// weight the row names. The airframe flown: one circuit through the A32NX laws at the weight it is
-// loaded to, with a full-stick roll added in cruise, timed as the gate's circuit is.
+// its drag and its static pitching moment, trims it, pulses its elevator and runs its engines to a
+// steady thrust (airframe.h), at the weight the row names. The airframe flown: one circuit through the
+// A32NX laws at the weight it is loaded to, with a full-stick roll added in cruise, timed as the gate's
+// circuit is.
 
 #include <algorithm>
 #include <cctype>
@@ -269,28 +272,146 @@ Measured dragRise(Airframe& a) {
 
 // The pitch short period of the bare airframe: the alpha response after a pulse of elevator, controls
 // otherwise fixed, from its first extremum and the next of opposite sign. Their ratio is
-// exp(-pi zeta / sqrt(1 - zeta^2)) for half a cycle.
-Measured shortPeriod(Airframe& a) {
-  constexpr double kAltitudeFt = 8000, kCasKn = 250, kPulseDeg = 2, kPulseS = 1, kRecordS = 12;
-  const PitchResponse r = a.pitchPulse(kAltitudeFt, kCasKn, kPulseDeg, kPulseS, kRecordS);
-  if (!r.ok) return {kNaN, "no trim at 8000 ft and 250 kt"};
+// exp(-pi zeta / sqrt(1 - zeta^2)) for half a cycle, and the time between them half a damped period.
+struct ShortPeriod {
+  Measured zeta, wn;  // damping ratio; undamped natural frequency, rad/s
+};
+
+ShortPeriod shortPeriodOf(const PitchResponse& r, double recordS) {
   const std::vector<double>& x = r.alphaDeg;
   std::vector<size_t> extrema;
   for (size_t k = 1; k + 1 < x.size(); ++k) {
     if ((x[k] - x[k - 1]) * (x[k + 1] - x[k]) < 0) extrema.push_back(k);
   }
-  if (extrema.empty()) return {kNaN, "alpha did not turn after the pulse"};
+  if (extrema.empty()) return {{kNaN, "alpha did not turn after the pulse"}, {kNaN, "alpha did not turn after the pulse"}};
   const size_t first = extrema.front();
   for (size_t e : extrema) {
     if (e > first && x[e] * x[first] < 0) {
       const double decrement = std::log(std::abs(x[first] / x[e]));
       const double zeta = decrement / std::sqrt(kPi * kPi + decrement * decrement);
       const double wn = kPi / (r.t[e] - r.t[first]) / std::sqrt(1 - zeta * zeta);
-      return {zeta, fmt("alpha %+.2f then %+.2f deg; natural frequency %.2f rad/s", x[first], x[e], wn)};
+      const std::string note = fmt("alpha %+.2f then %+.2f deg", x[first], x[e]);
+      return {{zeta, note + fmt("; natural frequency %.2f rad/s", wn)}, {wn, note + fmt("; damping %.2f", zeta)}};
     }
   }
   // No overshoot: the half-cycle ratio would be under 1/100 of the first excursion, so zeta is at least 0.83.
-  return {0.83, fmt("a lower bound: no overshoot within %.0f s of %+.2f deg of alpha", kRecordS, x[first])};
+  const std::string none = fmt("no overshoot within %.0f s of %+.2f deg of alpha", recordS, x[first]);
+  return {{0.83, "a lower bound: " + none}, {kNaN, none}};
+}
+
+// The short period by equation error, which needs no overshoot to see it: the pulse response from its
+// start fitted by least squares to alpha' = Za alpha + Zq q + Zd elevator + a and q' = Ma alpha + Mq q +
+// Md elevator + b, the rates by central differences, over the seconds named, short against the phugoid,
+// the constants taking up the little the speed has moved. The short period is [[Za Zq] [Ma Mq]]: its
+// natural frequency the square root of the determinant, its damping ratio minus the trace over twice it.
+ShortPeriod shortPeriodByEquationError(const PitchResponse& r, double overS) {
+  // normal equations of [x q d 1] for each of the two rates
+  double n[4][4] = {}, ya[4] = {}, yq[4] = {};
+  for (size_t k = 1; k + 1 < r.fromStart.size() && r.fromStart[k] <= overS; ++k) {
+    const double dt = r.fromStart[k + 1] - r.fromStart[k - 1];
+    const double alphaDot = (r.alphaFromStartDeg[k + 1] - r.alphaFromStartDeg[k - 1]) / dt;
+    const double qDot = (r.qDegS[k + 1] - r.qDegS[k - 1]) / dt;
+    const double x[4] = {r.alphaFromStartDeg[k], r.qDegS[k], r.elevatorDeg[k], 1};
+    for (int i = 0; i < 4; ++i) {
+      for (int j = 0; j < 4; ++j) n[i][j] += x[i] * x[j];
+      ya[i] += x[i] * alphaDot;
+      yq[i] += x[i] * qDot;
+    }
+  }
+  // Gauss-Jordan on both right-hand sides at once
+  double m[4][6];
+  for (int i = 0; i < 4; ++i) {
+    for (int j = 0; j < 4; ++j) m[i][j] = n[i][j];
+    m[i][4] = ya[i];
+    m[i][5] = yq[i];
+  }
+  for (int c = 0; c < 4; ++c) {
+    int pivot = c;
+    for (int i = c + 1; i < 4; ++i) {
+      if (std::abs(m[i][c]) > std::abs(m[pivot][c])) pivot = i;
+    }
+    if (std::abs(m[pivot][c]) < 1e-12) return {{kNaN, "the pulse response did not determine it"}, {kNaN, "the pulse response did not determine it"}};
+    for (int j = 0; j < 6; ++j) std::swap(m[c][j], m[pivot][j]);
+    for (int i = 0; i < 4; ++i) {
+      if (i == c) continue;
+      const double f = m[i][c] / m[c][c];
+      for (int j = c; j < 6; ++j) m[i][j] -= f * m[c][j];
+    }
+  }
+  const double za = m[0][4] / m[0][0], zq = m[1][4] / m[1][1], ma = m[0][5] / m[0][0], mq = m[1][5] / m[1][1];
+  const double det = za * mq - zq * ma, trace = za + mq;
+  const std::string note = fmt("Za %+.3f, Zq %+.3f per s; ", za, zq) + fmt("Ma %+.3f, Mq %+.3f per s", ma, mq);
+  if (!(det > 0)) return {{kNaN, note + ": not oscillatory"}, {kNaN, note + ": not oscillatory"}};
+  const double wn = std::sqrt(det), zeta = -trace / (2 * wn);
+  return {{zeta, note + fmt("; natural frequency %.2f rad/s", wn)}, {wn, note + fmt("; damping %.2f", zeta)}};
+}
+
+Measured shortPeriod(Airframe& a) {
+  constexpr double kAltitudeFt = 8000, kCasKn = 250, kPulseDeg = 2, kPulseS = 1, kRecordS = 12;
+  const PitchResponse r = a.pitchPulse(kAltitudeFt, kCasKn, kPulseDeg, kPulseS, kRecordS);
+  if (!r.ok) return {kNaN, "no trim at 8000 ft and 250 kt"};
+  return shortPeriodOf(r, kRecordS).zeta;
+}
+
+// The full nose-up elevator of the A320, 30 deg trailing edge up, in the computers' frame.
+constexpr double kElevatorFullUpDeg = -30;
+
+// How high in alpha full nose-up elevator holds the nose, the stabiliser at 0: the static pitching moment
+// about the centre of gravity in level flight at 1 g, swept upward by degrees from 4 to 40 deg, and the
+// alpha where it first turns nose down, found to a sixty-fourth of a degree by halving. Above it the
+// elevator cannot hold the aeroplane in steady flight.
+Measured elevatorAlpha(Airframe& a, const Configuration& c) {
+  double lastAlpha = 4, last = a.pitchMomentAt(c, lastAlpha, kElevatorFullUpDeg, 0);
+  const double atStart = last;
+  if (last <= 0) return {kNaN, fmt("nose down already at %.0f deg: Cm %+.3f", lastAlpha, last)};
+  for (int k = 5; k <= 40; ++k) {
+    double alpha = k, cm = a.pitchMomentAt(c, alpha, kElevatorFullUpDeg, 0);
+    if (cm > 0) {
+      lastAlpha = alpha;
+      last = cm;
+      continue;
+    }
+    for (int halving = 0; halving < 6; ++halving) {
+      const double mid = (lastAlpha + alpha) / 2, cmMid = a.pitchMomentAt(c, mid, kElevatorFullUpDeg, 0);
+      if (cmMid > 0) {
+        lastAlpha = mid;
+        last = cmMid;
+      } else {
+        alpha = mid;
+        cm = cmMid;
+      }
+    }
+    const double at = lastAlpha + (alpha - lastAlpha) * last / (last - cm);
+    return {at, fmt("Cm %+.3f at 4 deg; %+.4f per deg where it turns", atStart, (cm - last) / (alpha - lastAlpha))};
+  }
+  return {kNaN, fmt("still nose up at 40 deg: Cm %+.3f", last)};
+}
+
+// How far the pitching moment breaks nose down past the stall: the static moment about the centre of
+// gravity in level flight at 1 g, elevator and stabiliser at 0, at 6 deg past the lift peak, less the
+// straight line fitted to it from 2 deg to 6 deg short of the peak, extended there.
+Measured pitchBreak(Airframe& a, const Configuration& c, const LiftPeak& p) {
+  const double to = p.alphaDeg - 6, at = p.alphaDeg + 6;
+  if (to < 4) return {kNaN, fmt("the lift peaks at %.2f deg, too low for a line before it", p.alphaDeg)};
+  double n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (double alpha = 2; alpha <= to + 1e-9; alpha += 0.5) {
+    const double cm = a.pitchMomentAt(c, alpha, 0, 0);
+    n += 1;
+    sx += alpha;
+    sy += cm;
+    sxx += alpha * alpha;
+    sxy += alpha * cm;
+  }
+  const double slope = (n * sxy - sx * sy) / (n * sxx - sx * sx), intercept = (sy - slope * sx) / n;
+  const double line = intercept + slope * at, cm = a.pitchMomentAt(c, at, 0, 0);
+  return {cm - line, fmt("Cm %+.3f at %.2f deg; ", cm, at) +
+                         fmt("the line from 2 to %.2f deg, %+.4f per deg, gives %+.3f", to, slope, line)};
+}
+
+// The lift past the stall as a share of the peak, so many degrees past the alpha of maximum lift.
+Measured liftPastStall(Airframe& a, const Configuration& c, const LiftPeak& p, double pastDeg) {
+  const double cl = a.liftAt(c, p.alphaDeg + pastDeg);
+  return {cl / p.clMax, fmt("CL %.3f at %.2f deg; ", cl, p.alphaDeg + pastDeg) + fmt("CL max %.3f at %.2f deg", p.clMax, p.alphaDeg)};
 }
 
 // The bare airframe, measured row by row at the weight each row names: lift peaks once per
@@ -364,17 +485,47 @@ class Bare {
     }
     if (id == "drag-rise") return dragRise(a_);
     if (id == "short-period") return shortPeriod(a_);
+    if (family.rfind("short-period-", 0) == 0) {
+      // in a configuration and at a speed above VLS the condition names: "CONF FULL; ...; VLS + 5 kt"
+      const Config* c = family == "short-period-full" || family == "short-period-freq-full" ||
+                                family == "short-period-cap-full"
+                            ? config("full")
+                            : nullptr;
+      const size_t at = condition.find("VLS + ");
+      if (!c || at == std::string::npos) return {kNaN, "no configuration or no speed above VLS in the row"};
+      const double cas = speeds_.at("vls:" + c->name, tonnes) + std::atof(condition.c_str() + at + 6);
+      const ShortPeriodPoint& s = shortPeriodAt(*c, cas, lbs);
+      if (family == "short-period-full") return s.mode.zeta;
+      if (family == "short-period-freq-full") return s.mode.wn;
+      return s.cap;
+    }
+    if (family.rfind("elevator-alpha-", 0) == 0 && config(family.substr(15))) {
+      return elevatorAlpha(a_, config(family.substr(15))->surfaces);
+    }
+    if (family.rfind("pitch-break-", 0) == 0 && config(family.substr(12))) {
+      const Config& c = *config(family.substr(12));
+      return pitchBreak(a_, c.surfaces, peak(c));
+    }
+    if (family.rfind("lift-past-stall-", 0) == 0) {
+      // "lift-past-stall-full-15": CONF FULL, 15 deg past the peak
+      const std::string rest = family.substr(16);
+      const size_t dash = rest.find('-');
+      const Config* c = dash == std::string::npos ? nullptr : config(rest.substr(0, dash));
+      if (!c) return {kNaN, "no configuration in the row's id"};
+      return liftPastStall(a_, c->surfaces, peak(*c), std::atof(rest.c_str() + dash + 1));
+    }
     return {kNaN, "?"};
   }
 
   // Whether a row is measured on the bare airframe rather than flown.
   static bool measures(const std::string& id, const std::string& family) {
-    for (const char* prefix : {"vs1g-", "stall-alpha-", "vls-alpha-"}) {
+    for (const char* prefix : {"vs1g-", "stall-alpha-", "vls-alpha-", "elevator-alpha-", "pitch-break-"}) {
       const size_t n = std::strlen(prefix);
       if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
     }
     return family == "app-pitch-full" || family == "cruise-pitch" || family == "cruise-tla" || id == "drag-rise" ||
-           id == "short-period" || id.rfind("thrust-", 0) == 0 || endsWith(id, "-gradient");
+           id == "short-period" || family.rfind("short-period-", 0) == 0 || family.rfind("lift-past-stall-", 0) == 0 ||
+           id.rfind("thrust-", 0) == 0 || endsWith(id, "-gradient");
   }
 
  private:
@@ -384,10 +535,44 @@ class Bare {
     return peaks_[c.name] = a_.liftPeak(c.surfaces);
   }
 
+  // The short period of the bare airframe in a configuration, trimmed level at 1,000 ft and a CAS, after
+  // a pulse of 2 deg of elevator for 1 s, by equation error over its first 6 s; and with it the control
+  // anticipation parameter, the natural frequency squared over the load factor per radian of alpha,
+  // n/alpha = qbar S CL_alpha / W, from the lift slope at the trim. Measured once for the rows that share it.
+  struct ShortPeriodPoint {
+    ShortPeriod mode;
+    Measured cap;
+  };
+  const ShortPeriodPoint& shortPeriodAt(const Config& c, double casKn, double lbs) {
+    constexpr double kAltitudeFt = 1000, kPulseDeg = 2, kPulseS = 1, kRecordS = 12, kFitS = 6;
+    const std::string key = c.name + fmt(" %.3f kt %.1f lb", casKn, lbs);
+    const auto it = shortPeriods_.find(key);
+    if (it != shortPeriods_.end()) return it->second;
+    ShortPeriodPoint& s = shortPeriods_[key];
+    const PitchResponse r = a_.pitchPulse(kAltitudeFt, casKn, kPulseDeg, kPulseS, kRecordS, c.surfaces);
+    if (!r.ok) {
+      const Measured none{kNaN, fmt("no trim at %.0f kt", casKn)};
+      s = {{none, none}, none};
+      return s;
+    }
+    // In CONF FULL near VLS the response may not overshoot at all within the record (ours does not), so
+    // the extrema the clean row reads cannot see the period; equation error can. Where both can, they
+    // agree within 0.07 of damping and 0.05 rad/s (the clean row and the 737's CONF FULL, 2026-11-01).
+    s.mode = shortPeriodByEquationError(r, kFitS);
+    const double below = a_.aero(kAltitudeFt, r.mach, r.trimAlphaDeg - 0.5, c.surfaces).cl,
+                 above = a_.aero(kAltitudeFt, r.mach, r.trimAlphaDeg + 0.5, c.surfaces).cl;
+    const double clAlpha = (above - below) / (kPi / 180), nAlpha = r.qbarPsf * a_.wingAreaFt2() * clAlpha / lbs;
+    const double wn = s.mode.wn.value;
+    s.cap = {wn * wn / nAlpha, fmt("natural frequency %.2f rad/s; n/alpha %.2f g per rad; ", wn, nAlpha) +
+                                   fmt("at %.0f kt and %.1f deg of alpha", casKn, r.trimAlphaDeg)};
+    return s;
+  }
+
   Airframe& a_;
   const Speeds& speeds_;
   const double loadedLbs_;
   std::map<std::string, LiftPeak> peaks_;
+  std::map<std::string, ShortPeriodPoint> shortPeriods_;
 };
 
 // The airframe flown through the laws: the gate's circuit, to the approach, with one extra roll.
@@ -579,10 +764,62 @@ int instruments() {
   return failed ? 1 : 0;
 }
 
+// The instruments for pitch past the normal range, checked against what our A320's file says: the static
+// moment is static, the elevator's power is the file's and fades where the file says, and the two ways
+// of reading a short period agree where both can.
+int pitchInstruments() {
+  int failed = 0;
+  const Configuration full = config("full")->surfaces;
+  // At 1 g the alpha has no rate, so the alpha-rate damping cannot reach the static moment.
+  Airframe::select("a320");
+  double withDamping[2] = {};
+  for (int k = 0; k < 2; ++k) {
+    Airframe::setCoefficients({{"aero/fit/cm-alphadot", k ? -40.0 : 0.0}});
+    Airframe a;
+    withDamping[k] = a.pitchMomentAt(full, 15, kElevatorFullUpDeg, 0);
+  }
+  Airframe::setCoefficients({});
+  failed += verdict("the static moment carries no alpha-rate damping",
+                    std::abs(withDamping[1] - withDamping[0]) < 1e-4,
+                    fmt("Cm %+.5f with none, %+.5f with -40 per rad, at 15 deg in CONF FULL", withDamping[0], withDamping[1]));
+
+  // The elevator's power: the file's cm-de, and its lift, cl-de, acting at the reference point ahead of the
+  // centre of gravity; times the tail's share, 1 below the fade's onset and less above it.
+  Airframe a;
+  const double cmDe = a.property("aero/fit/cm-de"), clDe = a.property("aero/fit/cl-de");
+  const double fade = a.property("aero/fit/tail-fade"), from = a.property("aero/fit/tail-fade-from-deg");
+  const double arm = (a.property("inertia/cg-x-in") - a.property("metrics/aero-rp-x-in")) / (12 * a.property("metrics/cbarw-ft"));
+  for (double alpha : {6.0, 20.0}) {
+    const double share = std::max(0.25, 1 - fade * 0.1 * std::max(0.0, alpha - from));
+    const double expected = share * (cmDe + clDe * arm) * (-10 * kPi / 180);
+    const double measured = a.pitchMomentAt(full, alpha, -10, 0) - a.pitchMomentAt(full, alpha, 0, 0);
+    failed += verdict(alpha < from ? "10 deg of elevator moves the moment as the file says"
+                                   : "and past the onset of the tail's fade, by the share the file leaves it",
+                      std::abs(measured / expected - 1) < 0.02,
+                      fmt("%+.4f against %+.4f at %.0f deg of alpha", measured, expected, alpha) +
+                          fmt(", the tail's share %.3f", share));
+  }
+
+  // Equation error, which the CONF FULL rows read, and the extrema the clean row reads, on the 737's
+  // clean pulse, which overshoots enough for both.
+  Airframe::select("737");
+  Airframe b;
+  const PitchResponse r = b.pitchPulse(8000, 250, 2, 1, 12);
+  const ShortPeriod byExtrema = shortPeriodOf(r, 12), byEquations = shortPeriodByEquationError(r, 6);
+  failed += verdict("two readings of a short period agree",
+                    r.ok && std::abs(byExtrema.zeta.value - byEquations.zeta.value) < 0.07 &&
+                        std::abs(byExtrema.wn.value - byEquations.wn.value) < 0.06,
+                    fmt("damping %.3f and %.3f, ", byExtrema.zeta.value, byEquations.zeta.value) +
+                        fmt("natural frequency %.3f and %.3f rad/s", byExtrema.wn.value, byEquations.wn.value));
+  std::printf("%s\n", failed ? "FAILED" : "PASSED");
+  return failed ? 1 : 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
-  std::string targetsDir = FLIGHT_TARGETS_DIR, out, onlyGroup, skipGroup;
+  std::string targetsDir = FLIGHT_TARGETS_DIR, out, onlyGroup;
+  std::vector<std::string> skipGroups;
   bool check = false, fitRowsOnly = false;
   for (int i = 1; i < argc; ++i) {
     const std::string a = argv[i];
@@ -599,25 +836,31 @@ int main(int argc, char** argv) {
     } else if (a == "--only-group" && i + 1 < argc) {
       onlyGroup = argv[++i];
     } else if (a == "--skip-group" && i + 1 < argc) {
-      skipGroup = argv[++i];
+      skipGroups.push_back(argv[++i]);
     } else if (a == "--check") {
       check = true;
     } else if (a == "--instruments") {
       return instruments();
+    } else if (a == "--instruments-pitch") {
+      return pitchInstruments();
     } else {
       std::printf(
           "airframe_score [--airframe 737|a320] [--coefficients file] [--targets dir] [--out score.csv]\n"
-          "               [--check] [--fit-rows] [--only-group G | --skip-group G] [--instruments]\n");
+          "               [--check] [--fit-rows] [--only-group G | --skip-group G ...]\n"
+          "               [--instruments | --instruments-pitch]\n");
       return 2;
     }
   }
   const auto rows = readCsv(targetsDir + "/a320.csv");
   const Speeds speeds(targetsDir + "/a320-speeds.csv");
-  // The rows this run is about: every row, or the fit rows, of a group or of every group but one. The
-  // fitter fits the aerodynamics and the engines apart, on their own rows.
+  // The rows this run is about: every row, or the fit rows, of a group or of every group but those
+  // skipped. The fitter fits the aerodynamics, the engines and what lies past the stall apart, each on
+  // its own rows.
   auto wanted = [&](const std::map<std::string, std::string>& row) {
+    const std::string& group = row.at("group");
     return (!fitRowsOnly || (row.at("kind") == "target" && row.at("use") == "fit")) &&
-           (onlyGroup.empty() || row.at("group") == onlyGroup) && (skipGroup.empty() || row.at("group") != skipGroup);
+           (onlyGroup.empty() || group == onlyGroup) &&
+           std::find(skipGroups.begin(), skipGroups.end(), group) == skipGroups.end();
   };
 
   Airframe bare;

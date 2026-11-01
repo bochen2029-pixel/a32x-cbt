@@ -323,6 +323,10 @@ add_test(NAME airframe_is_scored_against_the_a320 COMMAND airframe_score --check
 # The scorer's instruments read the 737's own file back: its gear drag, the Mach where its drag table
 # crosses 20 counts, a pitch pulse answered the right way round.
 add_test(NAME scorer_instruments_read_the_737_right COMMAND airframe_score --instruments)
+# And the ones for pitch past the normal range read our A320's: a static moment with no alpha-rate damping
+# in it, the elevator's power and its fade with alpha as the file has them; and two readings of a short
+# period, by its extrema and by equation error, agree on the 737's clean pulse.
+add_test(NAME scorer_instruments_read_pitch_as_the_files_have_it COMMAND airframe_score --instruments-pitch)
 
 # Our fitted A320 flies by default since 2026-11-01. The 737 it replaced stays selectable and keeps its
 # own cases, so the swap rule can always score both: it is scored, flies the gate, and lands.

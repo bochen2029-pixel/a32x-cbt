@@ -10,7 +10,7 @@
 #   kind       target  - scored inside or outside its band, and counted
 #              context - scored beside its band, not counted: operational data, not capability
 #              pending - named, not yet measured
-#   group      stall, alpha, attitude, dynamics, performance, thrust
+#   group      stall, alpha, attitude, dynamics, performance, thrust, poststall (past the stall: fitted apart)
 #   condition  what the airframe is doing when measured (semicolons, not commas). A thrust or gradient
 #              row's condition is read by the scorer: the lever (TOGA, MCT, CL, idle), the configuration,
 #              a CAS in kt, static, or a Mach, and an altitude in ft, sea level or a flight level. ISA
@@ -70,6 +70,39 @@
 #                       Dutch roll damping at least 0.08; short-period damping 0.30 to 2.00. Floors for
 #                       handling, not A320 data. The short period is the bare airframe's: in direct law the
 #                       pilot flies it as it is
+#   mil-f-8785c-cat-c   The same specification (MIL-F-8785C, 5 November 1980), Level 1, Class III, flight
+#                       phase category C, the terminal phases: take-off, approach, landing. Short-period
+#                       damping 0.35 to 1.30 (3.2.2.1.2, table IV); the short period's natural frequency
+#                       inside the lines of figure 3, a control anticipation parameter, the frequency squared
+#                       over the load factor per radian of alpha, of 0.16 to 3.6 per g per s2, and for Class
+#                       III at least 0.7 rad/s where n/alpha is 2.0 g per rad or more, both read off the
+#                       figure. Floors for handling, not A320 data, measured on the bare airframe in CONF
+#                       FULL at the approach speed: in direct law, which A32NX's computers choose once the
+#                       gear is down in alternate law, the pilot lands it as it is
+#   foster-2005         Foster, Cunningham, Fremaux, Shah, Stewart (NASA Langley), Rivers (NASA Johnson),
+#                       Wilborn and Gato (Boeing): Dynamics Modeling and Simulation of Large Transport
+#                       Airplanes in Upset Conditions, AIAA 2005-5933, on NTRS (20050214373). Wind tunnel
+#                       tests of 5.5 % and 3.5 % models of a twin-jet transport to 85 deg of alpha: pitch
+#                       stability falls near the stall, and the elevator, effective at every alpha, loses
+#                       power as alpha rises, first in the wing's wake and then as the tail's own flow
+#                       separates. With full nose-up elevator, the stabiliser at 0, idle and a mid CG, the
+#                       highest steady alpha is about 25 deg with the flaps up; in piloted simulation the
+#                       highest alpha reached with full aft column was 4 to 5 deg lower with them down, so
+#                       about 20.5 deg. The axes of most of its figures carry no numbers (the company's data
+#                       are proprietary); these two do. Another airframe and an inference for flaps down,
+#                       so the bands, 4 deg either way, are ours
+#   tcm-gtm             Hueschen: Development of the Transport Class Model (TCM) Aircraft Simulation From a
+#                       Sub-Scale Generic Transport Model (GTM) Simulation, NASA/TM-2011-217169, August 2011,
+#                       public domain: a mid-sized single-aisle twin jet, full scale, on NASA's
+#                       non-proprietary polynomial database from the same 5.5 % model's wind tunnel data,
+#                       lift and drag corrected for Reynolds number at Mach 0.34 and 5,000 ft. Read off its
+#                       figures by eye. Figure 34, flaps 30, its landing flap: lift peaks at 2.99 near
+#                       20.8 deg, keeps 0.89 of it 5 deg past the peak and 0.64 of it 15 deg past, where it
+#                       levels off. Figure 33, flaps up, elevator and stabiliser at 0: the pitching moment
+#                       falls 0.023 per deg up to 12 deg, then breaks nose down through the stall to -0.60 at
+#                       24 deg, 6 deg past its lift peak, 0.20 below its earlier line extended, and levels
+#                       off beyond 25 deg. Another airframe, its moment not corrected for Reynolds number, so
+#                       the bands, 0.10 either way on the lift and -0.35 to -0.05 on the break, are ours
 #   easa-tcds-e067      EASA type-certificate data sheet E.067, issue 02, 17 April 2018, CFM56-5 series: the
 #                       CFM56-5-A1, the A320-211's engine and the one our A320 carries, is rated 11,120 daN for
 #                       take-off (constant below 30 C) and 10,540 daN maximum continuous (below 25 C); static,
@@ -153,6 +186,14 @@ roll-rate,target,dynamics,steady roll rate at full lateral stick,normal law; 800
 roll-tau,target,dynamics,roll mode time constant,full lateral stick step; normal law; 8000 ft; 250 kt,,,,1.4,s,check,mil-f-8785c
 dutch-roll-zeta,target,dynamics,Dutch roll damping with the yaw damper,released after 3 s of 0.3 pedal; normal law; 8000 ft; 250 kt,,,0.08,,ratio,check,mil-f-8785c
 short-period,target,dynamics,short-period damping ratio,bare airframe trimmed then 2 deg of elevator for 1 s; controls otherwise fixed; clean; 8000 ft; 250 kt,,,0.30,2.00,ratio,check,mil-f-8785c
+short-period-full,target,dynamics,short-period damping ratio,bare airframe trimmed at VLS + 5 kt then 2 deg of elevator for 1 s; controls otherwise fixed; CONF FULL; gear down; 1000 ft,65,,0.35,1.30,ratio,check,mil-f-8785c-cat-c
+short-period-freq-full,target,dynamics,short-period natural frequency,bare airframe trimmed at VLS + 5 kt then 2 deg of elevator for 1 s; controls otherwise fixed; CONF FULL; gear down; 1000 ft,65,,0.70,,rad/s,check,mil-f-8785c-cat-c
+short-period-cap-full,target,dynamics,control anticipation parameter,bare airframe trimmed at VLS + 5 kt then 2 deg of elevator for 1 s; controls otherwise fixed; CONF FULL; gear down; 1000 ft,65,,0.16,3.60,1/(g s2),check,mil-f-8785c-cat-c
+elevator-alpha-full,target,poststall,highest alpha full nose-up elevator holds,steady level flight at 1 g; elevator 30 deg up; stabiliser at 0; CONF FULL; 1000 ft,,,16.5,24.5,deg,fit,foster-2005
+elevator-alpha-clean,target,poststall,highest alpha full nose-up elevator holds,steady level flight at 1 g; elevator 30 deg up; stabiliser at 0; clean; 1000 ft,,,21,29,deg,check,foster-2005
+pitch-break-clean,target,poststall,pitching moment 6 deg past the lift peak less the line before the stall,steady level flight at 1 g; elevator and stabiliser at 0; the line fitted from 2 deg to 6 deg short of the peak; clean; 1000 ft,,,-0.35,-0.05,Cm,check,tcm-gtm
+lift-past-stall-full-5,target,poststall,lift 5 deg past its peak as a share of the peak,CONF FULL; elevator at 0; 1000 ft; 150 kt,,,0.79,0.99,ratio,fit,tcm-gtm
+lift-past-stall-full-15,target,poststall,lift 15 deg past its peak as a share of the peak,CONF FULL; elevator at 0; 1000 ft; 150 kt,,,0.54,0.74,ratio,fit,tcm-gtm
 thrust-toga-static,target,thrust,thrust of one engine,TOGA; static; sea level,,,110.09,112.31,kN,fit,easa-tcds-e067
 thrust-mct-static,target,thrust,thrust of one engine,MCT; static; sea level,,,104.35,106.45,kN,fit,easa-tcds-e067
 thrust-toga-100kt,target,thrust,thrust of one engine,TOGA; 100 kt; sea level,,,92.16,97.86,kN,fit,anp-a320-211
