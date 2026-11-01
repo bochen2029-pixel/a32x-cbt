@@ -6,8 +6,9 @@ installer. This document is the plan and the honest state of it.
 Last written: 2026-11-01, at P7. The flyable simulator is now the product (§3, §9); the systems
 trainer still ships on its own, MIT (P5's zip). P7's slice 1 flies the A32NX computers on an A320
 of ours, fitted to 33 cited targets, headless from takeoff to landing (§4, P7). The browser track
-(steps 5–8) is done: the same flight in a browser from `file://`, a joystick, a view. The thrust
-fit is under way; steps 2–4 and the gate are next.
+(steps 5–8) is done: the same flight in a browser from `file://`, a joystick, a view. So is step 2:
+Zurich's runway 14 and an ILS on it, wind and turbulence, the scripted crew flying the ILS inside every
+band. The thrust fit is under way; steps 3, 4 and the gate are next.
 
 ---
 
@@ -99,7 +100,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 33 A320 targets where the 737 it replaced is inside 8 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; steps 2–4 and the gate not started |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 33 A320 targets where the 737 it replaced is inside 8 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; steps 3, 4 and the gate not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -258,8 +259,19 @@ flight core as a C API whose replays give the same bytes; Emscripten 6.0.12 buil
 landing the scripted crew at the native touchdown to the printed digit; the page from `file://` in a
 Blob worker, a tick at 79 to 117 µs; a joystick mapped from the pilot's hands, the keyboard as fallback;
 the view at 30 fps in software rendering, 1440 × 900. Numbers and their desktop load in
-`flight/README.md`. Not done in them: the 2014 laptop, and an ILS for the overlay's empty scales
-(step 2).
+`flight/README.md`. Not done in them: the 2014 laptop.
+
+Step 2 is done [M]: LSZH runway 14 from OurAirports at its place and elevation, an ILS to ICAO's
+geometry on it (3°, 50 ft over the threshold), steady wind and Tustin turbulence from JSBSim's
+atmosphere, and an approach start, trimmed, in the harness, the C API and the page. The scripted crew
+flies raw-data ILS from 10 nm to a stop, from the beams, a dot left, right, low and high, 10 kt fast and
+slow, and in a 15 kt crosswind from either side, inside every band below, with either airframe (A320
+touching down 318 to 333 m past the threshold, the 737 357 to 365 m, within a metre of the centreline).
+In light turbulence it stays inside the A320's hard-landing limits but strays past the stabilised bands
+by a little — 1,050 fpm for a moment, a touchdown at 295 m — by a margin that depends on the compiler;
+`flight/README.md` has the numbers. A recorded approach replays to the same bytes. One finding on the
+way: JSBSim's initial condition and its dynamics take the wind with opposite signs, so the wind is set
+after the trim.
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes

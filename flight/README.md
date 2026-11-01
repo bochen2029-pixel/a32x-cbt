@@ -461,6 +461,18 @@ From the A320 fit:
   makes of them; neither is a fault there.
 - **The scripted flare is sensitive.** Of 72 settings swept for the crew, nine landed the A320 inside
   the limits, and a setting that lands one airframe well can leave the other touching down flat. The crew is a test fixture; a hand-flown ILS (P7's gate) will judge landings properly.
+  Flared higher on the ILS, from 40 to 50 ft instead of 33, it landed harder and shorter on both.
+- **JSBSim's initial condition and its dynamics take the wind with opposite signs.** The initial
+  condition holds the airspeed as the ground velocity plus the wind (`FGInitialCondition::GetWindNEDFpsIC`
+  is the airspeed vector less the ground velocity); the dynamics take it as the ground velocity less the
+  wind (`FGAuxiliary`: `vAeroUVW = vUVW - Tl2b * TotalWindNED`). A wind set through the initial
+  condition therefore starts the aircraft with its airspeed off by twice the wind: in a 15 kt crosswind
+  ours started 28 kt slow and diving, and the 737 hit the ground in 29 s. An approach start trims in still
+  air and then puts the wind into the atmosphere and onto the ground velocity together
+  (`FGPropagate::SetUVW`), so the airspeed stays the trimmed one. Worth reporting upstream.
+- **Windows' `cmd /c` strips the first and last quote of a line that holds more than two**, so a child
+  process started with a quoted path and a quoted argument (`--scenario "approach;wind=227/15"`) loses
+  both. The replay check gives it a pair of its own to strip.
 
 ## The browser simulator (P7, steps 5 to 8)
 
@@ -498,12 +510,11 @@ is the fallback (H lists the keys): arrows, Z X rudder, PgUp PgDn thrust levers 
 detents, R F flaps, G gear, B brakes, P parking brake, S speedbrake, A ground spoilers, T Y U RUD TRIM and
 its RESET. The takeover pushbutton is mapped; with no autopilot until P9 it disconnects nothing.
 
-**The view.** three.js, drawn as a 1980s full-flight simulator drew it: fields, haze, a 3,000 m runway with
-its paint and lights, an approach light line, a PAPI that reads the eye's angle, a few buildings, dusk,
-night or day. Over it, until P8 draws a PFD: a conformal horizon and pitch ladder, the flight path,
-speed, altitude, V/S, radio height, heading, flaps, gear, and ILS scales that stay empty until step 2.
-The runway is drawn at the start; the scripted crew lands wherever its path meets the ground, which step 2
-moves onto the runway.
+**The view.** three.js, drawn as a 1980s full-flight simulator drew it: fields, haze, the runway the
+flight core names (below) with its paint and lights, an approach light line, a PAPI that reads the eye's
+angle, a few buildings, dusk, night or day. Over it, until P8 draws a PFD: a conformal horizon and pitch
+ladder, the flight path, speed, altitude, V/S, radio height, heading, flaps, gear, and the ILS's
+localizer and glideslope scales.
 
 As measured, 2026-11-01, headless Chrome at 1440 × 900, with the desktop's CPU sampled each second:
 
@@ -522,14 +533,59 @@ The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach
 `the_view_puts_the_eye_and_the_papi_right`, and in the WebAssembly build `the_browser_module_flies` —
 the very file the page loads, in node: the scripted crew lands it at the native build's touchdown to the
 printed digit (A320: 1042.12 s, −143.2 fpm), and its inputs replayed into a second instance give the same
-state on every tick. Twenty-three native cases pass with either airframe; under node, all but the three
-that start processes.
+state on every tick. The suite's count is in the next section.
+
+## A runway, its ILS and the wind (P7, step 2)
+
+**The runway** is a real one: Zurich's runway 14, from OurAirports (`harness/runway.cpp`,
+`docs/provenance.md` §1f), at its place on the earth, its elevation, its heading of 137° true, its
+3,300 m and its displaced threshold. **The ILS** on it is a textbook one, to ICAO's geometry: a 3° glide
+crossing the threshold at 50 ft; full scale, two dots, 107 m either side of the centreline at the
+threshold and 0.24 of the glide's angle above and below it. Readings take the earth's curve out. A
+beam's deviation is where it lies from the aircraft, + right and + up, so flying toward the diamond
+centres it.
+
+**An approach start** puts the aircraft on it, in the air, trimmed by JSBSim, in CONF FULL with the gear
+down: `law_harness --scenario "approach;distance=10;loc=0;gs=0;cas=140;wind=227/15;turbulence=0"`, the
+page's `?scenario=` and the C API's `flight_start_scenario` all take the same text. The wind is steady,
+from a true direction; turbulence is JSBSim's Tustin model at a MIL-F-8785C severity, from a fixed seed.
+
+**The scripted crew** flies it from 10 nm to a stop, raw data: the beams' deviations read as metres
+with the distance, the track closing on the centreline over 20 s and the flight path on the glide over
+10 s, the speed on the thrust levers at Vapp 140 kt; it flares as the circuit crew does and takes the
+crab out with rudder in the last 15 ft. `--expect ils` judges it by the bands a hand-flown ILS will be
+judged by (`ROADMAP.md`, P7), each band's worst printed with where it happened. Every start passes with
+either airframe, and by 1,000 ft every start has converged, so the stabilised window reads the same
+whatever the start:
+
+| airframe | starts | worst LOC, G/S | worst sink | speed | touchdown | off the centreline | sink at touchdown |
+|---|---|---|---|---|---|---|---|
+| A320 | on the beams; a dot left, right, low, high; 10 kt fast, slow | 0.01, 0.03 dots | 756 fpm | 140.0 kt | 332–333 m | +0.5 m | 139–143 fpm |
+| A320 | 15 kt crosswind from the left, from the right | 0.01, 0.03 dots | 752 fpm | 140.0 kt | 318–319 m | +0.5 m | 227–231 fpm |
+| 737 | on the beams; a dot left, right, low, high; 10 kt fast, slow | 0.01, 0.04 dots | 756 fpm | 140.0 kt | 364–365 m | +0.5 m | 80–85 fpm |
+| 737 | 15 kt crosswind from the left, from the right | 0.01, 0.04 dots | 752 fpm | 140.0 kt | 357–359 m | −0.1 to +1.0 m | 95–104 fpm |
+
+In light turbulence the gusts take a crew this simple past the stabilised bands by a little: the sink
+rate to 1,050 fpm for a moment, the A320's touchdown to 295 m, the 737 5.8 kt slow. How far depends on
+the last bit of the arithmetic — the WebAssembly build's A320 touches down at 362 fpm where MSVC's does at
+207 — so the turbulence case asks what holds on every compiler: the gusts are felt, and the landing is
+inside the A320's hard-landing limits. The hand-flown gate is the operator's, and may be flown in calm air.
+
+The page flies the same approaches: `index.html?scenario=approach` (add `&crew=script` to watch), the
+runway drawn where it is from the core's `rwy_` state, the diamonds on the overlay. The browser's own
+module lands the scripted crew in a 15 kt crosswind at the native build's touchdown, to the metre.
+
+New `ctest` cases: `ils_on_the_beams`, `ils_a_dot_off_the_localizer`, `ils_a_dot_low` (an approach start
+reads the beams where it asked, holds hands off); nine `ils_flown_` cases (the crew, judged by the
+bands); `ils_in_light_turbulence_lands_inside_the_hard_landing_limits`;
+`ils_approach_replays_to_the_same_touchdown`. Thirty-seven native cases pass with either airframe, MSVC
+19.44; thirty-four under node, the WebAssembly build leaving out the three that start processes.
 
 ## What P7 still has to build
 
-`ROADMAP.md` §4, *P7 in detail*: a runway, an ILS and wind in the world; failures and the laws they
-reach; the protections exercised; and the gate — a hand-flown ILS, stable and repeatable, with its
-measures and bands written down. The browser steps (5 to 8) are above. Our fitted A320 flies all of it from here; the next fit is thrust
+`ROADMAP.md` §4, *P7 in detail*: failures and the laws they reach; the protections exercised; and the
+gate — a hand-flown ILS, stable and repeatable, with its measures and bands written down. The browser
+steps (5 to 8) and the runway, ILS and wind (step 2) are above. Our fitted A320 flies all of it from here; the next fit is thrust
 ([above](#the-swap-made-2026-11-01)).
 
 ## What is here
