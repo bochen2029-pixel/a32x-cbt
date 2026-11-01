@@ -16,6 +16,7 @@ import { buildNote, Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
 import { centre, drag, wheel } from './pointer.js';
+import { buildCompare, escapeHtml, looksLikeRecording, pack, REPLAY_TICKS, replayUrl, savedVerdict, STORE, unpack } from './replay.js';
 import { runwayFromState } from './scene-math.js';
 import { drawTimeline, momentAt, Playhead, readout, sampleAt, timeAt } from './timeline.js';
 import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
@@ -24,6 +25,9 @@ const params = new URLSearchParams(location.search);
 const airframe = params.get('airframe') || '';
 const scripted = params.get('crew') === 'script';
 const scenario = params.get('scenario') || '';
+const replayMode = params.get('replay') === '1';   // a saved recording, flown again (replay.js)
+const driven = scripted || replayMode;             // the crew or the recording flies: the page sends no inputs
+let replayDone = false;                            // the recording's last row has flown: the debrief is open on it
 const benchTicks = Math.round(Number(params.get('bench') || 0) * 60 * 50);
 const bench = { ticks: 0, ms: 0, wallMs: 0, done: benchTicks <= 0 };
 
@@ -80,7 +84,33 @@ eventsBox.addEventListener('click', (e) => {
 });
 let shownVerdict = '';   // the verdict the panel shows
 let saved = '';          // what the last save did, for the status line
+let opening = '';        // why a recording could not be opened, for the status line
 document.getElementById('save').addEventListener('click', () => save());
+
+// A recording opened, with Ctrl+O, the panel's button or a file dropped on the page: the page reloads to fly it
+// again, the recording carried across in sessionStorage (replay.js).
+const openInput = document.getElementById('open');
+document.getElementById('open-button').addEventListener('click', () => openInput.click());
+openInput.addEventListener('change', () => {
+  if (openInput.files[0]) openRecording(openInput.files[0]);
+});
+window.addEventListener('dragover', (e) => e.preventDefault());
+window.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer?.files?.[0];
+  if (file) openRecording(file);
+});
+async function openRecording(file) {
+  try {
+    const text = await file.text();
+    if (!looksLikeRecording(text)) throw new Error(`${file.name} is not a recording the page saved`);
+    sessionStorage.setItem(STORE, await pack(text));
+    sessionStorage.setItem(`${STORE}-name`, file.name);
+    location.href = replayUrl(location.href);
+  } catch (e) {
+    opening = `could not open the recording: ${e.message}`;
+  }
+}
 const overlay = new Overlay(overlayCanvas);
 
 // The mouse on the view (pointer.js): a drag looks round the flight deck or swings round the aircraft,
@@ -109,6 +139,11 @@ viewCanvas.addEventListener('dblclick', () => centre(view));
 
 // The view's own keys, beside the hands' (hands.js uses none of these): cameras, the hour, the debrief.
 window.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')) {
+    e.preventDefault();
+    openInput.click();
+    return;
+  }
   if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
     e.preventDefault();
     save();
@@ -196,7 +231,8 @@ function report() {
   return {
     error,
     airframe: airframe || 'default',
-    crew: scripted ? 'script' : 'hands',
+    crew: replayMode ? 'replay' : scripted ? 'script' : 'hands',
+    replay: replayMode ? { ended: Boolean(flight.ended), header: flight.replay?.header ?? null } : null,
     scenario: scenario || 'runway',
     build: flight.build || '',
     airport: drawn,
@@ -247,6 +283,8 @@ globalThis.flightDebug = {
     set(view, 'zoom', zoom);
     return view.mode;
   },
+  // the flight so far as Ctrl+S saves it, for a driver to open again (tools/drive.mjs)
+  recording: () => flight.recording({}).then((r) => r.text),
   // the debrief's playhead (timeline.js): to a time of the flight (Infinity: live); play or pause; what it shows
   seek(t) {
     playhead.playing = false;
@@ -282,24 +320,30 @@ function show() {
       `${c.parkingBrake ? 'PARK BRK  ' : ''}${c.toeBrakes ? 'BRAKES  ' : ''}${c.speedbrake ? 'SPD BRK  ' : ''}` +
       `${c.spoilersArmed ? 'GND SPLR ARM  ' : ''}${c.rudderTrim ? `RUD TRIM ${c.rudderTrim > 0 ? 'L' : 'R'}  ` : ''}` +
       `${c.takeover ? 'TAKEOVER (no autopilot yet)' : ''}\n`) +
-    `${hands.prompt()}` + (hands.help ? `\n\n${[...KEY_HELP, ...VIEW_KEYS, 'Ctrl+S  save the recording'].join('\n')}` : '');
+    `${hands.prompt()}` + (hands.help ? `\n\n${[...KEY_HELP, ...VIEW_KEYS, 'Ctrl+S  save the recording', 'Ctrl+O  open a recording and replay it (or drop it on the page)'].join('\n')}` : '');
   const r = report();
   const cls = r.stepsDropped ? 'warn' : '';
   // the build on a line of its own, clear of the disclaimer centred above (buildNote: amber where the gate refuses it)
   const build = buildNote(r.build);
   status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n` +
-    (build.text ? `${build.warn ? `<span class="warn">${build.text}</span>` : build.text}\n` : '') + `${view.describe()}\n` +
+    (build.text ? `${build.warn ? `<span class="warn">${build.text}</span>` : build.text}\n` : '') +
+    (replayMode ? `${replayLines()}\n` : '') + `${view.describe()}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
-    `<span class="${cls}">${r.stepsDropped} steps dropped</span>` + (saved ? `\n${saved}` : '');
+    `<span class="${cls}">${r.stepsDropped} steps dropped</span>` + (saved ? `\n${saved}` : '') +
+    (opening ? `\n<span class="bad">${escapeHtml(opening)}</span>` : '');
   // the gate's verdict once the core has stopped judging, as the core words it (flight_debrief())
   const judged = Number.isFinite(value('judge_stable'));
   // a worker too old to send the core's words gets the verdict from the slots, said as plainly
   const words = latest.debrief || (judged ? `${value('judge_stable') ? 'STABLE' : 'NOT STABLE'}, the touchdown ` +
     `${value('judge_touchdown_m').toFixed(0)} m past the threshold` : '');
   const open = judged || view.debriefOn;   // once judged; and in the debrief (K) as it flies
-  if (open && words !== shownVerdict) {
-    shownVerdict = words;
-    verdict.textContent = words;
+  // a replay's verdict beside the one saved with its recording, once it is judged
+  const saidThen = replayMode && judged ? savedVerdict(flight.replay?.judged) : '';
+  const shown = !saidThen ? words : saidThen === savedVerdict(words.split('\n'))
+    ? `${words}\nas saved with the recording` : `${words}\nsaved with the recording: ${saidThen}`;
+  if (open && shown !== shownVerdict) {
+    shownVerdict = shown;
+    verdict.textContent = shown;
   }
   if (open && log.version !== shownLog) {
     shownLog = log.version;
@@ -366,8 +410,10 @@ function frame(now) {
   // The clock decides the steps. While the worker still owes the last answer they wait, up to five;
   // past that they are dropped, as the clock drops its own.
   const droppedBefore = clock.dropped + droppedWaiting;
-  pending += clock.advance(realMs);
-  if (pending > clock.maxCatchUp) {
+  // a replay flies as fast as a frame's REPLAY_TICKS allow, not on the clock, and nothing of it is dropped
+  if (replayMode) pending = flight.ended ? 0 : REPLAY_TICKS;
+  else pending += clock.advance(realMs);
+  if (!replayMode && pending > clock.maxCatchUp) {
     droppedWaiting += pending - clock.maxCatchUp;
     pending = clock.maxCatchUp;
   }
@@ -378,16 +424,20 @@ function frame(now) {
   controls = apply(controls, h.axes, h.held, h.pressed, realMs / 1000);
   for (const [name, v] of Object.entries(coreInputs(controls))) inputs[flight.input[name]] = v;
 
-  if (pending && flight.step(pending, scripted ? null : inputs.slice())) {
+  if (pending && flight.step(pending, driven ? null : inputs.slice())) {
     ++requests;
     pending = 0;
   }
-  if (!started && !kicked && flight.step(1, scripted ? null : inputs.slice())) {
+  if (!started && !kicked && flight.step(1, driven ? null : inputs.slice())) {
     kicked = true;
     ++requests;
   }
   if (latest) {
     const s = Object.fromEntries(flight.stateNames.map((n, i) => [n, latest.state[i]]));
+    if (replayMode && flight.ended && !replayDone) {
+      replayDone = true;
+      view.setDebrief(true);   // the whole flight replayed: the debrief over it, its timeline end to end
+    }
     // the debrief's playhead, played on at the flight's pace, and live outside the debrief; the view draws the
     // aircraft where it holds it
     if (view.debriefOn) playhead.advance(realMs / 1000, view.history);
@@ -423,7 +473,32 @@ function keep(list, v) {
   if (list.length > 3000) list.splice(0, list.length - 3000);
 }
 
-flight.start(airframe, scripted, scenario).then((ready) => {
+// What the status line says of a replay: whose flight and when, and the recording's build against the page's.
+function replayLines() {
+  const h = flight.replay?.header ?? {};
+  const when = /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(h.flown || '') ? `flown ${h.flown.slice(0, 16).replace('T', ' ')} UTC` : '';
+  const who = [when, h.hands ? `by ${h.hands}` : ''].filter(Boolean).join(' ');
+  const said = escapeHtml(`replay${who ? ` of a flight ${who}` : ''}${flight.ended ? ', to its end' : ''}`);
+  const b = buildCompare(h.build, flight.build);
+  return `${said}\n${b.warn ? `<span class="warn">${escapeHtml(b.text)}</span>` : escapeHtml(b.text)}`;
+}
+
+// A replay starts from the recording carried across the reload (replay.js); without one, the page says so.
+function storedRecording() {
+  let packed = null;
+  try {
+    packed = sessionStorage.getItem(STORE);
+  } catch {
+    // a browser that keeps nothing for this page: as no recording
+  }
+  return packed ? unpack(packed) : Promise.reject(new Error('there is no recording to replay here: open one with Ctrl+O, or drop it on the page'));
+}
+const recordingToFly = replayMode ? storedRecording() : Promise.resolve(null);
+recordingToFly.catch((e) => {
+  error = e.message;
+  status.innerHTML = `<span class="bad">${escapeHtml(error)}</span>`;
+});
+recordingToFly.then((text) => flight.start(airframe, scripted, scenario, text)).then((ready) => {
   inputs = Float64Array.from(ready.inputs);  // the core's own start: FLT CTL pushbuttons pressed
   controls = controlsFromInputs(inputs, flight.input);
   try {

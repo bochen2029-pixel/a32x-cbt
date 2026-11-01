@@ -448,6 +448,8 @@ if(FLIGHT_NODE)
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/reverse.test.mjs")
   add_test(NAME the_debrief_timeline_holds_the_flight_where_it_was COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/timeline.test.mjs")
+  add_test(NAME a_saved_recording_opens_in_the_page_to_fly_again COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/replay.test.mjs")
   add_test(NAME the_pilots_guide_ships_as_a_page_with_its_pictures COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/guide-html.test.mjs")
   if(EMSCRIPTEN)
