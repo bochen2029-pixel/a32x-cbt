@@ -297,26 +297,26 @@
 
     <!-- lift: the slope, the lift at zero alpha, the lift peak and the width of its rounding, by
          configuration; the peak's alpha follows from them -->
-    <property value="5.7" persistent="true">aero/fit/cl-alpha</property>
-    <property value="0.10" persistent="true">aero/fit/cl-alpha-flap</property>
-    <property value="0.20" persistent="true">aero/fit/cl0-clean</property>
-    <property value="0.20" persistent="true">aero/fit/cl0-conf1</property>
-    <property value="0.55" persistent="true">aero/fit/cl0-conf1f</property>
-    <property value="0.68" persistent="true">aero/fit/cl0-conf2</property>
-    <property value="0.80" persistent="true">aero/fit/cl0-conf3</property>
-    <property value="1.10" persistent="true">aero/fit/cl0-full</property>
-    <property value="1.335" persistent="true">aero/fit/clmax-clean</property>
-    <property value="1.90" persistent="true">aero/fit/clmax-conf1</property>
-    <property value="2.25" persistent="true">aero/fit/clmax-conf1f</property>
-    <property value="2.40" persistent="true">aero/fit/clmax-conf2</property>
-    <property value="2.55" persistent="true">aero/fit/clmax-conf3</property>
-    <property value="2.953" persistent="true">aero/fit/clmax-full</property>
-    <property value="4.0" persistent="true">aero/fit/stall-width-clean-deg</property>
-    <property value="4.0" persistent="true">aero/fit/stall-width-conf1-deg</property>
-    <property value="4.0" persistent="true">aero/fit/stall-width-conf1f-deg</property>
-    <property value="4.0" persistent="true">aero/fit/stall-width-conf2-deg</property>
-    <property value="4.0" persistent="true">aero/fit/stall-width-conf3-deg</property>
-    <property value="4.0" persistent="true">aero/fit/stall-width-full-deg</property>
+    <property value="5.7091988" persistent="true">aero/fit/cl-alpha</property>
+    <property value="0.10003027" persistent="true">aero/fit/cl-alpha-flap</property>
+    <property value="0.19916652" persistent="true">aero/fit/cl0-clean</property>
+    <property value="0.19865321" persistent="true">aero/fit/cl0-conf1</property>
+    <property value="0.54924628" persistent="true">aero/fit/cl0-conf1f</property>
+    <property value="0.68219611" persistent="true">aero/fit/cl0-conf2</property>
+    <property value="0.8000092" persistent="true">aero/fit/cl0-conf3</property>
+    <property value="1.0987249" persistent="true">aero/fit/cl0-full</property>
+    <property value="1.2986945" persistent="true">aero/fit/clmax-clean</property>
+    <property value="1.9629725" persistent="true">aero/fit/clmax-conf1</property>
+    <property value="2.3263224" persistent="true">aero/fit/clmax-conf1f</property>
+    <property value="2.4216113" persistent="true">aero/fit/clmax-conf2</property>
+    <property value="2.5217264" persistent="true">aero/fit/clmax-conf3</property>
+    <property value="2.8654404" persistent="true">aero/fit/clmax-full</property>
+    <property value="4.0382267" persistent="true">aero/fit/stall-width-clean-deg</property>
+    <property value="3.9817815" persistent="true">aero/fit/stall-width-conf1-deg</property>
+    <property value="3.9809643" persistent="true">aero/fit/stall-width-conf1f-deg</property>
+    <property value="3.9670948" persistent="true">aero/fit/stall-width-conf2-deg</property>
+    <property value="3.9796589" persistent="true">aero/fit/stall-width-conf3-deg</property>
+    <property value="4.0094895" persistent="true">aero/fit/stall-width-full-deg</property>
     <property value="0.25" persistent="true">aero/fit/poststall-drop</property>
     <property value="0.60" persistent="true">aero/fit/clmax-mach</property>
     <property value="0.456" persistent="true">aero/fit/cl-de</property>
@@ -335,7 +335,7 @@
     <property value="0.030" persistent="true">aero/fit/cd-conf3</property>
     <property value="0.050" persistent="true">aero/fit/cd-full</property>
     <property value="0.017" persistent="true">aero/fit/cd-gear</property>
-    <property value="0.703" persistent="true">aero/fit/mcrit-cl05</property>
+    <property value="0.72976911" persistent="true">aero/fit/mcrit-cl05</property>
     <property value="0.06" persistent="true">aero/fit/cd-spoiler</property>
     <property value="0.4" persistent="true">aero/fit/cd-beta</property>
 
