@@ -40,7 +40,8 @@ const SKY_M = 35000;
 // The cameras, on keys 1 to 9 and 0 in this order; V steps through them. The pilot's eye, the one the
 // overlay is drawn for, comes first.
 export const CAMERAS = ['eye', 'cockpit', 'chase', 'orbit', 'tower', 'flyby', 'cabin', 'skyline', 'side', 'satellite'];
-export const VIEW_KEYS = ['1-9 0  cameras, V the next', '[ ]  the hour, back / on (GPU)', 'K  debrief', 'L  the flown path'];
+export const VIEW_KEYS = ['1-9 0  cameras, V the next', '[ ]  the hour, back / on (GPU)', 'K  debrief', 'L  the flown path',
+  'mouse  drag: look round the deck (2), swing round (4); wheel: zoom; double click: back'];
 
 // A deterministic pseudo-random sequence, so the scene is the same every time.
 function rng(seed) {

@@ -15,6 +15,7 @@ import { FlightLog } from './events.js';
 import { Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
 import { Overlay } from './overlay.js';
+import { centre, drag, wheel } from './pointer.js';
 import { runwayFromState } from './scene-math.js';
 import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
 
@@ -45,6 +46,30 @@ let shownVerdict = '';   // the verdict the panel shows
 let saved = '';          // what the last save did, for the status line
 document.getElementById('save').addEventListener('click', () => save());
 const overlay = new Overlay(overlayCanvas);
+
+// The mouse on the view (pointer.js): a drag looks round the flight deck or swings round the aircraft,
+// the wheel zooms or comes closer, a double click sets them back.
+const viewCanvas = document.getElementById('view');
+let pointerAt = null;
+viewCanvas.addEventListener('pointerdown', (e) => {
+  pointerAt = [e.clientX, e.clientY];
+  try {
+    viewCanvas.setPointerCapture(e.pointerId);   // the drag goes on past the window's edge
+  } catch {
+    // a pointer the browser does not track (a synthetic event): the drag works without the capture
+  }
+});
+viewCanvas.addEventListener('pointermove', (e) => {
+  if (!pointerAt) return;
+  drag(view, e.clientX - pointerAt[0], e.clientY - pointerAt[1]);
+  pointerAt = [e.clientX, e.clientY];
+});
+for (const end of ['pointerup', 'pointercancel']) viewCanvas.addEventListener(end, () => { pointerAt = null; });
+viewCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  wheel(view, e.deltaY);
+}, { passive: false });
+viewCanvas.addEventListener('dblclick', () => centre(view));
 
 // The view's own keys, beside the hands' (hands.js uses none of these): cameras, the hour, the debrief.
 window.addEventListener('keydown', (e) => {
