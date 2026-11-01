@@ -4,6 +4,7 @@
 #include "efcs.h"
 
 #include <cstring>
+#include <new>
 
 #include "Arinc429Utils.h"
 
@@ -298,9 +299,18 @@ void Efcs::updateFcdc(const World& w, int i, double dt) {
 
   fcdcs_[i].update(dt, false, true);
   tx_.fcdcDiscrete[i] = fcdcs_[i].getDiscreteOutputs();
-  const FcdcBus bus = fcdcs_[i].getBusOutputs();
+  // Departure: upstream's Arinc429 words have empty constructors, so the FcdcBus that getBusOutputs
+  // builds (Fcdc.cpp:502, `FcdcBus output = {};`) starts each word's data as whatever the memory held;
+  // setBit then converts that float to uint32 (Arinc429.cpp:100), undefined for garbage such as -1.46,
+  // and the bits the FCDC never sets — sometimes, through the float round trip, the ones it does — carry
+  // it. Where the memory differs, as between a scripted run and its replay, the bus differs (found by
+  // GCC's UBSan). Here the bus is built in zeroed storage: guaranteed copy elision makes it the call's
+  // result object, and getBusOutputs's one named return is elided into it, so every word starts at zero.
+  alignas(FcdcBus) unsigned char storage[sizeof(FcdcBus)] = {};
+  const FcdcBus* bus = new (storage) FcdcBus(fcdcs_[i].getBusOutputs());
   static_assert(sizeof(FcdcBus) == sizeof(base_fcdc_bus), "the driver reinterprets FcdcBus as base_fcdc_bus");
-  std::memcpy(&tx_.fcdcBus[i], &bus, sizeof bus);
+  std::memcpy(&tx_.fcdcBus[i], bus, sizeof *bus);
+  bus->~FcdcBus();
 }
 
 // :2537-2605. Positions stay in the computers' frame: the driver's sign flips translate into the
