@@ -74,13 +74,14 @@ git -C ../jsbsim checkout FETCH_HEAD
 
 **The airframe that flies by default is an A320 of ours (§1e), since 2026-11-01. Before it, JSBSim's
 737 flew, never its A320**, and the 737 stays selectable. Both ship in the clone; they are data files,
-read at run time from it, unmodified. Our A320 uses one more of the clone's files, an engine.
+read at run time from it, unmodified. Our A320 read one more of the clone's files, an engine, until
+its own engines were fitted (§1e); since then it reads only the clone's thruster.
 
 | file | author, date | licence | used |
 |---|---|---|---|
 | `aircraft/737/737.xml` | Dave Culp and Aeromatic, 2006 | GPL, as its header states | yes |
 | `engine/CFM56.xml` | Aeromatic | the clone's LGPL-2.1 | yes, through the 737 |
-| `engine/CFM56_5.xml` | Aeromatic | the clone's LGPL-2.1 | yes, through our A320: 25,000 lb, the A320-211's CFM56-5A1 |
+| `engine/CFM56_5.xml` | Aeromatic | the clone's LGPL-2.1 | not at run time: the seed of our A320's engines (§1e). Flown through our A320, 25,000 lb, the A320-211's CFM56-5A1, until they were fitted |
 | `engine/direct.xml` | JSBSim | the clone's LGPL-2.1 | yes, the thruster of both |
 | `aircraft/A320/A320.xml` | unknown, 2003, "BETA" | the clone's LGPL-2.1 | no |
 
@@ -149,13 +150,16 @@ derived from JSBSim's A320 or 737 files. Its numbers come from these, each named
 |---|---|---|
 | A32NX's MSFS flight model, `flight_model.cfg` (§1a clone) | GPLv3 | wing and tail areas, span; the A320-251N's operating empty weight (42.5 t at 30 % MAC) and empty moments of inertia; what its reference stall speeds imply for CL max clean and in CONF FULL; where its Mach drag table reaches 20 counts; spoiler and flap increments as cross-checks. MSFS conventions: a seed and a cross-check, not a drop-in |
 | OpenAP, `a320.yml` and `dragpolar/a320.yml` | LGPL-3.0 | the MAC; the clean drag polar (CD0 0.018, induced factor 0.039) and the gear's drag, fitted to ADS-B |
-| JSBSim's `engine/CFM56_5.xml` (§1c) | LGPL-2.1 | the engines, read from the clone at run time |
+| JSBSim's `engine/CFM56_5.xml` (§1c) | LGPL-2.1 | the engines' seed. Our engine file, `Engines/CFM56-5A1-fit.xml` (GPLv3), keeps its bypass ratio, fuel flow and idle and maximum spool speeds, six numbers, by value, which LGPL-2.1's section 3 allows under the GPL; its 25,000 lb rating is the type certificate's (§1d), the same. Its thrust tables, fitted in our form by least squares, are the seeds of the thrust (`thrust-seeds.csv`). Not read at run time |
 | textbook methods: USAF DATCOM's lift-curve slope, tail volume and downwash for the tail's terms (Etkin and Reid, *Dynamics of Flight*), McCormick's ground-effect factor, Korn's equation and Lock's rise | — | our estimates of the slopes, the tail's damping and power, ground effect and the drag rise's shape, from the file's geometry |
 | our own estimates | — | the rest, each said in the seeds file; where an estimate was compared with a held-out row of §1d while it was made, the seeds file says which |
 
 The fit is `flight/harness/fit.cpp`: CMA-ES as Hansen's tutorial sets it (arXiv:1604.00772), written
 here, scored by `airframe_score` on the fit rows of §1d only. The method is the tutorial's; the code
-is ours.
+is ours. It fits the aerodynamics on every group of rows but the thrust group, and, with `--thrust`,
+the engines' eight numbers on the thrust group's fit rows: the rating and Airbus's thrust of §1d. The
+form those numbers sit in, δ^x (1 + a1 M + a2 M²)(1 + c M (1 − δ)) for take-off thrust and δ (i0 + i1 M)
+for idle, is ours, chosen against ANP's points before the fit.
 
 ### 1f · The runway and its ILS
 
@@ -180,7 +184,7 @@ fit for navigation.
 | esbuild | build only, bundles `app/web/app.js`; its three-line class-field helper ships inside it | MIT | no, `npm i` |
 | JSBSim | `flight/` from P7 | LGPL-2.1 | no, cloned separately, `66f7faf` |
 | JSBSim's 737 and CFM56 data | `flight/` from P7, read at run time | GPL; LGPL-2.1 | no, read from the JSBSim clone |
-| JSBSim's CFM56_5 data | `flight/`, our A320's engines, read at run time | LGPL-2.1 | no, read from the JSBSim clone |
+| JSBSim's CFM56_5 data | `flight/`: the seed of our A320's engines, six of its numbers kept in our engine file (§1e); read at run time until those engines were fitted | LGPL-2.1 | no; not read since |
 | FlyByWire A32NX | `flight/` from P6 | GPLv3 | no, cloned separately, `66021c2` |
 | Emscripten (emsdk) | `flight/`'s WebAssembly build (P7): build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
 | three.js | `flight/web`: the out-the-window view, bundled into the page at build time | MIT | no, `npm i`, `0.186.1` |
