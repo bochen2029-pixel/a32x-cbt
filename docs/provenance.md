@@ -36,7 +36,7 @@ Its class files each carry `Copyright_2008_by_Hardy_Heinlin__Reverse_Engineering
 position taken here:
 
 - **No PSX code is in this repository.** Not the jar, not the decompiled classes, not an excerpt
-  pasted into TypeScript.
+  pasted into TypeScript or quoted in the notes.
 - What was taken is **design**, expressed in our own words in `docs/architecture.md` and
   `docs/psx-notes/`: a state dictionary with declared ranges, a two-rate scheduler, a causal
   dispatch order, controls described as data with position and form, procedures with per-step
@@ -47,6 +47,11 @@ position taken here:
   the deliverable is a reimplementation, not a decompilation.
 - Architecture note: reading a decompiled program to understand behaviour and then writing new code
   against that understanding is ordinary practice and is what happened here.
+- **Corrected 2026-11-01.** Earlier commits fell short of the first point: `docs/psx-notes/` quoted
+  short decompiled excerpts (class and method code, field lists, line references into the
+  decompiled tree), and `tools/` held a recipe for rebuilding that tree. The operator's decision:
+  *"Fix going forward only."* The notes now describe behaviour in prose, the recipe is gone, and the
+  published history was not rewritten.
 
 **If you are a model or an engineer picking this up: implement, do not port.** Do not ask for the
 jar. The notes give the design; the code is yours to write.
