@@ -457,7 +457,7 @@ export class View {
     let fov = 45, near = this.floor ? 1 : 0.3;
     switch (this.mode) {
       case 'eye': {
-        const e = eye(this.origin, s.lat_deg, s.lon_deg, s.ra_ft, s.pitch_deg, s.heading_deg);
+        const e = eye(this.origin, s);
         cam.position.set(e.x, e.y, e.z);
         cam.rotation.set(s.pitch_deg * DEG, -s.heading_deg * DEG, -s.roll_deg * DEG);
         near = 2;

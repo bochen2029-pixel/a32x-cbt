@@ -30,16 +30,22 @@ export function runwayFromState(s) {
   };
 }
 
-// The pilot's eye, from the airframe's state: its CG over the ground, then the eye 14 m forward and
-// 2.5 m up from the CG along the body, which puts it 5.5 m above the runway standing on the gear.
-export const EYE = { cgHeight: 3.0, forward: 14, up: 2.5 };
-
-export function eye(o, latDeg, lonDeg, radioHeightFt, pitchDeg, headingDeg) {
-  const p = localMetres(o, latDeg, lonDeg);
-  const th = pitchDeg * DEG, psi = headingDeg * DEG;
-  const along = EYE.forward * Math.cos(th) - EYE.up * Math.sin(th);
-  const height = EYE.cgHeight + Math.max(0, radioHeightFt) * FT + EYE.forward * Math.sin(th) + EYE.up * Math.cos(th);
-  return { x: p.east + along * Math.sin(psi), y: height, z: -(p.north + along * Math.cos(psi)) };
+// The pilot's eye, from the flight core's state s, by name: the CG over the ground (cg_height_m standing
+// on the gear, ra_ft above that), then the airframe definition's own eyepoint, the left seat, from the
+// CG in body axes (eye_fwd_m, eye_right_m, eye_up_m), turned by the attitude: heading, pitch, roll.
+export function eye(o, s) {
+  const p = localMetres(o, s.lat_deg, s.lon_deg);
+  const th = s.pitch_deg * DEG, ph = s.roll_deg * DEG, psi = s.heading_deg * DEG;
+  const f = s.eye_fwd_m, r = s.eye_right_m, u = s.eye_up_m;
+  const sth = Math.sin(th), cth = Math.cos(th), sph = Math.sin(ph), cph = Math.cos(ph);
+  // the body's forward, right and up axes, level: along the heading, across it, up; then pitch and roll
+  const along = f * cth + r * sph * sth - u * cph * sth;      // forward over the ground
+  const across = r * cph + u * sph;                            // right of the heading
+  const up = f * sth - r * sph * cth + u * cph * cth;
+  const sps = Math.sin(psi), cps = Math.cos(psi);
+  const east = along * sps + across * cps, north = along * cps - across * sps;
+  const height = s.cg_height_m + Math.max(0, s.ra_ft) * FT + up;
+  return { x: p.east + east, y: height, z: -(p.north + north) };
 }
 
 // A latitude and longitude as the world's [x, z], the form the scenery's builders take; and back.

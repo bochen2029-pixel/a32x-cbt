@@ -208,7 +208,8 @@ struct Airframe::Impl {
                  *psiDot = nullptr, *nx = nullptr, *ny = nullptr, *nz = nullptr, *vNorth = nullptr, *vEast = nullptr,
                  *groundSpeed = nullptr, *gamma = nullptr, *latitude = nullptr, *longitude = nullptr, *agl = nullptr,
                  *wow[3] = {}, *wheelSpeed[2] = {}, *gearPos = nullptr, *n1[2] = {}, *weight = nullptr,
-                 *cgX = nullptr, *aeroRpX = nullptr, *mac = nullptr;
+                 *cgX = nullptr, *aeroRpX = nullptr, *mac = nullptr, *cgY = nullptr, *cgZ = nullptr,
+                 *eye[3] = {};
 
   void bind() {
     elevator = node("a32nx/elevator-rad");
@@ -284,6 +285,11 @@ struct Airframe::Impl {
     cgX = node("inertia/cg-x-in");
     aeroRpX = node("metrics/aero-rp-x-in");
     mac = node("metrics/cbarw-ft");
+    cgY = node("inertia/cg-y-in");
+    cgZ = node("inertia/cg-z-in");
+    eye[0] = node("metrics/eyepoint-x-in");
+    eye[1] = node("metrics/eyepoint-y-in");
+    eye[2] = node("metrics/eyepoint-z-in");
   }
 
   void read() {
@@ -331,6 +337,12 @@ struct Airframe::Impl {
     s.weightLbs = weight->getDoubleValue();
     // %MAC, taking the aerodynamic reference point as the quarter chord, where Aeromatic puts it
     s.cgPercentMac = 25 + (cgX->getDoubleValue() - aeroRpX->getDoubleValue()) / (mac->getDoubleValue() * 12) * 100;
+    // JSBSim's structural frame runs x aft, y right, z up, in inches
+    constexpr double kMPerIn = 0.0254;
+    s.eyeFwdM = (cgX->getDoubleValue() - eye[0]->getDoubleValue()) * kMPerIn;
+    s.eyeRightM = (eye[1]->getDoubleValue() - cgY->getDoubleValue()) * kMPerIn;
+    s.eyeUpM = (eye[2]->getDoubleValue() - cgZ->getDoubleValue()) * kMPerIn;
+    s.cgHeightM = radioZeroFt * 0.3048;
   }
 
   void run(double seconds) {

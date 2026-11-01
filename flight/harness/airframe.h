@@ -62,6 +62,10 @@ struct AirframeState {
   double gearPosition = 1;                              // 0 up and locked .. 1 down and locked
   double n1[2] = {0, 0};
   double weightLbs = 0, cgPercentMac = 0;
+  // the pilot's eye, the definition's EYEPOINT (the left seat), from the CG in body axes: forward, right, up
+  double eyeFwdM = 0, eyeRightM = 0, eyeUpM = 0;
+  // the CG's height above the ground standing on the gear, where the radio height reads zero
+  double cgHeightM = 0;
 };
 
 // The bare airframe measured, for scoring it against targets (score.cpp).

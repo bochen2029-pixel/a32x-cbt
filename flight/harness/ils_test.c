@@ -49,6 +49,13 @@ int main(int argc, char** argv) {
   check(fabs(s[field("rwy_heading_deg")] - 180.3) < 1e-9 && fabs(s[field("rwy_elev_ft")] - 562) < 1e-9,
         "the runway is KDFW 17C, the main airport", s[field("rwy_heading_deg")]);
   check(s[field("on_ground")] == 0 && s[field("gear_pos")] > 0.999, "in the air, gear down", s[field("gear_pos")]);
+  printf("  the eye: %.2f m forward of the CG, %.2f m right, %.2f m up\n", s[field("eye_fwd_m")], s[field("eye_right_m")],
+         s[field("eye_up_m")]);
+  check(s[field("eye_fwd_m")] > 8 && s[field("eye_fwd_m")] < 20 && s[field("eye_up_m")] > 1 && s[field("eye_up_m")] < 4,
+        "the eye sits in the cockpit, well forward of the CG and above it", s[field("eye_fwd_m")]);
+  check(s[field("eye_right_m")] < -0.2 && s[field("eye_right_m")] > -1, "in the left seat", s[field("eye_right_m")]);
+  check(s[field("cg_height_m")] > 1 && s[field("cg_height_m")] < 5, "the CG stands a few metres up on the gear",
+        s[field("cg_height_m")]);
 
   flight_step(150);
   s = flight_state();

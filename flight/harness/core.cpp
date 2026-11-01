@@ -54,7 +54,11 @@ const std::vector<const char*> kState = {
     // of it (NaN outside the window); the verdict once the aircraft has stopped (1 stable, 0 not, NaN
     // before); and the first touchdown's distance past the threshold
     "vls_kn",       "vapp_kn",      "judge_window",  "judge_in_bands", "judge_stable",
-    "judge_touchdown_m"};
+    "judge_touchdown_m",
+    // the pilot's eye, the airframe definition's own EYEPOINT (the left seat), from the CG in body axes:
+    // forward, right, up, metres; a view puts its camera there; and the CG's height above the ground
+    // standing on the gear, where ra_ft reads zero, so a view puts the wheels on the runway
+    "eye_fwd_m",    "eye_right_m",  "eye_up_m",      "cg_height_m"};
 
 int slot(const std::vector<const char*>& names, const char* name) {
   for (size_t k = 0; k < names.size(); ++k) {
@@ -292,8 +296,12 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            judge_.inWindow() ? 1.0 : 0.0,
                            judge_.inWindow() ? (judge_.inBands() ? 1.0 : 0.0) : NAN,
                            judge_.active() && judge_.finished() ? (judge_.stable() ? 1.0 : 0.0) : NAN,
-                           judge_.touchdown().pastM};
-  static_assert(sizeof values / sizeof values[0] == 60, "one value per state slot");
+                           judge_.touchdown().pastM,
+                           a.eyeFwdM,
+                           a.eyeRightM,
+                           a.eyeUpM,
+                           a.cgHeightM};
+  static_assert(sizeof values / sizeof values[0] == 64, "one value per state slot");
   s.assign(std::begin(values), std::end(values));
 }
 
