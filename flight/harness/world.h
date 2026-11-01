@@ -10,6 +10,8 @@
 
 #pragma once
 
+#include <string>
+
 #include <memory>
 
 #include "ElacComputer_types.h"
@@ -95,6 +97,9 @@ struct WorldStart {
   int flapLever = 0;
   bool gearDown = true;
   Failures failures;
+  // In the air, a test pilot's manoeuvre (core.h, "air"): hold, bank, pull, push, alpha or speed. Empty:
+  // the scripted circuit, or the ILS from an approach start.
+  std::string manoeuvre;
 };
 
 class World {
@@ -131,6 +136,10 @@ class World {
   // --- for the runner's checks and trace -------------------------------------------------------
   double time() const { return t_; }
   Phase phase() const { return phase_; }
+  // The test pilot's manoeuvre and the stage of it now: settle, slow (alpha only), input, release,
+  // recover; empty when there is none.
+  const std::string& manoeuvre() const { return manoeuvre_; }
+  const char* testStage() const;
   int circuit() const { return circuit_; }
   double altitudeFt() const { return air().pressureAltitudeFt; }
   double radioHeightFt() const { return air().radioHeightFt; }
@@ -207,6 +216,10 @@ class World {
   // The ILS crew: the beams on the approach, the centreline over the runway and on it.
   void flyIls(double dt);
   void rollToCentreline(double bankLimit);
+  // The test pilot (flyTest): its manoeuvre, and the level flight it starts from and comes back to.
+  void flyTest(double dt);
+  std::string manoeuvre_;
+  double testAltFt_ = 0, testCasKn_ = 0, testHeadingDeg_ = 0;
 
   std::unique_ptr<Airframe> airframe_;
   Runway runway_;

@@ -30,8 +30,11 @@ int flight_start(const char* airframe, int scripted);
 // seconds after the start, or from it: "fail=adr1+adr2+adr3@300,green@420"; and for an approach
 // distance=NM (10), loc=DOTS (0), gs=DOTS (0), cas=KT (140), lever=0..4 (4, FULL),
 // wind=FROM/KT (0/0), turbulence=SEVERITY (0) — in CONF and gear for the lever, trimmed. There the
-// scripted crew flies the ILS to a landing and a stop. "reference" is the start P6 and the airframe
-// scorer use: 47 N 8 E, sea level, heading 360. A scenario not understood returns -3.
+// scripted crew flies the ILS to a landing and a stop. "air" starts level over the runway's threshold on
+// its heading, trimmed: alt=FT (10,000), cas=KT (250), lever=0..4 (0), wind, turbulence, and
+// manoeuvre=hold|bank|pull|push|alpha|speed (hold), which the scripted crew flies as a test pilot flies
+// a protection (world.h, flyTest). "reference" is the start P6 and the airframe scorer use: 47 N 8 E, sea
+// level, heading 360. A scenario not understood returns -3.
 int flight_start_scenario(const char* airframe, int scripted, const char* scenario);
 
 // The inputs, read before each step when the crew is not scripted.

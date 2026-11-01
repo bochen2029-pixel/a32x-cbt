@@ -182,6 +182,17 @@ struct Results {
   double failAt = -1;
   long long beforeGearTicks = 0, gearDownTicks = 0;
   std::map<std::string, long long> beforeGearPitch, beforeGearLateral, gearDownPitch;
+  // a test pilot's manoeuvre (core.h, "air"): the extremes in each stage of it, and whether normal law
+  // held through it
+  struct Stage {
+    long long ticks = 0;
+    double maxBank = 0, maxNz = -9, minNz = 9, maxPitch = -90, minPitch = 90, maxAlpha = -90, maxCas = 0, minCas = 1e9;
+    double lastBank = 0, lastAlpha = 0, lastCas = 0;
+    bool normal = true;
+  };
+  std::map<std::string, Stage> stages;
+  std::string manoeuvre;
+  int flapLever = 0;
   // what moved
   Range elevator, ths, aileron, spoiler, pitch, bank, load, altitude;
   Range checkPullElevator, checkPushElevator, checkLeftAileron, checkRightAileron;
@@ -305,6 +316,8 @@ Results run(const Options& opt, FILE* trace) {
   Efcs& efcs = core.efcs();
   Results r;
   r.failAt = earliestFailure(world.failures);
+  r.manoeuvre = world.manoeuvre();
+  r.flapLever = world.crew.flapLever;
   double gearDownAt = -1;
   Digest digest;
 
@@ -348,6 +361,27 @@ Results run(const Options& opt, FILE* trace) {
       if (t < 1.0 && healthy) r.healthyBeforeSwitches = true;
       if (healthy && r.healthyFrom < 0) r.healthyFrom = t;
       if (t > 21 && !healthy) ++r.unhealthyTicksAfterUp;
+
+      // a test pilot's manoeuvre: the extremes in each stage of it
+      if (const char* stage = world.testStage(); *stage) {
+        Results::Stage& e = r.stages[stage];
+        const double bank = std::abs(world.rollDeg());
+        const PitchLawState p = pitchLaw(tx.fcdcBus[0].efcs_status_word_1);
+        const LateralLawState l = lateralLaw(tx.fcdcBus[0].efcs_status_word_1);
+        ++e.ticks;
+        e.maxBank = std::max(e.maxBank, bank);
+        e.maxNz = std::max(e.maxNz, world.loadFactor());
+        e.minNz = std::min(e.minNz, world.loadFactor());
+        e.maxPitch = std::max(e.maxPitch, world.pitchDeg());
+        e.minPitch = std::min(e.minPitch, world.pitchDeg());
+        e.maxAlpha = std::max(e.maxAlpha, world.alphaDeg());
+        e.maxCas = std::max(e.maxCas, world.casKn());
+        e.minCas = std::min(e.minCas, world.casKn());
+        e.lastBank = bank;
+        e.lastAlpha = world.alphaDeg();
+        e.lastCas = world.casKn();
+        if (p != PitchLawState::Normal || l != LateralLawState::Normal) e.normal = false;
+      }
 
       // laws, in flight: from five seconds after liftoff until the flare
       pl = pitchLaw(tx.fcdcBus[0].efcs_status_word_1);
@@ -595,6 +629,62 @@ int checkExpectation(const std::string& which, const Results& r, const Options& 
                       fmt("trim %.2f deg 15 s after RESET", r.trimAfterReset));
   } else if (which == "landing") {
     failed += landingChecks(r);
+  } else if (which == "protection") {
+    // The protections of normal law (ROADMAP.md, P7 step 4), flown by the test pilot from an air start,
+    // each against the A320's published limit: load factor +2.5/-1 g clean and +2/0 g with flaps; pitch
+    // +30 deg (25 in CONF FULL) and -15 deg; bank 67 deg, and 33 deg once let go; and the ELAC's own alpha
+    // max (A32NX 66021c2, Mach 0 to 0.5: clean 8.7, CONF 1 13.6, CONF 2 14.2, CONF 3 13.1, FULL 13.0
+    // deg), with the airframe's stall 1 deg above it (flight/targets/a320.csv); high speed against the
+    // ELAC's own thresholds, VMO 350 kt where it engages and 380 kt above which it does not let the speed
+    // go. Each limit allows the overshoot stated; each manoeuvre also asks that a protection, not the
+    // airframe, set the extreme.
+    static const double kAlphaMax[5] = {8.7, 13.6, 14.2, 13.1, 13.0};
+    const int lever = std::max(0, std::min(4, r.flapLever));
+    const double nzMax = lever ? 2.0 : 2.5, nzMin = lever ? 0.0 : -1.0, pitchMax = lever == 4 ? 25 : 30;
+    const double alphaMax = kAlphaMax[lever];
+    auto stage = [&r](const char* name) -> const Results::Stage* {
+      const auto it = r.stages.find(name);
+      return it == r.stages.end() || it->second.ticks < 50 ? nullptr : &it->second;
+    };
+    const Results::Stage* in = stage("input");
+    const Results::Stage* out = stage("release");
+    failed += verdict("a manoeuvre flown", in && out, r.manoeuvre.empty() ? std::string("no air start") : r.manoeuvre);
+    if (in && out) {
+      failed += verdict("in normal law throughout", in->normal && out->normal, in->normal && out->normal ? "yes" : "no");
+      // what a protection is judged on here; and, as notes, what it does that is not judged yet, each with
+      // its limit (flight/README.md, P7 step 4, says why)
+      auto note = [](const std::string& what, const std::string& detail) {
+        std::printf("  note  %s - %s\n", what.c_str(), detail.c_str());
+      };
+      if (r.manoeuvre == "bank") {
+        failed += verdict("full stick: the bank stops at 67 deg (+0.5), the protection stopping it", in->maxBank >= 60 && in->maxBank <= 67.5,
+                          fmt("%.1f deg at most", in->maxBank));
+        failed += verdict("the load factor inside its limit (+0.1)", in->maxNz <= nzMax + 0.1, fmt("%.2f g at most", in->maxNz));
+        note("let go above 33 deg: back to 33 deg", fmt("%.1f deg %.0f s after", out->lastBank, out->ticks * kDt));
+      } else if (r.manoeuvre == "pull") {
+        failed += verdict("full back stick: the load factor inside its limit (+0.1)", in->maxNz <= nzMax + 0.1,
+                          fmt("%.2f g at most, against %.1f", in->maxNz, nzMax));
+        failed += verdict("the pitch inside its limit (+1)", in->maxPitch <= pitchMax + 1, fmt("%.1f deg at most, against %.0f", in->maxPitch, pitchMax));
+        note("the alpha inside alpha max", fmt("%.1f deg at most, against %.1f", in->maxAlpha, alphaMax));
+      } else if (r.manoeuvre == "push") {
+        failed += verdict("full forward stick: the load factor inside its limit (-0.1)", in->minNz >= nzMin - 0.1,
+                          fmt("%.2f g at least, against %.1f", in->minNz, nzMin));
+        note("the pitch inside -15 deg", fmt("%.1f deg at least", in->minPitch));
+      } else if (r.manoeuvre == "alpha") {
+        failed += verdict("slowed into the protection at idle, the altitude held", stage("slow") != nullptr, "60 s at idle");
+        failed += verdict("full back stick: the alpha at most alpha max (+0.5), short of the stall", in->maxAlpha <= alphaMax + 0.5,
+                          fmt("%.1f deg at most, against %.1f", in->maxAlpha, alphaMax));
+        failed += verdict("and held there (-1.5), the protection setting it", in->lastAlpha >= alphaMax - 1.5,
+                          fmt("%.1f deg at the end of %.0f s", in->lastAlpha, in->ticks * kDt));
+        note("let go, with TOGA: back to alpha prot", fmt("%.1f deg %.0f s after", out->lastAlpha, out->ticks * kDt));
+      } else if (r.manoeuvre == "speed") {
+        failed += verdict("full forward stick: past VMO, where the protection engages", in->maxCas >= 350, fmt("%.1f kt at most", in->maxCas));
+        note("held below the ELAC's upper threshold, 380 kt", fmt("%.1f kt at most", in->maxCas));
+        note("let go: back toward VMO", fmt("%.1f kt %.0f s after", out->lastCas, out->ticks * kDt));
+      } else {
+        failed += verdict("a manoeuvre to judge: bank, pull, push, alpha or speed", false, r.manoeuvre);
+      }
+    }
   } else if (which.rfind("laws=", 0) == 0) {
     // A failure's laws, as the computers chose them, and the landing flown in them (ROADMAP.md, P7 step
     // 3): laws=PITCH/LATERAL[,PITCH] names the pitch and lateral law in flight before the gear is down,

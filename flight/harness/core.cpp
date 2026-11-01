@@ -308,12 +308,15 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
     }
     return true;
   }
-  if (kind != "runway" && kind != "approach") {
+  if (kind != "runway" && kind != "approach" && kind != "air") {
     error = "no scenario called '" + kind + "'";
     return false;
   }
+  const bool air = kind == "air";
   Runway r = kdfw17c();  // the main airport (runway.h)
-  double distance = 10, loc = 0, gs = 0, cas = 140, lever = 4, windFrom = 0, windKn = 0, turbulence = 0;
+  double distance = 10, loc = 0, gs = 0, cas = air ? 250 : 140, lever = air ? 0 : 4, alt = 10000;
+  double windFrom = 0, windKn = 0, turbulence = 0;
+  std::string manoeuvre = "hold";
   for (size_t k = 1; k < parts.size(); ++k) {
     const size_t eq = parts[k].find('=');
     const std::string key = parts[k].substr(0, eq), value = eq == std::string::npos ? "" : parts[k].substr(eq + 1);
@@ -328,6 +331,16 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       if (!parseFailures(value, start.failures, error)) return false;
       continue;
     }
+    if (key == "manoeuvre" && air) {
+      for (const char* m : {"hold", "bank", "pull", "push", "alpha", "speed"}) {
+        if (value == m) manoeuvre = value;
+      }
+      if (manoeuvre != value) {
+        error = "no manoeuvre called '" + value + "': hold, bank, pull, push, alpha, speed";
+        return false;
+      }
+      continue;
+    }
     if (kind == "runway") {
       error = "the runway start takes only runway= and fail=";
       return false;
@@ -339,9 +352,14 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       error = "'" + parts[k] + "' is not key=number";
       return false;
     }
+    if (air && (key == "distance" || key == "loc" || key == "gs")) {
+      error = "an air start takes alt=, cas=, lever=, manoeuvre=, wind=, turbulence=, runway= and fail=";
+      return false;
+    }
     if (key == "distance") distance = v;
     else if (key == "loc") loc = v;
     else if (key == "gs") gs = v;
+    else if (key == "alt" && air) alt = v;
     else if (key == "cas") cas = v;
     else if (key == "lever") lever = v;
     else if (key == "turbulence") turbulence = v;
@@ -360,6 +378,24 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
   start.runway = r;
   if (kind == "runway") {  // on the gear, lined up 150 m past the threshold: the default start
     onCentreline(r, kRunwayStartPastThresholdM, a.latDeg, a.lonDeg);
+    return true;
+  }
+  if (air) {  // level over the threshold on the runway's heading, trimmed, the test pilot flying
+    if (!(alt >= r.elevationFt + 2000 && alt <= 39000) || !(cas > 100 && cas <= 400) || !(lever >= 0 && lever <= 4)) {
+      error = "alt 2,000 ft above the field to 39,000 ft, cas 100..400 kt, lever 0..4";
+      return false;
+    }
+    threshold(r, a.latDeg, a.lonDeg);
+    a.heightFt = alt - r.elevationFt;
+    a.airborne = true;
+    a.casKn = cas;
+    a.gammaDeg = 0;
+    a.windFromDeg = windFrom;
+    a.windKn = windKn;
+    a.turbulence = turbulence;
+    start.flapLever = static_cast<int>(lever);
+    start.gearDown = lever >= 3;
+    start.manoeuvre = manoeuvre;
     return true;
   }
   if (!(distance > 0.5 && distance < 20) || !(cas > 100 && cas < 250) || !(lever >= 0 && lever <= 4)) {

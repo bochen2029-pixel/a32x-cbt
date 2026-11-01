@@ -323,6 +323,22 @@ foreach(case IN ITEMS
   list(GET fields 2 laws)
   add_test(NAME laws_${name} COMMAND law_harness --fail "${failures}" --minutes 20 --expect "laws=${laws}")
 endforeach()
+# The protections of normal law, flown as a test pilot flies them from an air start, level at 10,000 ft
+# and 250 kt clean unless said (ROADMAP.md, P7 step 4; main.cpp, --expect protection, says what is
+# judged and notes the rest). Judged on the product airframe, our fitted A320, whatever FLIGHT_AIRFRAME
+# the suite runs with: alpha max and the stall are the A320's.
+foreach(case IN ITEMS
+    "full_stick_bank_stops_at_67_deg|air$<SEMICOLON>manoeuvre=bank"
+    "full_pull_inside_2_5_g_and_30_deg|air$<SEMICOLON>manoeuvre=pull"
+    "full_push_inside_minus_1_g|air$<SEMICOLON>manoeuvre=push"
+    "alpha_max_held_without_a_stall|air$<SEMICOLON>cas=200$<SEMICOLON>manoeuvre=alpha")
+  string(REPLACE "|" ";" fields "${case}")
+  list(GET fields 0 name)
+  list(GET fields 1 scenario)
+  add_test(NAME protection_${name} COMMAND law_harness --scenario "${scenario}" --minutes 3 --expect protection)
+  set_tests_properties(protection_${name} PROPERTIES ENVIRONMENT "FLIGHT_AIRFRAME=a320")
+endforeach()
+
 # A degraded flight, the trim wheel turned by hand in it, replays to the same bytes and touchdown.
 if(NOT EMSCRIPTEN)
   add_test(NAME laws_three_irs_replays_to_the_same_touchdown

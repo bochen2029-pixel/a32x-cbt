@@ -115,6 +115,22 @@ constexpr double kHeldTauS = 3, kTrimStartHeld = 0.02, kTrimStopHeld = 0.005, kT
 // one: an estimate. The THS's travel, in the computers' frame, negative nose up: 13.5 deg up, 4 down.
 constexpr double kTrimWheelDegS = 0.5, kThsNoseUpDeg = -13.5, kThsNoseDownDeg = 4.0;
 
+// The test pilot's programme for a manoeuvre (World::flyTest), in seconds from the start: level flight
+// until `input` (for alpha, from 20 s at idle, slowing), the input held until `release`, the stick let
+// go until `recover`, then level flight again.
+constexpr double kSettleS = 20;
+struct Programme {
+  double input, release, recover;
+};
+Programme programme(const std::string& m) {
+  if (m == "bank") return {20, 40, 60};
+  if (m == "pull") return {20, 40, 50};
+  if (m == "push") return {20, 28, 33};
+  if (m == "alpha") return {80, 100, 110};
+  if (m == "speed") return {20, 60, 80};
+  return {1e9, 1e9, 1e9};  // hold: level flight only
+}
+
 // The sidestick of a pilot flying a flight path angle and a heading through the laws.
 double pitchFor(double gammaTarget, double gamma, double q) {
   return clamp(0.08 * (gammaTarget - gamma) - 0.02 * q, -0.6, 0.6);
@@ -203,6 +219,14 @@ World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(con
     flapFppu_ = kFlapFppu[lever];
     flapDeg_ = flapSurfaceDeg(flapFppu_);
     gammaCmd_ = gammaSpeed_ = air().flightPathDeg;
+    if (!start.manoeuvre.empty()) {  // an air start: the test pilot, level where it starts
+      ilsCrew_ = false;
+      phase_ = Phase::Cruise;
+      manoeuvre_ = start.manoeuvre;
+      testAltFt_ = air().pressureAltitudeFt;
+      testCasKn_ = start.airframe.casKn;
+      testHeadingDeg_ = start.airframe.headingDeg;
+    }
   }
   lastCas_ = air().casKn;
   sense();
@@ -233,6 +257,43 @@ void World::thrustFor(double casTarget, double tlaMax, double dt) {
 void World::stickFor(double gammaTarget, double dt) {
   gammaCmd_ = follow(gammaCmd_, gammaTarget, 1.5, dt);
   crew.pitch = pitchFor(gammaCmd_, air().flightPathDeg, air().qDegS);
+}
+
+const char* World::testStage() const {
+  if (manoeuvre_.empty()) return "";
+  const Programme pr = programme(manoeuvre_);
+  if (t_ < kSettleS) return "settle";
+  if (t_ < pr.input) return manoeuvre_ == "alpha" ? "slow" : "settle";
+  if (t_ < pr.release) return "input";
+  if (t_ < pr.recover) return "release";
+  return "recover";
+}
+
+// The test pilot (ROADMAP.md, P7 step 4): each protection flown as a test pilot flies it, from level
+// flight, the input held to the stop. bank: full right stick, then let go, the elevator holding the
+// altitude throughout. pull, push: full back or forward stick, the thrust where it was, the wings
+// level; then let go. alpha: idle from 20 s, the altitude held as the speed decays into the protection,
+// then full back stick; let go with TOGA, as alpha floor would have set it (P9). speed: full forward
+// stick from a fast start, the thrust where it was. After the input, level flight again where it began.
+void World::flyTest(double dt) {
+  const AirframeState& a = air();
+  Crew& c = crew;
+  const std::string stage = testStage();
+  const bool level = stage == "settle" || stage == "slow" || stage == "recover";
+  if (level || manoeuvre_ == "bank") climbOrDescend(testAltFt_, testCasKn_, 25, dt);
+  c.roll = rollFor(testHeadingDeg_, a.headingDeg, a.rollDeg, a.pDegS);
+  if (stage == "slow") tla_ = 0;
+  if (stage == "input") {
+    if (manoeuvre_ == "bank") c.roll = 1;
+    if (manoeuvre_ == "pull" || manoeuvre_ == "alpha") c.pitch = 1;
+    if (manoeuvre_ == "push" || manoeuvre_ == "speed") c.pitch = -1;
+    if (manoeuvre_ == "alpha") tla_ = 0;
+  } else if (stage == "release") {
+    if (manoeuvre_ == "bank") c.roll = 0;
+    else c.pitch = 0;
+    if (manoeuvre_ == "alpha") tla_ = 45;
+  }
+  c.tla[0] = c.tla[1] = tla_;
 }
 
 // In direct law the stick moves the elevator itself and nothing trims: the PFD says USE MAN PITCH TRIM.
@@ -333,6 +394,10 @@ void World::fly(double dt) {
   c.pitch = c.roll = c.pedals = 0;
   const double h = a.pressureAltitudeFt, gamma = a.flightPathDeg, q = a.qDegS;
   const double phi = a.rollDeg, p = a.pDegS, psi = a.headingDeg;
+  if (!manoeuvre_.empty()) {
+    flyTest(dt);
+    return;
+  }
 
   switch (phase_) {
     case Phase::Parked:
