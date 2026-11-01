@@ -3,7 +3,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { apply, calibrated, controlsFromInputs, coreInputs, deadzone, detented, initialControls, moveLever } from '../src/controls.js';
+import {
+  apply, calibrated, controlsFromInputs, coreInputs, deadzone, detented, initialControls, MAX_REV, moveLever, REV_IDLE,
+} from '../src/controls.js';
 
 const none = new Set();
 
@@ -99,4 +101,35 @@ test('the controls start where the flight core started: an approach keeps its fl
   const back = coreInputs(c);
   assert.deepEqual([back.tla_1, back.flap_lever, back.gear_down, back.brakes], [7.1, 4, 1, 0],
                    'and handed back to the core unchanged until the hands move them');
+});
+
+test('the levers go behind idle only with the reverse latches lifted, and click into REV IDLE and MAX REV', () => {
+  assert.equal(moveLever(0, -5), 0, 'without the latches, idle is as far back as they go');
+  assert.equal(moveLever(0, -5, true), -5, 'with them, into the reverse range');
+  assert.equal(moveLever(-5, -2, true), REV_IDLE, 'stopping at REV IDLE');
+  assert.equal(moveLever(REV_IDLE, -30, true), MAX_REV, 'and no further than MAX REV');
+  assert.equal(moveLever(MAX_REV, 3), -17, 'once in reverse, the latches let go, the levers still move in it');
+  assert.equal(moveLever(-3, 5), 0, 'and forward, they stop at idle before any forward thrust');
+  assert.equal(detented(-7), REV_IDLE);
+  assert.equal(detented(-19), MAX_REV);
+  assert.equal(detented(-40), MAX_REV, 'nothing behind MAX REV');
+});
+
+test('keys: Shift held with PgDn pulls the levers into reverse; a throttle axis spans it with the latches held', () => {
+  let c = initialControls();
+  const none = new Set();
+  for (let k = 0; k < 50; ++k) c = apply(c, {}, new Set(['thrustDown']), none, 0.02);
+  assert.equal(c.tla, 0, 'PgDn alone stops at idle');
+  for (let k = 0; k < 150; ++k) c = apply(c, {}, new Set(['thrustDown', 'reverse']), none, 0.02);
+  assert.equal(c.tla, MAX_REV, 'with the latches, to MAX REV');
+  assert.equal(coreInputs(c).tla_1, MAX_REV, 'and the core gets it, both levers');
+  assert.equal(coreInputs(c).tla_2, MAX_REV);
+  let a = apply(initialControls(), { throttle: 0 }, new Set(['reverse']), none, 0.02);
+  assert.equal(a.tla, REV_IDLE, 'an axis at idle with the latches held: REV IDLE');
+  a = apply(a, { throttle: 1 }, new Set(['reverse']), none, 0.02);
+  assert.equal(a.tla, MAX_REV, 'pushed forward: MAX REV');
+  a = apply(a, { throttle: 0 }, none, none, 0.02);
+  assert.equal(a.tla, 0, 'the latches let go: the axis is forward travel again, at idle');
+  const resumed = controlsFromInputs([MAX_REV], { tla_1: 0, flap_lever: 0, gear_down: 0, spoilers_armed: 0, speedbrake: 0, brakes: 0 });
+  assert.equal(resumed.tla, MAX_REV, 'a start in reverse keeps the levers there');
 });

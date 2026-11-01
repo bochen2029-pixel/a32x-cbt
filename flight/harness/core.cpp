@@ -20,7 +20,8 @@ constexpr double kDt = 0.02;  // 50 Hz, the rate the computers are built for
 constexpr double kRunwayStartPastThresholdM = 150;  // where a runway start stands, lined up
 
 // Input slots. Signs and units are the crew's (world.h): stick +1 full pull and full right, pedals
-// +1 full left, thrust lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left and -1 right,
+// +1 full left, thrust lever angle -20 MAX REV, -6 REV IDLE, 0 idle .. 45 TOGA (reverse acts only on an
+// airframe that has it, on the ground: airframe.cpp), rudder_trim +1 the switch held left and -1 right,
 // pitch_trim the trim wheel turned at that fraction of its rate, + nose up.
 const std::vector<const char*> kInputs = {
     "pitch",      "roll",      "pedals",     "tla_1",       "tla_2",
@@ -58,7 +59,10 @@ const std::vector<const char*> kState = {
     // the pilot's eye, the airframe definition's own EYEPOINT (the left seat), from the CG in body axes:
     // forward, right, up, metres; a view puts its camera there; and the CG's height above the ground
     // standing on the gear, where ra_ft reads zero, so a view puts the wheels on the runway
-    "eye_fwd_m",    "eye_right_m",  "eye_up_m",      "cg_height_m"};
+    "eye_fwd_m",    "eye_right_m",  "eye_up_m",      "cg_height_m",
+    // the engines, where the airframe has them (airframe.h): 0 approach idle .. 1 ground idle; each
+    // reverser 0 stowed .. 1 deployed
+    "ground_idle",  "reverser_1",   "reverser_2"};
 
 int slot(const std::vector<const char*>& names, const char* name) {
   for (size_t k = 0; k < names.size(); ++k) {
@@ -201,8 +205,8 @@ void FlightCore::fromInputs(const std::vector<double>& v, Crew& c) {
   c.pitch = bounded(v[0], -1, 1, c.pitch);
   c.roll = bounded(v[1], -1, 1, c.roll);
   c.pedals = bounded(v[2], -1, 1, c.pedals);
-  c.tla[0] = bounded(v[3], 0, 45, c.tla[0]);
-  c.tla[1] = bounded(v[4], 0, 45, c.tla[1]);
+  c.tla[0] = bounded(v[3], -20, 45, c.tla[0]);
+  c.tla[1] = bounded(v[4], -20, 45, c.tla[1]);
   c.brakes = bounded(v[5], 0, 1, c.brakes);
   c.speedbrake = bounded(v[6], 0, 1, c.speedbrake);
   c.spoilersArmed = on(7, c.spoilersArmed);
@@ -300,8 +304,11 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            a.eyeFwdM,
                            a.eyeRightM,
                            a.eyeUpM,
-                           a.cgHeightM};
-  static_assert(sizeof values / sizeof values[0] == 64, "one value per state slot");
+                           a.cgHeightM,
+                           a.groundIdle,
+                           a.reverser[0],
+                           a.reverser[1]};
+  static_assert(sizeof values / sizeof values[0] == 67, "one value per state slot");
   s.assign(std::begin(values), std::end(values));
 }
 

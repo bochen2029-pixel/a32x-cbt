@@ -34,7 +34,7 @@ struct AirframeControls {
   double slat = 0;              // slat surface angle
   double flap = 0;              // flap surface angle
   // The rest of the aeroplane.
-  double tla[2] = {0, 0};       // thrust lever angle, deg: 0 idle, 25 CL, 35 MCT, 45 TOGA
+  double tla[2] = {0, 0};       // thrust lever angle, deg: -20 MAX REV, -6 REV IDLE, 0 idle, 25 CL, 35 MCT, 45 TOGA
   double brake[2] = {0, 0};     // left, right; 0..1 of full braking
   double noseWheel = 0;         // nose wheel steering angle, deg, + right
   bool gearDown = true;         // the gear lever
@@ -66,6 +66,9 @@ struct AirframeState {
   double eyeFwdM = 0, eyeRightM = 0, eyeUpM = 0;
   // the CG's height above the ground standing on the gear, where the radio height reads zero
   double cgHeightM = 0;
+  // where the aircraft file has them (airframe.cpp): 0 approach idle .. 1 ground idle; and each
+  // reverser, 0 stowed .. 1 deployed. Zero on an airframe without them.
+  double groundIdle = 0, reverser[2] = {0, 0};
 };
 
 // The bare airframe measured, for scoring it against targets (score.cpp).

@@ -96,6 +96,17 @@ using Schedule = std::array<double, 4>;
 const double kTla[4] = {0, 25, 35, 45};
 constexpr Schedule k737Schedule = {0, 0.88, 0.95, 1.0};
 
+// Ground idle and reverse thrust, where the aircraft file declares them: propulsion/a320/ground-idle, the
+// share of ground idle in its idle thrust, written here; propulsion/fit/reverse-efficiency, the share of
+// an engine's thrust its reverser turns forward; propulsion/fit/reverse-max, MAX REV's setting as the
+// fraction of the way from idle to take-off thrust. An aircraft without them has one idle, and below idle
+// is idle. The reverse range of the levers is the A320's (A32NX's detents): reverse idle at -6 degrees,
+// MAX REV at -20; between idle and -6 the reversers deploy and give reverse idle. The times are ours.
+constexpr double kRevIdleTla = -6, kMaxRevTla = -20;
+constexpr double kReverserTransitS = 2;  // stowed to deployed, or back
+constexpr double kGroundIdleSpoolS = 5;  // approach idle to ground idle, or back, as the engines spool
+constexpr double kRunningN2 = 50;        // an engine slower than this is not running: no reverse
+
 // Where a start puts the airframe: AirframeStart (airframe.h). An airborne start trims with alpha held
 // under this, comfortably past any approach's and short of every configuration's stall.
 constexpr double kStartTrimAlphaLimitDeg = 16;
@@ -209,7 +220,12 @@ struct Airframe::Impl {
                  *groundSpeed = nullptr, *gamma = nullptr, *latitude = nullptr, *longitude = nullptr, *agl = nullptr,
                  *wow[3] = {}, *wheelSpeed[2] = {}, *gearPos = nullptr, *n1[2] = {}, *weight = nullptr,
                  *cgX = nullptr, *aeroRpX = nullptr, *mac = nullptr, *cgY = nullptr, *cgZ = nullptr,
-                 *eye[3] = {};
+                 *eye[3] = {}, *n2[2] = {};
+  // ground idle and the reversers, where the aircraft file declares them (above); null where it does not
+  SGPropertyNode *groundIdleSelect = nullptr, *reverseEfficiency = nullptr, *reverseMax = nullptr,
+                 *reverserAngle[2] = {};
+  double groundIdle = 0;               // 0 approach idle .. 1 ground idle
+  double deployed[2] = {0, 0};         // each reverser, 0 stowed .. 1 deployed
 
   void bind() {
     elevator = node("a32nx/elevator-rad");
@@ -290,6 +306,43 @@ struct Airframe::Impl {
     eye[0] = node("metrics/eyepoint-x-in");
     eye[1] = node("metrics/eyepoint-y-in");
     eye[2] = node("metrics/eyepoint-z-in");
+    n2[0] = node("propulsion/engine[0]/n2");
+    n2[1] = node("propulsion/engine[1]/n2");
+
+    auto declared = [this](const char* path) { return fdm.GetPropertyManager()->GetNode(path); };
+    groundIdleSelect = declared("propulsion/a320/ground-idle");
+    reverseEfficiency = declared("propulsion/fit/reverse-efficiency");
+    reverseMax = declared("propulsion/fit/reverse-max");
+    if (reverseEfficiency && reverseMax) {  // a direct thruster's: its thrust times the angle's cosine
+      reverserAngle[0] = node("propulsion/engine[0]/reverser-angle-rad");
+      reverserAngle[1] = node("propulsion/engine[1]/reverser-angle-rad");
+    }
+  }
+
+  // Ground idle and the reversers, before a tick: approach idle in flight, ground idle with both main
+  // gears on the ground, coming in as the engines spool down; a reverser deploys only on the ground with
+  // its engine running and its lever below idle, and gives reverse idle until it is fully out. Then the
+  // throttle for each lever: forward on the schedule, or reverse from idle at -6 to MAX REV at -20.
+  void engines(const AirframeControls& c, double dt) {
+    const bool onGround = state.leftWow && state.rightWow;
+    if (groundIdleSelect) {
+      groundIdle += clamp((onGround ? 1.0 : 0.0) - groundIdle, -dt / kGroundIdleSpoolS, dt / kGroundIdleSpoolS);
+      groundIdleSelect->setDoubleValue(groundIdle);
+    }
+    for (int e = 0; e < 2; ++e) {
+      double setting = throttleFor(schedule, c.tla[e]);  // below idle: idle
+      if (reverserAngle[e]) {
+        const bool wanted = c.tla[e] < 0 && onGround && n2[e]->getDoubleValue() > kRunningN2;
+        deployed[e] += clamp((wanted ? 1.0 : 0.0) - deployed[e], -dt / kReverserTransitS, dt / kReverserTransitS);
+        const double efficiency = reverseEfficiency->getDoubleValue();
+        reverserAngle[e]->setDoubleValue(std::acos(clamp(1 - deployed[e] * (1 + efficiency), -1, 1)));
+        if (c.tla[e] < 0 && deployed[e] >= 1) {
+          const double share = clamp((kRevIdleTla - c.tla[e]) / (kRevIdleTla - kMaxRevTla), 0, 1);
+          setting = std::sqrt(share * reverseMax->getDoubleValue());
+        }
+      }
+      throttle[e]->setDoubleValue(setting);
+    }
   }
 
   void read() {
@@ -343,6 +396,9 @@ struct Airframe::Impl {
     s.eyeRightM = (eye[1]->getDoubleValue() - cgY->getDoubleValue()) * kMPerIn;
     s.eyeUpM = (eye[2]->getDoubleValue() - cgZ->getDoubleValue()) * kMPerIn;
     s.cgHeightM = radioZeroFt * 0.3048;
+    s.groundIdle = groundIdle;
+    s.reverser[0] = deployed[0];
+    s.reverser[1] = deployed[1];
   }
 
   void run(double seconds) {
@@ -501,11 +557,13 @@ Airframe::Airframe(const AirframeStart& start) : impl_(std::make_unique<Impl>())
   // Down onto the gear, on the brakes, engines at idle; then the radio altimeter reads zero.
   m.brake[0]->setDoubleValue(1);
   m.brake[1]->setDoubleValue(1);
+  if (m.groundIdleSelect) m.groundIdleSelect->setDoubleValue(m.groundIdle = 1);  // parked: ground idle
   m.run(kSettleS);
   m.radioZeroFt = m.agl->getDoubleValue();
   m.read();
 
   if (!start.airborne) return;
+  if (m.groundIdleSelect) m.groundIdleSelect->setDoubleValue(m.groundIdle = 0);  // in the air: approach idle
   // Into the air above the same field, trimmed by JSBSim's own routine in still air. The wind goes in
   // after the trim, not through the initial condition: JSBSim's initial condition takes the airspeed as
   // the ground velocity plus the wind and its dynamics as the ground velocity less the wind (FGAuxiliary,
@@ -574,10 +632,8 @@ void Airframe::step(double dt, const AirframeControls& c) {
     m.wingSpoilers[side]->setDoubleValue(clamp(extended / kWingSpoilersFullDeg, 0, 1));
   }
 
-  for (int e = 0; e < 2; ++e) {
-    m.throttle[e]->setDoubleValue(throttleFor(m.schedule, c.tla[e]));
-    m.brake[e]->setDoubleValue(clamp(c.brake[e], 0, 1));
-  }
+  m.engines(c, dt);
+  for (int e = 0; e < 2; ++e) m.brake[e]->setDoubleValue(clamp(c.brake[e], 0, 1));
   m.steer->setDoubleValue(c.noseWheel);
   m.gear->setDoubleValue(c.gearDown ? 1 : 0);
 

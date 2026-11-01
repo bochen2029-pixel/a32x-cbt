@@ -169,6 +169,13 @@ set_target_properties(judge_test PROPERTIES LINKER_LANGUAGE CXX)
 flight_warnings(judge_test)
 flight_node_program(judge_test)
 
+# Ground idle and reverse thrust through the C API, the crew's hands on the levers.
+add_executable(reverse_test harness/reverse_test.c)
+target_link_libraries(reverse_test PRIVATE flight_world)
+set_target_properties(reverse_test PROPERTIES LINKER_LANGUAGE CXX)
+flight_warnings(reverse_test)
+flight_node_program(reverse_test)
+
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
 target_link_libraries(airframe_score PRIVATE flight_world)
@@ -255,6 +262,12 @@ add_test(NAME the_judge_has_nothing_to_judge_on_the_runway COMMAND judge_test ru
 # From 3.5 nm the window opens before the FAC's VLS has settled: the judge waits for it before it fixes
 # Vapp, and leaves speed out of the in-band slot until then.
 add_test(NAME the_judge_waits_for_the_fac_s_vls_on_a_short_approach COMMAND judge_test short)
+# Ground idle and reverse thrust (airframe.cpp) act only on an airframe whose file has them: on one without
+# them, JSBSim's 737, there is one idle, below idle is idle, and nothing deploys, on the ground or in flight.
+add_test(NAME without_reversers_below_idle_is_idle COMMAND reverse_test ground)
+add_test(NAME without_reversers_nothing_deploys_in_flight COMMAND reverse_test air)
+set_tests_properties(without_reversers_below_idle_is_idle without_reversers_nothing_deploys_in_flight
+                     PROPERTIES ENVIRONMENT "FLIGHT_AIRFRAME=737")
 
 # The scripted crew flies KDFW 17C's ILS from 10 nm to a stop, judged by the hand-flown ILS's bands
 # (ROADMAP.md, P7): on the beams, a dot off each of them either way, 10 kt fast and slow, a 15 kt

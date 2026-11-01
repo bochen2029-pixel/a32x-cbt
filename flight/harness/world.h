@@ -27,7 +27,7 @@ struct Crew {
   double pedals = 0;      // the computers' rudder_pedal_pos, -1..1, + left
   double speedbrake = 0;  // lever, 0 retracted .. 1 full
   bool spoilersArmed = false;
-  double tla[2] = {0, 0};  // thrust lever angle, deg: 0 idle, 25 CL, 45 TOGA
+  double tla[2] = {0, 0};  // thrust lever angle, deg: -20 MAX REV, -6 REV IDLE, 0 idle, 25 CL, 45 TOGA
   bool elacOn[2] = {false, false};
   bool secOn[3] = {false, false, false};
   bool facOn[2] = {false, false};

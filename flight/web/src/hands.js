@@ -14,6 +14,7 @@ const KEY_ACTIONS = {
   KeyB: 'brakes', KeyP: 'parkingBrake', KeyS: 'speedbrake', KeyA: 'spoilersArm', KeyR: 'flapsUp',
   KeyF: 'flapsDown', KeyG: 'gear', PageUp: 'thrustUp', PageDown: 'thrustDown', KeyT: 'rudderTrimLeft',
   KeyY: 'rudderTrimRight', KeyU: 'rudderTrimReset', Home: 'pitchTrimDown', End: 'pitchTrimUp',
+  ShiftLeft: 'reverse', ShiftRight: 'reverse',
 };
 const KEY_AXES = {
   pitch: { plus: 'ArrowDown', minus: 'ArrowUp' },      // down arrow pulls
@@ -23,7 +24,8 @@ const KEY_AXES = {
 const KEY_RATE = 1.5, KEY_RETURN = 4;  // stick travel per second while held, and springing back
 
 export const KEY_HELP = [
-  'arrows  stick (down pulls)', 'Z X  rudder', 'PgUp PgDn  thrust levers', 'R F  flaps up / down',
+  'arrows  stick (down pulls)', 'Z X  rudder', 'PgUp PgDn  thrust levers', 'Shift + PgDn  into reverse',
+  'R F  flaps up / down',
   'G  gear', 'B  brakes (held)', 'P  parking brake', 'S  speedbrake', 'A  ground spoilers arm',
   'T Y  RUD TRIM left / right', 'U  RUD TRIM RESET', 'Home End  pitch trim wheel, nose down / up', 'M  map the joystick', 'C  calibrate it', 'H  hide this',
 ];

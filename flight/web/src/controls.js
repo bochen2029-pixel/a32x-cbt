@@ -3,10 +3,15 @@
 // here, so node tests it. GPLv3.
 //
 // Signs are the core's (core.h): pitch +1 full pull, roll +1 full right, pedals +1 full LEFT, thrust
-// lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left, pitch_trim the wheel turned, + nose up.
+// lever angle -20 MAX REV, -6 REV IDLE, 0 idle .. 45 TOGA, rudder_trim +1 the switch held left, pitch_trim
+// the wheel turned, + nose up.
 
-// IDLE, CL, FLX/MCT, TOGA: where the A320's thrust levers click in.
+// IDLE, CL, FLX/MCT, TOGA: where the A320's thrust levers click in; and behind idle, the reverse range,
+// which the levers enter only with the reverse latches lifted (the 'reverse' action, held): REV IDLE and
+// MAX REV. Reverse acts on the ground only, and only on an airframe that has it (airframe.cpp).
 export const DETENTS = [0, 25, 35, 45];
+export const REV_IDLE = -6, MAX_REV = -20;
+const ALL_DETENTS = [MAX_REV, REV_IDLE, ...DETENTS];
 export const DETENT_SNAP = 2;      // degrees of lever travel either side of a detent that click into it
 export const LEVER_RATE = 20;      // deg/s when the levers are driven by buttons or keys
 
@@ -14,7 +19,7 @@ export const LEVER_RATE = 20;      // deg/s when the levers are driven by button
 export const ACTIONS = [
   'brakes', 'parkingBrake', 'speedbrake', 'spoilersArm', 'flapsUp', 'flapsDown', 'gear',
   'thrustUp', 'thrustDown', 'rudderTrimLeft', 'rudderTrimRight', 'rudderTrimReset', 'takeover', 'pitchTrimDown',
-  'pitchTrimUp',
+  'pitchTrimUp', 'reverse',
 ];
 
 // A raw axis reading made -1..1 by its calibration: the halves either side of the centre are scaled
@@ -35,8 +40,8 @@ export function deadzone(v, dz) {
 
 // A lever position in degrees, clicked into the nearest detent when it is close enough.
 export function detented(tla) {
-  const t = Math.max(0, Math.min(45, tla));
-  for (const d of DETENTS) if (Math.abs(t - d) <= DETENT_SNAP) return d;
+  const t = Math.max(MAX_REV, Math.min(45, tla));
+  for (const d of ALL_DETENTS) if (Math.abs(t - d) <= DETENT_SNAP) return d;
   return t;
 }
 
@@ -56,7 +61,7 @@ export function controlsFromInputs(values, index) {
   const v = (name) => values[index[name]];
   return {
     ...initialControls(),
-    tla: Math.max(0, Math.min(45, v('tla_1'))),
+    tla: Math.max(MAX_REV, Math.min(45, v('tla_1'))),
     flapLever: Math.max(0, Math.min(4, Math.round(v('flap_lever')))),
     gearDown: v('gear_down') >= 0.5,
     spoilersArmed: v('spoilers_armed') >= 0.5,
@@ -68,16 +73,19 @@ export function controlsFromInputs(values, index) {
 // One frame of hands on the controls. axes: {pitch, roll, pedals, throttle, toeBrakes}, each in its
 // core range (throttle 0 idle .. 1 TOGA), or undefined where nothing is mapped. held: the actions whose
 // buttons or keys are down; pressed: those that went down this frame. dt: seconds since the last frame.
+// With the reverse latches held, a throttle axis spans the reverse range instead, idle to MAX REV, and
+// the keys or buttons drive the levers through idle into it.
 export function apply(previous, axes, held, pressed, dt) {
   const c = { ...previous };
   for (const name of ['pitch', 'roll', 'pedals']) {
     if (axes[name] !== undefined) c[name] = Math.max(-1, Math.min(1, axes[name]));
   }
+  const latches = held.has('reverse');
   if (axes.throttle !== undefined) {
-    c.tla = detented(axes.throttle * 45);
+    c.tla = latches ? detented(REV_IDLE + (MAX_REV - REV_IDLE) * axes.throttle) : detented(axes.throttle * 45);
   } else {
     const drive = (held.has('thrustUp') ? 1 : 0) - (held.has('thrustDown') ? 1 : 0);
-    if (drive) c.tla = moveLever(c.tla, drive * LEVER_RATE * dt);
+    if (drive) c.tla = moveLever(c.tla, drive * LEVER_RATE * dt, latches);
   }
   if (pressed.has('flapsUp')) c.flapLever = Math.max(0, c.flapLever - 1);
   if (pressed.has('flapsDown')) c.flapLever = Math.min(4, c.flapLever + 1);
@@ -94,10 +102,12 @@ export function apply(previous, axes, held, pressed, dt) {
 }
 
 // A lever driven at a rate stops for a moment in each detent it reaches, as a hand feels the click:
-// it does not pass a detent within one frame.
-export function moveLever(tla, delta) {
-  const next = Math.max(0, Math.min(45, tla + delta));
-  for (const d of DETENTS) {
+// it does not pass a detent within one frame. It goes back past idle only with the reverse latches
+// lifted, or once it is already in reverse.
+export function moveLever(tla, delta, latches = false) {
+  const floor = latches || tla < 0 ? MAX_REV : 0;
+  const next = Math.max(floor, Math.min(45, tla + delta));
+  for (const d of ALL_DETENTS) {
     if ((tla < d && next > d) || (tla > d && next < d)) return d;
   }
   return next;

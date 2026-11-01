@@ -10,14 +10,15 @@ import { calibrated, deadzone } from './controls.js';
 const STICK_DEADZONE = 0.04;
 
 // What a standard-mapping gamepad does out of the box: the left stick flies, the right stick's
-// x axis is the rudder, the shoulders drive the thrust levers, the triggers move the flap lever.
+// x axis is the rudder, the shoulders drive the thrust levers, the triggers move the flap lever, and
+// D-pad up held lifts the reverse latches.
 export function standardGamepad() {
   const axis = (index, invert = false) => ({ index, invert, deadzone: STICK_DEADZONE, cal: { min: -1, center: 0, max: 1 } });
   return {
     axes: { pitch: axis(1), roll: axis(0), pedals: axis(2, true) },
     buttons: {
       brakes: 0, speedbrake: 1, spoilersArm: 2, gear: 3, thrustDown: 4, thrustUp: 5, flapsUp: 6, flapsDown: 7,
-      parkingBrake: 8, takeover: 9, rudderTrimReset: 13, rudderTrimLeft: 14, rudderTrimRight: 15,
+      parkingBrake: 8, takeover: 9, reverse: 12, rudderTrimReset: 13, rudderTrimLeft: 14, rudderTrimRight: 15,
     },
   };
 }
@@ -63,6 +64,7 @@ export const STEPS = [
     ['brakes', 'brakes (held)'], ['parkingBrake', 'parking brake'], ['speedbrake', 'speedbrake'],
     ['spoilersArm', 'ground spoilers arm'], ['flapsUp', 'flaps up one notch'], ['flapsDown', 'flaps down one notch'],
     ['gear', 'gear lever'], ['thrustUp', 'thrust levers forward (held)'], ['thrustDown', 'thrust levers back (held)'],
+    ['reverse', 'the reverse latches (held), to pull the levers into reverse'],
     ['rudderTrimLeft', 'RUD TRIM left (held)'], ['rudderTrimRight', 'RUD TRIM right (held)'],
     ['rudderTrimReset', 'RUD TRIM RESET'], ['takeover', 'sidestick takeover pushbutton'],
   ].map(([name, what]) => ({ kind: 'button', name, ask: `press the button for: ${what} — Escape skips` })),
