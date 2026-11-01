@@ -16,6 +16,7 @@
 #include "FacComputer_types.h"
 #include "SecComputer_types.h"
 #include "airframe.h"
+#include "runway.h"
 
 // What the crew's hands and the overhead panel are doing.
 struct Crew {
@@ -69,9 +70,19 @@ enum class Phase { Parked, PowerUp, GroundCheck, Taxi, TakeoffRoll, Climb, Cruis
 
 const char* phaseName(Phase p);
 
+// Where the world begins: the airframe's start, the runway it is judged against, and the levers the
+// crew finds set. The default is P7's slice 1: on the gear at the start, a runway drawn 150 m behind it.
+struct WorldStart {
+  AirframeStart airframe;
+  Runway runway;           // empty name: the default runway, made from where the airframe starts
+  int flapLever = 0;
+  bool gearDown = true;
+};
+
 class World {
  public:
-  World();
+  World() : World(WorldStart{}) {}
+  explicit World(const WorldStart& start);
 
   // One 20 ms step: the crew acts on the previous instant, the actuators follow the orders, the
   // airframe moves, and the sensors are re-sampled.
@@ -122,6 +133,8 @@ class World {
   double flapDeg() const { return flapDeg_; }
   bool onGround() const { return mainGearCompressed(); }
   const AirframeState& airframeState() const { return air(); }
+  const Runway& runway() const { return runway_; }
+  IlsReading ils() const { return readIls(runway_, air().latitudeDeg, air().longitudeDeg, air().radioHeightFt); }
 
   // When the airframe went below the runway, or -1. JSBSim's 737 touches the ground only with its
   // gear; anything lower has flown into it. The world freezes there: what JSBSim makes of an
@@ -170,6 +183,7 @@ class World {
   void steerOnGround(double headingTarget);
 
   std::unique_ptr<Airframe> airframe_;
+  Runway runway_;
 
   double t_ = 0;
   Phase phase_ = Phase::Parked;

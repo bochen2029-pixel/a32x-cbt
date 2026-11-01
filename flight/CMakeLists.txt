@@ -120,7 +120,7 @@ function(flight_warnings target)
   endif()
 endfunction()
 
-set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp)
+set(FLIGHT_WORLD harness/efcs.cpp harness/world.cpp harness/airframe.cpp harness/runway.cpp)
 add_library(flight_world STATIC
   ${FLIGHT_WORLD}
   harness/core.cpp)  # the step loop behind a C API: start, inputs, step, state
@@ -144,6 +144,13 @@ target_link_libraries(core_test PRIVATE flight_world)
 set_target_properties(core_test PROPERTIES LINKER_LANGUAGE CXX)
 flight_warnings(core_test)
 flight_node_program(core_test)
+
+# An approach start on LSZH 14's ILS, through the same API.
+add_executable(ils_test harness/ils_test.c)
+target_link_libraries(ils_test PRIVATE flight_world)
+set_target_properties(ils_test PROPERTIES LINKER_LANGUAGE CXX)
+flight_warnings(ils_test)
+flight_node_program(ils_test)
 
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
@@ -195,7 +202,7 @@ if(EMSCRIPTEN)
   flight_warnings(flight_core)
   target_link_options(flight_core PRIVATE
     --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createFlightCore -sENVIRONMENT=worker,node -sSINGLE_FILE=1
-    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text"
+    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPF64"
     ${FLIGHT_EMBED_OPTIONS})
   set_target_properties(flight_core PROPERTIES LINK_DEPENDS "${FLIGHT_EMBED_FILES}")
@@ -216,6 +223,12 @@ if(NOT EMSCRIPTEN)
   add_test(NAME replay_reaches_the_same_touchdown COMMAND law_harness --minutes 18 --check-replay)
 endif()
 add_test(NAME the_c_api_flies COMMAND core_test)
+
+# A real runway and its ILS (P7 step 2): an approach start on LSZH 14 reads the beams where the scenario
+# put it — on both, a dot right of the localizer, a dot below the glideslope — and holds the path hands off.
+add_test(NAME ils_on_the_beams COMMAND ils_test "approach" 0 0)
+add_test(NAME ils_a_dot_off_the_localizer COMMAND ils_test "approach$<SEMICOLON>loc=1" 1 0)
+add_test(NAME ils_a_dot_low COMMAND ils_test "approach$<SEMICOLON>distance=8$<SEMICOLON>gs=1" 0 1)
 
 # The parts of a flight the gate leans on, each checked on its own.
 add_test(NAME computers_come_up COMMAND law_harness --minutes 1 --expect power-up)

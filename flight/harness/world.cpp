@@ -134,7 +134,53 @@ const char* phaseName(Phase p) {
   return "?";
 }
 
-World::World() : airframe_(std::make_unique<Airframe>()) {
+namespace {
+
+// The airframe's start with its configuration taken from the flap lever and the gear, as the SFCCs
+// would have set the slats and flaps for that lever.
+AirframeStart configured(const WorldStart& s) {
+  AirframeStart a = s.airframe;
+  const int lever = std::max(0, std::min(4, s.flapLever));
+  a.config.slatDeg = slatSurfaceDeg(kSlatFppu[lever]);
+  a.config.flapDeg = flapSurfaceDeg(kFlapFppu[lever]);
+  a.config.gearDown = s.gearDown;
+  return a;
+}
+
+// The default runway: 3,000 x 45 m, its threshold 150 m behind where the airframe starts, heading 360,
+// at sea level, the threshold and its end the same.
+Runway runwayAtStart(const AirframeState& a) {
+  Runway r;
+  r.name = "start";
+  constexpr double kBehindM = 150, kRadPerDeg = 3.14159265358979323846 / 180;
+  const double metresPerDegLat = 111132.954 - 559.822 * std::cos(2 * a.latitudeDeg * kRadPerDeg);
+  r.endLatDeg = a.latitudeDeg - kBehindM / metresPerDegLat;
+  r.endLonDeg = a.longitudeDeg;
+  r.headingDeg = 360;
+  r.lengthM = 3000;
+  r.widthM = 45;
+  return r;
+}
+
+}  // namespace
+
+World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(configured(start))) {
+  runway_ = start.runway.name.empty() ? runwayAtStart(air()) : start.runway;
+  if (start.airframe.airborne) {
+    // In the air: the levers and the surfaces where the trim left them, the brakes off.
+    const int lever = std::max(0, std::min(4, start.flapLever));
+    const TrimPoint& t = airframe_->startTrim();
+    crew.flapLever = lever;
+    crew.gearDown = start.gearDown;
+    crew.spoilersArmed = lever >= 3;
+    crew.brakes = 0;
+    crew.tla[0] = crew.tla[1] = tla_ = t.tla;
+    surfaces.ths = t.thsDeg;
+    slatFppu_ = kSlatFppu[lever];
+    flapFppu_ = kFlapFppu[lever];
+    flapDeg_ = flapSurfaceDeg(flapFppu_);
+    gammaCmd_ = gammaSpeed_ = air().flightPathDeg;
+  }
   lastCas_ = air().casKn;
   sense();
 }

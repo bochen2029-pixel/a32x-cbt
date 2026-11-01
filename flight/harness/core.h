@@ -22,6 +22,13 @@ extern "C" {
 // fly it, its inputs starting with the FLT CTL pushbuttons pressed. Returns 0, or -1 for a second call.
 int flight_start(const char* airframe, int scripted);
 
+// The same, from a scenario: "runway" (or empty) is flight_start's; "approach" starts in the air on LSZH
+// 14's ILS, options after it separated by semicolons — distance=NM (10), loc=DOTS (0), gs=DOTS (0),
+// cas=KT (140), lever=0..4 (4, FULL), wind=FROM/KT (0/0), turbulence=SEVERITY (0) — in CONF and gear
+// for the lever, trimmed. An outside crew only, for now: a scripted crew asked for there returns -2; a
+// scenario not understood, -3.
+int flight_start_scenario(const char* airframe, int scripted, const char* scenario);
+
 // The inputs, read before each step when the crew is not scripted.
 double* flight_inputs(void);
 int flight_input_count(void);
@@ -41,6 +48,7 @@ const char* flight_state_text(int index);
 }
 
 #include <functional>
+#include <string>
 #include <vector>
 
 #include "world.h"
@@ -50,7 +58,10 @@ class Efcs;
 // The same core for C++. The harness's runner steps through it too, so there is one step loop.
 class FlightCore {
  public:
-  explicit FlightCore(bool scripted);
+  explicit FlightCore(bool scripted, const WorldStart& start = WorldStart{});
+
+  // A scenario's text (flight_start_scenario) made into a start; false and a reason if not understood.
+  static bool parseScenario(const char* text, WorldStart& start, std::string& error);
 
   // One tick: the computers act on the world as it stands, then the crew's inputs for this tick are
   // set (unless scripted), then the world moves. `between` runs after the computers and before the

@@ -90,8 +90,9 @@ constexpr double kWingSpoilersFullDeg = 5 * 50;
 const double kTla[4] = {0, 25, 35, 45};
 const double kThrust[4] = {0, 0.88, 0.95, 1.0};
 
-// The runway: sea level, ISA, no wind, at the position the stub world's IRs reported.
-constexpr double kLatitude = 47.0, kLongitude = 8.0;
+// Where a start puts the airframe: AirframeStart (airframe.h). An airborne start trims with alpha held
+// under this, comfortably past any approach's and short of every configuration's stall.
+constexpr double kStartTrimAlphaLimitDeg = 16;
 constexpr double kSettleS = 10.0;  // on the brakes, before the world's clock starts
 
 [[noreturn]] void die(const std::string& what) {
@@ -177,6 +178,7 @@ struct Airframe::Impl {
   JSBSim::FGFDMExec fdm;
   AirframeState state;
   double radioZeroFt = 0;
+  TrimPoint startTrim;
 
   SGPropertyNode* node(const std::string& path) {
     SGPropertyNode* n = fdm.GetPropertyManager()->GetNode(path);
@@ -404,7 +406,7 @@ void Airframe::setCoefficients(const std::vector<std::pair<std::string, double>>
   coefficients() = c;
 }
 
-Airframe::Airframe() : impl_(std::make_unique<Impl>()) {
+Airframe::Airframe(const AirframeStart& start) : impl_(std::make_unique<Impl>()) {
   Impl& m = *impl_;
   JSBSim::FGFDMExec& fdm = m.fdm;
   const Model& model = m.model;
@@ -443,11 +445,15 @@ Airframe::Airframe() : impl_(std::make_unique<Impl>()) {
 
   fdm.Setdt(kFrame);
   auto ic = fdm.GetIC();
-  ic->SetLatitudeDegIC(kLatitude);
-  ic->SetLongitudeDegIC(kLongitude);
-  ic->SetTerrainElevationFtIC(0);
+  if (start.geodetic) {
+    ic->SetGeodLatitudeDegIC(start.latDeg);
+  } else {
+    ic->SetLatitudeDegIC(start.latDeg);
+  }
+  ic->SetLongitudeDegIC(start.lonDeg);
+  ic->SetTerrainElevationFtIC(start.fieldElevationFt);
   ic->SetAltitudeAGLFtIC(model.dropHeightFt);
-  ic->SetPsiDegIC(0);
+  ic->SetPsiDegIC(start.headingDeg);
   ic->SetVtrueKtsIC(0);
   m.gear->setDoubleValue(1);
   if (!fdm.RunIC()) die("JSBSim could not initialise the " + std::string(model.name));
@@ -459,9 +465,30 @@ Airframe::Airframe() : impl_(std::make_unique<Impl>()) {
   m.run(kSettleS);
   m.radioZeroFt = m.agl->getDoubleValue();
   m.read();
+
+  if (!start.airborne) return;
+  // Into the air above the same field: the wind set first, so the speed is the air's; then JSBSim's own
+  // trim. Turbulence, when asked for, from a fixed seed, so that a run repeats.
+  m.brake[0]->setDoubleValue(0);
+  m.brake[1]->setDoubleValue(0);
+  const double from = start.windFromDeg * kRad, wind = start.windKn * kFpsPerKt;
+  ic->SetWindNEDFpsIC(-wind * std::cos(from), -wind * std::sin(from), 0);
+  m.startTrim = trimmed(start.fieldElevationFt + start.heightFt, start.casKn, 0, start.gammaDeg, start.config,
+                        kStartTrimAlphaLimitDeg);
+  if (start.turbulence > 0) {
+    m.node("atmosphere/randomseed")->setIntValue(1983);
+    m.node("atmosphere/turb-type")->setIntValue(4);  // Tustin, MIL-F-8785C
+    m.node("atmosphere/turbulence/milspec/windspeed_at_20ft_AGL-fps")->setDoubleValue(std::max(1.0, wind));
+    m.node("atmosphere/turbulence/milspec/severity")->setDoubleValue(start.turbulence);
+  }
+  m.read();
 }
 
 Airframe::~Airframe() = default;
+
+const TrimPoint& Airframe::startTrim() const {
+  return impl_->startTrim;
+}
 
 void Airframe::step(double dt, const AirframeControls& c) {
   Impl& m = *impl_;
@@ -554,11 +581,16 @@ AeroPoint Airframe::aero(double altitudeFt, double mach, double alphaDeg, const 
 }
 
 TrimPoint Airframe::trim(double altitudeFt, double casKn, double mach, double gammaDeg, const Configuration& c) {
-  Impl& m = *impl_;
   const LiftPeak peak = liftPeak(c);
+  return trimmed(altitudeFt, casKn, mach, gammaDeg, c, peak.alphaDeg);
+}
+
+TrimPoint Airframe::trimmed(double altitudeFt, double casKn, double mach, double gammaDeg, const Configuration& c,
+                            double alphaLimitDeg) {
+  Impl& m = *impl_;
   m.configure(c);
   TrimPoint t;
-  t.ok = m.trimHere(altitudeFt, casKn, mach, gammaDeg, peak.alphaDeg);
+  t.ok = m.trimHere(altitudeFt, casKn, mach, gammaDeg, alphaLimitDeg);
   t.alphaDeg = m.state.alphaDeg;
   t.pitchDeg = m.state.pitchDeg;
   if (m.model.stabiliser) {

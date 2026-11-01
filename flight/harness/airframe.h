@@ -93,6 +93,21 @@ struct PitchResponse {
   std::vector<double> t, alphaDeg;  // from the end of the pulse: seconds, alpha less its trimmed value
 };
 
+// Where the airframe begins. By default, as since P7's slice 1: on the gear at 47 N 8 E (a latitude
+// JSBSim takes as geocentric), sea level, heading 360, no wind. A start on a real runway gives a geodetic
+// position, the field's elevation and a heading; an airborne start then flies from a height above that
+// field, trimmed by JSBSim at a speed and flight path in a configuration, the wind already blowing.
+struct AirframeStart {
+  double latDeg = 47.0, lonDeg = 8.0;
+  bool geodetic = false;
+  double fieldElevationFt = 0, headingDeg = 0;
+  bool airborne = false;
+  double heightFt = 0, casKn = 0, gammaDeg = 0;
+  Configuration config;
+  double windFromDeg = 0, windKn = 0;  // steady, from a true direction
+  double turbulence = 0;               // MIL-F-8785C (Tustin) severity: 0 none, 3 moderate
+};
+
 class Airframe {
  public:
   // Which aircraft definition every Airframe built from now on loads: "737" or "a320". Unless this is
@@ -108,8 +123,13 @@ class Airframe {
 
   // Loads the aircraft, puts it on a sea-level runway at 47 N 8 E heading 360 with engines at idle
   // and brakes on, and lets it settle on its gear. A load failure is reported and ends the process.
-  Airframe();
+  Airframe() : Airframe(AirframeStart{}) {}
+  explicit Airframe(const AirframeStart& start);
   ~Airframe();
+
+  // An airborne start's trim: the stabiliser and thrust lever angle it begins at, and whether JSBSim
+  // found one. A start on the gear has none.
+  const TrimPoint& startTrim() const;
 
   // One tick: JSBSim runs at 200 Hz, four frames per 20 ms.
   void step(double dt, const AirframeControls& controls);
@@ -141,6 +161,9 @@ class Airframe {
   Airframe& operator=(const Airframe&) = delete;
 
  private:
+  // trim(), its alpha held under a limit given rather than found by a lift sweep
+  TrimPoint trimmed(double altitudeFt, double casKn, double mach, double gammaDeg, const Configuration& c,
+                    double alphaLimitDeg);
   struct Impl;
   std::unique_ptr<Impl> impl_;
 };

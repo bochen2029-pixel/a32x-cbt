@@ -4,6 +4,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
+#include <cstdlib>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -37,7 +39,13 @@ const std::vector<const char*> kState = {
     "r_deg_s",      "flap_deg",     "gear_pos",      "on_ground",    "nose_on_ground",
     "elevator_deg", "ths_deg",      "aileron_l_deg", "aileron_r_deg", "rudder_deg",
     "rudder_trim_deg", "spoiler_l_deg", "spoiler_r_deg", "n1_1",      "n1_2",
-    "pitch_law",    "lateral_law",  "healthy",       "crashed",      "phase"};
+    "pitch_law",    "lateral_law",  "healthy",       "crashed",      "phase",
+    // the ILS (runway.h): where each beam lies from the aircraft, + right and + up, in dots
+    "loc_dots",     "gs_dots",      "loc_valid",     "gs_valid",
+    "thr_along_m",  "thr_right_m",  "thr_height_ft",
+    // the runway, fixed for the flight: its landing threshold, and the pavement past and before it
+    "rwy_lat_deg",  "rwy_lon_deg",  "rwy_elev_ft",   "rwy_heading_deg", "rwy_length_m",
+    "rwy_width_m",  "rwy_displaced_m"};
 
 int slot(const std::vector<const char*>& names, const char* name) {
   for (size_t k = 0; k < names.size(); ++k) {
@@ -55,7 +63,7 @@ std::vector<double> g_state;
 
 }  // namespace
 
-FlightCore::FlightCore(bool scripted) {
+FlightCore::FlightCore(bool scripted, const WorldStart& start) : world_(start) {
   world_.scripted = scripted;
   toInputs(world_.crew, inputs_);
   if (!scripted) {
@@ -142,6 +150,10 @@ void FlightCore::writeState(std::vector<double>& s) const {
   const AirframeState& a = w.airframeState();
   const Surfaces& f = w.surfaces;
   const Transmitted& tx = Efcs::instance().transmitted();
+  const IlsReading ils = w.ils();
+  const Runway& r = w.runway();
+  double thrLat = 0, thrLon = 0;
+  threshold(r, thrLat, thrLon);
   auto extension = [&f](int side) {
     double most = 0;
     for (double v : f.spoiler[side]) most = std::max(most, -v);
@@ -186,8 +198,22 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            static_cast<double>(lateralLaw(tx.fcdcBus[0].efcs_status_word_1)),
                            allHealthy(tx) ? 1.0 : 0.0,
                            w.crashedAt() >= 0 ? 1.0 : 0.0,
-                           static_cast<double>(w.phase())};
-  static_assert(sizeof values / sizeof values[0] == 40, "one value per state slot");
+                           static_cast<double>(w.phase()),
+                           ils.locDots,
+                           ils.gsDots,
+                           ils.locValid ? 1.0 : 0.0,
+                           ils.gsValid ? 1.0 : 0.0,
+                           ils.alongM,
+                           ils.rightM,
+                           ils.heightM / 0.3048,
+                           thrLat,
+                           thrLon,
+                           r.elevationFt,
+                           r.headingDeg,
+                           r.lengthM - r.displacedM,
+                           r.widthM,
+                           r.displacedM};
+  static_assert(sizeof values / sizeof values[0] == 54, "one value per state slot");
   s.assign(std::begin(values), std::end(values));
 }
 
@@ -199,14 +225,92 @@ const char* FlightCore::stateText(int index) const {
   return nullptr;
 }
 
+bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string& error) {
+  start = WorldStart{};
+  std::string s = text ? text : "";
+  std::vector<std::string> parts;
+  for (size_t at = 0; at <= s.size();) {
+    const size_t end = std::min(s.find(';', at), s.size());
+    parts.push_back(s.substr(at, end - at));
+    at = end + 1;
+  }
+  if (parts[0].empty() || parts[0] == "runway") {
+    if (parts.size() > 1) {
+      error = "the runway start takes no options";
+      return false;
+    }
+    return true;
+  }
+  if (parts[0] != "approach") {
+    error = "no scenario called '" + parts[0] + "'";
+    return false;
+  }
+  double distance = 10, loc = 0, gs = 0, cas = 140, lever = 4, windFrom = 0, windKn = 0, turbulence = 0;
+  for (size_t k = 1; k < parts.size(); ++k) {
+    const size_t eq = parts[k].find('=');
+    const std::string key = parts[k].substr(0, eq), value = eq == std::string::npos ? "" : parts[k].substr(eq + 1);
+    char* end = nullptr;
+    const double v = std::strtod(value.c_str(), &end);
+    const bool number = !value.empty() && end && (*end == '\0' || (key == "wind" && *end == '/'));
+    if (!number) {
+      error = "'" + parts[k] + "' is not key=number";
+      return false;
+    }
+    if (key == "distance") distance = v;
+    else if (key == "loc") loc = v;
+    else if (key == "gs") gs = v;
+    else if (key == "cas") cas = v;
+    else if (key == "lever") lever = v;
+    else if (key == "turbulence") turbulence = v;
+    else if (key == "wind") {
+      windFrom = v;
+      windKn = *end == '/' ? std::strtod(end + 1, nullptr) : 0;
+    } else {
+      error = "no option called '" + key + "'";
+      return false;
+    }
+  }
+  if (!(distance > 0.5 && distance < 20) || !(cas > 100 && cas < 250) || !(lever >= 0 && lever <= 4)) {
+    error = "distance 0.5..20 nm, cas 100..250 kt, lever 0..4";
+    return false;
+  }
+  const Runway r = lszh14();
+  AirframeStart& a = start.airframe;
+  onApproach(r, distance, loc, gs, a.latDeg, a.lonDeg, a.heightFt);
+  a.geodetic = true;
+  a.fieldElevationFt = r.elevationFt;
+  a.headingDeg = r.headingDeg;
+  a.airborne = true;
+  a.casKn = cas;
+  a.gammaDeg = -r.glideDeg;
+  a.windFromDeg = windFrom;
+  a.windKn = windKn;
+  a.turbulence = turbulence;
+  start.runway = r;
+  start.flapLever = static_cast<int>(lever);
+  start.gearDown = lever >= 3;
+  return true;
+}
+
 // --- the C API -----------------------------------------------------------------------------------
 
 extern "C" {
 
 int flight_start(const char* airframe, int scripted) {
+  return flight_start_scenario(airframe, scripted, "");
+}
+
+int flight_start_scenario(const char* airframe, int scripted, const char* scenario) {
   if (g_core) return -1;
+  WorldStart start;
+  std::string error;
+  if (!FlightCore::parseScenario(scenario, start, error)) {
+    std::fprintf(stderr, "flight_start_scenario: %s\n", error.c_str());
+    return -3;
+  }
+  if (scripted && start.airframe.airborne) return -2;
   if (airframe && *airframe) Airframe::select(airframe);
-  g_core = std::make_unique<FlightCore>(scripted != 0);
+  g_core = std::make_unique<FlightCore>(scripted != 0, start);
   g_core->writeState(g_state);
   return 0;
 }
