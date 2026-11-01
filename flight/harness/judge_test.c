@@ -6,6 +6,9 @@
  *   judge_test hands-off  nobody flies it: the trimmed aircraft drifts off the beams and never flares;
  *                         the judge says what broke, the hard touchdown among it, and once the test has
  *                         stopped it, that the approach was NOT STABLE
+ *   judge_test moves-on   as hands-off, and then, the verdict given at the stop, the test drives the
+ *                         aircraft on, well across the field, and stops it again: the verdict stands
+ *                         as it was at the stop, every line of it, for the approach ended there
  *   judge_test runway     a runway start: there is no approach to judge
  *   judge_test short      the scripted crew from 3.5 nm, where the window opens before the FAC's VLS has
  *                         settled: no Vapp until it has, then VLS + 5 and final; the in-band slot leaves
@@ -45,8 +48,9 @@ int main(int argc, char** argv) {
   const char* mode = argc > 1 ? argv[1] : "";
   const int scripted = strcmp(mode, "scripted") == 0, handsOff = strcmp(mode, "hands-off") == 0;
   const int runway = strcmp(mode, "runway") == 0, shortStart = strcmp(mode, "short") == 0;
-  if (!scripted && !handsOff && !runway && !shortStart) {
-    fprintf(stderr, "judge_test scripted | hands-off | runway | short\n");
+  const int movesOn = strcmp(mode, "moves-on") == 0;
+  if (!scripted && !handsOff && !runway && !shortStart && !movesOn) {
+    fprintf(stderr, "judge_test scripted | hands-off | moves-on | runway | short\n");
     return 2;
   }
   const char* airframe = getenv("FLIGHT_AIRFRAME");
@@ -79,7 +83,7 @@ int main(int argc, char** argv) {
   int vappMoved = 0;
   const double* s = flight_state();
   for (int tick = 0; tick < 6 * 60 * 50; ++tick) {
-    if (handsOff && s[field("on_ground")] == 1) {  /* the test stops it on the runway: idle, brakes */
+    if ((handsOff || movesOn) && s[field("on_ground")] == 1) {  /* the test stops it: idle, brakes */
       double* in = flight_inputs();
       in[input("tla_1")] = in[input("tla_2")] = 0;
       in[input("brakes")] = 1;
@@ -113,6 +117,31 @@ int main(int argc, char** argv) {
       touchdownM = s[field("judge_touchdown_m")];
     }
     if (!isnan(s[field("judge_stable")])) break;
+  }
+  if (movesOn) {
+    /* The verdict given at the stop, then the aircraft driven on: off the brakes, the levers at 20 deg, full
+     * right pedal turning the nose wheel, for 30 s; then idle and the brakes again. */
+    static char atStop[16384];
+    snprintf(atStop, sizeof atStop, "%s", flight_debrief());
+    const double stableAtStop = s[field("judge_stable")], rightAtStop = s[field("thr_right_m")];
+    double* in = flight_inputs();
+    in[input("brakes")] = 0;
+    in[input("tla_1")] = in[input("tla_2")] = 20;
+    in[input("pedals")] = -1;
+    flight_step(30 * 50);
+    in[input("tla_1")] = in[input("tla_2")] = 0;
+    in[input("pedals")] = 0;
+    in[input("brakes")] = 1;
+    flight_step(15 * 50);
+    s = flight_state();
+    const double moved = fabs(s[field("thr_right_m")] - rightAtStop);
+    printf("%s  then driven on %.0f m across, and stopped again\n", atStop, moved);
+    check(moved > 20, "after the stop, the test drives the aircraft well across", moved);
+    check(strcmp(flight_debrief(), atStop) == 0, "and the debrief stands as it was at the stop, every line", 0);
+    check(s[field("judge_stable")] == stableAtStop, "the verdict too", s[field("judge_stable")]);
+    if (strcmp(flight_debrief(), atStop) != 0) printf("after:\n%s", flight_debrief());
+    printf("%s\n", failures ? "FAILED" : "PASSED");
+    return failures ? 1 : 0;
   }
   const char* debrief = flight_debrief();
   printf("%s", debrief);

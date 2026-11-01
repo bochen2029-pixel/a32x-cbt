@@ -1241,7 +1241,9 @@ threshold to 50 ft — localizer and glideslope within a dot, sink rate under 1,
 CONF FULL, speed within Vapp −5/+10 kt, bank within 7° — then the touchdown — sink under 360 fpm, load
 factor under 2.6 g, pitch 0 to 10°, 300 to 900 m past the threshold, within 5 m of the centreline —
 the rollout, within 5 m of it to the stop, and no bounce. Each band reports its worst and the height
-or the distance where it happened. *Stable* is every band held, once the aircraft has stopped.
+or the distance where it happened. *Stable* is every band held, once the aircraft has stopped. The
+approach ends at the stop: what the aircraft does after it, taxiing on or rolling back on its reversers,
+changes nothing in the verdict (`the_judge_keeps_its_verdict_from_the_stop`).
 
 **Vapp** is Airbus's on the A320: the FAC's VLS + 5 kt — 134 kt on the approach start's 65 t, its VLS
 128.6 kt at 1,000 ft. A32NX's FAC sends no VLS for the first 10 s of a flight, then sits on its 116 kt floor

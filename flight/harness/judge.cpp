@@ -141,8 +141,11 @@ void ApproachJudge::observe(const World& w, const Transmitted& tx) {
   if (touchdowns_ > 0) windowOver_ = true;
   if (!vappFinal_ && (windowOver_ || finished())) finalVapp();  // the window over: Vapp as it stands
 
-  // the rollout, from the step after the touchdown until the aircraft stops
-  if (touchdowns_ > 0 && !touchedThisStep_ && w.groundSpeedKn() > 1) rolloutOffM_.add(std::abs(ils.rightM), -ils.alongM);
+  // the rollout, from the step after the touchdown until the aircraft stops; what it does after that, taxiing
+  // on or rolling back on its reversers, is no longer the approach's
+  if (touchdowns_ > 0 && !touchedThisStep_ && !stopped_ && w.groundSpeedKn() > 1) {
+    rolloutOffM_.add(std::abs(ils.rightM), -ils.alongM);
+  }
   if (touchdowns_ > 0 && onGround && w.groundSpeedKn() < 1) stopped_ = true;
 }
 

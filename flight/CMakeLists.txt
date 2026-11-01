@@ -271,6 +271,9 @@ add_test(NAME ils_a_dot_low COMMAND ils_test "approach$<SEMICOLON>distance=8$<SE
 add_test(NAME the_judge_finds_the_scripted_approach_stable COMMAND judge_test scripted)
 add_test(NAME the_judge_finds_an_unflared_approach_not_stable COMMAND judge_test hands-off)
 add_test(NAME the_judge_has_nothing_to_judge_on_the_runway COMMAND judge_test runway)
+# The approach ends at the stop: the aircraft driven on afterwards, across the field, leaves the verdict
+# and every line of the debrief as they were at the stop.
+add_test(NAME the_judge_keeps_its_verdict_from_the_stop COMMAND judge_test moves-on)
 # From 3.5 nm the window opens before the FAC's VLS has settled: the judge waits for it before it fixes
 # Vapp, and leaves speed out of the in-band slot until then.
 add_test(NAME the_judge_waits_for_the_fac_s_vls_on_a_short_approach COMMAND judge_test short)

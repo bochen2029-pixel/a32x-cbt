@@ -221,7 +221,8 @@ the order flown) and its length in simulated seconds. The file is the flight its
 from, who flew it and with what, the build of the simulator that flew it (its `# build:` line: the
 commit it was made from), the inputs of every one of its fifty steps a second, and at the end the
 judge's verdict as it stood when you saved. You can save at any time; the recording runs from the start
-to the moment you save.
+to the moment you save. The verdict is the judge's at the stop: taxiing on afterwards, or rolling back on
+the reversers, before you save changes nothing in it.
 
 The recording is what you hand in. The native build's judge, built from the same commit as the page
 that flew it, replays it and must reach the same verdict:
