@@ -84,7 +84,7 @@ export function updateEngine(d: Dictionary, n: 1 | 2, i: EngineInputs, dt: numbe
   d.set(`${p}.n1`, n1 + (next * 0.25 - n1) * Math.min(1, dt * 1.5));
 
   // EGT: hot starts run hotter than a clean start; with fuel off it settles back to ambient.
-  // Snap inside a dead band, the PSX getSmoothExpo rule — otherwise it approaches 15 forever and
+  // Snap inside a dead band, the PSX rule (psx-notes 02, I2) — otherwise it approaches 15 forever and
   // a settled aircraft never stops moving.
   const target = d.bool(`sys.${p}Burning`) ? (hot ? 800 : 300 + next * 3) : 15;
   const egt = d.num(`${p}.egt`);

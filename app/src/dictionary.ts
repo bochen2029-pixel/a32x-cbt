@@ -1,7 +1,7 @@
 /**
  * The state dictionary.
  *
- * Pattern recovered from PSX `Glob` / `Q` / `Qs` (notes 04): every addressable quantity is a
+ * Pattern recovered from PSX's variable registry (psx-notes 04): every addressable quantity is a
  * declared slot with a kind and a range; a write validates, stores and marks the slot dirty;
  * a reader can read-and-clear the dirty flag. The dictionary is the debrief bus, the panel
  * binding and the scenario file, all at once.
