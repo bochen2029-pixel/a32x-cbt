@@ -561,6 +561,24 @@ guidance, a real path through the world — with the CBT's procedures and scorin
 - [ ] **A 3D debrief in the manner of ACMI/Tacview**: the flown trail coloured by the gate's bands, a
       timeline and an event log, built on the deterministic replay (house rule 7). Relayed the same
       day by the same session. Not scheduled; it extends the P7 gate's debrief.
+- [ ] **Aerodynamics from CFD, later** — the operator's idea, 2026-11-01, relayed by the same session:
+      tune the A320 model with open-source CFD (OpenFOAM and others), since the A320 flies well under
+      Mach 1, on geometry modelled from Airbus's public dimensions and external drawings. Not
+      scheduled; it starts on the operator's word. When planned: the geometry source, the solver and
+      its licence go in `docs/provenance.md` first; the pipeline is validated on public cases (NASA's
+      Common Research Model and its high-lift variant) before it is trusted; and its results enter as
+      cited targets with uncertainty bands, under the swap rule. First use: the gaps step 4 measured —
+      the stall above Mach 0.3, the transonic pitching moment, lift past the stall.
+- [ ] **Weather, later** — from the operator the same day: *"rudimentary weather systems like clouds,
+      rain, wind, etc. etc.? maybe even lightning"*, real-life weather, and the real motion of the sun
+      and moon. Two parts. Offline, inside every rule: the sun and moon from an ephemeris at the real
+      date and place; clouds, rain and lightning drawn cheaply in the 1980s register; wind, gusts and
+      visibility through the flight core's inputs, never the view alone (house rule 6). Live weather
+      needs the network, which the flyable artefact forbids today (§4, P7 packaging), so it is the
+      operator's call: an opt-in that falls back to a set scenario offline. Their reference is a site of
+      their own that does both; reusing its code needs a licence suited to GPLv3, recorded in
+      `docs/provenance.md`, and a weather service's terms (attribution, non-commercial tiers) are
+      checked first. Not scheduled.
 - [x] **KDFW is the main airport, and where the simulator starts.** From the operator, 2026-11-01, in
       their words: *"kdfw should be the main airport, In Microsoft Flight Simulator, it always started
       in like this airport in Seattle, because that's where Microsoft was based. ... It should be Dallas
