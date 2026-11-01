@@ -1027,6 +1027,81 @@ New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `the_judge_finds_an_unflared_approach_not_stable` and `the_judge_has_nothing_to_judge_on_the_runway`,
 through the C API, natively and under node; `five_scripted_approaches_are_repeatable`. Fifty-seven native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; fifty-two under node, the WebAssembly build leaving out the five that start processes.
 
+## The Windows release (P7, packaging)
+
+The packaging the operator decided on 2026-11-01 (`ROADMAP.md`, *Decisions*), built for Windows first:
+a zip with a launcher, and its Corresponding Source beside it. Nothing is published.
+
+```
+cd flight/web && npm ci
+npm run release -- --a32nx <A32NX clone> --jsbsim <JSBSim clone>    # or A32NX_DIR and JSBSIM_DIR
+npm run release:gate                                                 # the release, then its gate
+```
+
+`flight/dist/` gets `a32x-sim-0.1.0-win64.zip`, `a32x-sim-0.1.0-source.zip` and `SHA256SUMS`.
+
+| path | what |
+|---|---|
+| `launcher/` | `A32X.exe`: opens `web\index.html`, beside it, in Microsoft Edge as an app window (`--app=<file URL>`), or in the default browser through ShellExecute when there is no Edge; `--trainer` opens the trainer's page; a missing page is a message box. MSVC with the static CRT: it imports KERNEL32, USER32, SHELL32, ADVAPI32 and OLE32 and nothing else, asks for no administrator, and builds to the same bytes in any folder (`/Brepro`, no debug information). `--print-url` prints the URL and the command that would open it and starts nothing, for the gate. Its own `ctest` |
+| `web/tools/release.mjs` | the release step |
+| `web/tools/release-contents.mjs` | what each archive holds and must say: the explicit file lists, the notices and the text each must carry, the archives themselves |
+| `web/tools/verify-release.mjs` | the gate |
+| `web/tools/pe.mjs` | a Windows program's machine, imports and hardening flags, read from its image |
+| `web/release/` | the two READMEs and the airport data's public-domain note |
+
+**The source archive comes first, from git's objects.** This repository at HEAD (a tracked file that
+differs from HEAD refuses the release); A32NX at `66021c2`, the code that is compiled
+(`fbw-a32nx/src/wasm/fbw_a320/`) and the licence, not the other 1.4 GB of that repository; JSBSim at
+`66f7faf`, whole; and the three.js files the page bundles, as npm installed them. Each upstream folder
+holds a `SOURCE-COMMIT`, which `CMakeLists.txt` reads where an export has no `.git` to ask. **Everything
+that ships is then built from that archive, unzipped outside the repository:** the module in WSL by
+Emscripten 6.0.12 (emsdk `35ff8a6`, both checked), which `the_browser_module_flies` then flies; the page
+by esbuild, its three.js files compared with the archive's; `A32X.exe` by MSVC, with its test; the
+trainer by P5's own packager, once its committed bundle is shown to be what its source builds. The
+archive is the source of the shipped bytes by construction.
+
+**What it refuses**: a file off the explicit list or missing from it; a notice that does not carry its
+licence's text (GPLv3; A32NX's GPLv3 and commit; JSBSim's LGPL-2.1, commit and authors; the embedded
+aircraft and engine files' headers; Emscripten's, musl's, libc++'s, libc++abi's, libunwind's and
+compiler-rt's licences, dlmalloc's dedication; three.js's MIT and the licence comment esbuild keeps in
+`flight.js`; the airport data's sources; the trainer's MIT); a system library the module links whose
+licence it does not know, read off a verbose relink; esbuild's runtime helpers in a bundle; a page that
+points at a file that does not ship; a placeholder left in a README; a launcher that imports a DLL
+Windows does not ship; a file that names a path of the machine that built it.
+`the_release_refuses_to_ship_without_its_notices` (`web/test/release.test.mjs`) shows each refusal on
+stand-ins.
+
+**Deterministic**: the same commit gives the same bytes. The module's `__DATE__`, which JSBSim prints in
+its version string, is the commit's time through `SOURCE_DATE_EPOCH`. Zip entries are dated 1980, as P5
+dates its zip: a zip stores no time zone, so the commit's own time unzips hours in the future west of
+Greenwich, and there Ninja regenerates its build forever. That was found in WSL, which keeps Chicago's
+time; the release's own extractions are dated when written, whatever the archive says.
+
+As measured, 2026-11-01, by `npm run release:gate` on this release's code atop master's `f9c9c3c`, the
+desktop's processors 75 % busy on average during the release and 58 % during the gate:
+
+| what | result |
+|---|---|
+| the release | 109 s: the module 92.0 s from scratch, the page 4.0 s, `A32X.exe` 4.8 s, the trainer 1.8 s |
+| `a32x-sim-0.1.0-win64.zip` | 1,106,931 bytes, 25 files |
+| `a32x-sim-0.1.0-source.zip` | 31,370,192 bytes, 1,694 files; JSBSim is 50 MB of them unpacked |
+| (a) the page from `file://`, network off | Chrome 148 and Edge 156, two loads each, the GPU tier: 15.00 to 15.02 s simulated in 15.01 s, no step dropped as it started or in flight, a tick 0.4 to 0.7 ms on average and 9.6 ms at worst, 143 frames a second; nothing thrown in the page or its worker; it read `index.html`, `core.js`, `flight.js` and its own Blob, nothing else; the trainer beside it loaded and ran |
+| (b) `A32X.exe --print-url` | names `web\index.html` and `trainer\index.html` as Node writes their file URLs; a missing page refused on stderr, no window; imports only Windows' DLLs |
+| (c) the source archive, MSVC 19.44 | configured against its own upstream folders, no clone and no git; built in 46 s; `ctest` 58 of 58 with our A320 and 58 of 58 with the 737; the launcher's test; `A32X.exe` built from it the same bytes as the one shipped |
+| the same commit, twice | two releases of one commit (atop master's `052f872`), each built in folders of its own, the module in WSL and `A32X.exe` by MSVC: the same bytes, both archives |
+
+The gate counts steps dropped as the page starts, while its first frames compile the view, apart from
+those dropped in flight. On the page as it stood at `853802a`, before the view's later work, every load
+dropped 4 to 7 steps at simulated time zero; one load in Edge also dropped a step in flight, when a
+single tick took 64 ms with the desktop 56 % busy. On the commit released twice, with the desktop 91 %
+busy, two of four loads fell behind real time, one of them on a single tick of 1.55 s; run again at 53 %,
+all four held it with no step dropped. A gate run on a busy desktop can fail that check for the desktop's sake: run it
+again, and record the load.
+
+Found on the way: Node 24.16 on Windows corrupts its own heap (exit `0xC0000374`) decoding UTF-16 from a
+`Buffer` that starts at an odd offset, as `git cat-file --batch`'s blobs did; the release searches for
+UTF-16 paths byte by byte instead.
+
 ## What P7 still has to build
 
 `ROADMAP.md` §4, *P7 in detail*: the gate — a hand-flown ILS, stable and repeatable, with its measures

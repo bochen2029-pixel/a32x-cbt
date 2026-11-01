@@ -424,7 +424,14 @@ trainer's debrief does.
   GPLv3 artefact comes with its Corresponding Source from the same place, a source archive made by
   the same packaging step: our source and build scripts, the exact upstream sources compiled into it
   (A32NX `66021c2`, JSBSim `66f7faf`, the pinned Emscripten named) and every licence text and notice.
-  Nothing is published anywhere without the operator's word.
+  Nothing is published anywhere without the operator's word. **Built 2026-11-01 for Windows, the
+  operator's first release, and not published** [M]: `npm run release` in `flight/web` writes
+  `a32x-sim-0.1.0-win64.zip` (`A32X.exe`, a launcher of ours that opens the page in Edge's app mode,
+  the page, the trainer, every licence and notice) and `a32x-sim-0.1.0-source.zip`, and builds the
+  first from the second, unzipped. Its gate, as P5's, unzips both outside the repository: the page from
+  `file://` with the network off in Chrome and Edge, the launcher through its test switch, and the
+  source archive built by MSVC with ctest green on either airframe (`flight/README.md`, *The Windows
+  release*). A WebView2 shell can come after its own provenance check.
 - Not changed: P8's displays come after this gate. Step 8's overlay is not a PFD.
 
 ---

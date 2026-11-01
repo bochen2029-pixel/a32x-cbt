@@ -218,6 +218,7 @@ visual system's register. Nothing here is fit for navigation.
 | Emscripten (emsdk) | `flight/`'s WebAssembly build (P7): build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
 | three.js | `flight/web`: the out-the-window view, bundled into the page at build time | MIT | no, `npm i`, `0.186.1` |
 | esbuild | `flight/web` too: bundles the page and its worker | MIT | no, `npm i`, `0.28.2` |
+| MSVC (Visual Studio 2022) | `flight/launcher`: builds `A32X.exe`, whose C runtime it links in statically (§2a) | Visual Studio's; the runtime a System Library in GPLv3's sense | no, installed separately |
 
 Runtime dependencies in `app/`: **none.** It is Node built-ins and a browser.
 
@@ -252,13 +253,31 @@ Decided 2026-11-01 (`ROADMAP.md` §4, P7: *packaging*). Two artefacts:
 | artefact | holds | licence |
 |---|---|---|
 | `a32x-cbt.zip` (P5) | the systems trainer: `app/` built, its data, `LICENSE`, `README.txt` | MIT |
-| the flyable simulator (from P7) | the A32NX computers and JSBSim as WebAssembly, the browser shell from `flight/`, and the trainer's MIT code under its own notice | GPLv3 |
+| the flyable simulator (from P7): `a32x-sim-<version>-win64.zip` | `A32X.exe`, our launcher; `web/`: the page with three.js bundled in, and the A32NX computers, JSBSim and our airframe as WebAssembly; `trainer/`: P5's package as it is; `LICENSE.txt`, GPLv3; `notices/`; `README.txt` | GPLv3; `trainer/` MIT |
+| its Corresponding Source: `a32x-sim-<version>-source.zip` | this repository at the commit; A32NX `66021c2`'s flight-control code, which is what is compiled (`fbw-a32nx/src/wasm/fbw_a320/`), and its licence; JSBSim `66f7faf`, whole; the three.js files the page bundles; Emscripten `6.0.12` named, with where to get it | each part its own |
 
 The second carries the first's code, never the reverse: `app/` imports nothing from `flight/`.
 Every distributed build of it comes with its Corresponding Source from the same place — our source
 and build scripts and the exact upstream sources compiled into it — and with every licence text and
 notice: GPLv3, A32NX's notices, LGPL-2.1 for JSBSim, the aircraft files' headers, MIT for Three.js
 and for the trainer. Nothing is published without the operator's word.
+
+**The first build of it, 2026-11-01, for Windows, not published.** `flight/web/tools/release.mjs`
+makes the source archive first, from git's objects at the commits pinned, and then builds everything
+that ships from that archive, unzipped: the module by the pinned Emscripten, the page by esbuild,
+`A32X.exe` by MSVC, the trainer by P5's packager. The upstream sources travel only inside that archive,
+exported, each folder naming its commit in a `SOURCE-COMMIT` file; the repository still vendors none.
+Its `notices/` carries A32NX's licence, JSBSim's LGPL-2.1 and authors, the headers of the aircraft and
+engine files the module embeds, the licence of Emscripten and of each system library the module links
+(musl, libc++, libc++abi, libunwind, compiler-rt, and dlmalloc's dedication to the public domain),
+three.js's MIT, and the airport data's public-domain sources (§1f). The release refuses a notice that
+is missing or does not carry its licence's text, and a system library linked whose licence it does not
+know. `flight/README.md`, *The Windows release*, has the rest.
+
+`A32X.exe` is ours, GPLv3 (`flight/launcher`): it opens the page in Microsoft Edge's app mode, or in the
+default browser. It links Microsoft's C runtime statically, a System Library in GPLv3's sense (section 1:
+part of the compiler used), which Visual Studio's licence lets a program carry. No WebView2 shell for
+now: its SDK's licence and its loader DLL need a check of their own before anything ships with them.
 
 ---
 
