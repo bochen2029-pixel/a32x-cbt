@@ -340,6 +340,10 @@ async function main() {
 
   const source = new Map([['README.txt', Buffer.from(fill(template('README-source.txt'), values, 'README-source.txt'))]]);
   for (const [path, data] of ours) source.set(`a32x-cbt/${path}`, data);
+  // Exported without .git, this repository names its own commit as the upstreams do, so that a build
+  // from the archive can say which commit it is (the recordings' build line).
+  if (ours.has('SOURCE-COMMIT')) refuse('this repository tracks a SOURCE-COMMIT; the release writes its own');
+  source.set('a32x-cbt/SOURCE-COMMIT', Buffer.from(`${commit}\n`));
   for (const [key, files] of [['a32nx', a32nx], ['jsbsim', jsbsim]]) {
     for (const [path, data] of files) source.set(`upstream/${key}/${path}`, data);
     source.set(`upstream/${key}/SOURCE-COMMIT`, Buffer.from(`${UPSTREAM[key].commit}\n`));

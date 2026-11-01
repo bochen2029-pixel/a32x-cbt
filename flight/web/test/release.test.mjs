@@ -182,6 +182,7 @@ test('the source archive must hold its licences, its build and each upstream nam
     ['README.txt', fill(read('../release/README-source.txt'), values, 'README-source.txt')],
     ['a32x-cbt/LICENSE', 'MIT License\n'],
     ['a32x-cbt/flight/LICENSE', GPL3],
+    ['a32x-cbt/SOURCE-COMMIT', '0ff9296b0a5b8c0e4d4a7b1f2c3d4e5f60718293\n'],
     ['a32x-cbt/flight/CMakeLists.txt', read('../../CMakeLists.txt')],
     ['a32x-cbt/flight/launcher/CMakeLists.txt', ''],
     ['a32x-cbt/flight/web/tools/build.mjs', ''],
@@ -207,6 +208,12 @@ test('the source archive must hold its licences, its build and each upstream nam
   const wrong = new Map(files);
   wrong.set('upstream/jsbsim/SOURCE-COMMIT', Buffer.from('0123456\n'));
   assert.throws(() => checkSource(wrong), /upstream\/jsbsim\/SOURCE-COMMIT does not carry JSBSim's commit/);
+  const short = new Map(files);
+  short.set('a32x-cbt/SOURCE-COMMIT', Buffer.from('0ff9296\n'));
+  assert.throws(() => checkSource(short), /a32x-cbt\/SOURCE-COMMIT does not carry the commit it was exported from/);
+  const unnamed = new Map(files);
+  unnamed.delete('a32x-cbt/SOURCE-COMMIT');
+  assert.throws(() => checkSource(unnamed), /a32x-cbt\/SOURCE-COMMIT, which carries the commit it was exported from, is missing/);
   const none = new Map(files);
   none.delete('upstream/a32nx/LICENSE');
   assert.throws(() => checkSource(none), /upstream\/a32nx\/LICENSE, which carries A32NX's licence, is missing/);

@@ -25,7 +25,7 @@ WHAT IS HERE
   The upstream folders are exports of those commits, byte for byte as git stores them, not clones. Each
   one's SOURCE-COMMIT names its commit, and a32x-cbt/flight/CMakeLists.txt reads it in place of git. To
   check one against its repository, export the same paths there (git archive <commit> <paths>) and
-  compare.
+  compare. a32x-cbt/SOURCE-COMMIT names this repository's own commit in the same way.
 
   Not included, because they are generally available tools, used unmodified:
     Emscripten @EMSCRIPTEN@ (emsdk @EMSDK@), which compiles the module. Its

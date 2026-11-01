@@ -128,6 +128,7 @@ export const SOURCE_NOTICES = [
   ['README.txt', DISCLAIMER, 'the disclaimer'],
   ['a32x-cbt/LICENSE', MIT, "the repository's MIT licence"],
   ['a32x-cbt/flight/LICENSE', GPL3, "flight/'s GPLv3"],
+  ['a32x-cbt/SOURCE-COMMIT', /^[0-9a-f]{40}\n$/, 'the commit it was exported from'],
   ['a32x-cbt/flight/CMakeLists.txt', null, 'the flight build'],
   ['a32x-cbt/flight/launcher/CMakeLists.txt', null, "the launcher's build"],
   ['a32x-cbt/flight/web/tools/build.mjs', null, "the page's build"],
