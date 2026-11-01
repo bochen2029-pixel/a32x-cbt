@@ -11,7 +11,8 @@ joystick, a view. So is step 2: real runways and an ILS on them, wind and turbul
 flying the ILS inside every band. Every flight starts at KDFW, the main airport by the operator's word
 (§9), and the view draws it whole: seven runways, terminals, ramps and towers. So is the thrust fit,
 and so is step 3: the instructor's failures, the laws A32NX's computers choose for them, each flown to
-a landing, direct law trimmed by hand. Step 4 and the gate are next.
+a landing, direct law trimmed by hand; and step 4: the protections flown as a test pilot flies them,
+judged where they hold and where the airframe is fitted. The gate is next.
 
 ---
 
@@ -103,7 +104,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 and the gate not started |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -295,6 +296,18 @@ three IRs direct; any alternate law goes direct with the gear down; lateral goes
 leaves normal. Every degraded case lands, with either airframe, as gently as a healthy one (A320 155
 fpm and 1.43 g). Two hydraulic pairs, green with blue and green with yellow, are beyond the scripted
 crew, which flies a fixed 140 kt; the instructor may still fail them. `flight/README.md` has the table.
+
+Step 4 is done [M], with what it leaves open said: a start in the air, and the scripted crew flying each
+protection as a test pilot does — full stick held, then let go. In normal law the bank stops at 65.7°
+(67°), the load factor holds 2.1 to 2.2 g on a full pull (2.5) and −1.07 g on a full push (−1.0), and
+slowed at idle into the high-AoA protection, full back stick holds alpha max without a stall. Not yet
+judged, and measured: a full pull at Mach 0.45 passes alpha max, because the fitted airframe runs out of
+lift near 2 g there (its stall above Mach 0.3 is unfitted); the push's pitch reaches −17.7° (−15°); the
+bank returns to 26.5°, not 33°; high speed reaches 381 kt against the ELAC's 380, on unfitted transonic
+aerodynamics; and a fast pull in CONF FULL at 150 kt passes alpha max (13.0°, reaching 20.4°) inside the
+fitted range — an open finding. Alpha floor waits for the autothrust and the FADEC (P9). On the way, a
+start in the air with the gear up held the ELAC on the ground until a gear reported weight on wheels only
+while down. `flight/README.md` has the table.
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
