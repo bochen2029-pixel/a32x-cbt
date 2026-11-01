@@ -78,23 +78,28 @@ double slatSurfaceDeg(double fppu) {
 constexpr double kRudderPedalDeg = 25;    // full pedal (a320_systems: rudder travel 50 deg, end to end)
 constexpr double kPedalSteeringDeg = 6;   // nose wheel at full pedal; the tiller is not modelled
 
-// The crew's numbers for this airframe at its weight, about 107,000 lb. Calibrated airspeeds, knots.
-// JSBSim's 737 stalls near 150 kt clean and 113 kt at full flap here; it has no slats, so CONF 1 is
-// clean to it. The approach speeds keep about 1.23 VS and stay under the A320's flap limits.
+// The crew's numbers for either airframe: JSBSim's 737 at about 107,000 lb and our A320 at 65 t.
+// Calibrated airspeeds, knots. The 737 stalls near 150 kt clean and 113 kt at full flap; it has no
+// slats, so CONF 1 is clean to it. The A320 stalls at 157 kt clean and 106 kt at full flap, and its
+// VLS in CONF FULL is 129 kt. The approach speed is 1.23 VS for the 737 and VLS + 11 for the A320,
+// and every speed stays under the A320's flap limits.
 constexpr double kVr = 140;              // rotate
 constexpr double kV2 = 165;              // initial climb in CONF 1+F, to the acceleration altitude
 constexpr double kVFlapsUp = 200;        // accelerate to this in 1+F (limit 215), then retract
 constexpr double kVSlatsIn = 225;        // until the slats are in (CONF 1 limit 230)
 constexpr double kVClean = 250;          // clean, below 10,000 ft
-constexpr double kVApp = 145;            // final approach, CONF FULL (limit 177)
+constexpr double kVApp = 140;            // final approach, CONF FULL (limit 177)
 constexpr double kTaxiKn = 15;           // groundspeed
 constexpr double kRotateDegS = 3;        // pitch rate of the rotation
 constexpr double kRotateToDeg = 12.5;    // pitch the rotation aims at; the wheels leave before it
 constexpr double kAccelerationFt = 1500; // take-off thrust to here, then climb thrust and accelerate
 constexpr double kCruiseFt = 8000, kPatternFt = 2000;
 // The flare: from 33 ft the sink rate is taken down exponentially, 3 s to e, toward 2 ft/s, and the
-// sidestick pulls 0.06 per ft/s of sink above that. 33 ft is where 3 s meets the glide's 13 ft/s.
-constexpr double kFlareFt = 33, kFlareTauS = 3, kFlareGain = 0.06;
+// sidestick pulls 0.10 per ft/s of sink above that. 33 ft is where 3 s meets the glide's 12 ft/s. The
+// pilot eases off as the pull is felt, 0.08 per deg/s of pitch rate and 1.0 per g above one. Without
+// that lead, an airframe whose lift rises faster with alpha than the 737's (our A320 in CONF FULL, 6.3
+// per rad against 4.35) gets more lift from the same rotation than it needs, and floats off.
+constexpr double kFlareFt = 33, kFlareTauS = 3, kFlareGain = 0.10, kFlarePitchRate = 0.08, kFlareLoad = 1.0;
 // Approach, configured in stages as the speed comes back: the speed flown in each stage, and the
 // speed below which the next configuration goes in (CONF 1, 2, 3 with the gear, FULL).
 const double kVStage[5] = {210, 200, 180, 165, kVApp};
@@ -316,7 +321,7 @@ void World::fly(double dt) {
       const double height = std::max(0.0, a.radioHeightFt);
       const double sinkTarget = height / kFlareTauS + 2.0;  // ft/s
       const double sink = -a.verticalSpeedFpm / 60;
-      c.pitch = clamp(kFlareGain * (sink - sinkTarget) - 0.03 * q, -0.3, 0.8);
+      c.pitch = clamp(kFlareGain * (sink - sinkTarget) - kFlarePitchRate * q - kFlareLoad * (a.nz - 1), -0.3, 0.8);
       gammaCmd_ = gammaSpeed_ = gamma;
       if (height < 20) {
         tla_ = 0;  // retard

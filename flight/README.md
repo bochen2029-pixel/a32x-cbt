@@ -83,7 +83,7 @@ scores, no warning in our code. The numbers in the table are the 737's.
 | `stick_flies_the_aircraft` | a 0.5 pull gives +4.3°/s and 1.67 g; the push −6.8°/s |
 | `stabiliser_takes_the_trim` | in steady flight the elevator rests at 0.25° on average; the THS holds the trim, 2 to 3.5° nose up |
 | `yaw_damper_takes_out_a_pedal_kick` | three seconds of 0.3 left pedal raise 4.6° of sideslip; four seconds after release yaw rate and sideslip are under 0.1 |
-| `lands_inside_the_limits` | the first landing: −170 fpm, 3.7° of pitch, wings level, 1.80 g, no bounce |
+| `lands_inside_the_limits` | the first landing, wings level, no bounce: the 737 at −77 fpm, 3.2° of pitch, 1.27 g; our A320 at −143 fpm, 5.5°, 1.41 g. Eighteen minutes, because the A320 descends at idle at about 1,030 fpm against the 737's 1,700 and lands 125 s later |
 | `airframe_is_scored_against_the_a320` | the scorer measures every target and context row; it fails only on a row it could not measure (shown with a planted bogus row), never on a row outside its band |
 | `scorer_instruments_read_the_737_right` | the scorer's instruments read the 737's own file back: its gear drag, 0.015; the Mach at which its drag table crosses 20 counts, 0.8170; a nose-down elevator pulse lowering alpha. Without the gear fix (Findings) it fails two of three |
 | `a320_is_scored_against_the_a320` | our A320 loads, flies the scorer's circuit, and every row is measured on it |
@@ -262,8 +262,8 @@ circuit flown; 5.11 to 5.30 s wall, 339 to 353 times real time, with the desktop
 (4 to 39 %, sampled each second) — and so do thirteen more cases. `lands_inside_the_limits` does not,
 for two reasons:
 
-- The crew is the 737's. It flies the final approach at 145 kt — 1.28 VS for the 737, VLS + 16 for an
-  A320 at 65 t — and flares with a gain set on the 737, whose lift rises with alpha at 4.35 per
+- The crew was the 737's, until the change below. It flew the final approach at 145 kt — 1.28 VS for
+  the 737, VLS + 16 for an A320 at 65 t — and flared with a gain set on the 737, whose lift rises with alpha at 4.35 per
   radian in CONF FULL. Our A320's rises at 6.3, so the rotation the crew asks for buys it more lift,
   later in the flare than the crew expects. It touches down at 361 fpm and 5.9° of pitch, still
   pitching up, at 2.19 g, and the rising lift takes it off the runway again for 1.1 s. With less
@@ -272,15 +272,11 @@ for two reasons:
 - Its first landing comes at 1,036 s, after the case's 16 minutes. It descends at idle at 1,030 fpm,
   inside WRAP's band, where the 737 does 1,700, and the descent alone takes 125 s longer.
 
-A crew that lands both was found by sweeping 72 settings in scratch builds: final approach 140 kt,
-flare gain 0.10 per ft/s of sink, 0.08 per °/s of pitch rate and 1.0 per g of load factor above one,
-so that the pilot eases off as the pull is felt. With it, and the landing case run for 18 minutes,
-all fifteen cases pass with either airframe flying: the 737 lands at −77 fpm, 3.2° of pitch, 1.27 g;
-our A320 at −143 fpm, 5.5°, 1.41 g; both gates pass. Neighbouring settings show the scripted flare is
-sensitive: at 0.4 per g the 737 touches down at −0.1° of pitch. That change is to the crew in
-`harness/world.cpp` and to the case's length, outside what this change was to touch
-(`harness/airframe.cpp` and the aircraft file, so that the browser track's merge stays small), and it
-changes how the 737 is flown too. It waits for the operator. With it, the swap itself is one line,
+A crew that lands both was found by sweeping 72 settings in scratch builds, and it is the crew now
+(*The crew's numbers are technique*, below). With it, and the landing case run for 18 minutes, all
+fifteen cases pass with either airframe flying: the 737 lands at −77 fpm, 3.2° of pitch, 1.27 g; our
+A320 at −143 fpm, 5.5°, 1.41 g; both gates pass. Neighbouring settings show the scripted flare is
+sensitive: at 0.4 per g the 737 touches down at −0.1° of pitch. The swap itself is one line,
 `kDefaultModel` in `harness/airframe.cpp`.
 
 ## How it is built
@@ -344,7 +340,27 @@ direct law (stick is aileron). On the ground the pedals hold the heading — rud
 wheel slow — and the toe brakes stop it. One circuit: power-up, flight control check, taxi, takeoff in
 1+F rotating at 140 kt, an open climb to 8,000 ft with the flaps in at 200 kt, a doublet, a 180° turn,
 speedbrake, a pedal kick, a 45° steep turn, a descent to 2,000 ft configured as the speed comes back,
-a 3° path at 145 kt, a flare from 33 ft, ground spoilers, rollout, and again.
+a 3° path at 140 kt, a flare from 33 ft, ground spoilers, rollout, and again.
+
+**The crew's numbers are technique, not airframe data.** One scripted crew flies both airframes: final
+approach at 140 kt, and a flare that pulls 0.10 per ft/s of sink above its target and eases off 0.08
+per °/s of pitch rate and 1.0 per g of load factor above one, as a pilot does when the pull is felt.
+Until 2026-11-01 it flew the 737's own technique, 145 kt and a flare of 0.06 per ft/s and 0.03 per °/s;
+that crew bounced our A320, whose lift rises faster with alpha, and the common one lands both. A real
+A320 pilot flies Vapp = VLS + 5 off the speed tape, the FAC's VLS; the scripted crew does not, because
+the FAC computes an A320's VLS and would fly the 737 near its stall. The hand-flown gate on the A320
+takes Vapp from the FAC's VLS. Nothing `airframe_score` measures depends on the crew's approach or
+flare: both airframes' scores were byte for byte the same before and after the change.
+
+The 737, re-baselined by that change (MSVC 19.44). There is no touchdown point to give: the runway is
+everywhere until P7's step 2 puts one somewhere.
+
+| the 737 | before, crew at 145 kt | after, the common crew |
+|---|---|---|
+| P6 gate | pass; normal law 100 % of 1,594 s; 0 non-finite of 20,520,000 | pass; normal law 100 % of 1,595 s; 0 non-finite of 20,520,000 |
+| first landing | 911.2 s: −170 fpm, 3.7° of pitch, 142 kt, 1.80 g | 916.6 s: −77 fpm, 3.2°, 137 kt, 1.27 g |
+| gate digest, 30 min | `e6956d5a53836880` | `ae72d18431512654` |
+| determinism digest, 3 min, before the approach | `79dd930cc06b6ef6` | `79dd930cc06b6ef6` |
 
 ## Findings
 
