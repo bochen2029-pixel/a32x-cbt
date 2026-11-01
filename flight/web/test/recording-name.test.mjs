@@ -19,6 +19,14 @@ test('a scenario\'s slashes, semicolons and equals signs never reach the file na
   assert.equal(recordingName(header('a320'), 'KDFW 17C', 60), 'a32x-a320-KDFW-17C-0060s.csv', 'the runway, for a runway start');
 });
 
+test('a recording flown at a time carries it, so five approaches sort in the order flown', () => {
+  const at = (iso) => recordingName(header('a320'), 'approach', 412, 'a320', iso);
+  assert.equal(at('2026-11-01T18:30:12.345Z'), 'a32x-a320-approach-20261101T1830Z-0412s.csv');
+  const names = ['2026-11-01T18:42:00Z', '2026-11-01T18:30:00Z', '2026-11-01T19:05:00Z'].map(at);
+  assert.deepEqual([...names].sort(), [names[1], names[0], names[2]]);
+  assert.equal(at('not a time'), 'a32x-a320-approach-0412s.csv', 'no time, no stamp');
+});
+
 test('without the core\'s airframe line the page\'s own word is used, and nothing is left empty', () => {
   assert.equal(recordingName('pitch,roll\n', '', NaN, '737'), 'a32x-737-flight-0000s.csv');
   const odd = recordingName('# airframe: ../../x\n', '///', 5);

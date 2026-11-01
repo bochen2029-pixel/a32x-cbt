@@ -196,12 +196,14 @@ function show() {
 // runway the flight started on) and the simulated seconds; only letters, digits, '.', '_' and '-'.
 async function save() {
   if (!latest) return;
-  const reply = await Promise.race([flight.recording(), new Promise((resolve) => setTimeout(() => resolve(null), 3000))]);
+  // who flew it and when, as header lines the gate's --repeatable prints (P7's recording contract)
+  const extra = { hands: hands.pad ? hands.pad.id : 'keyboard', flown: flownAt || new Date().toISOString() };
+  const reply = await Promise.race([flight.recording(extra), new Promise((resolve) => setTimeout(() => resolve(null), 3000))]);
   if (!reply || typeof reply.text !== 'string' || !reply.text) {
     saved = '<span class="bad">no recording: this core does not keep one</span>';
     return;
   }
-  const name = recordingName(reply.text, scenario || drawn, value('t_s'), airframe || 'a320');
+  const name = recordingName(reply.text, scenario || drawn, value('t_s'), airframe || 'a320', extra.flown);
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([reply.text], { type: 'text/csv' }));
   a.download = name;
@@ -214,6 +216,7 @@ async function save() {
 
 let last = 0;
 let started = false;     // the clock is running: the worker has answered once
+let flownAt = null;      // when the flight's clock started, wall-clock UTC: for the recording's header only
 let kicked = false;      // the step that wakes the worker has been asked for
 let pending = 0;         // steps due but not yet asked for: the worker was still busy
 let droppedWaiting = 0;  // steps given up because the worker stayed busy past five
@@ -226,6 +229,7 @@ function frame(now) {
   if (!started && latest && latest.type === 'state') {
     started = true;
     last = 0;
+    flownAt = new Date().toISOString();   // metadata, not simulation (CLAUDE.md, 2)
   }
   const realMs = started && last ? Math.min(now - last, 1000) : 0;
   last = now;
