@@ -280,10 +280,17 @@ guidance, a real path through the world — with the CBT's procedures and scorin
       (NAV, with SID, STAR, approach legs and DIR TO); managed vertical (CLB and DES profiles with
       constraints); autopilot, flight director and autothrust. The guidance half exists in the clone
       as `FmgcComputer`, not yet built. The flight-management half is TypeScript welded to MSFS in
-      A32NX, and its navigation data comes from MSFS or Navigraph, which this project cannot use — an
-      open source of airports, runways, waypoints and procedures has to be chosen (FAA CIFP and
-      OurAirports are public-domain candidates). **P9**. §5's "route, performance, progress, DIR"
-      is now too narrow: managed vertical is in.
+      A32NX. **P9**. §5's "route, performance, progress, DIR" is now too narrow: managed vertical
+      is in.
+- [ ] **Navigation data: bring your own AIRAC, with a free base.** Current cycles come every 28
+      days from Navigraph or Aerosoft NavDataPro — what PMDG and A32NX read. They are licensed to
+      the subscriber and may not be redistributed, so the zip cannot carry one; the trainer reads a
+      cycle the user has installed, in a format those services already export (X-Plane's native nav
+      format is the likely one: its specification is published). Whether their terms cover use
+      outside the product the data was downloaded for, and whether a format of our own would need
+      their agreement, has to be checked before building on it. For a user with no subscription, a
+      public-domain base ships: FAA CIFP (US airports with SIDs, STARs and approaches, ARINC 424,
+      every 28 days) and OurAirports (airports and runways worldwide, no procedures). **P9**.
 - [ ] **An exterior aircraft model**: not now; perhaps later, the operator's call.
 
 What that implies, for whoever plans P7: the computers and JSBSim reach the browser as WebAssembly
