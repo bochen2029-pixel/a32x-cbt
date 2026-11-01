@@ -6,7 +6,8 @@ filed as issues on `flybywiresim/aircraft`.
 **Status: posted 2026-11-01** on the operator's word (*"post them"*), under their account, with
 the text below unchanged:
 [#11005](https://github.com/flybywiresim/aircraft/issues/11005) (§1) and
-[#11006](https://github.com/flybywiresim/aircraft/issues/11006) (§2). Filed through the API with
+[#11006](https://github.com/flybywiresim/aircraft/issues/11006) (§2); §3 followed later that day as
+[#11007](https://github.com/flybywiresim/aircraft/issues/11007). Filed through the API with
 `gh`: the repository turns blank issues off and asks for its bug-report form, which is built for
 reports from the simulator (simulator version, the EFB's build info, steps in the sim). These were
 found in source, outside MSFS, so they went as written. Checked on 2026-11-01: `master` of `flybywiresim/aircraft` was
@@ -75,10 +76,12 @@ In `fbw-a32nx/src/systems/instruments/src/MCDU/legacy/NXSpeeds.ts` (`master`, 66
 
 ---
 
-## 3 · The FCDC's output bus starts from uninitialized words — drafted, not posted
+## 3 · The FCDC's output bus starts from uninitialized words
 
-Found 2026-11-01 by the P7 session with GCC's UBSan, after §1 and §2 were filed; it waits for the
-operator's yes on this text.
+Found 2026-11-01 by the P7 session with GCC's UBSan, after §1 and §2 were filed. Posted the same day
+on the operator's word (*"post it"*), text unchanged, as
+[#11007](https://github.com/flybywiresim/aircraft/issues/11007), after the same checks: `master` still
+`66021c2`, and no issue or pull request on `getBusOutputs`, `FcdcBus` or the Arinc429 constructors.
 
 **Title:** FCDC: `getBusOutputs` builds its bus from uninitialized ARINC 429 words
 
