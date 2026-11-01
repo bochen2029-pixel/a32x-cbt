@@ -1403,8 +1403,11 @@ fit's; the harness and the page are built, and act only on an airframe whose fil
 `propulsion/fit/ground-idle`, the ground idle thrust's share of the rating; `propulsion/fit/reverse-efficiency`,
 the share of an engine's thrust its reverser turns forward; `propulsion/fit/reverse-max`, MAX REV's setting
 as the fraction of the way from idle to take-off thrust; and `propulsion/a320/ground-idle`, which the
-harness writes and the engine file weighs its idle thrust by. Until the fit declares them, nothing flies
-differently.
+harness writes and the engine file weighs its idle thrust by. Our A320 declares the first three since
+`0ff9296`, provisional until cited (0.03, 0.3, 0.7), so the reversers work for a pilot on the ground; the
+fourth, which turns ground idle on, is the fit's next commit, and lands with the crews' reverse below, so
+that the scripted flights change once and are re-baselined once. Until then no scripted flight changes:
+the reference digests and every scripted ILS line are as before.
 
 - The thrust levers reach the A320's reverse range, `tla_1` and `tla_2` from −20 (MAX REV) to 45, with
   reverse idle at −6, A32NX's own detents; the computers read the levers and see it.
@@ -1423,10 +1426,10 @@ differently.
   forward; a throttle axis spans the reverse range while they are held.
 
 New `ctest` cases on JSBSim's 737, which has no reversers: `without_reversers_below_idle_is_idle` and
-`without_reversers_nothing_deploys_in_flight`. The same test on our A320 proves the mechanics once the
-data is declared; checked with placeholder numbers in a throwaway copy, it does. The scripted crews' use
-of reverse on the landing roll — MAX REV at touchdown, reverse idle from 70 kt, idle by taxi speed —
-lands with the data, since it changes the flight.
+`without_reversers_nothing_deploys_in_flight`. The same test on our A320 proves the mechanics, and is
+registered for it with the crews' reverse; checked with the fit's numbers in a throwaway copy, it passes.
+The scripted crews' use of reverse on the landing roll — MAX REV at touchdown, reverse idle from 70 kt,
+idle by taxi speed — lands with ground idle, since together they change the flight.
 
 ## What P7 still has to build
 

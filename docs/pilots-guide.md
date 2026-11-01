@@ -201,11 +201,13 @@ what was flown:
 
 The name gives the airframe, the scenario, when it was flown (UTC, so that five approaches sort in
 the order flown) and its length in simulated seconds. The file is the flight itself: the scenario and airframe it started
-from, who flew it and with what, and the inputs of every one of its fifty steps a second. You can save
-at any time; the recording runs from the start to the moment you save.
+from, who flew it and with what, the build of the simulator that flew it (its `# build:` line: the
+commit it was made from), the inputs of every one of its fifty steps a second, and at the end the
+judge's verdict as it stood when you saved. You can save at any time; the recording runs from the start
+to the moment you save.
 
-The recording is what you hand in. The native build's judge replays it and must reach the same
-verdict:
+The recording is what you hand in. The native build's judge, built from the same commit as the page
+that flew it, replays it and must reach the same verdict:
 
     law_harness --replay a32x-a320-approach-20261101T1744Z-0289s.csv --expect ils
 
@@ -214,7 +216,19 @@ and the gate takes five of them at once:
     law_harness --repeatable a.csv b.csv c.csv d.csv e.csv
 
 It replays each in a fresh process, judges it, and checks that all five are stable, hand-flown,
-different flights, with their touchdowns within 150 m of their mean.
+different flights, with their touchdowns within 150 m of their mean. Before that it checks the builds:
+the five must come from one build, a commit's, and be judged with the `law_harness` built from that
+same commit, or it refuses them and says why. A page built from changes no commit holds names itself
+with `+dirty`, and one that cannot name its commit `unknown`; the gate takes neither, so fly the gate
+on a release, or on a page built from a commit.
+
+Five that passed count for a later release only if they still pass on it:
+
+    law_harness --rejudge a.csv b.csv c.csv d.csv e.csv
+
+built from that release, replays them there, judges them by every rule of the gate, and names every
+band whose verdict differs from the one each recording was saved with. If any of the five is no longer
+stable, they are flown again on the release.
 
 # Starting elsewhere
 
