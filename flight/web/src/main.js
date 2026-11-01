@@ -218,7 +218,8 @@ const flight = new Flight(
   },
   (message) => {
     error = message;
-    status.innerHTML = `<span class="bad">${message}</span>`;
+    // a replay's error may quote its file (core-session.js, parseRecording): said as text, never markup
+    status.innerHTML = `<span class="bad">${escapeHtml(message)}</span>`;
   });
 
 function value(name) {
@@ -333,7 +334,7 @@ function show() {
   const cls = r.stepsDropped ? 'warn' : '';
   // the build on a line of its own, clear of the disclaimer centred above (buildNote: amber where the gate refuses it)
   const build = buildNote(r.build);
-  status.innerHTML = `${r.airport} · ${r.airframe} · ${r.crew}\n` +
+  status.innerHTML = `${escapeHtml(`${r.airport} · ${r.airframe} · ${r.crew}`)}\n` +   // a replay's airframe is its file's
     (build.text ? `${build.warn ? `<span class="warn">${build.text}</span>` : build.text}\n` : '') +
     (replayMode ? `${replayLines()}\n` : '') + `${view.describe()}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
@@ -524,7 +525,7 @@ recordingToFly.then((text) => (text === null ? flight.start(airframe, scripted, 
   } catch (e) {
     // a bad airport file stops the page, said where it can be seen (CLAUDE.md, 9)
     error = `the airport could not be drawn: ${e.message}`;
-    status.innerHTML = `<span class="bad">${error}</span>`;
+    status.innerHTML = `<span class="bad">${escapeHtml(error)}</span>`;
     return;
   }
   status.textContent = bench.done ? 'flying' : 'measuring a tick…';
