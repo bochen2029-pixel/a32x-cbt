@@ -1,7 +1,7 @@
 # Bus population — what a healthy system actually sends
 
 Measured from the driver and producers. Paths relative to
-`C:\FID\747\a32nx\fbw-a32nx\src\wasm\fbw_a320\src\` unless noted. Repo `66021c2`.
+`<A32NX clone>\fbw-a32nx\src\wasm\fbw_a320\src\` unless noted. Repo `66021c2`.
 
 ## The structural fact
 

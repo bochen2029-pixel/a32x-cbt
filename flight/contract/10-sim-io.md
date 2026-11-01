@@ -120,7 +120,7 @@ That is the entire risk item from note 11, closed.
 
 ## Provenance
 
-- Header: `C:\FID\747\a32nx\fbw-a32nx\src\wasm\fbw_a320\src\interface\SimConnectData.h`
+- Header: `<A32NX clone>\fbw-a32nx\src\wasm\fbw_a320\src\interface\SimConnectData.h`
 - Driver: `...\src\FlyByWireInterface.cpp` (80 field reads, 5 write channels)
 - Interface: `...\src\interface\SimConnectInterface.cpp` (sendData overloads)
 - Repo HEAD `66021c2`, 2026-10-28.
