@@ -3,7 +3,8 @@
 A computer-based trainer for an A320 fly-by-wire, built to run on a laptop with no GPU and no
 installer. This document is the plan and the honest state of it.
 
-Last written: 2026-10-31, at P5 (packaging) — the tree was split into `app/` and `flight/` and put under git.
+Last written: 2026-11-01, at P7 (aero) — slice 1: the A32NX computers fly JSBSim's 737 headless, takeoff to
+landing. The rest of P7 is planned in §4 and waits for the operator's agreement.
 
 ---
 
@@ -18,7 +19,7 @@ Last written: 2026-10-31, at P5 (packaging) — the tree was split into `app/` a
   └─ situations\  one saved aircraft as a sample
 
   flight\         GPLv3. The A32NX port contract, and the flight control computers running headless
-                  at 50 Hz against a stub world (P6). Nothing flies for real until P7.
+                  at 50 Hz: against a stub world for P6, flying a JSBSim airframe from P7.
   docs\           provenance, architecture, psx-notes\, conventions
   tools\          regen-psx-reference.md
   reference\      two screenshots
@@ -83,7 +84,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | not started |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly JSBSim's 737 headless, takeoff to landing, normal law throughout; the rest is planned below, not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -173,6 +174,94 @@ Started 2026-11-01 on the operator's instruction, before P5's reference-machine 
 
 Found on the way, in `flight/README.md`: the computers depend on zero-filled static storage; the
 driver reads one past a five-element array for SEC 2; elevator servos run reverted solenoid logic.
+
+### P7 in detail — an airframe, then a hand-flown ILS in the browser
+
+Started 2026-11-01; the card that started it was the operator's decision. Slice 1 is done. Everything
+after it is a plan, and waits for the operator's agreement: no browser work and no P8 has begun.
+
+**Slice 1 — the harness flies JSBSim, headless** [M]
+
+- [x] JSBSim v1.3.3 (`66f7faf`, LGPL-2.1) pinned like A32NX: compiled from a clone outside the
+      repository into the build tree, any other commit refused, recorded in `docs/provenance.md` first
+- [x] the airframe is JSBSim's 737, read unmodified from the clone. Its A320 was measured first and
+      refused: it cannot be trimmed on approach. The 737 is A320-class, not an A320, and the operator
+      chose to fly it for now — *"okay go with the 737 then"*, 2026-11-01
+- [x] behind `World`'s interface, with `efcs.cpp` untouched: one adapter (`harness/airframe.cpp`) and
+      one JSBSim system of ours that hands the aerodynamics the A32NX servos' surface positions
+- [x] a scripted crew flying it closed loop through the laws, the way the A320's own modes split the
+      job: takeoff, an open climb, a 180° turn, a doublet, speedbrake, a pedal kick, a 45° steep turn,
+      an approach configured as the speed comes back, a 3° path, flare, rollout
+- [x] the P6 gate, unchanged, passes on it: 30 minutes, 0 non-finite of 20.5 M values, every computer
+      healthy, normal law for 100 % of 1,594 s of settled flight, a landing at −170 fpm. 4.8 s of wall
+      time on MSVC 19.44 with the desktop 28 % busy; the same verdicts on GCC 13.3
+- [x] eleven `ctest` cases. The three new ones state what a real airframe adds — the stabiliser takes
+      the trim, the yaw damper takes out a pedal kick, the landing is inside A320 limits — and two of
+      them were shown able to fail by reversing a sign. A crash fails any run: an airframe below the
+      runway freezes the world
+
+Known limits of slice 1, all of them the airframe's or the crew's:
+
+- It is a 737. Its lift peaks near 13° of alpha; in one badly flown climb during development it went
+  through that to 24° in normal law, because the A320 laws' angle-of-attack protection is shaped for
+  the A320's wing. Only an A320 airframe cures that.
+- The 737's aerodynamics have no stabiliser, no slats, no roll spoilers and no aileron droop: the THS
+  acts as 1.8 times its angle in elevator, and spoilers and speedbrakes act through the 737's coarse
+  steps. The engines are JSBSim's turbine on a thrust lever schedule of ours, with no reverse, no
+  FADEC and no autothrust. The FMGC is a stub that reports weight and CG.
+- The crew flies on truth, not instruments. No wind, ISA, and a sea-level runway that is everywhere.
+
+**The rest of P7 — the plan.** Ordered; each step is done when its test passes, and the gate is last.
+
+| step | what | done when |
+|---|---|---|
+| 2 | A runway and an ILS in the world | a 3,000 × 45 m runway with a threshold, touchdown zone and centreline; localizer and a 3° glideslope crossing the threshold at 50 ft, computed from the aircraft's position; the scripted crew flies raw-data ILS from 10 nm, from starts 1 dot and 10 kt off, inside every band below, every time |
+| 3 | The flight core as a library | the step loop behind a small C API — start, inputs, step, state — with the scripted crew one input source among others; a recorded input stream replays to the same touchdown, byte for byte |
+| 4 | WebAssembly | Emscripten builds the A32NX computers, JSBSim and their data files into one single-file module that runs from `file://` in a Blob worker, network off; 50 Hz holds with headroom, measured on the dev desktop with its load beside the number, and on the 2014 laptop when there is one |
+| 5 | Joystick and the loop | the Gamepad API: sidestick pitch and roll, rudder on a twist or pedals, a throttle axis with CL, MCT and TOGA detents, buttons for takeover, brakes, speedbrake, flaps and gear; per-device mapping, deadzones and calibration kept between sessions; keyboard only as fallback; fixed 50 Hz steps under a display-rate loop that drops debt rather than stretch a step |
+| 6 | The view | Three.js (MIT), bundled with the page rather than fetched: runway with edge, centreline and approach lights, horizon, ground, a few buildings, dusk and night, from the pilot's eyepoint; a minimal overlay — speed, altitude, attitude, localizer and glideslope dots, flaps, gear — until P8 draws a PFD; frame time measured under software rendering |
+| 7 | **the gate** | a hand-flown ILS, judged as below |
+
+**How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
+threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
+(Flight Safety Foundation, ALAR briefing note 7.1), the speed band is Airbus's, the touchdown limits
+are the A320's; the rest are this project's and say so.
+
+| measure | band | over | source |
+|---|---|---|---|
+| localizer deviation | within 1 dot | 1,000 ft to 50 ft | FSF ALAR 7.1 |
+| glideslope deviation | within 1 dot | 1,000 ft to 50 ft | FSF ALAR 7.1 |
+| sink rate | under 1,000 fpm | 1,000 ft to 50 ft | FSF ALAR 7.1 |
+| configuration | gear down, CONF FULL | from 1,000 ft | FSF ALAR 7.1 |
+| speed | Vapp −5 / +10 kt | 1,000 ft to 50 ft | Airbus SOP |
+| bank | within 7° | 1,000 ft to 50 ft | ours |
+| sink rate at touchdown | under 360 fpm, never 600 | touchdown | ours; 600 fpm is the A320's hard landing |
+| load factor at touchdown | under 2.6 g | touchdown | the A320's hard landing |
+| pitch at touchdown | 0 to 10° | touchdown | ours; the A320's tail strikes at 11.7° |
+| touchdown point | 300 to 900 m past the threshold | touchdown | ours; the touchdown zone |
+| main gear from the centreline | within 5 m | touchdown and rollout | ours |
+
+*Stable* means no excursion outside a band between 1,000 ft and 50 ft, and a touchdown inside every
+touchdown band. *Repeatable* means five consecutive hand-flown approaches — joystick, browser — each
+of them stable, with their touchdown points within 150 m of their mean. Every approach's record must
+replay to the same verdict, which is house rule 7 applied to flight. The scripted crew passes the
+same bands from varied starts before anyone is asked to, so the gate's numbers are known reachable
+on this airframe. The debrief prints each band's worst deviation and where it happened, as the
+trainer's debrief does.
+
+**Decisions taken, and still open.**
+
+- Taken 2026-11-01: fly JSBSim's 737 now.
+- Open — a fitted A320. A table of A320 targets from public sources: trims across speed,
+  configuration and weight (alpha, pitch, elevator and THS), stall speeds, pitch and roll responses,
+  climb and descent. An optimiser tunes a 737-shaped set of coefficients, seeded from public A320
+  numbers, against it; what mismatch remains becomes part of the P7 gate. The fitted A320 replaces the
+  737 when it beats it on the same table. The harness keeps the airframe to one adapter and one data
+  set so the swap stays small. A fit of tens of coefficients against JSBSim itself, at about 10 µs a
+  frame, is minutes of CPU, not a GPU job.
+- Open — packaging. The browser product links A32NX, so it is GPLv3; `app/` stays MIT. Two
+  artefacts, or one GPLv3 artefact that carries the trainer: decide before step 4 ships anything.
+- Not changed: P8's displays come after this gate. Step 6's overlay is not a PFD.
 
 ---
 
