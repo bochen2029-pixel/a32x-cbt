@@ -10,7 +10,8 @@ replaced and which stays selectable. A scripted crew flies either through the co
 runway, round a circuit and back onto the runway, headless, in normal law. The 737 is A320-class, not
 an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6 passed against a point-mass stub;
 the same gate, unchanged, passes against both. The A320's numbers are written down
-(`targets/a320.csv`, 75 targets): our A320 is inside all 75, the 737 inside 21. The A320 replaced the
+(`targets/a320.csv`, 76 targets): our A320 is inside 75, all but its pitching moment deep past the
+stall ([below](#the-pitching-moment-deep-past-the-stall)), the 737 inside 21. The A320 replaced the
 737 under the swap rule ([below](#the-swap-made-2026-11-01)) on its aerodynamics, and its engines
 were fitted after ([below](#its-engines-and-how-they-were-fitted)), and then what lies past its stall
 ([below](#past-the-stall-and-how-it-was-fitted)), the drag of its landing flaps and gear
@@ -119,7 +120,7 @@ at that instant, so the computers never see what JSBSim makes of an aeroplane un
 ## The A320's targets, and the two airframes against them
 
 The operator chose to fly the 737 for P7 and swap in a fitted A320 later. `targets/a320.csv` is the
-bar for that swap: 75 targets an airframe is counted against and 4 context rows scored but not
+bar for that swap: 76 targets an airframe is counted against and 4 context rows scored but not
 counted. Each row names its source in the file's header: A32NX's VS1g and VLS tables
 (`targets/a320-speeds.csv`, a community reconstruction of Airbus's, sampled on a weight grid), the
 ELAC's own α max and α prot, a recorded A320 approach (VT-WGR's flight data, from AAIB India's
@@ -134,7 +135,7 @@ Airbus's drag-to-lift ratios in ANP again, on approach and on departure, and DLR
 identified from A320 flight data; and for the pace of the engines' spool-up, the FAA's limit for
 certifying an engine. OpenAP WRAP's distributions fitted to ADS-B are the four context rows.
 Thirty-five rows are marked *fit*, for an optimiser to tune against, the static thrust at an 8,000 ft
-airfield the last; forty are *held out*, so that a fit which only memorises is caught.
+airfield the last; forty-one are *held out*, so that a fit which only memorises is caught.
 Rows that depend on weight are measured at two: 48.5 t, the weight the 737 is loaded to, and 65 t,
 between an A320-251N's maximum zero-fuel and landing weights. The rule for the swap is in
 `ROADMAP.md`, P7.
@@ -243,6 +244,7 @@ held-out rows, past the stall:
 |---|---|---|---|---|---|---|---|---|
 | `elevator-alpha-clean` |  | 21.0..29.0 deg | 23.80 | **inside** | 35.22 | outside +6.2 | none | outside |
 | `pitch-break-clean` |  | -0.35..-0.05 Cm | -0.17 | **inside** | -0.03 | outside +0.0 | 0.11 | outside +0.2 |
+| `pitch-past-stall-clean` |  | -0.19..0.01 Cm | -0.27 | outside -0.1 | not measured | | 0.05 | outside +0.0 |
 
 held-out rows, the engines:
 
@@ -279,11 +281,12 @@ context rows, not counted:
 | `climb-rate` |  | 1500.00..2530.00 ft/min | 3352.66 | (outside +822.7) | 4602.18 | (outside +2072.2) | 3962.64 | (outside +1432.6) |
 | `descent-rate` |  | -1550.00..-840.00 ft/min | -1113.99 | (inside) | -1033.95 | (inside) | -1699.40 | (outside -149.4) |
 
-**Our A320: inside 75 of 75 targets — 35 of 35 fit rows, 40 of 40 held out — the engines' 27 rows
-among them, where on JSBSim's CFM56_5 it was inside 3 of the first 24, and before their fit inside 1
-of the 3 at a high airfield; the 5 past the stall, where before their fit it was inside 1; the 6 for
-the drag of the flaps and the gear, where before their fits it was inside 3; and its engine's
-spool-up, outside before its fit. The 737: inside 21 of 75 — 7 of 35 fit, 14 of 40 held out.** Our
+**Our A320: inside 75 of 76 targets — 35 of 35 fit rows, 40 of 41 held out, all but its pitching
+moment deep past the stall — the engines' 27 rows among them, where on JSBSim's CFM56_5 it was inside
+3 of the first 24, and before their fit inside 1 of the 3 at a high airfield; the 5 past the stall
+that came with their fit, where before that fit it was inside 1; the 6 for the drag of the
+flaps and the gear, where before their fits it was inside 3; and its engine's spool-up, outside
+before its fit. The 737: inside 21 of 76 — 7 of 35 fit, 14 of 41 held out.** Our
 A320 is inside every row the 737 is inside, and every row it was inside before its engines, what lies
 past its stall or the drag of its flaps and gear were fitted. Every row but the five past the stall
 reads as it did before that fit, every row but the gear's as it did before the drag fit, every target
@@ -516,8 +519,9 @@ inside both bands. The held-out rows, which the fit never saw, land inside their
 elevator holds 23.8° where Foster's flaps-up figure is about 25°, and the clean break is −0.17 where
 the GTM's is −0.20. So a model fitted on CONF FULL alone predicts the clean configuration's stall
 behaviour from two sources. What no row checks: how much power the elevator keeps at very high alpha
-(a quarter, our estimate); the pitching moment beyond 25°, where the GTM's levels off and ours goes on
-stiffening; and the break in CONF FULL, which takes the clean configuration's size. The fit moves
+(a quarter, our estimate), and the break in CONF FULL, which takes the clean configuration's size. The
+pitching moment beyond 25°, where the GTM's levels off and ours goes on stiffening, has a held-out row
+since, which ours is outside ([below](#the-pitching-moment-deep-past-the-stall)). The fit moves
 nothing below the stall: every other row reads as before, to the digit printed. The P6 gate's flight
 reads the same above 5 kt in every digit its trace prints, and its first landing is the same, at
 1,023.84 s and −143.5 fpm. Its digest moves: standing on the runway, JSBSim's alpha is that of a
@@ -744,6 +748,38 @@ compiler:
   Mach 0.25 than at rest, 92.0 % against 91.7 % and 84.4 % against 83.8 %; the form before fails it,
   91.8 % against 95.0 %. Seventy-five native cases pass with either airframe on MSVC 19.44 and on
   GCC 13.3, and seventy under node, on master with the replay (`60371d0`).
+
+### The pitching moment deep past the stall
+
+Part 3 of the airframe plan (`ROADMAP.md`), decided on 2026-11-02: the pitch of our A320 beyond 25° of
+alpha, which no row measured. Of the two things the plan named, one has a source. The Transport Class
+Model report's figure 33 plots the GTM's pitching moment with the flaps up, elevator and stabiliser at
+0, to 85° of alpha. Its image, digitised (the full-scale curve, 841 by 797 pixels, mapped through the
+plot's frame), agrees with what was read off it by eye for the break, and past the stall it levels
+off: −0.596 at 24°, 6° past the lift peak, −0.686 at 34° and −0.721 at 40°, 0.009 per degree from 24°
+to 34° and 0.007 from 25° to 40°, where it fell 0.022 per degree before the stall. The other, how much
+power the elevator keeps at very high alpha (a quarter, ours), has none: the report plots no control
+power.
+
+One held-out row, `pitch-past-stall-clean`: the static moment about the centre of gravity in level
+flight at 1 g, elevator and stabiliser at 0, clean, 16° past the lift peak less 6° past it, as the
+break's row reads it 6° past the peak; the GTM's −0.090, the band 0.10 either way, ours. Our A320 reads
+−0.27, from −0.655 at 18.75° to −0.927 at 28.75°, outside by 0.08; JSBSim's 737 +0.05, a slight
+pitch-up, outside by 0.04. Inside 75 of 76, the 737 inside 21.
+
+Why: our static moment has one slope, `cm-alpha`, −1.5 per radian, and it runs on past the stall
+unchanged. Past the stall only the tail's control power fades (`aero/a320/k-tail`, from 10.95°), not
+the tail's share of the static stability. The fix that suggests itself is to let the tail's share of
+the static moment fade with the same factor, the wing and body's share staying. With the tail giving
+1.3 times the whole slope (an estimate for a transport whose tail-off moment is destabilising, to be
+sourced), the row would read about −0.12 on today's fit, inside it. But that weakens the static
+stability from 10.95° up, by about 30 % at 15°: it moves the stall, Foster's rows and the CONF FULL
+fast pull of P7's step 4, and wants a refit of the post-stall group and those cases re-baselined. It
+is left for fbw-parent and P7 to decide; nothing in the airframe changed here.
+
+What changes in flight: nothing. The airframe is as it was, so every flight is the same, bit for bit.
+Seventy-five native cases pass with either airframe on MSVC 19.44 and on GCC 13.3, and seventy under
+node.
 
 ## The swap: made, 2026-11-01
 
