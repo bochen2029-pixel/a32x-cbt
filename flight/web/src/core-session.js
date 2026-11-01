@@ -1,8 +1,103 @@
 // One flight in one instance of the flight core's WebAssembly module (flight/harness/core.h): start
-// it, step it with inputs, read its state. The worker routes messages here, and the module's tests in
-// node call it directly. GPLv3.
+// it, step it with inputs, read its state; or open a recording and fly it again (Replay). The worker
+// routes messages here, and the module's tests in node call it directly. GPLv3.
 //
 // Slots are found by name, never by number: the names come from the module itself.
+
+// The build a recording was flown on when it does not say: v0.1.0's, the last release whose recordings had no
+// build line (fbw-parent's ruling, 2026-11-01; flight/harness/main.cpp, kUnnamedBuild).
+export const UNNAMED_BUILD = '1a672e9';
+
+// A recording (CoreSession.recording; flight/harness/main.cpp, Recording) read back as law_harness --replay reads
+// it: the "# key: value" lines before the column names, the column names, a row of inputs a step, and among or
+// after the rows the judge's verdict when it was saved, its "# judged: " lines; other lines that begin with '#'
+// are passed over, as law_harness passes over them. Throws, saying which line and why, for what law_harness would
+// not replay either: no column names, a row with another number of values, a value that is not a number. Blank
+// lines may end the text, not interrupt the rows; a line may end in CR LF.
+export function parseRecording(text) {
+  const lines = String(text).split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  const header = Object.create(null);
+  let at = 0;
+  for (; at < lines.length && lines[at].startsWith('#'); ++at) {
+    const m = /^# ([a-z][a-z0-9_-]*): ?(.*)$/.exec(lines[at]);
+    if (m) header[m[1]] = m[2];
+  }
+  if (at >= lines.length || !lines[at]) throw new Error('it has no column names: it is not a recording');
+  const columns = lines[at].split(',');
+  const n = columns.length;
+  const judged = [];
+  let rows = new Float64Array(1024 * n), count = 0;
+  for (let k = at + 1; k < lines.length; ++k) {
+    const l = lines[k];
+    if (l.startsWith('#')) {
+      if (l.startsWith('# judged: ')) judged.push(l.slice(10));
+      continue;
+    }
+    if (!l) throw new Error(`line ${k + 1} is blank, among the rows`);
+    const values = l.split(',');
+    if (values.length !== n) throw new Error(`line ${k + 1} has ${values.length} values where the columns name ${n}`);
+    if ((count + 1) * n > rows.length) {
+      const grown = new Float64Array(rows.length * 2);
+      grown.set(rows);
+      rows = grown;
+    }
+    for (let i = 0; i < n; ++i) {
+      const v = Number(values[i]);
+      if (!Number.isFinite(v) || !values[i].trim()) throw new Error(`line ${k + 1}: '${values[i]}' is not a number`);
+      rows[count * n + i] = v;
+    }
+    ++count;
+  }
+  return { header, columns, rows: rows.subarray(0, count * n), count, judged };
+}
+
+// What a replay says of the build it flies on, beside the page's own (flight.js, buildNote). Flown and replayed on
+// the same build, a commit's, the replay is the very flight. Another build may fly it otherwise, and its verdict
+// is not the gate's, which judges a recording by the law_harness of the recording's own commit (flight/README.md,
+// Flying the gate); nor is that of a build made from uncommitted changes or unable to name its commit. named:
+// whether the recording has a build line; without one it counts as v0.1.0's.
+export function replayNote(build, here, named = true) {
+  const clean = (b) => String(b).replace(/[^A-Za-z0-9.+_-]/g, '');
+  const was = clean(build), is = clean(here);
+  const flownOn = named ? `build ${was}` : `build ${was} (it has no build line: v0.1.0's)`;
+  if (build !== here) {
+    return { text: `flown on ${flownOn}, replayed on build ${is}: it may fly otherwise here, and this verdict is not the gate's`, warn: true };
+  }
+  if (/\+dirty$|^unknown$/.test(was)) return { text: `flown and replayed on build ${was}, not a commit's: not for the gate`, warn: true };
+  return { text: `flown on this build, ${was}: the replay is the flight itself`, warn: false };
+}
+
+// A band's verdict in a line of the judge's debrief (judge.cpp; main.cpp, bandLine): pass, FAIL or '....' while
+// it cannot be judged yet, two spaces, then the band's name, up to " - ".
+function bandOf(line) {
+  const m = /^\s*(pass|FAIL|\.\.\.\.) {2}(.+?)(?: - .*)?$/.exec(line);
+  return m ? { status: m[1], name: m[2] } : null;
+}
+
+// A replay's verdict against the one its recording was saved with, a debrief line each: the same line for line
+// when the replay flew the very flight (house rule 7); and every band whose verdict differs, as law_harness
+// --rejudge names them, and the verdict line if it differs. A band not judged on either side is passed over.
+// comparable: the recording was saved with a verdict (recordings older than 0.1.1 were not).
+export function compareVerdicts(saved, replayed) {
+  const same = saved.length > 0 && saved.length === replayed.length && saved.every((l, i) => l === replayed[i]);
+  const statuses = (lines) => {
+    const m = new Map();
+    for (const l of lines) {
+      const b = bandOf(l);
+      if (b) m.set(b.name, b.status);
+    }
+    return m;
+  };
+  const now = statuses(replayed), changed = [];
+  for (const [name, was] of statuses(saved)) {
+    const is = now.get(name);
+    if (is !== undefined && was !== '....' && is !== '....' && is !== was) changed.push(`${name}: ${was} when flown, ${is} here`);
+  }
+  const last = (lines) => (lines.length ? lines[lines.length - 1] : '');
+  if (saved.length && last(saved) !== last(replayed)) changed.push(`the verdict: ${last(saved)} when flown, ${last(replayed)} here`);
+  return { comparable: saved.length > 0, same, changed, saved, replayed };
+}
 
 export class CoreSession {
   // mod: an instance from the module's factory (createFlightCore). airframe: 'a320', '737' or '' for the
@@ -116,5 +211,67 @@ export class CoreSession {
     const out = {};
     for (const n of this.texts) out[n] = this.mod.UTF8ToString(this.mod._flight_state_text(this.field[n]));
     return out;
+  }
+}
+
+// A recording flown again in a fresh instance of the module, as law_harness --replay flies one: the core started
+// from the recording's scenario and airframe, its rows the crew, a row a tick, nothing from the page's hands. Its
+// session is an ordinary CoreSession, read as any other. Refused before the core starts when its columns are not
+// this core's inputs, so the instance it was given is left unflown.
+export class Replay {
+  constructor(mod, text) {
+    this.text = String(text);  // as it was opened: what a replay hands back when asked for its recording
+    this.recording = parseRecording(this.text);
+    const names = Array.from({ length: mod._flight_input_count() }, (_, i) => mod.UTF8ToString(mod._flight_input_name(i)));
+    if (this.recording.columns.join(',') !== names.join(',')) {
+      throw new Error(`its columns are not this core's inputs (${names.join(',')})`);
+    }
+    const h = this.recording.header;
+    // a recording older than its scenario and airframe lines flies from the runway on the default airframe, as
+    // law_harness --replay flies one without --scenario and FLIGHT_AIRFRAME
+    this.session = new CoreSession(mod, h.airframe || '', false, h.scenario || '');
+    this.build = 'build' in h ? h.build : UNNAMED_BUILD;
+    this.at = 0;
+  }
+
+  get steps() {
+    return this.recording.count;
+  }
+
+  get ended() {
+    return this.at >= this.recording.count;
+  }
+
+  // Flies up to ticks rows, a tick each; returns how many it flew: none once the recording has ended.
+  step(ticks) {
+    const n = this.recording.columns.length, rows = this.recording.rows;
+    let ran = 0;
+    while (ran < ticks && this.at < this.recording.count) {
+      this.session.step(1, rows.subarray(this.at * n, (this.at + 1) * n));
+      ++this.at;
+      ++ran;
+    }
+    return ran;
+  }
+
+  // What the recording says of itself, for the page: where and on what it was flown, by whom, on which build, how
+  // many steps, whether it was saved with a verdict, and a plain note on the build (replayNote).
+  info() {
+    const h = this.recording.header;
+    return {
+      scenario: h.scenario || '', airframe: this.session.airframe, crew: h.crew || '', hands: h.hands || '',
+      flown: h.flown || '', build: this.build, sameBuild: this.build === this.session.build, steps: this.steps,
+      judged: this.recording.judged.length > 0, note: replayNote(this.build, this.session.build, 'build' in h),
+    };
+  }
+
+  // The verdict as the replay stands against the one the recording was saved with (compareVerdicts).
+  verdict() {
+    return compareVerdicts(this.recording.judged, this.session.debrief().split('\n').filter(Boolean));
+  }
+
+  // How far it has flown; once it has ended, its verdict too.
+  progress() {
+    return { at: this.at, steps: this.steps, ended: this.ended, ...(this.ended ? { verdict: this.verdict() } : {}) };
   }
 }

@@ -1,15 +1,19 @@
 // The browser's module, the very file the page loads into its worker, run under node: the scripted
 // crew flies it to a landing, its inputs replayed into a second instance give the same state on every
-// tick, and a tick costs far less than the 20 ms it has. GPLv3.
+// tick, and a tick costs far less than the 20 ms it has; a recording the page saves opens again in the
+// page and replays to the identical debrief, as law_harness judges it. GPLv3.
 //
 // FLIGHT_CORE_JS names the module (flight_core.js from the WebAssembly build). Without it these tests
 // are skipped, and say so.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync } from 'node:fs';
-import { CoreSession } from '../src/core-session.js';
+import { existsSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { CoreSession, Replay, UNNAMED_BUILD } from '../src/core-session.js';
 
 const path = process.env.FLIGHT_CORE_JS;
 const skip = !path || !existsSync(path) ? 'FLIGHT_CORE_JS does not name a built flight_core.js' : false;
@@ -114,6 +118,73 @@ test('the page records its flight as law_harness reads it, and the recording rep
   assert.throws(() => replay.recording({ crew: 'script' }), /no header line called crew/, 'and nobody rewrites who flew it');
   assert.throws(() => replay.recording({ build: 'abcdef0' }), /no header line called build/, 'nor on which build');
   assert.throws(() => replay.recording({ judged: 'STABLE' }), /no header line called judged/, 'nor what was judged');
+});
+
+// A recording saved by the page, opened again in the page (core-session.js, Replay): its rows flown through a fresh
+// instance as law_harness --replay flies them, to the debrief it was saved with, line for line, and the same state
+// (house rule 7). Then the same file judged by the law_harness built beside this module, of the same build.
+test('a recording saved by the page replays in the page to the identical debrief, and law_harness agrees', { skip }, async (t) => {
+  const scenario = 'approach;distance=5';
+  const flown = new CoreSession(await createFlightCore(), airframe, true, scenario);
+  for (let done = 0; done < 220 * 50; done += 50) flown.step(50);
+  const extra = { hands: 'a joystick', flown: '2026-11-01T22:40Z' };
+  const text = flown.recording(extra);
+
+  const replay = new Replay(await createFlightCore(), text);
+  const info = replay.info();
+  assert.deepEqual([info.scenario, info.airframe, info.crew, info.hands, info.flown, info.steps],
+                   [scenario, flown.airframe, 'script', extra.hands, extra.flown, flown.steps],
+                   'it says where, on what and by whom it was flown, and for how long');
+  assert.equal(info.build, flown.build);
+  assert.equal(info.sameBuild, true, 'flown on this very build');
+  assert.equal(info.judged, true, 'and saved with its verdict');
+  assert.equal(replay.progress().ended, false);
+  const sizes = [1, 7, 50, 333];  // flown in pieces of every size the page might ask for
+  for (let k = 0; !replay.ended; ++k) replay.step(sizes[k % sizes.length]);
+  assert.equal(replay.at, flown.steps, 'to the last row');
+  assert.equal(replay.step(25), 0, 'and no further: nothing flies once the recording has ended');
+  const v = replay.progress().verdict;
+  assert.equal(v.same, true, `the debrief it was saved with, line for line:\n${v.replayed.join('\n')}`);
+  assert.deepEqual(v.changed, []);
+  assert.equal(replay.session.debrief(), flown.debrief(), 'the judge saying it in the same words');
+  const a = flown.state(), b = replay.session.state();
+  a[flown.field.phase] = b[replay.session.field.phase] = 0;  // only the scripted crew keeps a phase
+  assert.deepEqual(Array.from(b), Array.from(a), 'and it ends in the same state, slot for slot');
+
+  // another build's copy opens and says so; one older than build lines counts as v0.1.0's, with no verdict to compare
+  const other = new Replay(await createFlightCore(), text.replace(`# build: ${flown.build}\n`, '# build: 0000000\n'));
+  assert.equal(other.info().sameBuild, false);
+  assert.equal(other.info().note.warn, true);
+  assert.match(other.info().note.text, /0000000.*not the gate's/);
+  const bare = text.split('\n').filter((l) => !l.startsWith('# build: ') && !l.startsWith('# judged: ')).join('\n');
+  const old = new Replay(await createFlightCore(), bare);
+  assert.deepEqual([old.info().build, old.info().judged], [UNNAMED_BUILD, false]);
+
+  // another core's columns: refused before the core starts, the instance it was given left unflown
+  const mod = await createFlightCore();
+  assert.throws(() => new Replay(mod, text.replace('pitch,roll,', 'roll,pitch,')), /columns are not this core's inputs/);
+  assert.doesNotThrow(() => new CoreSession(mod, airframe, false, scenario), 'the instance is still unflown');
+
+  // the same file judged by the law_harness built beside this module: every band word for word, the same verdict
+  const lawHarness = join(dirname(path), 'law_harness.js');
+  if (!existsSync(lawHarness)) {
+    t.diagnostic(`no ${lawHarness}: the cross-check with law_harness is skipped`);
+    return;
+  }
+  const file = join(tmpdir(), `replay-${process.pid}.csv`);
+  writeFileSync(file, text);
+  try {
+    const run = spawnSync(process.execPath, [lawHarness, '--replay', file, '--expect', 'ils'], { encoding: 'utf8', timeout: 300000 });
+    assert.equal(run.error, undefined, String(run.error));
+    const out = run.stdout.split('\n');
+    for (const line of v.saved.filter((l) => /^ {2}(pass|FAIL) {2}/.test(l))) {
+      assert.ok(out.includes(line), `law_harness --replay judges it so too: ${line}\n${run.stdout}`);
+    }
+    const word = v.saved[v.saved.length - 1];
+    assert.ok(out.some((l) => l.startsWith(`judge: ${word}`)), `and gives the same verdict, ${word}:\n${run.stdout}`);
+  } finally {
+    rmSync(file, { force: true });
+  }
 });
 
 test('from an approach start the scripted crew flies the ILS onto the runway it reports', { skip }, async () => {

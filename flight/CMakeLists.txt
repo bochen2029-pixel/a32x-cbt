@@ -425,6 +425,10 @@ if(FLIGHT_NODE)
   add_test(NAME the_page_clock_keeps_50_hz COMMAND "${FLIGHT_NODE}" --test "${CMAKE_CURRENT_SOURCE_DIR}/web/test/clock.test.mjs")
   add_test(NAME the_hands_reach_the_controls COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/controls.test.mjs" "${CMAKE_CURRENT_SOURCE_DIR}/web/test/mapping.test.mjs")
+  # A saved recording opened again in the page reads as law_harness reads it, refused where law_harness would
+  # refuse it, and its replay's verdict is set against the saved one (core-session.js); the module test flies it.
+  add_test(NAME the_page_reads_a_recording_as_law_harness_does COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/recording.test.mjs")
   add_test(NAME the_view_puts_the_eye_where_the_flight_is COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/scene.test.mjs")
   add_test(NAME kdfw_is_laid_out_as_ourairports_and_the_faa_have_it COMMAND "${FLIGHT_NODE}" --test
