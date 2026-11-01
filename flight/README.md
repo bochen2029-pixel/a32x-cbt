@@ -1127,7 +1127,9 @@ hold a fast entry there. Traced through both ELACs, it is an oscillation, and th
 
 Entered slowly, at idle from 150 kt, full back stick holds 12.1° to 13.8° of alpha against 13.0, without
 a stall. For the gate: a normal approach and flare reach 8.3° of alpha, 2.3° short of alpha prot, but a
-hard pull to full back stick near the ground can take our A320 past its stall, 14°. For A32NX upstream, the
+hard pull to full back stick near the ground can take our A320 past its stall: the CONF FULL lift curve
+rounds from 14° and peaks at 17.75° (`stall-alpha-full`, above); the fast full pull from 8,000 ft
+reaches 18.1°. For A32NX upstream, the
 question is posted (`flight/upstream-reports.md`, §4;
 [flybywiresim/aircraft discussion #11009](https://github.com/flybywiresim/aircraft/discussions/11009)):
 whether the protection should act on an alpha lagged by 2 s.

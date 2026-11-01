@@ -131,8 +131,10 @@ the thrust levers and pull gently: the scripted crew touches down at about 160 f
 
 **Flare progressively.** A normal approach and flare reach about 8° of angle of attack, some 2° short
 of where the protection begins. An abrupt pull to full back stick near the ground, in CONF FULL, can
-take this A320 past its stall, about 14°: flare with a steady, growing pull, never a snatch of the
-stick. (`flight/README.md`, "The protections", has the measurements.)
+take this A320 past its stall: its lift curve starts to round at about 14° and peaks near 18°, and a
+fast full pull, tested from 8,000 ft, went past the peak. Flare with a steady, growing pull, never a
+snatch of the stick.
+(`flight/README.md`, "The protections", has the measurements.)
 
 ![The chase camera at night: the approach lights, the touchdown zone and the edge lights of 17C ahead,
 the metroplex's street lights to the horizon.](guide/night-chase.jpg)
