@@ -7,10 +7,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <exception>
+#include <initializer_list>
 #include <string>
 
 #include "FGFDMExec.h"
 #include "initialization/FGInitialCondition.h"
+#include "initialization/FGTrim.h"
 #include "input_output/FGLog.h"
 #include "input_output/FGXMLFileRead.h"
 #include "models/FGFCS.h"
@@ -80,6 +82,19 @@ double throttleFor(double tla) {
   return std::sqrt(fraction);
 }
 
+// And back: the thrust lever angle for a throttle.
+double tlaFor(double throttle) {
+  const double fraction = throttle * throttle;
+  if (fraction >= kThrust[3]) return kTla[3];
+  int k = 0;
+  while (fraction > kThrust[k + 1]) ++k;
+  return kTla[k] + (kTla[k + 1] - kTla[k]) * (fraction - kThrust[k]) / (kThrust[k + 1] - kThrust[k]);
+}
+
+// For measuring: how far JSBSim's trim may move the elevator, through the pitch trim command.
+constexpr double kTrimAuthorityRad = 0.6;  // about 34 deg either way
+constexpr double kMeasureAltitudeFt = 1000, kMeasureCasKn = 150;
+
 // JSBSim speaks through a logger. Routine chatter is dropped; warnings and errors reach stderr,
 // because a model that loaded with complaints must not look like one that loaded clean.
 class StderrLogger : public JSBSim::FGLogger {
@@ -126,6 +141,9 @@ struct Airframe::Impl {
   SGPropertyNode *elevator = nullptr, *aileron[2] = {}, *rudder = nullptr, *flapDeg = nullptr, *flapNorm = nullptr,
                  *speedbrake = nullptr, *groundSpoiler = nullptr, *throttle[2] = {}, *brake[2] = {}, *steer = nullptr,
                  *gear = nullptr;
+  // for measuring
+  SGPropertyNode *trimAuthority = nullptr, *pitchTrim = nullptr, *elevatorPos = nullptr, *clSquared = nullptr,
+                 *wingArea = nullptr, *alphaMax = nullptr, *alphaMin = nullptr;
   // read each tick
   SGPropertyNode *pressureAltitude = nullptr, *cas = nullptr, *tas = nullptr, *mach = nullptr, *hDot = nullptr,
                  *alpha = nullptr, *beta = nullptr, *pressure = nullptr, *theta = nullptr, *phi = nullptr,
@@ -150,6 +168,14 @@ struct Airframe::Impl {
     brake[1] = node("fcs/right-brake-cmd-norm");
     steer = node("fcs/steer-pos-deg[0]");
     gear = node("gear/gear-cmd-norm");
+
+    trimAuthority = node("a32nx/trim-authority-rad");
+    pitchTrim = node("fcs/pitch-trim-cmd-norm");
+    elevatorPos = node("fcs/elevator-pos-rad");
+    clSquared = node("aero/cl-squared");
+    wingArea = node("metrics/Sw-sqft");
+    alphaMax = node("aero/alpha-max-rad");
+    alphaMin = node("aero/alpha-min-rad");
 
     pressureAltitude = node("atmosphere/pressure-altitude");
     cas = node("velocities/vc-kts");
@@ -241,6 +267,31 @@ struct Airframe::Impl {
       if (!fdm.Run()) die("JSBSim stopped running at " + std::to_string(fdm.GetSimTime()) + " s");
     }
   }
+
+  // Surfaces neutral, flaps and gear where asked, for a measurement.
+  void configure(double flap, bool gearDown) {
+    for (SGPropertyNode* n : {elevator, aileron[0], aileron[1], rudder, speedbrake, groundSpoiler}) n->setDoubleValue(0);
+    flapDeg->setDoubleValue(flap);
+    flapNorm->setDoubleValue(flap / kFlapFullDeg);
+    gear->setDoubleValue(gearDown ? 1 : 0);
+    trimAuthority->setDoubleValue(0);
+    pitchTrim->setDoubleValue(0);
+  }
+
+  // The initial condition a measurement starts from: wings level, no sideslip.
+  void place(double altitudeFt, double casKn, double machNumber, double gammaDeg, double alphaDeg) {
+    auto ic = fdm.GetIC();
+    ic->SetAltitudeASLFtIC(altitudeFt);
+    if (machNumber > 0) {
+      ic->SetMachIC(machNumber);
+    } else {
+      ic->SetVcalibratedKtsIC(casKn);
+    }
+    ic->SetFlightPathAngleDegIC(gammaDeg);
+    ic->SetAlphaDegIC(alphaDeg);
+    ic->SetBetaDegIC(0);
+    ic->SetPhiDegIC(0);
+  }
 };
 
 const char* Airframe::model() {
@@ -330,4 +381,56 @@ void Airframe::step(double dt, const AirframeControls& c) {
 
 const AirframeState& Airframe::state() const {
   return impl_->state;
+}
+
+double Airframe::wingAreaFt2() const {
+  return impl_->wingArea->getDoubleValue();
+}
+
+LiftPeak Airframe::liftPeak(double flapDeg, bool gearDown) {
+  Impl& m = *impl_;
+  m.configure(flapDeg, gearDown);
+  LiftPeak peak;
+  for (int k = 0; k <= 100; ++k) {
+    const double alpha = 0.25 * k;
+    m.place(kMeasureAltitudeFt, kMeasureCasKn, 0, 0, alpha);
+    // JSBSim forms aero/cl-squared at the start of a frame from the lift of the frame before:
+    // initialise twice at the same state, and the second frame reads its own lift.
+    if (!m.fdm.RunIC() || !m.fdm.RunIC()) die("JSBSim could not initialise for a lift sweep");
+    const double cl = std::sqrt(m.clSquared->getDoubleValue());
+    if (cl > peak.clMax) peak = {cl, alpha};
+  }
+  return peak;
+}
+
+TrimPoint Airframe::trim(double altitudeFt, double casKn, double mach, double gammaDeg, double flapDeg, bool gearDown) {
+  Impl& m = *impl_;
+  // JSBSim's trim searches alpha from -5 to 20 deg unless the aircraft names its own limits, and the
+  // 737 does not. Past the lift peak the search can lose the solution it straddles; keep it on the
+  // attached-flow side, where a trim means something.
+  const LiftPeak peak = liftPeak(flapDeg, gearDown);
+  m.configure(flapDeg, gearDown);
+  m.trimAuthority->setDoubleValue(kTrimAuthorityRad);
+  m.place(altitudeFt, casKn, mach, gammaDeg, 4);
+  if (!m.fdm.RunIC()) die("JSBSim could not initialise for a trim");
+  m.alphaMax->setDoubleValue(peak.alphaDeg * kRad);  // after RunIC, which resets them; before DoTrim reads them
+  m.alphaMin->setDoubleValue(-5 * kRad);
+  TrimPoint t;
+  try {
+    m.fdm.DoTrim(JSBSim::tLongitudinal);
+    t.ok = true;
+  } catch (const std::exception&) {
+    t.ok = false;  // JSBSim's trim found no solution: reported, not fatal
+  }
+  m.read();
+  t.alphaDeg = m.state.alphaDeg;
+  t.pitchDeg = m.state.pitchDeg;
+  t.pitchControlDeg = m.elevatorPos->getDoubleValue() / kRad;
+  t.thsDeg = t.pitchControlDeg / kThsAsElevator;
+  t.tla = tlaFor(m.throttle[0]->getDoubleValue());
+  m.trimAuthority->setDoubleValue(0);
+  m.pitchTrim->setDoubleValue(0);
+  m.alphaMax->setDoubleValue(0);
+  m.alphaMin->setDoubleValue(0);
+  return t;
 }

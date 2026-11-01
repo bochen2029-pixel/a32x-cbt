@@ -54,6 +54,19 @@ struct AirframeState {
   double weightLbs = 0, cgPercentMac = 0;
 };
 
+// The bare airframe measured, for scoring it against targets (score.cpp).
+struct LiftPeak {
+  double clMax = 0, alphaDeg = 0;
+};
+
+struct TrimPoint {
+  bool ok = false;  // JSBSim's trim converged
+  double alphaDeg = 0, pitchDeg = 0;
+  double pitchControlDeg = 0;  // the pitch control the trim needed, in elevator degrees (elevator + 1.8 THS)
+  double thsDeg = 0;           // the same as THS alone, the elevator at rest as autotrim leaves it
+  double tla = 0;              // thrust lever angle for the thrust the trim needed
+};
+
 class Airframe {
  public:
   // Loads the aircraft, puts it on a sea-level runway at 47 N 8 E heading 360 with engines at idle
@@ -67,6 +80,14 @@ class Airframe {
   const AirframeState& state() const;
 
   static const char* model();
+  double wingAreaFt2() const;
+
+  // Measurements. Each one re-initialises JSBSim: use them on an airframe that is not flying.
+  // The lift coefficient against alpha at 1,000 ft and 150 kt, elevator at neutral, swept from 0 to
+  // 25 deg in quarter degrees: where it peaks.
+  LiftPeak liftPeak(double flapDeg, bool gearDown);
+  // JSBSim's longitudinal trim, wings level, on a flight path, at a CAS or, when mach > 0, a Mach.
+  TrimPoint trim(double altitudeFt, double casKn, double mach, double gammaDeg, double flapDeg, bool gearDown);
 
   Airframe(const Airframe&) = delete;
   Airframe& operator=(const Airframe&) = delete;

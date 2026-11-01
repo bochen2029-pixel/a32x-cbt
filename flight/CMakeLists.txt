@@ -92,24 +92,40 @@ set(CMAKE_DISABLE_FIND_PACKAGE_CxxTest ON)
 set(CMAKE_DISABLE_FIND_PACKAGE_PkgConfig ON)
 add_subdirectory("${JSBSIM_DIR}" jsbsim EXCLUDE_FROM_ALL SYSTEM)
 
-# --- ours: the world adapter, the world, the runner ------------------------------------------------
-add_executable(law_harness
-  harness/main.cpp
+# --- ours: the world adapter, the world and its airframe, and the two programs that run them -------
+function(flight_warnings target)
+  if(MSVC)
+    target_compile_options(${target} PRIVATE /W4 /EHsc /permissive-)
+    target_compile_definitions(${target} PRIVATE _CRT_SECURE_NO_WARNINGS)  # plain fopen, as on every other platform
+  else()
+    target_compile_options(${target} PRIVATE -Wall -Wextra)
+  endif()
+endfunction()
+
+add_library(flight_world STATIC
   harness/efcs.cpp
   harness/world.cpp
   harness/airframe.cpp)
-target_link_libraries(law_harness PRIVATE a32nx_efcs libJSBSim)
-target_compile_definitions(law_harness PRIVATE
-  A32NX_COMMIT="${A32NX_COMMIT}"
-  JSBSIM_COMMIT="${JSBSIM_COMMIT}"
+target_link_libraries(flight_world PUBLIC a32nx_efcs libJSBSim)
+target_include_directories(flight_world PUBLIC harness)
+target_compile_definitions(flight_world PRIVATE
   JSBSIM_ROOT="${JSBSIM_DIR}"                              # aircraft/ and engine/ are read from the clone
   FLIGHT_JSBSIM_DIR="${CMAKE_CURRENT_SOURCE_DIR}/jsbsim")  # and our own JSBSim files from here
-if(MSVC)
-  target_compile_options(law_harness PRIVATE /W4 /EHsc /permissive-)
-  target_compile_definitions(law_harness PRIVATE _CRT_SECURE_NO_WARNINGS)  # plain fopen, as on every other platform
-else()
-  target_compile_options(law_harness PRIVATE -Wall -Wextra)
-endif()
+flight_warnings(flight_world)
+
+# The runner: the gate, the expectations, the trace.
+add_executable(law_harness harness/main.cpp)
+target_link_libraries(law_harness PRIVATE flight_world)
+target_compile_definitions(law_harness PRIVATE A32NX_COMMIT="${A32NX_COMMIT}" JSBSIM_COMMIT="${JSBSIM_COMMIT}")
+flight_warnings(law_harness)
+
+# The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
+add_executable(airframe_score harness/score.cpp)
+target_link_libraries(airframe_score PRIVATE flight_world)
+target_compile_definitions(airframe_score PRIVATE
+  JSBSIM_COMMIT="${JSBSIM_COMMIT}"
+  FLIGHT_TARGETS_DIR="${CMAKE_CURRENT_SOURCE_DIR}/targets")
+flight_warnings(airframe_score)
 
 # --- the gate and the properties it rests on -------------------------------------------------------
 enable_testing()
@@ -130,6 +146,10 @@ add_test(NAME stick_flies_the_aircraft COMMAND law_harness --minutes 8 --expect 
 add_test(NAME stabiliser_takes_the_trim COMMAND law_harness --minutes 8 --expect autotrim)
 add_test(NAME yaw_damper_takes_out_a_pedal_kick COMMAND law_harness --minutes 8 --expect pedal-kick)
 add_test(NAME lands_inside_the_limits COMMAND law_harness --minutes 16 --expect landing)
+
+# The scorer runs, and measures every target and context row. It scores the airframe; a row outside
+# its band is information, not a failure.
+add_test(NAME airframe_is_scored_against_the_a320 COMMAND airframe_score --check)
 
 # Negative controls: the gate's two checks are shown able to fail.
 add_test(NAME scanner_catches_a_planted_nan COMMAND law_harness --expect scanner-catches-nan)

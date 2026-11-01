@@ -10,10 +10,15 @@
 
   Every output is a surface position the aircraft definitions in the JSBSim clone read: flaps by
   angle (the A320) and by fraction (the 737), speedbrake and ground spoilers by fraction.
+
+  One input is for measuring the airframe, not flying it: a32nx/trim-authority-rad lets JSBSim's own
+  trim routine, which works the pitch trim command, move the elevator. It is zero in flight, so in
+  flight the elevator is the servos' alone.
 -->
 <system name="A32NX surfaces">
 
   <property value="0">a32nx/elevator-rad</property>
+  <property value="0">a32nx/trim-authority-rad</property>
   <property value="0">a32nx/left-aileron-rad</property>
   <property value="0">a32nx/right-aileron-rad</property>
   <property value="0">a32nx/rudder-rad</property>
@@ -24,11 +29,18 @@
 
   <channel name="A32NX surfaces">
 
-    <pure_gain name="a32nx-elevator">
-      <input>a32nx/elevator-rad</input>
-      <gain>1</gain>
+    <fcs_function name="a32nx-elevator">
+      <function>
+        <sum>
+          <property>a32nx/elevator-rad</property>
+          <product>
+            <property>a32nx/trim-authority-rad</property>
+            <property>fcs/pitch-trim-cmd-norm</property>
+          </product>
+        </sum>
+      </function>
       <output>fcs/elevator-pos-rad</output>
-    </pure_gain>
+    </fcs_function>
 
     <pure_gain name="a32nx-left-aileron">
       <input>a32nx/left-aileron-rad</input>

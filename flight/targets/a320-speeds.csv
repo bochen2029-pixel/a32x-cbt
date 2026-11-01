@@ -1,0 +1,28 @@
+# A320 1-g stall speed (vs1g) and lowest selectable speed (vls), knots CAS, by configuration and gross
+# weight in tonnes. GPLv3, like everything in flight/.
+#
+# Source: FlyByWire A32NX at 66021c2 (GPLv3), fbw-a32nx/src/systems/instruments/src/MCDU/legacy/NXSpeeds.ts,
+# the tables its getVs1g() and VLS read: a community reconstruction of Airbus's own, not Airbus data.
+# Sampled at the 5 t breakpoints with CG at 28 % MAC (the tables' aft-of-25 % branch); between them
+# the tables are piecewise linear, so linear interpolation here reproduces them.
+#
+# Three points are corrected, not copied, because the source has typos its neighbours expose:
+#   vs1g conf1f at 70 t and 75 t: the source writes "117 + 0.8 + (m - 65)" and "121 + 0.8 + (m - 70)"
+#     where every neighbouring bracket multiplies; with "0.8 *" they read 121.0 and 125.0 (source
+#     gives 122.8 and 126.8, a 0.8 kt step at 65 t).
+#   vls conf3 at 80 t: the source writes "151 + m - 65" in the 75-80 t bracket, which jumps to 165;
+#     "151 + m - 75" joins its neighbours at 155.0.
+# Worth reporting upstream.
+kind,config,gear,t40,t45,t50,t55,t60,t65,t70,t75,t80
+vs1g,clean,up,124.0,131.0,138.0,145.0,150.0,156.0,161.0,166.0,172.0
+vs1g,conf1,up,102.0,107.0,112.0,117.0,123.0,127.0,132.0,137.0,141.0
+vs1g,conf1f,up,93.0,98.0,103.0,108.0,112.0,117.0,121.0,125.0,130.0
+vs1g,conf2,up,91.0,96.0,101.0,105.0,110.0,114.0,119.0,122.0,126.0
+vs1g,conf3,down,89.0,94.0,99.0,103.0,108.0,112.0,117.0,120.0,124.0
+vs1g,full,down,84.0,88.0,93.0,97.0,101.0,105.0,109.0,113.0,116.0
+vls,clean,up,159.0,168.0,177.0,186.0,192.0,198.0,206.0,212.0,220.0
+vls,conf1,up,125.0,132.0,138.0,144.0,151.0,156.0,162.0,169.0,173.0
+vls,conf1f,up,114.0,121.0,127.0,133.0,138.0,144.0,149.0,154.0,160.0
+vls,conf2,up,110.0,119.0,125.0,131.0,137.0,142.0,145.0,149.0,154.0
+vls,conf3,down,116.0,116.0,123.0,129.0,134.0,140.0,145.0,150.0,155.0
+vls,full,down,116.0,116.0,116.0,119.0,124.0,129.0,134.0,139.0,143.0
