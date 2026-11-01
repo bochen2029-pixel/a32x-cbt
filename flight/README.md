@@ -164,9 +164,12 @@ From P7's first slice:
 - **The P6 crew leaned on the stub.** The stub clamped bank at 80° and gave speed by fiat; under real
   aerodynamics the old open-loop steep turn overbanked in direct law into a spiral, a stall at 80° of
   alpha and the ground. The crew now holds bank closed loop, and a crash fails the run.
-- **The A320 laws protect an A320's wing.** In one badly flown climb during development the 737 went
-  through its stall at 13° of alpha to 24° in normal law. Angle-of-attack protection on this airframe
-  is not the protection it is on the aircraft the laws were written for.
+- **The A320 laws protect an A320's wing.** The ELAC's α max is 8.7° clean (6.4° at high Mach) and
+  13.0 to 14.2° with slats out; α prot 6.5° clean, 10.6 to 11.9° with slats out (`ElacComputer_P`,
+  read out of the compiled table). The 737's lift peaks near 13.2° whatever its flaps: clean, the
+  protection stops it far short of its stall; with slats out, α max is at or past it. In one badly
+  flown climb during development, flaps running in at low speed, the 737 went through its stall to
+  24° of alpha in normal law.
 
 ## What P7 still has to build
 
