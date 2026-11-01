@@ -155,8 +155,35 @@ is ours.
 | JSBSim's 737 and CFM56 data | `flight/` from P7, read at run time | GPL; LGPL-2.1 | no, read from the JSBSim clone |
 | JSBSim's CFM56_5 data | `flight/`, our A320's engines, read at run time | LGPL-2.1 | no, read from the JSBSim clone |
 | FlyByWire A32NX | `flight/` from P6 | GPLv3 | no, cloned separately, `66021c2` |
+| Emscripten (emsdk) | `flight/`'s WebAssembly build (P7): build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
+| three.js | `flight/web`: the out-the-window view, bundled into the page at build time | MIT | no, `npm i`, `0.186.1` |
+| esbuild | `flight/web` too: bundles the page and its worker | MIT | no, `npm i`, `0.28.2` |
 
 Runtime dependencies in `app/`: **none.** It is Node built-ins and a browser.
+
+### 2b · Emscripten — the WebAssembly toolchain
+
+`emscripten-core/emsdk`, release `6.0.12`, commit `35ff8a6` (2026-10-08), which installs Emscripten
+6.0.12 (`5488e087`) with its own LLVM, Binaryen and node. It compiles `flight/` — the A32NX computers,
+JSBSim and our harness — to WebAssembly (P7, step 6). It is a build tool, but not only that: the module
+it links carries Emscripten's JavaScript runtime and system libraries, musl libc and LLVM's libc++
+beside our code. Their licences — MIT, NCSA, Apache-2.0 with the LLVM exception — sit with the module's
+GPLv3, and their notices go with any distributed build (§2a).
+
+Installed outside the repository, fetched by hash (exercised 2026-11-01, in WSL's Ubuntu 24.04):
+
+```
+git init emsdk
+git -C emsdk remote add origin https://github.com/emscripten-core/emsdk.git
+git -C emsdk fetch --depth 1 origin 35ff8a6d150541276abbc6bae512ca90bcfbe220
+git -C emsdk checkout FETCH_HEAD
+emsdk/emsdk install 6.0.12
+emsdk/emsdk activate 6.0.12
+source emsdk/emsdk_env.sh
+```
+
+The WebAssembly build then runs as `flight/README.md` says. Moving the pin means rebuilding and
+re-running both suites, native and WebAssembly.
 
 ### 2a · What ships, and under which licence
 
