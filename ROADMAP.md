@@ -547,9 +547,12 @@ guidance, a real path through the world — with the CBT's procedures and scorin
       already, but mean something only on an airframe that can stall and overspeed: the **P7**
       airframe must be judged on credible high-AoA and high-Mach behaviour, not on trim alone.
       α floor also needs the FMGC's autothrust and the FADEC.
-- [ ] **Flying through the world**: position over a round earth — latitude, longitude, altitude,
-      wind — moving with the aircraft, and runways at real places. The FDM provides it from **P7**;
-      the P6 stub holds a fixed latitude and longitude.
+- [x] **Flying through the world**: position over a round earth — latitude, longitude, altitude,
+      wind — moving with the aircraft, and runways at real places. Done in P7: JSBSim carries the
+      aircraft over a WGS84 earth and the IRs report it (slice 1); wind and turbulence come from its
+      atmosphere (step 2); KDFW's seven runways and LSZH 14 sit at their surveyed places (OurAirports,
+      `docs/provenance.md` §1f). The view's own earth curvature is separate: its ground is cut short
+      enough for it (`d2cdca3`), and turning it on is the visuals' to do.
 - [ ] **FMS and guidance — the Airbus LNAV and VNAV**: a flight plan; managed lateral navigation
       (NAV, with SID, STAR, approach legs and DIR TO); managed vertical (CLB and DES profiles with
       constraints); autopilot, flight director and autothrust. The guidance half exists in the clone
