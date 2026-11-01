@@ -29,15 +29,16 @@ export class Scenery {
     this.latDeg = latDeg;
     this.atmosphere = new Atmosphere();
     const u = this.u = hazeUniforms(this.atmosphere);
-    // The world stays flat, as the flight model's ground and P7's airport are: the earth's curve waits
-    // until the airport's long quads are cut short enough to follow it (a 4 km runway sags under it).
-    u.uCurve.value = 0;
+    // The earth's curve under everything fixed to the ground (haze.js, CURVE_GLSL): the far country and
+    // Dallas's foot sink behind the horizon as they do. The ground is cut short enough to follow it: P7's
+    // airport by subdivide() (airport-layout.js), the water likewise (terrain.js).
+    u.uCurve.value = 1;
     u.uTime = { value: 0 };
     u.uPixelRatio = { value: pixelRatio };
     u.uLightGain = { value: 1 };
     u.uHalo = { value: 3 };
     this.night = { value: 0 };
-    this.lights = hazedLightMaterial(u, { curve: false });
+    this.lights = hazedLightMaterial(u, { curve: true });   // every light fixed to the ground
     this.points = [];
     this.sun = new THREE.DirectionalLight(0xffffff, 1);
     scene.add(this.sun, this.sun.target);
@@ -122,7 +123,7 @@ export class Scenery {
     this.u.uFieldElev.value = fieldElevM;
     airport.group.traverse((o) => {
       if (o.isPoints) o.material = this.lights;
-      else if (o.isMesh && o.material && !o.material.isShaderMaterial) haze(o.material, this.u, { curve: false });
+      else if (o.isMesh && o.material && !o.material.isShaderMaterial) haze(o.material, this.u, { curve: true });
     });
     airport.material.uniforms.uTime = this.u.uTime;
   }

@@ -9,7 +9,7 @@
 import * as THREE from 'three';
 import { xz } from './scene-math.js';
 import { haze } from './haze.js';
-import { COLOURS } from './airport-layout.js';
+import { COLOURS, subdivide } from './airport-layout.js';
 import { LightSet } from './lights.js';
 
 export function rng(seed) {
@@ -162,7 +162,9 @@ export class Terrain {
       arr.set(g.attributes.position.array, at);
       at += g.attributes.position.array.length;
     }
-    merged.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    // cut so no edge is longer than 500 m: the earth's curve is applied a vertex at a time, and a lake's
+    // triangles kilometres long would float metres over its shores (500 m: under 5 mm)
+    merged.setAttribute('position', new THREE.Float32BufferAttribute(subdivide(arr, 500), 3));
     merged.computeVertexNormals();
     const m = haze(new THREE.MeshStandardMaterial({ color: 0x0e1f2a, roughness: 0.06, metalness: 0.0 }), this.uniforms);
     this.waterMesh = new THREE.Mesh(merged, m);
