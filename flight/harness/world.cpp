@@ -174,6 +174,7 @@ Runway runwayAtStart(const AirframeState& a) {
 
 World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(configured(start))) {
   runway_ = start.runway.name.empty() ? runwayAtStart(air()) : start.runway;
+  headingTarget_ = runway_.headingDeg;  // the circuit's turns are flown relative to the runway
   if (start.airframe.airborne) {
     // In the air: the levers and the surfaces where the trim left them, the brakes off, the flight
     // controls on, and the scripted crew established on the final approach.
@@ -337,14 +338,14 @@ void World::fly(double dt) {
         tla_ = 0;
         c.brakes = 0.5;
       }
-      steerOnGround(360);
+      steerOnGround(runway_.headingDeg);
       if (inPhase >= 25) enter(Phase::TakeoffRoll);
       break;
 
     case Phase::TakeoffRoll:
       c.brakes = 0;
       tla_ = 45;
-      steerOnGround(360);
+      steerOnGround(runway_.headingDeg);
       if (a.casKn >= kVr) {  // rotate at a steady rate toward the climb attitude
         if (rotateAt_ < 0) rotateAt_ = t_;
         const double pitchTarget = std::min(kRotateToDeg, kRotateDegS * (t_ - rotateAt_));
@@ -363,7 +364,7 @@ void World::fly(double dt) {
       if (c.flapLever == 1 && h > kAccelerationFt && a.casKn > kVFlapsUp - 5) c.flapLever = 0;
       double v = h > kAccelerationFt ? kVFlapsUp : kV2;
       if (c.flapLever == 0) v = slatFppu_ < 1 && flapFppu_ < 1 ? kVClean : kVSlatsIn;
-      headingTarget_ = h > 3000 && h < 6000 ? 90 : 360;
+      headingTarget_ = h > 3000 && h < 6000 ? runway_.headingDeg - 270 : runway_.headingDeg;  // the runway, then 90 right
       climbOrDescend(kCruiseFt, v, h > kAccelerationFt ? 25 : 45, dt);
       c.roll = rollFor(headingTarget_, psi, phi, p);
       if (std::abs(kCruiseFt - h) < 50) enter(Phase::Cruise);
@@ -375,8 +376,8 @@ void World::fly(double dt) {
       c.roll = rollFor(headingTarget_, psi, phi, p);
       if (inPhase >= 20 && inPhase < 22) c.pitch = 0.5;
       if (inPhase >= 22 && inPhase < 24) c.pitch = -0.5;
-      if (inPhase >= 40 && inPhase < 80) headingTarget_ = 180;  // a 180-degree turn at 25 degrees of bank
-      if (inPhase >= 80 && inPhase < 120) headingTarget_ = 360;
+      if (inPhase >= 40 && inPhase < 80) headingTarget_ = runway_.headingDeg - 180;  // a 180-degree turn at 25 degrees of bank
+      if (inPhase >= 80 && inPhase < 120) headingTarget_ = runway_.headingDeg;
       c.speedbrake = inPhase >= 120 && inPhase < 140 ? 1.0 : 0.0;
       if (inPhase >= 150 && inPhase < 153) c.pedals = 0.3;
       // A steep turn at 45 degrees. Past 33 degrees normal law rolls back toward 33 unless the stick
@@ -405,7 +406,7 @@ void World::fly(double dt) {
       } else {
         holdPath(-3.0, kVApp, dt);
       }
-      c.roll = rollFor(360, psi, phi, p);
+      c.roll = rollFor(runway_.headingDeg, psi, phi, p);
       if (stage_ == 5 && a.radioHeightFt < kFlareFt) enter(Phase::Flare);
       break;
     }
@@ -427,7 +428,7 @@ void World::fly(double dt) {
         rollToCentreline(3);
         if (height < kDecrabFt) c.pedals = clamp(kDecrabGain * wrap180(psi - runway_.headingDeg), -1, 1);
       } else {
-        c.roll = rollFor(360, psi, phi, p);
+        c.roll = rollFor(runway_.headingDeg, psi, phi, p);
       }
       if (onGround()) enter(Phase::Rollout);
       break;
@@ -442,7 +443,7 @@ void World::fly(double dt) {
       }
       tla_ = 0;
       c.brakes = a.noseWow ? 0.3 : 0;
-      steerOnGround(360);
+      steerOnGround(runway_.headingDeg);
       if (a.groundSpeedKn < 30) {
         c.spoilersArmed = false;
         c.flapLever = 0;

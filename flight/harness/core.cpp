@@ -17,6 +17,7 @@
 namespace {
 
 constexpr double kDt = 0.02;  // 50 Hz, the rate the computers are built for
+constexpr double kRunwayStartPastThresholdM = 150;  // where a runway start stands, lined up
 
 // Input slots. Signs and units are the crew's (world.h): stick +1 full pull and full right, pedals
 // +1 full left, thrust lever angle 0 idle .. 45 TOGA, rudder_trim +1 the switch held left and -1 right.
@@ -234,21 +235,34 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
     parts.push_back(s.substr(at, end - at));
     at = end + 1;
   }
-  if (parts[0].empty() || parts[0] == "runway") {
+  const std::string kind = parts[0].empty() ? "runway" : parts[0];
+  if (kind == "reference") {  // P6's and slice 1's start: 47 N 8 E (geocentric), sea level, heading 360
     if (parts.size() > 1) {
-      error = "the runway start takes no options";
+      error = "the reference start takes no options";
       return false;
     }
     return true;
   }
-  if (parts[0] != "approach") {
-    error = "no scenario called '" + parts[0] + "'";
+  if (kind != "runway" && kind != "approach") {
+    error = "no scenario called '" + kind + "'";
     return false;
   }
+  Runway r = kdfw17c();  // the main airport (runway.h)
   double distance = 10, loc = 0, gs = 0, cas = 140, lever = 4, windFrom = 0, windKn = 0, turbulence = 0;
   for (size_t k = 1; k < parts.size(); ++k) {
     const size_t eq = parts[k].find('=');
     const std::string key = parts[k].substr(0, eq), value = eq == std::string::npos ? "" : parts[k].substr(eq + 1);
+    if (key == "runway") {
+      if (!runwayNamed(value, r)) {
+        error = "no runway called '" + value + "': KDFW17C or LSZH14";
+        return false;
+      }
+      continue;
+    }
+    if (kind == "runway") {
+      error = "the runway start takes only runway=";
+      return false;
+    }
     char* end = nullptr;
     const double v = std::strtod(value.c_str(), &end);
     const bool number = !value.empty() && end && (*end == '\0' || (key == "wind" && *end == '/'));
@@ -270,23 +284,26 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       return false;
     }
   }
+  AirframeStart& a = start.airframe;
+  a.geodetic = true;
+  a.fieldElevationFt = r.elevationFt;
+  a.headingDeg = r.headingDeg;
+  start.runway = r;
+  if (kind == "runway") {  // on the gear, lined up 150 m past the threshold: the default start
+    onCentreline(r, kRunwayStartPastThresholdM, a.latDeg, a.lonDeg);
+    return true;
+  }
   if (!(distance > 0.5 && distance < 20) || !(cas > 100 && cas < 250) || !(lever >= 0 && lever <= 4)) {
     error = "distance 0.5..20 nm, cas 100..250 kt, lever 0..4";
     return false;
   }
-  const Runway r = lszh14();
-  AirframeStart& a = start.airframe;
   onApproach(r, distance, loc, gs, a.latDeg, a.lonDeg, a.heightFt);
-  a.geodetic = true;
-  a.fieldElevationFt = r.elevationFt;
-  a.headingDeg = r.headingDeg;
   a.airborne = true;
   a.casKn = cas;
   a.gammaDeg = -r.glideDeg;
   a.windFromDeg = windFrom;
   a.windKn = windKn;
   a.turbulence = turbulence;
-  start.runway = r;
   start.flapLever = static_cast<int>(lever);
   start.gearDown = lever >= 3;
   return true;

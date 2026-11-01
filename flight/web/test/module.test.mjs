@@ -77,10 +77,10 @@ test('the scripted crew lands it, and a replay into a second instance matches ti
 });
 
 test('from an approach start the scripted crew flies the ILS onto the runway it reports', { skip }, async () => {
-  const s = new CoreSession(await createFlightCore(), airframe, true, 'approach;wind=227/15');
+  const s = new CoreSession(await createFlightCore(), airframe, true, 'approach;wind=270/15');
   const f = s.field;
   let state = s.state();
-  assert.equal(state[f.rwy_heading_deg], 137, 'LSZH 14');
+  assert.equal(state[f.rwy_heading_deg], 180.3, 'KDFW 17C, the main airport');
   assert.ok(Math.abs(state[f.thr_along_m] / 1852 - 10) < 0.01 && state[f.loc_valid] && state[f.gs_valid], 'on both beams at 10 nm');
   let touchdown = null, worstLoc = 0, worstGs = 0, lastVs = 0;
   for (let k = 0; k < 6 * 60 * 50 && !touchdown; ++k) {

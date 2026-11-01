@@ -16,17 +16,19 @@
 extern "C" {
 #endif
 
-// Starts the flight on the runway: the airframe ("a320", "737"; null or empty for the default),
-// engines at idle, parked on the brakes. scripted = 1: the harness's own crew flies it, power-up to
-// landing, and writes what it did into the inputs after each step. scripted = 0: the caller's inputs
-// fly it, its inputs starting with the FLT CTL pushbuttons pressed. Returns 0, or -1 for a second call.
+// Starts the flight on the runway of the main airport, KDFW 17C (runway.h), lined up 150 m past the
+// threshold: the airframe ("a320", "737"; null or empty for the default), engines at idle, parked on
+// the brakes. scripted = 1: the harness's own crew flies it, power-up to landing, and writes what it did
+// into the inputs after each step. scripted = 0: the caller's inputs fly it, its inputs starting with
+// the FLT CTL pushbuttons pressed. Returns 0, or -1 for a second call.
 int flight_start(const char* airframe, int scripted);
 
-// The same, from a scenario: "runway" (or empty) is flight_start's; "approach" starts in the air on LSZH
-// 14's ILS, options after it separated by semicolons — distance=NM (10), loc=DOTS (0), gs=DOTS (0),
-// cas=KT (140), lever=0..4 (4, FULL), wind=FROM/KT (0/0), turbulence=SEVERITY (0) — in CONF and gear
-// for the lever, trimmed. There the scripted crew flies the ILS to a landing and a stop. A scenario not
-// understood returns -3.
+// The same, from a scenario: "runway" (or empty) is flight_start's; "approach" starts in the air on the
+// runway's ILS. Options follow, separated by semicolons: runway=KDFW17C|LSZH14 for either; and for an
+// approach distance=NM (10), loc=DOTS (0), gs=DOTS (0), cas=KT (140), lever=0..4 (4, FULL),
+// wind=FROM/KT (0/0), turbulence=SEVERITY (0) — in CONF and gear for the lever, trimmed. There the
+// scripted crew flies the ILS to a landing and a stop. "reference" is the start P6 and the airframe
+// scorer use: 47 N 8 E, sea level, heading 360. A scenario not understood returns -3.
 int flight_start_scenario(const char* airframe, int scripted, const char* scenario);
 
 // The inputs, read before each step when the crew is not scripted.

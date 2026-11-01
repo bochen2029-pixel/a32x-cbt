@@ -21,10 +21,23 @@ struct Runway {
   double glideDeg = 3.0, tchFt = 50;    // the glideslope's angle and threshold crossing height
 };
 
-// LSZH (Zurich) runway 14, from OurAirports (public domain), retrieved 2026-11-01: le end 47.483101 N
-// 8.53473 E, 1,402 ft, 137 deg true, 10,827 x 197 ft, threshold displaced 492 ft. The 3 deg path and the
-// 50 ft crossing height are this project's (ROADMAP.md, P7 step 2), not LSZH's published ILS.
+// KDFW (Dallas Fort Worth) runway 17C: the simulator's main airport and its default start, by the
+// operator's decision of 2026-11-01. From OurAirports (public domain), retrieved 2026-11-01: le end
+// 32.91569901 N 97.02600098 W, 562 ft at both ends, 180.3 deg true, 13,400 x 150 ft, no displaced
+// threshold; the field is 607 ft. 17C is level, which the flat terrain here needs, and DFW flies south
+// flow most of the year.
+Runway kdfw17c();
+
+// LSZH (Zurich) runway 14, the alternative, from OurAirports (public domain), retrieved 2026-11-01: le
+// end 47.483101 N 8.53473 E, 1,402 ft, 137 deg true, 10,827 x 197 ft, threshold displaced 492 ft.
 Runway lszh14();
+
+// Either of the above by its name ("KDFW17C", "LSZH14"); false if there is no such runway. The 3 deg path
+// and the 50 ft crossing height on both are this project's (ROADMAP.md, P7 step 2), not their published ILS.
+bool runwayNamed(const std::string& name, Runway& r);
+
+// A point on the centreline, metres past the landing threshold.
+void onCentreline(const Runway& r, double pastThresholdM, double& latDeg, double& lonDeg);
 
 struct IlsReading {
   double locDots = 0, gsDots = 0;   // where each beam lies from the aircraft: + right, + up

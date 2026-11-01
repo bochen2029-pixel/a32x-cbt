@@ -43,8 +43,8 @@ int main(int argc, char** argv) {
   check(fabs(s[field("loc_dots")] - locWanted) < 0.05, "the localizer reads where the scenario put it", s[field("loc_dots")]);
   check(fabs(s[field("gs_dots")] - gsWanted) < 0.1, "the glideslope too", s[field("gs_dots")]);
   check(s[field("loc_valid")] == 1 && s[field("gs_valid")] == 1, "both beams received", s[field("gs_valid")]);
-  check(fabs(s[field("rwy_heading_deg")] - 137) < 1e-9 && fabs(s[field("rwy_elev_ft")] - 1402) < 1e-9,
-        "the runway is LSZH 14", s[field("rwy_heading_deg")]);
+  check(fabs(s[field("rwy_heading_deg")] - 180.3) < 1e-9 && fabs(s[field("rwy_elev_ft")] - 562) < 1e-9,
+        "the runway is KDFW 17C, the main airport", s[field("rwy_heading_deg")]);
   check(s[field("on_ground")] == 0 && s[field("gear_pos")] > 0.999, "in the air, gear down", s[field("gear_pos")]);
 
   flight_step(150);

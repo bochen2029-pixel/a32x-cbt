@@ -32,6 +32,39 @@ double gsOriginPastThresholdM(const Runway& r) {
 
 }  // namespace
 
+Runway kdfw17c() {
+  Runway r;
+  r.name = "KDFW 17C";
+  r.endLatDeg = 32.91569901;
+  r.endLonDeg = -97.02600098;
+  r.elevationFt = 562;
+  r.headingDeg = 180.3;
+  r.lengthM = 13400 * kFt;
+  r.widthM = 150 * kFt;
+  r.displacedM = 0;
+  return r;
+}
+
+bool runwayNamed(const std::string& name, Runway& r) {
+  if (name == "KDFW17C") {
+    r = kdfw17c();
+  } else if (name == "LSZH14") {
+    r = lszh14();
+  } else {
+    return false;
+  }
+  return true;
+}
+
+void onCentreline(const Runway& r, double pastThresholdM, double& latDeg, double& lonDeg) {
+  double tLat, tLon, mn, me;
+  threshold(r, tLat, tLon);
+  radii(tLat, mn, me);
+  const double h = r.headingDeg * kRad;
+  latDeg = tLat + pastThresholdM * std::cos(h) / mn / kRad;
+  lonDeg = tLon + pastThresholdM * std::sin(h) / me / kRad;
+}
+
 Runway lszh14() {
   Runway r;
   r.name = "LSZH 14";
