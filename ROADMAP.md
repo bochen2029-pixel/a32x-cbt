@@ -565,7 +565,10 @@ guidance, a real path through the world — with the CBT's procedures and scorin
       their agreement, has to be checked before building on it. For a user with no subscription, a
       public-domain base ships: FAA CIFP (US airports with SIDs, STARs and approaches, ARINC 424,
       every 28 days) and OurAirports (airports and runways worldwide, no procedures). **P9**.
-- [ ] **An exterior aircraft model**: not now; perhaps later, the operator's call.
+- [x] **An exterior aircraft model**: the operator's call, made 2026-11-01 when they approved the
+      visuals study (*"yes i aoprove the threejs"*). Built in `c8415a1`: an A320 of our own, shaped by eye
+      to Airbus's published dimensions, its gear and engines placed from `A320-fit.xml`, a house livery
+      with no airline's marks (`docs/provenance.md` §1g). Parked aircraft at the gates are not built.
 - [ ] **VR, later, as a toggle** — back burner, not to be built now. Meta Quest 3 and 3S only (a
       Quest 2 may work but is not a target; no Apple headset), with true stereo depth. Relayed on
       2026-11-01 by the session researching visuals, which noted the route: three.js's built-in
@@ -573,7 +576,9 @@ guidance, a real path through the world — with the CBT's procedures and scorin
       on the PC, with the standalone Quest browser as the lightest tier. Not scheduled.
 - [ ] **A 3D debrief in the manner of ACMI/Tacview**: the flown trail coloured by the gate's bands, a
       timeline and an event log, built on the deterministic replay (house rule 7). Relayed the same
-      day by the same session. Not scheduled; it extends the P7 gate's debrief.
+      day by the same session. Begun in `c8415a1`: ten cameras, a debrief view (K) and the flown trail
+      (L). Not built: the event log and its tags, and the trail coloured by the gate's bands, which
+      waits on the page side of the gate's judge (P7).
 - [ ] **Aerodynamics from CFD, later** — the operator's idea, 2026-11-01, relayed by the same session:
       tune the A320 model with open-source CFD (OpenFOAM and others), since the A320 flies well under
       Mach 1, on geometry modelled from Airbus's public dimensions and external drawings. Not
