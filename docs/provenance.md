@@ -161,12 +161,24 @@ the engines' eight numbers on the thrust group's fit rows: the rating and Airbus
 form those numbers sit in, δ^x (1 + a1 M + a2 M²)(1 + c M (1 − δ)) for take-off thrust and δ (i0 + i1 M)
 for idle, is ours, chosen against ANP's points before the fit.
 
-### 1f · The runway and its ILS
+### 1f · The runways, the ILS, and KDFW drawn
 
-`flight/harness/runway.cpp` is ours, GPLv3. Its numbers, and where they come from:
+`flight/harness/runway.cpp` and `flight/web/data/kdfw.json` are ours, GPLv3. Their numbers, and where they
+come from:
 
 | source | licence | what is taken |
 |---|---|---|
+| OurAirports, `runways.csv` and `airports.csv` (davidmegginson.github.io/ourairports-data), retrieved 2026-11-01 | public domain | KDFW (Dallas/Fort Worth), the main airport by the operator's decision of 2026-11-01: all seven runways, each end's position, elevation, true heading and displaced threshold, each runway's length and width, and the field's elevation, 607 ft. KDFW 17C, the default runway, in `runway.cpp`: its end at 32.91569901 N 97.02600098 W, 562 ft at both ends, 180.3° true, 13,400 × 150 ft. LSZH (Zurich) runway 14, the alternative: its end at 47.483101 N 8.53473 E, 1,402 ft, 137° true, 10,827 × 197 ft, the threshold displaced 492 ft. Numbers copied by value into the sources and cited there; no file is copied |
+| FAA airport diagram AL-6039, Dallas-Fort Worth Intl, d-TPP cycle 2611, effective 29 Oct 2026 to 26 Nov 2026: https://aeronav.faa.gov/d-tpp/2611/06039ad.pdf (445,030 bytes, SHA-256 `404eb71e507ffe80223ff28d0b9e95503c545d6dde0292e59f366dc6b81dbf7a`), downloaded 2026-11-01 on the operator's word | public domain (a work of the US government, 17 U.S.C. § 105) | KDFW's five terminals' footprints, its two central terminal ramps and the positions of its three control towers, read off the chart's vector drawing and georeferenced by its seven runway bars against OurAirports' runway ends (a similarity fit, 17.64 m per point; worst residual 13.5 m); the terminal spine is the gap between the ramps. Coordinates are in `kdfw.json`, the chart is not copied. The towers' and terminals' heights are this project's estimates: the chart gives none |
+| FAA Advisory Circulars 150/5340-1 (Standards for Airport Markings) and 150/5340-30 (Design and Installation Details for Airport Visual Aids) | public domain | as methods: a precision runway's markings (threshold stripes by runway width, touchdown zone and aiming point, centreline and edge stripes) and its lights (edge, centreline coding, touchdown zone, ALSF-2 with sequenced flashers, PAPI). Implemented in `flight/web/src/airport-layout.js`, not copied |
+| ICAO Annex 10, Volume I (Radio Navigation Aids) | — | the ILS's geometry, as a method: the localizer's displacement sensitivity (full scale 107 m either side at the threshold), the glide path's (0.24 of its angle), its coverage; the localizer's antenna 300 m past the stop end, a typical siting. Implemented here, not copied |
+| this project | — | the 3° glide path and 50 ft threshold crossing height on every runway (no published ILS is used), and the PAPI set to that glide; two dots for full scale, as the A320's PFD draws it; which runways are arrivals in south flow; the generic parallel taxiways; the scripted crew; the bands it is judged by (`ROADMAP.md`, P7) |
+
+The runways are real, and so are their places on the earth, as are KDFW's terminals and towers; the
+ILS on them is a textbook one. Nothing here is fit for navigation.
+
+---
+|---|---|
 | OurAirports, `runways.csv` (davidmegginson.github.io/ourairports-data), retrieved 2026-11-01 | public domain | LSZH (Zurich) runway 14: its end at 47.483101 N 8.53473 E, 1,402 ft, 137° true, 10,827 × 197 ft, the threshold displaced 492 ft. Six numbers copied by value into the source and cited there; no file is copied |
 | ICAO Annex 10, Volume I (Radio Navigation Aids) | — | the ILS's geometry, as a method: the localizer's displacement sensitivity (full scale 107 m either side at the threshold), the glide path's (0.24 of its angle), its coverage; the localizer's antenna 300 m past the stop end, a typical siting. Implemented here, not copied |
 | this project | — | the 3° glide path and 50 ft threshold crossing height (LSZH's published ILS is not used); two dots for full scale, as the A320's PFD draws it; the scripted crew; the bands it is judged by (`ROADMAP.md`, P7) |
