@@ -508,8 +508,8 @@ damping, −40 per rad, moves the static moment by 0.00001; 10° of elevator mov
 `cm-de` and `cl-de` say, to 0.1 %, and past the fade's onset by the share the file leaves; and on the
 737's clean pulse the two short-period readings agree, damping 0.55 and 0.51, 1.69 and 1.66 rad/s. It
 was shown able to fail: with the alpha-rate in the moment, and with the tail's share left out of the
-elevator's term. With it, sixty native cases pass with either airframe on MSVC 19.44 and on GCC 13.3,
-and fifty-five under node.
+elevator's term. With it, sixty-two native cases pass with either airframe on MSVC 19.44 and on GCC
+13.3, and fifty-seven under node, on master after the 0.1.0 release.
 
 ### The drag of the landing flaps and the gear
 
@@ -1121,6 +1121,44 @@ hard pull to full back stick near the ground can take our A320 past its stall, 1
 question is posted (`flight/upstream-reports.md`, §4;
 [flybywiresim/aircraft discussion #11009](https://github.com/flybywiresim/aircraft/discussions/11009)):
 whether the protection should act on an alpha lagged by 2 s.
+
+**Fitted past the stall, it still swings.** The targets this finding asked for now exist and the
+airframe is inside them ([above](#past-the-stall-and-how-it-was-fitted)): its short period in CONF FULL,
+its lift and pitching moment past the stall. Flown again as step 4 flew it, from 8,000 ft, the fast pull
+in CONF FULL peaks at 16.5° of alpha 3 s in, falls to 0.3°, rises to 16.1°, falls to 5.2° and rises to
+18.1° 18.5 s in, before it settles once the stick is let go; its pitch reaches 26.6° against 25°. Before
+the fit: 17.0°, −4.1°, 20.4°, 5.3°, 16.8°, and 27.3° of pitch. Its third swing still takes it past its
+lift peak, 17.75°, by a margin the condition decides: from 10,000 ft it reaches 20.0° (20.3° before).
+Entered slowly, full back stick now peaks at 13.7° and ends at 13.1° (13.8° and 13.0° before). Why the
+fit could not do more, from 8,000 ft:
+
+- The first overshoot does not move with the terms past the stall: across every setting of them that
+  was tried, it stays between 15.4° and 16.7° (15.3° and 16.7° from 10,000 ft). With the lag cut to
+  0.2 s it stays near 17° (above), so it is not the lag's either.
+- What the targets pin acts above 11 to 14°: the elevator's fade from 10.95° and the break from where
+  the lift curve begins to round, 14° in CONF FULL. The swing runs alpha from 0° to 18°, and over most
+  of it what decides it is the pitch of normal flight in CONF FULL — how much alpha a degree of elevator
+  buys, 1.38° here (Cm_δe −1.81 against Cm_α −1.31 per rad at the loaded CG, with the lift's share) —
+  and the law's 2 s.
+- Nothing measured says that is wrong. The CONF FULL short period is inside MIL-F-8785C's Level 1, as is
+  the 737's. Transports in their landing configuration span it: NASA CR-2144 (Heffley and Jewell, 1972)
+  gives the Boeing 747 Cm_δe −1.40 and Cm_α −1.45 per rad at 131 kt (0.97° per degree) and the Convair
+  880M −0.657 and −0.381 at 134 kt (1.72°).
+- The settings tried: the tail's fade from 6°, 8° or 10°, by 0.1, 0.2 or 0.3 every 10°, and a break of
+  0.05, 0.15 or 0.30, twenty-seven settings, the lift past the peak as fitted; each scored on the three
+  rows past the stall and flown from 8,000 ft and from 10,000 ft. With all three rows inside their
+  bands, the later swings stay between 16.3° and 18.1° (16.4° and 19.9° from 10,000 ft). At best — a
+  fade from 10° of 0.3 every 10° and a break of 0.05 — they stay below the lift peak, though 3° past
+  alpha max; but that setting sits at the edges of Foster's flaps-up figure (21.2° against 21 to 29°)
+  and of the GTM's break (−0.08 against −0.35 to −0.05), where a fit aiming at the middle of each band
+  does not go. Every setting tried that holds the later swings to 15° or less, from either height,
+  breaks the held-out clean row, Foster's 21 to 29° with the flaps up, and some the fitted CONF FULL
+  row as well.
+
+So the airframe cannot both meet these targets and stop the swinging, which the 0.2 s test above puts on
+A32NX's lagged alpha; its pitch in CONF FULL is within what real transports have. Open, for the
+airframe: a target on the pitch of normal flight in CONF FULL from an A320's own data, which no public
+source here gives.
 
 New `ctest` cases, judged on the product airframe, our A320, whatever `FLIGHT_AIRFRAME` the suite runs
 with: `protection_full_stick_bank_stops_at_67_deg`, `protection_full_pull_inside_2_5_g_and_30_deg`,
