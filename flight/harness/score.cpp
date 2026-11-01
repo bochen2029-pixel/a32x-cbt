@@ -418,6 +418,14 @@ Measured pitchBreak(Airframe& a, const Configuration& c, const LiftPeak& p) {
                          fmt("the line from 2 to %.2f deg, %+.4f per deg, gives %+.3f", to, slope, line)};
 }
 
+// How the pitching moment goes on past the stall: the static moment about the centre of gravity in level
+// flight at 1 g, elevator and stabiliser at 0, 16 deg past the lift peak less 6 deg past it.
+Measured pitchPastStall(Airframe& a, const Configuration& c, const LiftPeak& p) {
+  const double from = p.alphaDeg + 6, to = p.alphaDeg + 16;
+  const double cmFrom = a.pitchMomentAt(c, from, 0, 0), cmTo = a.pitchMomentAt(c, to, 0, 0);
+  return {cmTo - cmFrom, fmt("Cm %+.3f at %.2f deg, ", cmFrom, from) + fmt("%+.3f at %.2f deg", cmTo, to)};
+}
+
 // The lift past the stall as a share of the peak, so many degrees past the alpha of maximum lift.
 Measured liftPastStall(Airframe& a, const Configuration& c, const LiftPeak& p, double pastDeg) {
   const double cl = a.liftAt(c, p.alphaDeg + pastDeg);
@@ -548,6 +556,10 @@ class Bare {
       const Config& c = *config(family.substr(12));
       return pitchBreak(a_, c.surfaces, peak(c));
     }
+    if (family.rfind("pitch-past-stall-", 0) == 0 && config(family.substr(17))) {
+      const Config& c = *config(family.substr(17));
+      return pitchPastStall(a_, c.surfaces, peak(c));
+    }
     if (family.rfind("lift-past-stall-", 0) == 0) {
       // "lift-past-stall-full-15": CONF FULL, 15 deg past the peak
       const std::string rest = family.substr(16);
@@ -562,7 +574,8 @@ class Bare {
   // Whether a row is measured on the bare airframe rather than flown.
   static bool measures(const std::string& id, const std::string& family) {
     for (const char* prefix :
-         {"vs1g-", "stall-alpha-", "vls-alpha-", "elevator-alpha-", "pitch-break-", "drag-ratio-", "gear-drag-"}) {
+         {"vs1g-", "stall-alpha-", "vls-alpha-", "elevator-alpha-", "pitch-break-", "pitch-past-stall-", "drag-ratio-",
+          "gear-drag-"}) {
       const size_t n = std::strlen(prefix);
       if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
     }

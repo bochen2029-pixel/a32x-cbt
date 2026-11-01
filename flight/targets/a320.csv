@@ -102,7 +102,12 @@
 #                       falls 0.023 per deg up to 12 deg, then breaks nose down through the stall to -0.60 at
 #                       24 deg, 6 deg past its lift peak, 0.20 below its earlier line extended, and levels
 #                       off beyond 25 deg. Another airframe, its moment not corrected for Reynolds number, so
-#                       the bands, 0.10 either way on the lift and -0.35 to -0.05 on the break, are ours
+#                       the bands, 0.10 either way on the lift and -0.35 to -0.05 on the break, are ours.
+#                       Past the stall figure 33's moment levels off: its image digitised (the full-scale curve,
+#                       841 by 797 pixels, mapped through the plot's frame), -0.596 at 24 deg and -0.686 at
+#                       34 deg, 0.090 over the 10 deg from 6 to 16 deg past the lift peak, 0.009 per deg, and
+#                       0.007 per deg from 25 to 40 deg, where it fell 0.022 per deg before the stall. That
+#                       row's band, 0.10 either way, is ours
 #   easa-tcds-e067      EASA type-certificate data sheet E.067, issue 02, 17 April 2018, CFM56-5 series: the
 #                       CFM56-5-A1, the A320-211's engine and the one our A320 carries, is rated 11,120 daN for
 #                       take-off (constant below 30 C) and 10,540 daN maximum continuous (below 25 C); static,
@@ -227,6 +232,7 @@ short-period-cap-full,target,dynamics,control anticipation parameter,bare airfra
 elevator-alpha-full,target,poststall,highest alpha full nose-up elevator holds,steady level flight at 1 g; elevator 30 deg up; stabiliser at 0; CONF FULL; 1000 ft,,,16.5,24.5,deg,fit,foster-2005
 elevator-alpha-clean,target,poststall,highest alpha full nose-up elevator holds,steady level flight at 1 g; elevator 30 deg up; stabiliser at 0; clean; 1000 ft,,,21,29,deg,check,foster-2005
 pitch-break-clean,target,poststall,pitching moment 6 deg past the lift peak less the line before the stall,steady level flight at 1 g; elevator and stabiliser at 0; the line fitted from 2 deg to 6 deg short of the peak; clean; 1000 ft,,,-0.35,-0.05,Cm,check,tcm-gtm
+pitch-past-stall-clean,target,poststall,pitching moment 16 deg past the lift peak less 6 deg past it,steady level flight at 1 g; elevator and stabiliser at 0; clean; 1000 ft,,,-0.19,0.01,Cm,check,tcm-gtm
 lift-past-stall-full-5,target,poststall,lift 5 deg past its peak as a share of the peak,CONF FULL; elevator at 0; 1000 ft; 150 kt,,,0.79,0.99,ratio,fit,tcm-gtm
 lift-past-stall-full-15,target,poststall,lift 15 deg past its peak as a share of the peak,CONF FULL; elevator at 0; 1000 ft; 150 kt,,,0.54,0.74,ratio,fit,tcm-gtm
 thrust-toga-static,target,thrust,thrust of one engine,TOGA; static; sea level,,,110.09,112.31,kN,fit,easa-tcds-e067
