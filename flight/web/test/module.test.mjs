@@ -87,20 +87,26 @@ test('the page records its flight as law_harness reads it, and the recording rep
   assert.equal(lines[0], `# scenario: ${scenario}`);
   assert.match(lines[1], /^# airframe: (a320|737)$/, 'the airframe the core flew, the default resolved');
   if (airframe) assert.equal(lines[1], `# airframe: ${airframe}`);
-  assert.equal(lines[2], flown.inputNames.join(','));
-  assert.equal(lines.length - 3, ticks, 'a row a step');
+  assert.equal(lines[2], '# crew: script', 'and who flew it');
+  assert.equal(lines[3], flown.inputNames.join(','));
+  assert.equal(lines.length - 4, ticks, 'a row a step');
   assert.equal(flown.steps, ticks);
   const verdict = flown.debrief();
   assert.match(verdict, /\nSTABLE\n$/, `the scripted crew's approach is stable:\n${verdict}`);
 
   // into a fresh instance, as a pilot's: on the airframe and from the start the header names
   const replay = new CoreSession(await createFlightCore(), lines[1].slice(12), false, lines[0].slice(12));
-  for (const line of lines.slice(3)) replay.step(1, line.split(',').map(Number));
+  for (const line of lines.slice(4)) replay.step(1, line.split(',').map(Number));
   const a = flown.state(), b = replay.state();
   a[flown.field.phase] = b[replay.field.phase] = 0;  // only the scripted crew keeps a phase
   assert.deepEqual(Array.from(b), Array.from(a), 'the same state, slot for slot');
   assert.equal(replay.debrief(), verdict, 'and the same verdict from the gate\'s judge');
-  assert.equal(replay.recording(), text, 'and its own recording is the same file');
+  assert.equal(replay.recording(), text.replace('# crew: script', '# crew: hands'),
+               'and its own recording is the same file, flown by the caller this time');
+  const saved = replay.recording({ hands: 'a joystick', flown: '2026-11-01T18:30Z' }).split('\n');
+  assert.deepEqual(saved.slice(2, 5), ['# crew: hands', '# hands: a joystick', '# flown: 2026-11-01T18:30Z'],
+                   'with what the page knows: the device and when');
+  assert.throws(() => replay.recording({ crew: 'script' }), /no header line called crew/, 'and nobody rewrites who flew it');
 });
 
 test('from an approach start the scripted crew flies the ILS onto the runway it reports', { skip }, async () => {

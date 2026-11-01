@@ -4,7 +4,7 @@
 //
 // Messages in:  {type: 'start', airframe, scripted, scenario}
 //               {type: 'step', ticks, inputs}   inputs: a Float64Array in the core's order, or null
-//               {type: 'recording'}             at any time
+//               {type: 'recording', extra}      at any time; extra: header lines by name (CoreSession)
 // Messages out: {type: 'ready', inputNames, stateNames, state, texts, inputs, debrief}
 //               {type: 'state', state, texts, inputs, debrief, ticks, ms}   ms: what the ticks cost in here
 //               {type: 'recording', text, steps}  the flight so far, as law_harness --replay reads it
@@ -36,7 +36,7 @@ self.onmessage = async (event) => {
       session.step(m.ticks, m.inputs);
       report('state', { ticks: m.ticks, ms: performance.now() - t0 });
     } else if (m.type === 'recording') {
-      self.postMessage({ type: 'recording', text: session.recording(), steps: session.steps });
+      self.postMessage({ type: 'recording', text: session.recording(m.extra || {}), steps: session.steps });
     }
   } catch (e) {
     self.postMessage({ type: 'error', message: String(e && e.message ? e.message : e) });

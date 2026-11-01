@@ -38,11 +38,12 @@ export class Flight {
     return true;
   }
 
-  // The flight so far, as law_harness --replay reads it: a promise of {text, steps}.
-  recording() {
+  // The flight so far, as law_harness --replay reads it: a promise of {text, steps}. extra: header lines
+  // by name, {hands: the device, flown: the wall-clock time} (CoreSession.recording).
+  recording(extra = {}) {
     return new Promise((resolve) => {
       this.recordings.push(resolve);
-      this.worker.postMessage({ type: 'recording' });
+      this.worker.postMessage({ type: 'recording', extra });
     });
   }
 

@@ -42,11 +42,18 @@ export class CoreSession {
   }
 
   // The flight so far as law_harness --replay reads it (flight/harness/main.cpp, Recording): what it was
-  // started from, the input names, then the inputs that flew each step, a row a step. Saved, it is what
-  // a pilot hands in: law_harness --replay FILE --expect ils judges it as the page's judge did.
-  recording() {
+  // started from and who flew it - the scripted crew, or hands at the page's controls - then the input
+  // names, then the inputs that flew each step, a row a step. extra adds lines the caller knows, by name:
+  // the page gives {hands: the device, flown: the wall-clock time}. Saved, it is what a pilot hands in:
+  // law_harness --replay FILE --expect ils judges it as the page's judge did.
+  recording(extra = {}) {
     const n = this.inputNames.length;
-    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, this.inputNames.join(',')];
+    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, `# crew: ${this.scripted ? 'script' : 'hands'}`];
+    for (const [key, value] of Object.entries(extra)) {
+      if (!/^[a-z][a-z0-9_-]*$/.test(key) || ['scenario', 'airframe', 'crew'].includes(key)) throw new Error(`no header line called ${key}`);
+      lines.push(`# ${key}: ${String(value).replace(/[\r\n]+/g, ' ')}`);
+    }
+    lines.push(this.inputNames.join(','));
     for (let k = 0; k < this.steps; ++k) lines.push(Array.from(this.rows.subarray(k * n, (k + 1) * n), String).join(','));
     return lines.join('\n') + '\n';
   }

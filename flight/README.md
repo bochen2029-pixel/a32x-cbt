@@ -986,6 +986,11 @@ that flew each step — the caller's, or the scripted crew's, stepped a tick at 
 gives them as `law_harness --replay` reads them, the scenario and the airframe (`flight_airframe()`, the
 default resolved) above the columns. The worker puts the judge's text on every message, `debrief`, and
 answers `{type: 'recording'}` at any time; `Flight.recording()` is its promise on the page's side. A
+recording says who flew it: `# crew: script` for the scripted crew (the page's `crew=script`, and every
+`law_harness --record`), `# crew: hands` for a person at the page's controls, with the device and the
+wall-clock time the page adds (`# hands:`, `# flown:`). `--repeatable` takes only hand-flown approaches for
+the gate, five different flights (a recording given twice is refused), and prints who flew each; `--check-repeatable`, on the scripted crew's five, also checks that the
+gate would refuse them as hand-flown. A
 recording made in the module replays into a fresh one to the same state and the same verdict, and the
 native build judges it alike: the scripted crew's approach from a dot left, flown in the module and
 saved, is STABLE with its touchdown 328.9 m past the threshold in both. The pilot's eye is the airframe's

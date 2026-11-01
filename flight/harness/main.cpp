@@ -217,8 +217,21 @@ struct Results {
 // from the scripted crew and replayed through the core as an outside crew must give the same bytes.
 // A recording: what flew it, then a row of the core's inputs a step. Lines that begin with '#' come
 // first and say where it was flown from - "# scenario: <text>" (core.h) and "# airframe: <a320|737>" -
-// so that it replays by itself; the page's recordings carry the same lines. A recording without them
-// replays from --scenario and FLIGHT_AIRFRAME, as before.
+// so that it replays by itself, and who flew it: "# crew: script" (this harness's crew, as --record
+// records it) or "# crew: hands" (a person at the page's controls), with the page's "# hands: <device>"
+// and "# flown: <wall-clock time>". A recording without them replays from --scenario and
+// FLIGHT_AIRFRAME, as before.
+struct RecordingHeader {
+  std::string scenario, airframe, crew, hands, flown;
+  bool hasScenario = false;
+  long long rows = -1;  // the column names
+  std::string who() const {
+    if (crew == "script") return "the scripted crew";
+    if (crew != "hands") return "nobody said: the recording has no crew line";
+    return "hand" + (hands.empty() ? std::string() : " (" + hands + ")") + (flown.empty() ? std::string() : ", " + flown);
+  }
+};
+
 class Recording {
  public:
   bool open(const std::string& path, bool write, const std::string& scenario = "") {
@@ -227,7 +240,8 @@ class Recording {
     std::string names;
     for (const char* n : FlightCore::inputNames()) names += (names.empty() ? "" : ",") + std::string(n);
     if (write) {
-      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n%s\n", scenario.c_str(), Airframe::selected().c_str(), names.c_str());
+      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n# crew: script\n%s\n", scenario.c_str(), Airframe::selected().c_str(),
+                   names.c_str());
       return true;
     }
     char line[4096] = "";
@@ -240,24 +254,28 @@ class Recording {
   }
   // A recording's header, read before the run is built: its scenario and airframe, when it says, and
   // how many steps it holds.
-  static bool header(const std::string& path, std::string& scenario, bool& hasScenario, std::string& airframe,
-                     long long& rows) {
+  static bool header(const std::string& path, RecordingHeader& h) {
     FILE* f = std::fopen(path.c_str(), "r");
     if (!f) return false;
-    hasScenario = false;
-    airframe.clear();
-    rows = -1;  // the column names
+    h = RecordingHeader{};
     char line[4096];
     while (std::fgets(line, sizeof line, f)) {
       const std::string l(line, std::strcspn(line, "\r\n"));
-      if (rows < 0 && l.rfind("# scenario: ", 0) == 0) {
-        scenario = l.substr(12);
-        hasScenario = true;
-      } else if (rows < 0 && l.rfind("# airframe: ", 0) == 0) {
-        airframe = l.substr(12);
-      } else if (rows >= 0 || l[0] != '#') {
-        ++rows;
+      if (h.rows >= 0 || l.empty() || l[0] != '#') {
+        ++h.rows;
+        continue;
       }
+      auto field = [&l](const char* key, std::string& into) {
+        const std::string k = std::string("# ") + key + ": ";
+        if (l.rfind(k, 0) != 0) return false;
+        into = l.substr(k.size());
+        return true;
+      };
+      if (field("scenario", h.scenario)) h.hasScenario = true;
+      field("airframe", h.airframe);
+      field("crew", h.crew);
+      field("hands", h.hands);
+      field("flown", h.flown);
     }
     std::fclose(f);
     return true;
@@ -840,16 +858,35 @@ std::string judgeLine(const ApproachJudge& j) {
 // The gate's repeatability (ROADMAP.md, P7: how a hand-flown ILS is judged): five consecutive approaches,
 // each replayed from its recording in a fresh process and judged, each of them stable, with their
 // touchdown points within 150 m of their mean.
-int repeatable(const char* argv0, const std::vector<std::string>& files) {
+int repeatable(const char* argv0, const std::vector<std::string>& files, bool byHand = true) {
   struct Approach {
-    std::string file, judge;
+    std::string file, judge, who;
     double touchdownM = NAN;
-    bool stable = false;
+    bool stable = false, hand = false;
+    size_t flight = 0;  // the inputs it was flown with, hashed: the same flight given twice hashes the same
   };
   std::vector<Approach> flown;
   for (const std::string& f : files) {
     Approach a;
     a.file = f;
+    RecordingHeader h;
+    if (Recording::header(f, h)) {
+      a.who = h.who();
+      a.hand = h.crew == "hands";
+    }
+    if (FILE* in = std::fopen(f.c_str(), "rb")) {
+      std::string text;
+      char chunk[1 << 16];
+      for (size_t n; (n = std::fread(chunk, 1, sizeof chunk, in)) > 0;) text.append(chunk, n);
+      std::fclose(in);
+      size_t at = 0;  // past the header and the column names: the rows alone
+      while (at < text.size() && text[at] == '#') {
+        const size_t eol = text.find('\n', at);
+        at = eol == std::string::npos ? text.size() : eol + 1;
+      }
+      at = text.find('\n', at);
+      a.flight = std::hash<std::string>{}(at == std::string::npos ? std::string() : text.substr(at));
+    }
     std::string cmd = self(argv0) + " --replay \"" + f + "\"";
 #ifdef _WIN32
     cmd = "\"" + cmd + "\"";  // childDigest says why
@@ -872,7 +909,8 @@ int repeatable(const char* argv0, const std::vector<std::string>& files) {
   double sum = 0;
   int landed = 0;
   for (const Approach& a : flown) {
-    failed += verdict(a.file.c_str(), a.stable, a.judge.empty() ? std::string("did not replay") : a.judge);
+    failed += verdict(a.file.c_str(), a.stable,
+                      (a.judge.empty() ? std::string("did not replay") : a.judge) + "; flown by " + (a.who.empty() ? "?" : a.who));
     stable += a.stable;
     if (!std::isnan(a.touchdownM)) {
       sum += a.touchdownM;
@@ -880,6 +918,17 @@ int repeatable(const char* argv0, const std::vector<std::string>& files) {
     }
   }
   failed += verdict("five consecutive approaches, as the gate asks", flown.size() == 5, fmt("%.0f of them", static_cast<double>(flown.size())));
+  int hand = 0, twice = 0;
+  for (size_t i = 0; i < flown.size(); ++i) {
+    hand += flown[i].hand;
+    for (size_t j = 0; j < i; ++j) twice += flown[i].flight == flown[j].flight;
+  }
+  failed += verdict("five different flights: no recording given twice", twice == 0,
+                    twice ? fmt("%.0f pairs of them the same flight", twice) : std::string("each its own"));
+  if (byHand) {
+    failed += verdict("each flown by hand, in the page, as the gate asks", hand == static_cast<int>(flown.size()),
+                      fmt("%.0f of %.0f", hand, static_cast<double>(flown.size())));
+  }
   failed += verdict("each of them stable", stable == static_cast<int>(flown.size()), fmt("%.0f of %.0f", stable, static_cast<double>(flown.size())));
   const double mean = landed ? sum / landed : NAN;
   double worst = NAN;
@@ -894,8 +943,7 @@ int repeatable(const char* argv0, const std::vector<std::string>& files) {
   failed += verdict("touchdown points within 150 m of their mean", landed == static_cast<int>(flown.size()) && worst <= 150,
                     landed ? fmt("mean %.0f m past the threshold, worst %.0f m from it, ", mean, worst) + where
                            : std::string("no touchdowns"));
-  std::printf("%s\n", failed ? "FAILED" : "PASSED");
-  return failed ? 1 : 0;
+  return failed;
 }
 
 // The repeatability check on the scripted crew: five approaches from varied starts recorded in fresh
@@ -914,13 +962,23 @@ int checkRepeatable(const char* argv0) {
     std::printf("a recording run failed\nFAILED\n");
     return 1;
   }
-  const int result = repeatable(argv0, files);
+  std::printf("the scripted crew's five approaches, recorded from varied starts: a check that the gate's rule can be "
+              "met, not the gate, which takes only approaches flown by hand\n");
+  int result = repeatable(argv0, files, false);
+  int hand = 0;
+  for (const std::string& f : files) {
+    RecordingHeader h;
+    hand += Recording::header(f, h) && h.crew == "hands";
+  }
+  result += verdict("and the gate would not take them as hand-flown", hand == 0,
+                    fmt("%.0f of %.0f say crew: hands", hand, static_cast<double>(files.size())));
   if (result == 0) {
     for (const std::string& f : files) std::remove(f.c_str());
   } else {
     std::printf("the recordings are kept\n");
   }
-  return result;
+  std::printf("%s\n", result ? "FAILED" : "PASSED");
+  return result ? 1 : 0;
 }
 
 void usage() {
@@ -994,16 +1052,23 @@ int main(int argc, char** argv) {
     std::printf("--record writes what the scripted crew does, --replay flies a recording: one or the other\n");
     return 2;
   }
-  if (!opt.repeatable.empty()) return repeatable(argv[0], opt.repeatable);
+  if (!opt.repeatable.empty()) {
+    const int failed = repeatable(argv[0], opt.repeatable);
+    std::printf("%s\n", failed ? "FAILED" : "PASSED");
+    return failed ? 1 : 0;
+  }
   if (opt.repeatableCheck) return checkRepeatable(argv[0]);
   if (!opt.replay.empty()) {
-    std::string scenario, airframe;
-    bool hasScenario = false;
-    long long rows = 0;
-    if (!Recording::header(opt.replay, scenario, hasScenario, airframe, rows)) {
+    RecordingHeader h;
+    if (!Recording::header(opt.replay, h)) {
       std::printf("cannot read %s\n", opt.replay.c_str());
       return 2;
     }
+    const std::string& scenario = h.scenario;
+    const std::string& airframe = h.airframe;
+    const bool hasScenario = h.hasScenario;
+    const long long rows = h.rows;
+    std::printf("%s: flown by %s\n", opt.replay.c_str(), h.who().c_str());
     if (hasScenario && opt.scenario.empty()) {
       opt.scenario = scenario;
     } else if (hasScenario && scenario != opt.scenario) {
