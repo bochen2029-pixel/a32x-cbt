@@ -10,10 +10,11 @@ replaced and which stays selectable. A scripted crew flies either through the co
 runway, round a circuit and back onto the runway, headless, in normal law. The 737 is A320-class, not
 an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6 passed against a point-mass stub;
 the same gate, unchanged, passes against both. The A320's numbers are written down
-(`targets/a320.csv`, 65 targets): our A320 is inside all 65, the 737 inside 21. The A320 replaced the
+(`targets/a320.csv`, 68 targets): our A320 is inside all 68, the 737 inside 21. The A320 replaced the
 737 under the swap rule ([below](#the-swap-made-2026-11-01)) on its aerodynamics, and its engines
 were fitted after ([below](#its-engines-and-how-they-were-fitted)), and then what lies past its stall
-([below](#past-the-stall-and-how-it-was-fitted)).
+([below](#past-the-stall-and-how-it-was-fitted)) and the drag of its landing flaps and gear
+([below](#the-drag-of-the-landing-flaps-and-the-gear)).
 
 ## Build and run
 
@@ -36,7 +37,8 @@ airframe against the A320's targets (below); `--out score.csv` writes the table.
 `airframe_score --airframe 737` scores it. Our A320 is `jsbsim/aircraft/A320-fit/A320-fit.xml`, read
 from this tree, with engines of its own beside it (`Engines/CFM56-5A1-fit.xml`).
 `flight/build/Release/airframe_fit` fits its aerodynamics (below), `airframe_fit --thrust` its
-engines and `airframe_fit --poststall` what lies past its stall, each in a minute or two; `--write` puts
+engines, `airframe_fit --poststall` what lies past its stall and `airframe_fit --drag` the drag of its
+landing flaps and gear, each in a minute or two; `--write` puts
 the result into the aircraft file, and `--from-file` starts the search where the last fit left it.
 
 ## The P6 gate on JSBSim, as measured
@@ -113,7 +115,7 @@ at that instant, so the computers never see what JSBSim makes of an aeroplane un
 ## The A320's targets, and the two airframes against them
 
 The operator chose to fly the 737 for P7 and swap in a fitted A320 later. `targets/a320.csv` is the
-bar for that swap: 65 targets an airframe is counted against and 4 context rows scored but not
+bar for that swap: 68 targets an airframe is counted against and 4 context rows scored but not
 counted. Each row names its source in the file's header: A32NX's VS1g and VLS tables
 (`targets/a320-speeds.csv`, a community reconstruction of Airbus's, sampled on a weight grid), the
 ELAC's own α max and α prot, a recorded A320 approach (VT-WGR's flight data, from AAIB India's
@@ -121,10 +123,12 @@ report), the lateral law's 15°/s, MIL-F-8785C's Level 1 floors for large aircra
 the terminal phases, the wave-drag model OpenAP implements, one band from pilot literature still to
 confirm; for the engines, the CFM56-5A1's type-certificate ratings, Airbus's own thrust and
 drag-to-lift ratios for the A320-211 in the ANP database, OpenAP's engine data and Bartel and Young's
-thrust lapse; and past the stall, NASA's wind tunnel data on a transport (Foster et al.) and its
-Generic Transport Model (the Transport Class Model's report). OpenAP WRAP's distributions fitted to
-ADS-B are the four context rows. Twenty-seven rows are marked *fit*, for an optimiser to tune against;
-thirty-eight are *held out*, so that a fit which only memorises is caught.
+thrust lapse; past the stall, NASA's wind tunnel data on a transport (Foster et al.) and its Generic
+Transport Model (the Transport Class Model's report); and for the drag of the landing flaps and the
+gear, Airbus's drag-to-lift ratios in ANP again and DLR's gear drag identified from A320 flight data.
+OpenAP WRAP's distributions fitted to ADS-B are the four context rows. Thirty rows are marked *fit*,
+for an optimiser to tune against; thirty-eight are *held out*, so that a fit which only memorises is
+caught.
 Rows that depend on weight are measured at two: 48.5 t, the weight the 737 is loaded to, and 65 t,
 between an A320-251N's maximum zero-fuel and landing weights. The rule for the swap is in
 `ROADMAP.md`, P7.
@@ -177,6 +181,15 @@ fit rows, the engines:
 | `thrust-idle-140kt-1000ft` |  | 2.80..4.80 kN | 3.78 | **inside** | 5.01 | outside +0.2 | 3.85 | **inside** |
 | `thrust-idle-210kt-5000ft` |  | -0.71..1.29 kN | 0.32 | **inside** | 1.50 | outside +0.2 | 1.15 | **inside** |
 | `thrust-idle-250kt-10000ft` |  | -2.65..-0.65 kN | -1.67 | **inside** | 0.16 | outside +0.8 | 0.13 | outside +0.8 |
+
+fit rows, the drag of the landing flaps and the gear (ANP's R, drag over lift in level flight at ANP's
+approach speed; DLR's gear drag coefficient):
+
+| row | t | band | our A320 | | before | | JSBSim's 737 | |
+|---|---|---|---|---|---|---|---|---|
+| `drag-ratio-conf3-65t` | 65 | 0.0911..0.1113 | 0.1018 | **inside** | 0.1018 | **inside** | none | outside |
+| `drag-ratio-full-65t` | 65 | 0.1043..0.1274 | 0.1163 | **inside** | 0.1156 | **inside** | 0.1436 | outside +0.0 |
+| `gear-drag-conf3` |  | 0.0269..0.0329 | 0.0297 | **inside** | 0.0170 | outside -0.0 | 0.0150 | outside -0.0 |
 
 fit rows, past the stall:
 
@@ -248,11 +261,13 @@ context rows, not counted:
 | `climb-rate` |  | 1500.00..2530.00 ft/min | 3348.63 | (outside +818.6) | 4602.18 | (outside +2072.2) | 3962.64 | (outside +1432.6) |
 | `descent-rate` |  | -1550.00..-840.00 ft/min | -1113.92 | (inside) | -1033.95 | (inside) | -1699.40 | (outside -149.4) |
 
-**Our A320: inside 65 of 65 targets — 27 of 27 fit rows, 38 of 38 held out — the 24 engine rows
-among them, where on JSBSim's CFM56_5 it was inside 3, and the 5 past the stall, where before their fit
-it was inside 1. The 737: inside 21 of 65 — 7 of 27 fit, 14 of 38 held out.** Our A320 is inside every
-row the 737 is inside, and every row it was inside before its engines, or what lies past its stall,
-were fitted. Every row but the five past the stall reads as it did before that fit, to the digit printed.
+**Our A320: inside 68 of 68 targets — 30 of 30 fit rows, 38 of 38 held out — the 24 engine rows
+among them, where on JSBSim's CFM56_5 it was inside 3; the 5 past the stall, where before their fit
+it was inside 1; and the 3 for the drag of the landing flaps and the gear, where before theirs it was
+inside 2. The 737: inside 21 of 68 — 7 of 30 fit, 14 of 38 held out.** Our A320 is inside every row
+the 737 is inside, and every row it was inside before its engines, what lies past its stall or the
+drag of its flaps and gear were fitted. Every row but the five past the stall reads as it did before
+that fit, and every row but the gear's as it did before the drag fit, to the digit printed.
 
 Read plainly: the 737 stalls 14 to 47 kt faster than an A320 of its weight, at either weight, because
 its wing is smaller — 1,171 ft² against the A320's 1,317 — and lifts less: a CL max of 2.09 at full
@@ -496,6 +511,37 @@ was shown able to fail: with the alpha-rate in the moment, and with the tail's s
 elevator's term. With it, sixty native cases pass with either airframe on MSVC 19.44 and on GCC 13.3,
 and fifty-five under node.
 
+### The drag of the landing flaps and the gear
+
+The thrust fit left the drag of the flaps and the gear to seeds. ANP gives Airbus's drag-to-lift ratio
+R for the A320-211 in each configuration, and for CONF 3 and CONF FULL with the gear down it also gives
+the approach speed, D√W, at which the lift coefficient is the same at every weight: 1.51 and 1.63. Its
+other approach ratios name no speed, and R falls with the lift coefficient, so they are not scored.
+DLR identified the A320 family's gear drag from 804 extensions in A320neo airline flights (Deiler and
+Fezans, AIAA 2025-1250): a drag coefficient of 0.0296, 0.0291 and 0.0311 in CONF 2, 3 and FULL, 0.0299
+as one. Three fit rows, each band 10 % either way, ours: R in CONF 3 and FULL at 65 t at 145.8 and
+140.3 kt, read as the aerodynamic drag over lift where a level trim ends, and the gear's drag
+coefficient, the aerodynamics in CONF 3 at 6° with the gear down less with it up.
+
+Our A320's totals were already Airbus's: R 0.1018 against 0.1012 in CONF 3 and 0.1156 against
+0.1159 in FULL. Its gear was not: 0.017, OpenAP's figure, against DLR's 0.030, so its landing flaps
+carried drag that is the gear's. ANP says the same on its own: its CONF 2 ratios with the gear down
+and up differ by 0.0288, which is DLR's coefficient at a lift coefficient of 1.04. `airframe_fit
+--drag` fits `cd-conf3`, `cd-full` and `cd-gear` (`drag-seeds.csv`, moved from `seeds.csv` unchanged)
+on those rows alone, the clean polar held: 47 generations, 756 evaluations, 17 s, the desktop 75 %
+busy before it and 99 % during, the fit included; GCC 13.3 fits the same three numbers. The gear goes
+to 0.0297, CONF 3's flaps from 0.030 to 0.0174 and FULL's from 0.050 to 0.0385, and R stays where
+Airbus has it, 0.1018 and 0.1163. Every other row reads as before; of the context rows, the take-off
+acceleration falls from 2.36 to 2.33 m/s², the gear being down on the runway.
+
+What changes in flight: with the gear down in CONF 1 to 3, 0.013 more drag than before; in CONF 3 with
+the gear up, a go-around's configuration, 0.013 less. CONF 2's flaps and CONF 1+F's stay seeds, which
+the take-off gradient tests (held out, above). What this leaves of the thrust session's list: ground
+idle and reverse thrust are the world's and the crew's, not the airframe's; and the engine's spool-up
+has no row yet. 14 CFR 33.73(b) gives its floor, 95 % of rated take-off thrust within 5 s of minimum
+flight idle from a stabilized static condition, which needs the engine run in time; every thrust row
+runs it to its steady state.
+
 ## The swap: made, 2026-11-01
 
 The rule (`ROADMAP.md`, P7): a fitted A320 replaces the 737 when, scored on the same revision of the
@@ -545,10 +591,11 @@ case runs 20 minutes since: the slower climb puts the first landing 35 s later.
 | `jsbsim/aircraft/A320-fit/seeds.csv` | each aerodynamic coefficient's seed, prior width, limits and source |
 | `jsbsim/aircraft/A320-fit/Engines/CFM56-5A1-fit.xml` | its engines: CFM56_5's, with a take-off and idle thrust lapse of ours |
 | `jsbsim/aircraft/A320-fit/thrust-seeds.csv` | the same for the thrust numbers, seeded from CFM56_5 and the harness's schedule |
+| `jsbsim/aircraft/A320-fit/drag-seeds.csv` | the same for the drag of the landing flaps and the gear, moved from `seeds.csv` unchanged |
 | `jsbsim/aircraft/A320-fit/poststall-seeds.csv` | the same for what lies past the stall: the pitch break, the tail's fade with alpha, the lift past the peak |
 | `harness/main.cpp` | the runner: the non-finite scan, the law decoding, the gate, the expectations, the crash check |
 | `harness/score.cpp` | the scorer: the airframe measured bare (lift sweeps, drag, the static pitching moment at 1 g, trims, a pitch pulse, thrust, gradients) and flown (the circuit), against the targets; the fit rows alone, with a cost, for the fitter |
-| `harness/fit.cpp` | the fitter: CMA-ES over our A320's coefficients, with `--thrust` its engines', with `--poststall` what lies past its stall, each candidate scored by the scorer in a process of its own |
+| `harness/fit.cpp` | the fitter: CMA-ES over our A320's coefficients, with `--thrust` its engines', with `--poststall` what lies past its stall, with `--drag` the drag of its landing flaps and gear, each candidate scored by the scorer in a process of its own |
 | `targets/a320.csv` | the A320's acceptance targets: band, weight, fit or held out, and source, row by row |
 | `targets/a320-speeds.csv` | VS1g and VLS by configuration and weight, from A32NX's tables, three points corrected |
 

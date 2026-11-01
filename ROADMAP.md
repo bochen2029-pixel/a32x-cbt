@@ -237,6 +237,10 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
       power fading with alpha and the lift beyond the peak, against 8 new rows from MIL-F-8785C's
       terminal phases and NASA's wind tunnel data on a transport. Inside 65 of 65, the 737 inside 21 [M];
       the fast full pull in CONF FULL still rings (*Decisions*)
+- [x] the drag of its landing flaps and gear fitted the same way (`airframe_fit --drag`): Airbus's
+      drag-to-lift ratios for CONF 3 and FULL in ANP, at ANP's approach speed, and DLR's gear drag from
+      A320 flight data. The totals were already Airbus's; the gear's share rose from 0.017 to 0.030.
+      Inside 68 of 68, the 737 inside 21 [M]
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
@@ -443,6 +447,14 @@ trainer's debrief does.
   MIL-F-8785C's Level 1 and inside what NASA CR-2144 gives the 747 and the Convair 880M on landing. So the
   airframe cannot both meet its targets and stop the ring; what is left is A32NX's protection flying an
   alpha lagged by 2 s (`flight/README.md`, step 4).
+- **The drag fit, 2026-11-01, under the same rule.** The thrust fit left the drag of the flaps and the
+  gear to seeds. Three rows: Airbus's drag-to-lift ratios for CONF 3 and FULL with the gear down (ANP,
+  at ANP's approach speed) and the gear's drag DLR identified from A320 flight data. The totals were
+  Airbus's already; the gear's share was not, 0.017 against 0.030. `airframe_fit --drag` moves drag
+  from the landing flaps to the gear and leaves the totals: **inside 68 of 68**, every other row as
+  before but the take-off's context rows; the 737 inside 21; every `ctest` case passes with either
+  airframe, on MSVC, GCC and under node. Ground idle and reverse thrust, also on the thrust session's
+  list, are the world's and the crew's (`flight/harness`), not the airframe's, and wait for them.
 - The harness keeps the airframe to one adapter (`harness/airframe.cpp`) and one aircraft file, so
   the swap stays small. Either airframe can fly: `FLIGHT_AIRFRAME=737|a320`.
 - **Taken 2026-11-01: packaging.** The operator left it to the recommendation: *"go with your own
