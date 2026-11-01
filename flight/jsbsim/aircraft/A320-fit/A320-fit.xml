@@ -187,11 +187,12 @@
     <property value="-0.98107818" persistent="true">propulsion/fit/lapse-mach-delta</property>
     <property value="0.087183774" persistent="true">propulsion/fit/idle</property>
     <property value="-0.24100822" persistent="true">propulsion/fit/idle-mach</property>
-    <!-- ground idle and reverse thrust, for the harness to read: provisional, see thrust-seeds.csv. The
-         selector the harness writes, 0 for the flight idle above and 1 for ground idle; declared, it turns
-         ground idle on (the harness parks and rolls an airframe that has it at 1) -->
-    <property value="0.03" persistent="true">propulsion/fit/ground-idle</property>
-    <property value="0.3" persistent="true">propulsion/fit/reverse-efficiency</property>
+    <!-- ground idle and reverse thrust, for the harness to read, see thrust-seeds.csv: ground idle and the
+         reverser's efficiency cited, MAX REV provisional. The selector the harness writes, 0 for the flight
+         idle above and 1 for ground idle; declared, it turns ground idle on (the harness parks and rolls an
+         airframe that has it at 1) -->
+    <property value="0.04" persistent="true">propulsion/fit/ground-idle</property>
+    <property value="0.31" persistent="true">propulsion/fit/reverse-efficiency</property>
     <property value="0.7" persistent="true">propulsion/fit/reverse-max</property>
     <property value="0">propulsion/a320/ground-idle</property>
     <!-- the thrust lever schedule (flight/harness/airframe.cpp): at the CL and MCT detents, the fraction

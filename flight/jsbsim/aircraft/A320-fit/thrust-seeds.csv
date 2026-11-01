@@ -14,9 +14,21 @@
 #                 over Mach 0 to 0.5 and 0 to 10,000 ft (within 2.1 %), where the targets are. Aeromatic's
 #                 tables are generic, so the widths are wide: the seed is a start, not an estimate to keep
 #   harness       the schedule the harness flew both airframes with, drawn up for the 737 stand-in
-#   provisional   a placeholder, not cited: the values the harness's reverse and ground-idle mechanics
-#                 were tested on, until a source replaces them. No fit row answers to them, so the fit
-#                 holds them
+#   apex          NASA's APEX series, gas emissions from CFM56-2C1, -3B1, -3B2 and -7B22 engines on the
+#                 ground (Wey and Wey, ISABE-2007-1277, NTRS 20070022426): its test matrices are "defined as
+#                 ground idle (approximately 4%)" of rated thrust and up. Other CFM56s, not the -5A1
+#   nasa-reverser NASA's static tests of thrust reversers on a model of a high-bypass turbofan (Asbury and
+#                 Yetter, NASA/TM-2000-210300, figure 23(a)): a cascade reverser's overall effectiveness,
+#                 its net reverse force over the engine's forward thrust, "about 0.31, which is typical of
+#                 cascade thrust reversers"; the report also gives 0.35 to 0.40 for cascade systems. The
+#                 A320-211's is a four-door pivoting reverser, for which no public figure was found
+#   provisional   a placeholder, not cited: the value the harness's reverse mechanics were tested on,
+#                 until a source replaces it. No public source found gives MAX REV for the A320-211;
+#                 the Volpe Center's analysis of FAA flight data (Noel and Boeker, June 2007) gives the
+#                 A320's engines 68.4 % N1 on average while the reversers are deployed, 32.0 % of rated
+#                 thrust: a floor for MAX REV, which ours, 71 % static, is above
+#
+# No fit row answers to these three, so the fit holds them.
 #
 # None of these seeds was compared with a held-out row while it was made.
 property,seed,sigma,lo,hi,source,note
@@ -26,8 +38,8 @@ propulsion/fit/lapse-mach2,0.601,1.0,-1.0,3.0,cfm56-5,and how that fall levels o
 propulsion/fit/lapse-mach-delta,-0.079,1.0,-2.0,1.0,cfm56-5,how the fall with Mach changes with height
 propulsion/fit/idle,0.065,0.05,-0.05,0.2,cfm56-5,idle thrust at rest at sea level
 propulsion/fit/idle-mach,-0.130,0.2,-0.6,0.2,cfm56-5,how idle thrust falls with Mach
-propulsion/fit/ground-idle,0.03,0.01,0.0,0.15,provisional,static ground idle thrust as a share of the rating
-propulsion/fit/reverse-efficiency,0.3,0.1,0.0,1.0,provisional,reverse thrust as a share of the thrust at the setting
+propulsion/fit/ground-idle,0.04,0.01,0.0,0.15,apex,static ground idle thrust as a share of the rating
+propulsion/fit/reverse-efficiency,0.31,0.1,0.0,1.0,nasa-reverser,reverse thrust as a share of the thrust at the setting
 propulsion/fit/reverse-max,0.7,0.1,0.0,1.0,provisional,MAX REV as the fraction of the way from idle to take-off thrust
 propulsion/fit/climb-fraction,0.88,0.06,0.6,1.0,harness,the CL detent
 propulsion/fit/mct-fraction,0.95,0.04,0.8,1.0,harness,the MCT detent
