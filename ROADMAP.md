@@ -307,7 +307,9 @@ judged, and measured: a full pull at Mach 0.45 passes alpha max, because the fit
 lift near 2 g there (its stall above Mach 0.3 is unfitted); the push's pitch reaches −17.7° (−15°); the
 bank returns to 26.5°, not 33°; high speed reaches 381 kt against the ELAC's 380, on unfitted transonic
 aerodynamics; and a fast pull in CONF FULL at 150 kt passes alpha max (13.0°, reaching 20.4°) inside the
-fitted range — an open finding. Alpha floor waits for the autothrust and the FADEC (P9). On the way, a
+fitted range — an open finding, diagnosed: A32NX's ELAC flies its alpha protection on an alpha lagged by
+2 s, so a fast entry overshoots on either airframe, and our A320's quicker pitch in CONF FULL, unfitted at
+high alpha, lets it ring. A normal flare stays 2.3° short of alpha prot. Alpha floor waits for the autothrust and the FADEC (P9). On the way, a
 start in the air with the gear up held the ELAC on the ground until a gear reported weight on wheels only
 while down. `flight/README.md` has the table.
 

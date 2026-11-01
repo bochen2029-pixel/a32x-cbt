@@ -884,8 +884,27 @@ bank's return to 26.5° rather than 33° and the slow return from alpha max afte
 computers' and the airframe's together, not yet separated. And one finding at low Mach, inside the fit,
 not registered as a case: a full pull in CONF FULL at 150 kt holds 1.80 g against 2.0, but its pitch
 reaches 27.3° against 25° and its alpha 20.4° against alpha max 13.0 — the high-AoA protection does not
-stop a fast entry there. That is open: the airframe's pitch response at high alpha, or A32NX's alpha
-protection, or both.
+hold a fast entry there. Traced through both ELACs, it is an oscillation, and the ELAC's own:
+
+- What the ELAC is given is faithful. Its ADRs carry the airframe's alpha within a step, as A32NX's
+  own ADIRS passes the simulator's `INCIDENCE ALPHA` through unfiltered (`adirs.rs`), and the elevator
+  goes where the ELAC orders it.
+- A32NX's ELAC passes alpha through a first-order lag of 2 s (`ElacComputer.cpp`, `LagFilter_C1` = 0.5)
+  and its pitch law flies that lagged alpha, both to engage the protection and to hold alpha in it
+  (`PitchNormalLaw`'s `In_alpha_deg`). From 150 kt, full back stick takes alpha to 16° before the lagged
+  alpha reaches alpha prot, 10.6°; the protection then pushes on stale alpha while alpha falls to −4°,
+  and pulls again, late again, to 19.8°, about every 8 s.
+- The airframe decides whether it rings. The 737, under the same law, overshoots as far, to 19.1°, and
+  settles at alpha max within a cycle. Our A320 answers the elevator faster in CONF FULL — 0.86°/s of
+  pitch rate per degree of elevator, to the 737's 0.52 — so the lag costs it more phase; and its pitch at
+  high alpha is unfitted: its pitching moment stays linear in alpha past the stall, and no target
+  measures its short period in CONF FULL.
+
+Entered slowly, at idle from 150 kt, full back stick holds 12.1° to 13.8° of alpha against 13.0, without
+a stall. For the gate: a normal approach and flare reach 8.3° of alpha, 2.3° short of alpha prot, but a
+hard pull to full back stick near the ground can take our A320 past its stall, 14°. Open, for the aero
+fit: targets for the short period in CONF FULL near VLS, and for lift and pitching moment past the stall;
+and for A32NX upstream, whether the protection should fly an alpha lagged by 2 s.
 
 New `ctest` cases, judged on the product airframe, our A320, whatever `FLIGHT_AIRFRAME` the suite runs
 with: `protection_full_stick_bank_stops_at_67_deg`, `protection_full_pull_inside_2_5_g_and_30_deg`,
