@@ -782,14 +782,70 @@ module lands the scripted crew in a 15 kt crosswind at the native build's touchd
 New `ctest` cases: `ils_on_the_beams`, `ils_a_dot_off_the_localizer`, `ils_a_dot_low` (an approach start
 reads the beams where it asked, holds hands off); nine `ils_flown_` cases (the crew, judged by the
 bands); `ils_in_light_turbulence_reaches_the_runway`; `ils_approach_replays_to_the_same_touchdown`.
-Thirty-eight native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; thirty-five under node,
-the WebAssembly build leaving out the three that start processes.
+The suite's count is in the next section.
+
+## Failures, and the laws they leave (P7, step 3)
+
+**The instructor's failures.** Any ADR or IR, any hydraulic system, either ELAC and any SEC can be
+failed at a set time, from the scenario text the harness, the C API and the page all take —
+`fail=adr1+adr2+adr3@300,green@420`, the units that fail together joined by `+`, failing that many
+seconds after the start, or from it — or `law_harness --fail`. A failed ADR or IR transmits
+FailureWarning on every word, as the real one does; a failed ELAC or SEC stops through its own
+`faultActive`, as A32NX's failures stop it. A failed hydraulic system loses its pressure and with it
+the servos, the THS motor, the yaw damper and the slat and flap motors it drives, counted as A32NX's
+computers count them: ELAC 1's aileron servos blue on the left and green on the right, ELAC 2's the
+other way round; the elevators' servos blue for ELAC 1 and SEC 1, green on the left and yellow on the
+right for ELAC 2 and SEC 2; spoilers 1 and 5 green, 2 and 4 yellow, 3 blue; the THS on green and
+yellow, the slats on green and blue, the flaps on green and yellow, at half speed on one. The gear,
+the brakes and the nose wheel steering are not yet tied to their systems. The computers decide the law;
+the harness only reads it from the FCDC.
+
+**A pitch trim wheel.** In direct law nothing trims: the PFD says USE MAN PITCH TRIM. The wheel is a
+crew input, the core's `pitch_trim`; it moves the THS through its hydraulic motors, with priority over
+the computers' motors, at 0.5°/s turned briskly — an estimate — and half that on one motor. The page
+turns it with Home (nose down) and End (nose up), or with joystick buttons mapped to it.
+
+**The scripted crew in direct law** flies as a pilot does there. Its loops fly the stick as in normal
+law; in direct law the stick asks for elevator instead of load factor, near enough the same at
+approach speeds, so the paths hold, only off by what is out of trim. So the hand trims: once it has
+held a pull or a push for a few seconds it turns the wheel against it, faster the more it holds,
+never in the flare — the wheel is the integrator the loops lack — and with one elevator left it moves
+the stick twice as far. A first try, the hand holding the load factor normal law would have asked for,
+diverged in a pitch oscillation of eight seconds and was dropped.
+
+**What A32NX's computers choose**, the KDFW circuit flown with the failure at 300 s, in the cruise,
+the same with either airframe:
+
+| failure | pitch law in flight | lateral law | with the gear down |
+|---|---|---|---|
+| any one unit, of any kind | normal | normal | normal |
+| ADR 1+2, IR 1+2, ELAC 1+2, hydraulics blue+yellow | alternate 1 | direct | direct |
+| SEC 1+2, or all three | alternate 1 | direct | direct, on the flaps a second later |
+| ADR 1+2+3 | alternate 2 | direct | direct |
+| IR 1+2+3 | direct | direct | direct |
+
+A32NX's ELAC makes the lateral law direct whenever pitch leaves normal law (`ElacComputer.cpp`:1028),
+and every alternate law direct once the gear is down; with both SECs lost it cannot see the gear,
+which reaches it through them, and goes direct on the flap position instead. Failures interact: green
+with ELAC 1 leaves alternate 1, the left elevator having lost both its servos. Green with blue (no
+ailerons, the slats jammed) and green with yellow (no THS, the flaps jammed) are emergencies beyond
+this scripted crew, which flies a fixed 140 kt: it does not land them, and no case asks it to.
+
+Every degraded case is flown to a landing, judged as any other: the A320 at 155 fpm, 5.0° of pitch and
+1.43 g, the 737 at 55 to 59 fpm. Before the trim wheel the crew landed the three-ADR case at 564 fpm
+and 2.87 g and bounced, having flown the approach 1.75° steep on an untrimmed elevator. A direct-law
+flight, the wheel turned by hand, replays to the same bytes. Healthy flights are byte for byte as
+before.
+
+New `ctest` cases: nine `laws_` cases — `--expect laws=PITCH/LATERAL[,PITCH]`, the laws held from five
+seconds after the failure until the crew configures to land, and once the gear is down, then the
+landing — and `laws_three_irs_replays_to_the_same_touchdown`. Forty-eight native cases pass with either airframe on MSVC 19.44 and on GCC 13.3; forty-four under node, the WebAssembly build leaving out the four that start processes.
 
 ## What P7 still has to build
 
-`ROADMAP.md` §4, *P7 in detail*: failures and the laws they reach; the protections exercised; and the
-gate — a hand-flown ILS, stable and repeatable, with its measures and bands written down. The browser
-steps (5 to 8) and the runway, ILS and wind (step 2) are above. Our fitted A320 flies all of it from
+`ROADMAP.md` §4, *P7 in detail*: the protections exercised; and the gate — a hand-flown ILS, stable
+and repeatable, with its measures and bands written down. The browser steps (5 to 8), the runway, ILS
+and wind (step 2) and the failures and their laws (step 3) are above. Our fitted A320 flies all of it from
 here, its engines fitted too ([above](#its-engines-and-how-they-were-fitted)).
 
 ## What is here

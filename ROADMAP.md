@@ -9,8 +9,9 @@ of ours, fitted to 57 cited targets, its aerodynamics and its engines, headless 
 (§4, P7). The browser track (steps 5–8) is done: the same flight in a browser from `file://`, a
 joystick, a view. So is step 2: real runways and an ILS on them, wind and turbulence, the scripted crew
 flying the ILS inside every band. Every flight starts at KDFW, the main airport by the operator's word
-(§9), and the view draws it whole: seven runways, terminals, ramps and towers. So is the thrust fit;
-steps 3, 4 and the gate are next.
+(§9), and the view draws it whole: seven runways, terminals, ramps and towers. So is the thrust fit,
+and so is step 3: the instructor's failures, the laws A32NX's computers choose for them, each flown to
+a landing, direct law trimmed by hand. Step 4 and the gate are next.
 
 ---
 
@@ -102,7 +103,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; steps 3, 4 and the gate not started |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside all 57 A320 targets, its engines' 24 among them, where the 737 it replaced is inside 17 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 and the gate not started |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -283,6 +284,17 @@ in the browser, since A32NX's ARINC 429 words start at zero here (flybywiresim/a
 view draws KDFW whole, its terminals and towers from the FAA's airport diagram. One finding on the way:
 JSBSim's initial condition and its dynamics take the wind with opposite signs, so the wind is set after
 the trim.
+
+Step 3 is done [M]: the instructor's failures — each ADR and IR, each hydraulic system with the
+servos, THS, slat and flap motors it drives, each ELAC and SEC — at set times, from the scenario text
+the harness, the C API and the page take; a pitch trim wheel; and the scripted crew flying direct law
+as a pilot does, its loops on the stick and the wheel trimming off what the hand holds. A32NX's
+computers choose the laws, read from the FCDC: one unit of any kind lost leaves normal law; two ADRs,
+two IRs, both ELACs, SECs 1 and 2, or blue and yellow hydraulics, alternate 1; three ADRs alternate 2;
+three IRs direct; any alternate law goes direct with the gear down; lateral goes direct whenever pitch
+leaves normal. Every degraded case lands, with either airframe, as gently as a healthy one (A320 155
+fpm and 1.43 g). Two hydraulic pairs, green with blue and green with yellow, are beyond the scripted
+crew, which flies a fixed 140 kt; the instructor may still fail them. `flight/README.md` has the table.
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
