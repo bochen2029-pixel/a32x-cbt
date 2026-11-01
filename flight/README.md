@@ -1562,8 +1562,9 @@ reversers held their engines at idle). Our A320 on MSVC 19.44:
 - The take-offs from the runway spool up sooner, so the gates' flights land about a second sooner; the
   approach from 10 nm, which starts in the air, touches down as before, and its digest moves on the
   landing roll, where reverse thrust spools up from idle and ground idle is a little higher.
-- The nine scripted ILS cases are STABLE as before, their touchdown and judge lines the same to the
-  digit printed.
+- The nine scripted ILS cases are STABLE as before, their touchdowns and verdicts the same to the
+  digit printed; one band detail moved, in `ils_flown_from_10_kt_slow` the worst sink, 747.19 fpm as
+  before, coming at 176 ft where it came at 177 ft.
 - The 737 reads none of these files: its digests are unchanged (the `reference` start
   `275232cf63a21228` on MSVC, `172fcae195c7270d` on GCC).
 - Every thrust row reads as before, as the scorer measures at flight idle and steady state; the

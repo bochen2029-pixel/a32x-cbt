@@ -495,6 +495,60 @@ trainer's debrief does.
 
 ---
 
+### The airframe, where it is still unfitted — a plan
+
+Not started: a plan for the operator, written when our A320 came inside all 69 of its targets
+(`3e1c191`). Each part starts on the operator's word and lands as a merge of its own under the swap rule
+(P7, *Decisions*), with its own re-baseline; where a flight moves, the gate's five recordings are
+re-judged on the new build (`law_harness --rejudge`) or flown again.
+
+**Why.** Inside its targets is not inside the whole envelope: the targets cover what the gate and the
+circuit fly, and much of the airframe outside that is still an estimate no row measures.
+`flight/README.md` names each where it arises; here they are together, with what each moves, where a
+source might come from, and an order, the parts whose sources are in hand first.
+
+1. **The drag of CONF 1+F, CONF 1 and CONF 2** (seeds). In hand: ANP's departure for the A320-211 flies
+   CONF 1+F to 186.2 kt and CONF 1 to 208.1 kt, and its drag-to-lift ratios for both, 0.071403 and
+   0.066827, can become rows at those segments' speeds, as CONF 3's and FULL's are at theirs. CONF 2 has
+   ratios, 0.067463 gear up and 0.096267 down, but no speed in ANP: its row would take one from A32NX's
+   VLS table, an assumption to say. The take-off gradient stays held out, testing thrust and drag
+   together. Moves take-offs, the circuit and approaches, a little.
+2. **Thrust above 10,000 ft and from high airfields.** In hand: OpenAP's engine data, already the cruise
+   row's source. First as held-out checks, climb thrust at FL200 and FL300, to see whether the lapse's
+   form holds where only the cruise row pins it; fitted only if it does not. Moves climbs above
+   10,000 ft.
+3. **Pitch beyond 25° of alpha** (the elevator's power left there, a quarter, ours; a pitching moment
+   that goes on stiffening where the GTM's levels off). In hand: the TCM report's moment past 25°, where it
+   levels off, for a held-out row at 30 to 40°. Moves only flight deep in the stall.
+4. **The stall above Mach 0.3** (`clmax-mach`, an estimate). Moves the 1-g stall and alpha max's margin
+   at altitude, and step 4's full pull at Mach 0.45, where ours runs out of lift near 2 g. To look for:
+   Airbus's public flight-operations brochure on performance, *Getting to Grips with Aircraft
+   Performance*, for the A320's buffet onset with Mach; NASA's Common Research Model, a generic
+   transport's public transonic test data, for the trend. Rows on lift at buffet onset by Mach, banded
+   wide.
+5. **The transonic pitching moment and drag past the drag rise** (`cm-mach-tuck`, an estimate, and the
+   wave drag past Mach 0.85). Moves high-speed protection, where step 4 reached 381 kt against the ELAC's
+   380. To look for: the Common Research Model's pitching moment with Mach at a fixed lift, another
+   wing's trend, so held out or banded wide.
+6. **Ground effect** (`cm-ground`, and McCormick's factor on the induced drag: estimates). Moves every
+   flare, so the gate's own flights: best taken after the gate is flown, with its recordings re-judged.
+   To look for: NASA's wind-tunnel reports on transport configurations near the ground.
+7. **The pitch of normal flight in CONF FULL** (reached only through the rows about the stall). Moves the
+   handling of the approach and the flare, the gate's own. No public A320 data found; accident reports
+   with an A320's flight-data traces in the landing configuration are the only candidates, and anything
+   taken from them would be a held-out check.
+8. **MAX REV** (`reverse-max`, provisional at 0.7). The FAA's statistical-loads report on the A320,
+   DOT/FAA/AR-02/35, the source of Volpe's 32 %, plots the N1 its engines use in reverse, and its top
+   would bound MAX REV's N1. Turning N1 into thrust needs the CFM56-5A1's own curve, which is not public;
+   and the report is on DTIC, a download not yet allowed.
+
+**Decisions for the operator.** (a) Which parts to start, and when against the gate: 6 and 7 move its
+flights. (b) Downloads: 4 and 5 need NASA's and Airbus's documents, 8 DTIC's; the rule so far allows
+EASA's and EUROCONTROL's official pages. (c) CFD, which the operator has named for much later, could
+answer 4 to 6 from the A320's public geometry: a phase of its own.
+
+---
+
 ### P8 in detail — the displays, a plan
 
 Not started: P7's gate comes first, and the phase starts on the operator's word (CLAUDE.md §10). A plan
