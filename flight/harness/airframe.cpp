@@ -316,9 +316,13 @@ struct Airframe::Impl {
     s.longitudeDeg = longitude->getDoubleValue();
     s.radioHeightFt = agl->getDoubleValue() - radioZeroFt;
 
-    s.noseWow = wow[0]->getBoolValue();
-    s.leftWow = wow[1]->getBoolValue();
-    s.rightWow = wow[2]->getBoolValue();
+    // A gear compressed only while it is down: JSBSim updates a gear's WOW only when the gear is down
+    // (FGLGear.cpp, gearPos > 0.99) and a retracted gear keeps the last it had. A start in the air with
+    // the gear up never had one, and kept the gear compressed — which held the ELAC on the ground.
+    const bool down = gearPos->getDoubleValue() > 0.99;
+    s.noseWow = down && wow[0]->getBoolValue();
+    s.leftWow = down && wow[1]->getBoolValue();
+    s.rightWow = down && wow[2]->getBoolValue();
     s.wheelSpeedKn = std::max(0.0, (wheelSpeed[0]->getDoubleValue() + wheelSpeed[1]->getDoubleValue()) / 2 / kFpsPerKt);
     s.gearPosition = gearPos->getDoubleValue();
     s.n1[0] = n1[0]->getDoubleValue();
