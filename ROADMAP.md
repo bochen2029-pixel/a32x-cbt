@@ -202,25 +202,32 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
-- It is a 737. Its lift peaks near 13° of alpha; in one badly flown climb during development it went
-  through that to 24° in normal law, because the A320 laws' angle-of-attack protection is shaped for
-  the A320's wing. Only an A320 airframe cures that.
+- It is a 737. Its lift peaks near 13.2° of alpha whatever the flaps. The laws' α max (A32NX's ELAC
+  table) is 8.7° clean, far short of that, but 13.0 to 14.2° with slats out — at or past the peak, so
+  a slowdown to α max with slats out can stall this airframe. In one badly flown climb during
+  development, flaps running in at low speed, it went through its stall to 24° of alpha in normal law.
+  Only an A320 airframe cures that.
 - The 737's aerodynamics have no stabiliser, no slats, no roll spoilers and no aileron droop: the THS
   acts as 1.8 times its angle in elevator, and spoilers and speedbrakes act through the 737's coarse
   steps. The engines are JSBSim's turbine on a thrust lever schedule of ours, with no reverse, no
   FADEC and no autothrust. The FMGC is a stub that reports weight and CG.
 - The crew flies on truth, not instruments. No wind, ISA, and a sea-level runway that is everywhere.
+  The position is real: JSBSim moves the aircraft over a WGS84 earth and the IRs report it.
 
 **The rest of P7 — the plan.** Ordered; each step is done when its test passes, and the gate is last.
+Steps 3 and 4 answer §9's "all three laws" and "the protections", which land from P7 as well; the gate
+row in the table above is still the hand-flown ILS unless the operator widens it.
 
 | step | what | done when |
 |---|---|---|
-| 2 | A runway and an ILS in the world | a 3,000 × 45 m runway with a threshold, touchdown zone and centreline; localizer and a 3° glideslope crossing the threshold at 50 ft, computed from the aircraft's position; the scripted crew flies raw-data ILS from 10 nm, from starts 1 dot and 10 kt off, inside every band below, every time |
-| 3 | The flight core as a library | the step loop behind a small C API — start, inputs, step, state — with the scripted crew one input source among others; a recorded input stream replays to the same touchdown, byte for byte |
-| 4 | WebAssembly | Emscripten builds the A32NX computers, JSBSim and their data files into one single-file module that runs from `file://` in a Blob worker, network off; 50 Hz holds with headroom, measured on the dev desktop with its load beside the number, and on the 2014 laptop when there is one |
-| 5 | Joystick and the loop | the Gamepad API: sidestick pitch and roll, rudder on a twist or pedals, a throttle axis with CL, MCT and TOGA detents, buttons for takeover, brakes, speedbrake, flaps and gear; per-device mapping, deadzones and calibration kept between sessions; keyboard only as fallback; fixed 50 Hz steps under a display-rate loop that drops debt rather than stretch a step |
-| 6 | The view | Three.js (MIT), bundled with the page rather than fetched: runway with edge, centreline and approach lights, horizon, ground, a few buildings, dusk and night, from the pilot's eyepoint; a minimal overlay — speed, altitude, attitude, localizer and glideslope dots, flaps, gear — until P8 draws a PFD; frame time measured under software rendering |
-| 7 | **the gate** | a hand-flown ILS, judged as below |
+| 2 | A runway, an ILS and wind | a real runway at its real place and elevation, from OurAirports (public domain); localizer and a 3° glideslope crossing the threshold at 50 ft, computed from the aircraft's position; wind and turbulence from JSBSim's atmosphere; the scripted crew flies raw-data ILS from 10 nm, from starts 1 dot and 10 kt off, calm and in a 15 kt crosswind, inside every band below, every time |
+| 3 | Failures, and the laws they reach | the instructor's failures in the harness — ADRs, IRs, hydraulic pairs, ELACs, SECs — and a case for each law: alternate 1, alternate 2, direct, and direct at gear-down in alternate, each reached from its failure and flown to a landing. ADR loss already reaches alternate 2 and then direct at gear-down on this airframe |
+| 4 | The protections, exercised | the crew drives each one — bank to 67°, pitch to +30/−15°, +2.5 g, full back stick slowing to α max, a dive to VMO/MMO — and each holds. This needs an airframe whose stall and transonic behaviour are credible against the laws' α prot, α max and MMO: see the airframe decision below. α floor waits for autothrust and FADEC, P9 |
+| 5 | The flight core as a library | the step loop behind a small C API — start, inputs, step, state — with the scripted crew one input source among others; a recorded input stream replays to the same touchdown, byte for byte |
+| 6 | WebAssembly | Emscripten builds the A32NX computers, JSBSim and their data files into one single-file module that runs from `file://` in a Blob worker, network off; 50 Hz holds with headroom, measured on the dev desktop with its load beside the number, and on the 2014 laptop when there is one |
+| 7 | Joystick and the loop | the Gamepad API: sidestick pitch and roll, rudder on a twist or pedals, a throttle axis with CL, MCT and TOGA detents, buttons for takeover, brakes, speedbrake, flaps and gear; per-device mapping, deadzones and calibration kept between sessions; keyboard only as fallback; fixed 50 Hz steps under a display-rate loop that drops debt rather than stretch a step |
+| 8 | The view | Three.js (MIT), bundled with the page rather than fetched: runway with edge, centreline and approach lights, horizon, ground, a few buildings, dusk and night, from the pilot's eyepoint; a minimal overlay — speed, altitude, attitude, localizer and glideslope dots, flaps, gear — until P8 draws a PFD; frame time measured under software rendering |
+| 9 | **the gate** | a hand-flown ILS, judged as below |
 
 **How a hand-flown ILS is judged.** Every approach is recorded and scored from 1,000 ft above the
 threshold to the stop. The path bands are the stabilised-approach criteria the industry publishes
@@ -253,15 +260,19 @@ trainer's debrief does.
 
 - Taken 2026-11-01: fly JSBSim's 737 now.
 - Open — a fitted A320. A table of A320 targets from public sources: trims across speed,
-  configuration and weight (alpha, pitch, elevator and THS), stall speeds, pitch and roll responses,
-  climb and descent. An optimiser tunes a 737-shaped set of coefficients, seeded from public A320
-  numbers, against it; what mismatch remains becomes part of the P7 gate. The fitted A320 replaces the
-  737 when it beats it on the same table. The harness keeps the airframe to one adapter and one data
-  set so the swap stays small. A fit of tens of coefficients against JSBSim itself, at about 10 µs a
-  frame, is minutes of CPU, not a GPU job.
+  configuration and weight (alpha, pitch, elevator and THS), stall speeds and the alpha they stall
+  at, pitch and roll responses, climb and descent, and the drag rise toward MMO. An optimiser tunes a
+  737-shaped set of coefficients, seeded from public A320 numbers, against it; what mismatch remains
+  becomes part of the P7 gate. The fitted A320 replaces the 737 when it beats it on the same table.
+  The harness keeps the airframe to one adapter and one data set so the swap stays small. A fit of
+  tens of coefficients against JSBSim itself, at about 10 µs a frame, is minutes of CPU, not a GPU
+  job. **§9 now asks that the P7 airframe be judged on credible high-AoA and high-Mach behaviour, not
+  on trim alone, and with slats out the 737's lift peaks at or below the laws' α max: on §9's terms
+  step 4 cannot pass on the 737.** So "the 737 for now" reads as "the 737 until the fit lands",
+  unless the operator decides otherwise.
 - Open — packaging. The browser product links A32NX, so it is GPLv3; `app/` stays MIT. Two
-  artefacts, or one GPLv3 artefact that carries the trainer: decide before step 4 ships anything.
-- Not changed: P8's displays come after this gate. Step 6's overlay is not a PFD.
+  artefacts, or one GPLv3 artefact that carries the trainer: decide before step 6 ships anything.
+- Not changed: P8's displays come after this gate. Step 8's overlay is not a PFD.
 
 ---
 
