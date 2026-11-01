@@ -126,7 +126,9 @@ names one of these sources.
 | AAIB India, final report on the serious incident to A320-271N VT-WGR at Bengaluru, 11 November 2019 | a public investigation report | a recorded approach: 65.2 t, CG 30.6 % MAC, CONF FULL, on the ILS glide slope at VLS + 8 kt, pitch +2.5° at 1,000 ft and +2.5 to +3.5° down to 220 ft, from Airbus's analysis of the flight data recorder quoted in the report | cited by value; the band's 0.5° either way is ours |
 | OpenAP's drag model (`junzis/openap`, `openap/drag.py`; Sun, Hoekstra and Ellerbroek, *Aerospace* 7(8) 104, 2020), after Gur, Mason and Schetz, *Journal of Aircraft* 47(4), 2010 | LGPL-3.0; the paper's equations | the drag rise: Korn's drag-divergence Mach (technology factor 0.95, OpenAP's default thickness 0.12, the A320's 25° of sweep from OpenAP's `a320.yml`) and Lock's fourth-power rise above a critical Mach 0.108 below it; at a lift coefficient of 0.5 the rise reaches 20 counts at Mach 0.827 | computed from the published equations; no code copied. A model, not a measurement, and the file says so |
 | OpenAP WRAP, A320 (Sun, Ellerbroek and Hoekstra, *Transportation Research Part C*, 2019; `junzis/openap`) | LGPL-3.0 | the ranges of its ADS-B fits for takeoff acceleration, liftoff speed, climb and descent rate, and its typical cruise | four ranges and a typical cruise Mach and level cited, units converted; no file copied. The four ranges are context rows, not counted: they are what airlines fly, at reduced thrust and mixed weights |
-| MIL-F-8785C, *Flying Qualities of Piloted Airplanes* (US DoD, 1980) | public domain | Level 1 floors for large aircraft: roll-mode time constant at most 1.4 s, Dutch-roll damping at least 0.08, short-period damping 0.30 to 2.00 | cited |
+| MIL-F-8785C, *Flying Qualities of Piloted Airplanes* (US DoD, 1980) | public domain | Level 1 floors for large aircraft: roll-mode time constant at most 1.4 s, Dutch-roll damping at least 0.08, short-period damping 0.30 to 2.00; in the terminal phases (category C), short-period damping 0.35 to 1.30 (table IV), a control anticipation parameter of 0.16 to 3.6 per g per s² and a natural frequency of at least 0.7 rad/s (figure 3, read off its log scales) | cited |
+| Foster, Cunningham, Fremaux, Shah, Stewart, Rivers, Wilborn and Gato, *Dynamics Modeling and Simulation of Large Transport Airplanes in Upset Conditions*, AIAA 2005-5933 (NASA Langley and Boeing; NTRS 20050214373) | a paper published on NASA's technical reports server | wind tunnel tests of a twin-jet transport to 85° of alpha: the highest steady alpha full nose-up elevator holds, the stabiliser at 0, about 25° with the flaps up, and the peak alpha of piloted stalls 4 to 5° lower with the flaps down; that pitch stability falls near the stall and the elevator loses power with alpha | cited by value; the flaps-down figure is our inference from it, and the file says so. Most of the paper's figures carry no numbers, the company's data being proprietary |
+| Hueschen, *Development of the Transport Class Model (TCM) Aircraft Simulation From a Sub-Scale Generic Transport Model (GTM) Simulation*, NASA/TM-2011-217169 (NTRS 20110014509) | public domain, a work of the US government | the non-proprietary aerodynamics NASA derived from the same wind tunnel model, full scale: the lift past the peak at flaps 30, 0.89 of the peak 5° past it and 0.64 15° past (figure 34); the pitching moment's nose-down break across the stall with the flaps up, 0.20 below its earlier line 6° past the lift peak (figure 33) | read off the figures by eye; no data file used |
 | EASA type-certificate data sheet E.067, issue 02, 17 April 2018, CFM56-5 series | a public certification document | the CFM56-5-A1's ratings: 11,120 daN take-off, 10,540 daN maximum continuous, static, sea level, ISA, no air bled | cited by value |
 | The Aircraft Noise and Performance (ANP) database, version 2.3, A320-211 / CFM56-5A1 (EUROCONTROL and ECAC; the archive tables EASA publishes) | public; its data are developed by the manufacturer and reviewed by the FAA, EASA, the Volpe Center and EUROCONTROL | Airbus's thrust coefficients for the MaxTakeoff, MaxClimb and IdleApproach ratings; its drag-to-lift ratios for CONF 1+F and clean; its take-off speed coefficient for CONF 1+F | cited by value; thrust and gradients computed with the equations below; no file copied |
 | Commission Directive (EU) 2015/996, Annex II, Appendix B: ECAC Doc 29's flight-performance method | EU law, public | equation B-1, corrected net thrust from the ANP coefficients; B-12, the climb gradient; B-15, the take-off speed; its guidance on reduced take-off and climb thrust, read for the WRAP rows | cited |
@@ -137,7 +139,12 @@ names one of these sources.
 The margins and the bands' widths that no source gives — ±3 kt on a stall speed, 1° above α max,
 0.5° around a recorded attitude, 0.02 of Mach around a modelled drag rise, 1 % around a rating, 3 %
 around ANP's thrust and 1 kN around its idle, 5 % around a generic model, 10 % around a gradient
-from another airframe's drag — are this project's, and the file says so where it uses them.
+from another airframe's drag, 4° around Foster's alphas, 0.10 around the TCM's lift past the stall and
+−0.35 to −0.05 around its pitch break — are this project's, and the file says so where it uses them.
+
+Quoted for comparison, not scored: NASA CR-2144, Heffley and Jewell, *Aircraft Handling Qualities Data*
+(1972, NTRS 19730003312), whose tables give the Boeing 747's and the Convair 880M's pitch derivatives in
+their landing configurations; `flight/README.md` sets ours beside them (step 4).
 
 The ANP entry is the A320-211, with the CFM56-5A1 our A320 carries and wingtip fences where ours has
 sharklets. ANP's thrust is kept below 10,000 ft, where Doc 29 uses it; above that one row stands on
@@ -153,7 +160,8 @@ derived from JSBSim's A320 or 737 files. Its numbers come from these, each named
 
 | source | licence | what is taken |
 |---|---|---|
-| A32NX's MSFS flight model, `flight_model.cfg` (§1a clone) | GPLv3 | wing and tail areas, span; the A320-251N's operating empty weight (42.5 t at 30 % MAC) and empty moments of inertia; what its reference stall speeds imply for CL max clean and in CONF FULL; where its Mach drag table reaches 20 counts; spoiler and flap increments as cross-checks. MSFS conventions: a seed and a cross-check, not a drop-in |
+| A32NX's MSFS flight model, `flight_model.cfg` (§1a clone) | GPLv3 | wing and tail areas, span; the A320-251N's operating empty weight (42.5 t at 30 % MAC) and empty moments of inertia; what its reference stall speeds imply for CL max clean and in CONF FULL; where its Mach drag table reaches 20 counts; how its elevator's power fades with alpha past 10° (`pitch_moment_delta_elevator_aoa_table`), the seed of our tail's fade; spoiler and flap increments as cross-checks. MSFS conventions: a seed and a cross-check, not a drop-in |
+| NASA's Transport Class Model (§1d, Hueschen 2011) | public domain | the size of the pitching moment's nose-down break across the stall, the seed of ours |
 | OpenAP, `a320.yml` and `dragpolar/a320.yml` | LGPL-3.0 | the MAC; the clean drag polar (CD0 0.018, induced factor 0.039) and the gear's drag, fitted to ADS-B |
 | JSBSim's `engine/CFM56_5.xml` (§1c) | LGPL-2.1 | the engines' seed. Our engine file, `Engines/CFM56-5A1-fit.xml` (GPLv3), keeps its bypass ratio, fuel flow and idle and maximum spool speeds, six numbers, by value, which LGPL-2.1's section 3 allows under the GPL; its 25,000 lb rating is the type certificate's (§1d), the same. Its thrust tables, fitted in our form by least squares, are the seeds of the thrust (`thrust-seeds.csv`). Not read at run time |
 | textbook methods: USAF DATCOM's lift-curve slope, tail volume and downwash for the tail's terms (Etkin and Reid, *Dynamics of Flight*), McCormick's ground-effect factor, Korn's equation and Lock's rise | — | our estimates of the slopes, the tail's damping and power, ground effect and the drag rise's shape, from the file's geometry |
@@ -161,8 +169,10 @@ derived from JSBSim's A320 or 737 files. Its numbers come from these, each named
 
 The fit is `flight/harness/fit.cpp`: CMA-ES as Hansen's tutorial sets it (arXiv:1604.00772), written
 here, scored by `airframe_score` on the fit rows of §1d only. The method is the tutorial's; the code
-is ours. It fits the aerodynamics on every group of rows but the thrust group, and, with `--thrust`,
-the engines' eight numbers on the thrust group's fit rows: the rating and Airbus's thrust of §1d. The
+is ours. It fits the aerodynamics on every group of rows but the thrust and post-stall groups; with
+`--thrust`, the engines' eight numbers on the thrust group's fit rows: the rating and Airbus's thrust of
+§1d; and with `--poststall` five numbers past the stall (`poststall-seeds.csv`) on the post-stall group's
+fit rows, Foster's alpha with full nose-up elevator in CONF FULL and the TCM's lift past the peak. The
 form those numbers sit in, δ^x (1 + a1 M + a2 M²)(1 + c M (1 − δ)) for take-off thrust and δ (i0 + i1 M)
 for idle, is ours, chosen against ANP's points before the fit.
 

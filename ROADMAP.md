@@ -5,7 +5,8 @@ installer. This document is the plan and the honest state of it.
 
 Last written: 2026-11-01, at P7. The flyable simulator is now the product (§3, §9); the systems
 trainer still ships on its own, MIT (P5's zip). P7's slice 1 flies the A32NX computers on an A320
-of ours, fitted to 57 cited targets, its aerodynamics and its engines, headless from takeoff to landing
+of ours, fitted to 65 cited targets, its aerodynamics, its engines and what lies past its stall,
+headless from takeoff to landing
 (§4, P7). The browser track (steps 5–8) is done: the same flight in a browser from `file://`, a
 joystick, a view. So is step 2: real runways and an ILS on them, wind and turbulence, the scripted crew
 flying the ILS inside every band. Every flight starts at KDFW, the main airport by the operator's word
@@ -232,6 +233,10 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
       file of ours, seeded from JSBSim's CFM56_5, and a thrust lever schedule of its own, against 24 new
       rows from its type certificate and Airbus's own data in the ANP database. Inside 57 of 57, the
       737 inside 17 [M]; the climb at 250 kt down from 4,600 to 3,350 fpm (*Decisions*)
+- [x] what lies past its stall fitted the same way (`airframe_fit --poststall`): a pitch break, the tail's
+      power fading with alpha and the lift beyond the peak, against 8 new rows from MIL-F-8785C's
+      terminal phases and NASA's wind tunnel data on a transport. Inside 65 of 65, the 737 inside 21 [M];
+      the fast full pull in CONF FULL still rings (*Decisions*)
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
@@ -420,6 +425,23 @@ trainer's debrief does.
   at 3,349 fpm at 250 kt, still above WRAP's airline average, as full climb thrust should. What no row
   checks — climb thrust above 10,000 ft, take-off from high airfields, ground idle — is in
   `flight/README.md`.
+- **The fit past the stall, 2026-11-01, under the same rule.** Step 4 left a fast full pull in CONF FULL
+  stalling our A320, and asked for targets on its short period in CONF FULL near VLS and on its lift and
+  pitching moment past the stall. The table gained 8 rows (`docs/provenance.md` §1d): the short period
+  against MIL-F-8785C's Level 1 for the terminal phases, held out; the highest alpha full nose-up
+  elevator holds, from NASA's wind tunnel tests of a transport (Foster et al., AIAA 2005-5933), CONF FULL
+  fitted and clean held out; the pitch break and the lift past the peak, from NASA's Generic Transport
+  Model (NASA/TM-2011-217169), the lift fitted, the break held out. Five coefficients of ours carry them —
+  a nose-down break, the tail's power fading with alpha, the lift's fall past the peak — fitted by
+  `airframe_fit --poststall` on those rows alone, the pitch of normal flight held, since none of them
+  measures it. Fitted, the A320 is **inside 65 of 65 — 27 of 27 fit rows, 38 of 38 held out** — and
+  inside every row it was inside before; the 737, untouched, inside 21; every `ctest` case passes with
+  either airframe, on MSVC and GCC. It does not stop the ring: the fast pull in CONF FULL peaks at 20.0°
+  of alpha on its third swing, against 20.3° before. What the targets pin acts above 11°, the ring swings
+  alpha from 1° to 20°, and over most of that swing the pitch of normal flight decides it, which is inside
+  MIL-F-8785C's Level 1 and inside what NASA CR-2144 gives the 747 and the Convair 880M on landing. So the
+  airframe cannot both meet its targets and stop the ring; what is left is A32NX's protection flying an
+  alpha lagged by 2 s (`flight/README.md`, step 4).
 - The harness keeps the airframe to one adapter (`harness/airframe.cpp`) and one aircraft file, so
   the swap stays small. Either airframe can fly: `FLIGHT_AIRFRAME=737|a320`.
 - **Taken 2026-11-01: packaging.** The operator left it to the recommendation: *"go with your own

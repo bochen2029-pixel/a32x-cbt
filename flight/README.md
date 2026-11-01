@@ -10,9 +10,10 @@ replaced and which stays selectable. A scripted crew flies either through the co
 runway, round a circuit and back onto the runway, headless, in normal law. The 737 is A320-class, not
 an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6 passed against a point-mass stub;
 the same gate, unchanged, passes against both. The A320's numbers are written down
-(`targets/a320.csv`, 57 targets): our A320 is inside all 57, the 737 inside 17. The A320 replaced the
+(`targets/a320.csv`, 65 targets): our A320 is inside all 65, the 737 inside 21. The A320 replaced the
 737 under the swap rule ([below](#the-swap-made-2026-11-01)) on its aerodynamics, and its engines
-were fitted after ([below](#its-engines-and-how-they-were-fitted)).
+were fitted after ([below](#its-engines-and-how-they-were-fitted)), and then what lies past its stall
+([below](#past-the-stall-and-how-it-was-fitted)).
 
 ## Build and run
 
@@ -34,8 +35,9 @@ airframe against the A320's targets (below); `--out score.csv` writes the table.
 `FLIGHT_AIRFRAME=737` in the environment flies the 737 instead of our A320, in either program, and
 `airframe_score --airframe 737` scores it. Our A320 is `jsbsim/aircraft/A320-fit/A320-fit.xml`, read
 from this tree, with engines of its own beside it (`Engines/CFM56-5A1-fit.xml`).
-`flight/build/Release/airframe_fit` fits its aerodynamics (below) and `airframe_fit --thrust` its
-engines, each in a minute or two; `--write` puts the result into the aircraft file.
+`flight/build/Release/airframe_fit` fits its aerodynamics (below), `airframe_fit --thrust` its
+engines and `airframe_fit --poststall` what lies past its stall, each in a minute or two; `--write` puts
+the result into the aircraft file, and `--from-file` starts the search where the last fit left it.
 
 ## The P6 gate on JSBSim, as measured
 
@@ -97,6 +99,7 @@ number, it is the 737's, measured before the swap.
 | `lands_inside_the_limits` | the first landing, wings level, no bounce within 30 s: our A320 at −152 fpm, 5.7° of pitch, 1.45 g, at 1,076.7 s; the 737 at −77 fpm, 3.2°, 1.27 g. Twenty minutes for the A320, which descends at idle at about 1,100 fpm against the 737's 1,700 and, with its engines fitted, climbs at about 3,350 fpm against 4,600; eighteen for the 737 |
 | `airframe_is_scored_against_the_a320` | the scorer measures every target and context row; it fails only on a row it could not measure (shown with a planted bogus row), never on a row outside its band |
 | `scorer_instruments_read_the_737_right` | the scorer's instruments read the 737's own file back: its gear drag, 0.015; the Mach at which its drag table crosses 20 counts, 0.8170; a nose-down elevator pulse lowering alpha. Without the gear fix (Findings) it fails two of three |
+| `scorer_instruments_read_pitch_as_the_files_have_it` | the instruments for pitch past the normal range: a static moment that −40 per rad of alpha-rate damping moves by 0.00001; 10° of elevator moving it as our A320's file says, to 0.1 %, and past the onset of the tail's fade by the share the file leaves; and two readings of the 737's clean short period agreeing. It fails with the alpha rate in the moment, and with the fade left out of the elevator's term |
 | `the_737_is_scored_against_the_a320` | the 737 it replaced is still scored on every row, so the swap rule can always rescore both |
 | `the_737_flies_the_gate` | the P6 gate with the 737 flying (`FLIGHT_AIRFRAME=737`) |
 | `the_737_lands_inside_the_limits` | the landing case with the 737 flying |
@@ -110,34 +113,36 @@ at that instant, so the computers never see what JSBSim makes of an aeroplane un
 ## The A320's targets, and the two airframes against them
 
 The operator chose to fly the 737 for P7 and swap in a fitted A320 later. `targets/a320.csv` is the
-bar for that swap: 57 targets an airframe is counted against and 4 context rows scored but not
+bar for that swap: 65 targets an airframe is counted against and 4 context rows scored but not
 counted. Each row names its source in the file's header: A32NX's VS1g and VLS tables
 (`targets/a320-speeds.csv`, a community reconstruction of Airbus's, sampled on a weight grid), the
 ELAC's own α max and α prot, a recorded A320 approach (VT-WGR's flight data, from AAIB India's
-report), the lateral law's 15°/s, MIL-F-8785C's Level 1 floors for large aircraft, the wave-drag
-model OpenAP implements, one band from pilot literature still to confirm; and for the engines, the
-CFM56-5A1's type-certificate ratings, Airbus's own thrust and drag-to-lift ratios for the A320-211
-in the ANP database, OpenAP's engine data and Bartel and Young's thrust lapse. OpenAP WRAP's
-distributions fitted to ADS-B are the four context rows. Twenty-four rows are marked *fit*, for an
-optimiser to tune against; thirty-three are *held out*, so that a fit which only memorises is caught.
+report), the lateral law's 15°/s, MIL-F-8785C's Level 1 floors for large aircraft, cruising and in
+the terminal phases, the wave-drag model OpenAP implements, one band from pilot literature still to
+confirm; for the engines, the CFM56-5A1's type-certificate ratings, Airbus's own thrust and
+drag-to-lift ratios for the A320-211 in the ANP database, OpenAP's engine data and Bartel and Young's
+thrust lapse; and past the stall, NASA's wind tunnel data on a transport (Foster et al.) and its
+Generic Transport Model (the Transport Class Model's report). OpenAP WRAP's distributions fitted to
+ADS-B are the four context rows. Twenty-seven rows are marked *fit*, for an optimiser to tune against;
+thirty-eight are *held out*, so that a fit which only memorises is caught.
 Rows that depend on weight are measured at two: 48.5 t, the weight the 737 is loaded to, and 65 t,
 between an A320-251N's maximum zero-fuel and landing weights. The rule for the swap is in
 `ROADMAP.md`, P7.
 
 `airframe_score` measures in two ways. The bare airframe, no computers, at each row's weight: JSBSim
-sweeps the lift curve in each configuration (from which the 1-g stall speed), reads the drag against
-Mach at a lift coefficient of 0.5, trims it at the A320's VLS and approach speed and in cruise, pulses
-its elevator from a trim for the short period, runs one engine to a steady thrust at a lever's detent,
-and sets a lever's thrust against the thrust a level trim needs, for a steady climb or descent
-gradient. The airframe flown, at the weight it is loaded to: the gate's circuit through the A32NX
+sweeps the lift curve in each configuration (from which the 1-g stall speed, and the lift past the
+peak), reads the drag against Mach at a lift coefficient of 0.5, sweeps the static pitching moment in
+level flight at 1 g, trims it at the A320's VLS and approach speed and in cruise, pulses its elevator
+from a trim for the short period, runs one engine to a steady thrust at a lever's detent, and sets a
+lever's thrust against the thrust a level trim needs, for a steady climb or descent gradient. The airframe flown, at the weight it is loaded to: the gate's circuit through the A32NX
 laws, with a full-stick roll added in cruise, timing the roll, the Dutch roll after the circuit's
 pedal kick, the takeoff, the climb and the descent. It scores; it does not gate. Its `ctest` cases fail
 only on a row they could not measure.
 
 Measured on this revision of the table, MSVC 19.44: `airframe_score --airframe a320`, then
 `--airframe 737`; for the engines, our A320 also as it flew on JSBSim's CFM56_5 before they were
-fitted. Our A320 is loaded to 65.0 t at 28.1 % MAC, the 737 to 48.5 t at 15.4 %. A weight-dependent
-band is the A320's at the row's weight.
+fitted, and past the stall as it flew before that was fitted. Our A320 is loaded to 65.0 t at 28.1 %
+MAC, the 737 to 48.5 t at 15.4 %. A weight-dependent band is the A320's at the row's weight.
 
 fit rows, the aerodynamics:
 
@@ -173,6 +178,14 @@ fit rows, the engines:
 | `thrust-idle-210kt-5000ft` |  | -0.71..1.29 kN | 0.32 | **inside** | 1.50 | outside +0.2 | 1.15 | **inside** |
 | `thrust-idle-250kt-10000ft` |  | -2.65..-0.65 kN | -1.67 | **inside** | 0.16 | outside +0.8 | 0.13 | outside +0.8 |
 
+fit rows, past the stall:
+
+| row | t | band | our A320 | | before | | JSBSim's 737 | |
+|---|---|---|---|---|---|---|---|---|
+| `elevator-alpha-full` |  | 16.5..24.5 deg | 20.35 | **inside** | 29.01 | outside +4.5 | 39.09 | outside +14.6 |
+| `lift-past-stall-full-5` |  | 0.79..0.99 ratio | 0.83 | **inside** | 0.80 | **inside** | 0.82 | **inside** |
+| `lift-past-stall-full-15` |  | 0.54..0.74 ratio | 0.67 | **inside** | 0.75 | outside +0.0 | 0.53 | outside -0.0 |
+
 held-out rows, the aerodynamics:
 
 | row | t | band | our A320 | | JSBSim's 737 | |
@@ -197,6 +210,16 @@ held-out rows, the aerodynamics:
 | `roll-tau` |  | ..1.40 s | 0.90 | **inside** | 0.76 | **inside** |
 | `dutch-roll-zeta` |  | 0.08.. ratio | 0.65 | **inside** | 0.83 | **inside** |
 | `short-period` |  | 0.30..2.00 ratio | 0.58 | **inside** | 0.55 | **inside** |
+| `short-period-full` | 65 | 0.35..1.30 ratio | 0.63 | **inside** | 0.47 | **inside** |
+| `short-period-freq-full` | 65 | 0.70.. rad/s | 0.92 | **inside** | 1.04 | **inside** |
+| `short-period-cap-full` | 65 | 0.16..3.60 1/(g s2) | 0.24 | **inside** | 0.50 | **inside** |
+
+held-out rows, past the stall:
+
+| row | t | band | our A320 | | before | | JSBSim's 737 | |
+|---|---|---|---|---|---|---|---|---|
+| `elevator-alpha-clean` |  | 21.0..29.0 deg | 23.80 | **inside** | 35.22 | outside +6.2 | none | outside |
+| `pitch-break-clean` |  | -0.35..-0.05 Cm | -0.17 | **inside** | -0.03 | outside +0.0 | 0.11 | outside +0.2 |
 
 held-out rows, the engines:
 
@@ -225,10 +248,11 @@ context rows, not counted:
 | `climb-rate` |  | 1500.00..2530.00 ft/min | 3348.63 | (outside +818.6) | 4602.18 | (outside +2072.2) | 3962.64 | (outside +1432.6) |
 | `descent-rate` |  | -1550.00..-840.00 ft/min | -1113.92 | (inside) | -1033.95 | (inside) | -1699.40 | (outside -149.4) |
 
-**Our A320: inside 57 of 57 targets — 24 of 24 fit rows, 33 of 33 held out — the 24 engine rows
-among them, where on JSBSim's CFM56_5 it was inside 3. The 737: inside 17 of 57 — 6 of 24 fit, 11 of
-33 held out.** Our A320 is inside every row the 737 is inside, and every row it was inside before its
-engines were fitted.
+**Our A320: inside 65 of 65 targets — 27 of 27 fit rows, 38 of 38 held out — the 24 engine rows
+among them, where on JSBSim's CFM56_5 it was inside 3, and the 5 past the stall, where before their fit
+it was inside 1. The 737: inside 21 of 65 — 7 of 27 fit, 14 of 38 held out.** Our A320 is inside every
+row the 737 is inside, and every row it was inside before its engines, or what lies past its stall,
+were fitted. Every row but the five past the stall reads as it did before that fit, to the digit printed.
 
 Read plainly: the 737 stalls 14 to 47 kt faster than an A320 of its weight, at either weight, because
 its wing is smaller — 1,171 ft² against the A320's 1,317 — and lifts less: a CL max of 2.09 at full
@@ -262,9 +286,16 @@ How much the held-out rows say, row by row:
   optimiser never saw these rows, but the person who wrote the seeds did, so they are weaker
   evidence than the rest. Two pass with almost nothing to spare: clean alpha at VLS, 6.25° at 48.5 t
   and 6.49° at 65 t, against 6.5°.
-- No row measures the stall at high Mach, the transonic pitching moment, the post-stall lift or
-  ground effect. Their coefficients are the seeds' estimates; P7's protections step will be the
-  first to fly them.
+- No row measures the stall at high Mach, the transonic pitching moment or ground effect. Their
+  coefficients are the seeds' estimates; P7's protections step was the first to fly them.
+- The three short-period rows in CONF FULL are MIL-F-8785C's Level 1 for large aircraft on approach:
+  floors, not A320 data, and wide. Both airframes are inside them and they move nothing; the fit past
+  the stall cannot reach them. Ours is the slower: 0.92 rad/s and a control anticipation parameter of
+  0.24, near the floor of 0.16, against the 737's 1.04 and 0.50, trimmed at 11.9° of alpha there.
+- The clean configuration's two rows past the stall test the post-stall model fitted on CONF FULL
+  alone, against Foster's flaps-up figure and the GTM's break, which come from the same wind tunnel
+  programme as the fitted rows but another configuration. Their seeds were written with those sources
+  open ([below](#past-the-stall-and-how-it-was-fitted)).
 - The engines' held-out thrust rows are Airbus's own model at speeds and heights the fit did not see,
   between the ones it did: they test that eight numbers carry the lapse, not that the lapse is right.
   They land within 2.0 % of it, and within 0.8 kN at idle. Bartel and Young's lapse is a second
@@ -387,6 +418,83 @@ ANP stops at take-off speeds and 4,000 ft, and so does the fit. There is one idl
 the A320's approach idle; on the ground the FADEC sets a lower one, and at a standstill this engine
 gives 8.7 % of its rating where ICAO's idle setting is 7 %.
 
+### Past the stall, and how it was fitted
+
+Step 4 found that a fast full pull in CONF FULL passes alpha max and stalls our A320
+([below](#the-protections-p7-step-4)), and nothing in the table measured anything there: the pitching
+moment stayed linear in alpha through the stall, the elevator kept all its power at every alpha, and
+past its peak the lift fell toward three quarters of it over a guessed 3°. The table gained eight rows
+(`targets/a320.csv`; `docs/provenance.md` §1d):
+
+- the bare airframe's short period in CONF FULL at the approach speed, VLS + 5 kt at 65 t, against
+  MIL-F-8785C's Level 1 for large aircraft in the terminal phases: damping 0.35 to 1.30, natural
+  frequency at least 0.7 rad/s, control anticipation parameter 0.16 to 3.6 per g per s². Held out:
+  floors for handling, not A320 data. In direct law, which the computers choose once the gear is down
+  in alternate law, the pilot lands this airframe as it is;
+- the highest alpha full nose-up elevator holds in steady flight at 1 g, the stabiliser at 0: NASA's
+  wind tunnel tests of a transport give about 25° with the flaps up, and 4 to 5° less with them down
+  (Foster et al., AIAA 2005-5933). CONF FULL fitted, clean held out;
+- the pitch break across the stall and the lift past it, from NASA's Generic Transport Model as its
+  full-scale Transport Class Model carries it (Hueschen, NASA/TM-2011-217169): the break with the flaps
+  up held out, the lift 5° and 15° past the peak at its landing flap fitted.
+
+Five coefficients of the aircraft file carry them, seeded in `jsbsim/aircraft/A320-fit/poststall-seeds.csv`:
+the pitching moment breaks nose down by `cm-stall` from where the lift curve begins to round into its
+peak, over a few degrees; the tail's power, elevator and stabiliser, moment and lift, fades by
+`tail-fade` every 10° past `tail-fade-from-deg`, to no less than a quarter, since Foster's elevator
+stays effective at every alpha; and past the peak the lift falls toward `poststall-drop` below it over
+`poststall-width-deg`, the 3° that was fixed. The seeds: the GTM's break, 0.20; the fade A32NX's MSFS
+model gives its elevator past 10° (its `pitch_moment_delta_elevator_aoa_table`), 0.45 every 10°; the
+onset our estimate, 10°, past the 8.3° a flare reaches; the lift's two as they stood.
+
+`airframe_fit --poststall` fits them on the poststall group's three fit rows and on nothing else, as the
+engines were fitted apart. Those rows answer to the pitch of normal flight as well — `cm-alpha`,
+`cm-de`, the elevator's lift — and a first fit with everything free spread the change over them, Cm_α
+from −1.5 to −1.28 among them, to meet one row about the stall. No row measures them at low alpha, so
+this fit holds them where the aerodynamic fit left them.
+
+The fit that is committed: 78 generations, 1,254 evaluations, 17 s on the i9-9900K, the desktop 22 %
+busy before it and about 90 % during, the fit included; GCC 13.3 lands on the same five numbers to the
+last digit, and a refit from the file (`--from-file`) stays where it is.
+
+| number | seed | fitted | widths |
+|---|---|---|---|
+| `cm-stall`, the break | 0.20 | 0.148 | −0.65 |
+| `tail-fade`, every 10° | 0.45 | 0.121 | −1.64 |
+| `tail-fade-from-deg` | 10 | 10.95 | +0.32 |
+| `poststall-drop` | 0.25 | 0.410 | +1.60 |
+| `poststall-width-deg` | 3 | 9.18 | +3.09 |
+
+The lift moved furthest. At its landing flap the GTM keeps 0.89 of its peak 5° past it and 0.64 of it
+15° past, where it levels off; one exponential cannot do both, and the fit settles at 0.83 and 0.67,
+inside both bands. The held-out rows, which the fit never saw, land inside theirs: clean, full nose-up
+elevator holds 23.8° where Foster's flaps-up figure is about 25°, and the clean break is −0.17 where
+the GTM's is −0.20. So a model fitted on CONF FULL alone predicts the clean configuration's stall
+behaviour from two sources. What no row checks: how much power the elevator keeps at very high alpha
+(a quarter, our estimate); the pitching moment beyond 25°, where the GTM's levels off and ours goes on
+stiffening; and the break in CONF FULL, which takes the clean configuration's size. The fit moves
+nothing below the stall: every other row reads as before, to the digit printed. The P6 gate's flight
+reads the same above 5 kt in every digit its trace prints, and its first landing is the same, at
+1,023.84 s and −143.5 fpm. Its digest moves: standing on the runway, JSBSim's alpha is that of a
+velocity of millimetres a second, nearly vertical, and the new terms act there, on a dynamic pressure
+of almost nothing. The aerodynamic fit, run again from its seeds, still repeats its committed numbers
+to the last digit over the old lift past the stall, and over the new one lands on an equivalent fit by
+another path (13 of 13, objective 0.026758 against 0.026764, the loosely held stall widths and lifts
+at zero alpha moved in the third digit): its quarter-degree lift sweeps meet the lift past a peak in a
+rare candidate whose sample falls just beyond it. The committed aerodynamic numbers are kept.
+
+The new instruments: a static pitching moment, swept in steady level flight at 1 g, with the idle
+thrust's share across the flight path counted (off 1 g, JSBSim's alpha rate is not zero and the
+"static" moment carries the alpha-rate damping: Findings); the lift past the peak; and the short
+period in CONF FULL by equation error, a least-squares fit of alpha's and pitch rate's equations to the
+pulse response, because ours does not overshoot within 12 s and the extrema the clean row reads cannot
+see its period. `scorer_instruments_read_pitch_as_the_files_have_it` holds them: an extreme alpha-rate
+damping, −40 per rad, moves the static moment by 0.00001; 10° of elevator moves it as the file's
+`cm-de` and `cl-de` say, to 0.1 %, and past the fade's onset by the share the file leaves; and on the
+737's clean pulse the two short-period readings agree, damping 0.55 and 0.51, 1.69 and 1.66 rad/s. It
+was shown able to fail: with the alpha-rate in the moment, and with the tail's share left out of the
+elevator's term.
+
 ## The swap: made, 2026-11-01
 
 The rule (`ROADMAP.md`, P7): a fitted A320 replaces the 737 when, scored on the same revision of the
@@ -436,9 +544,10 @@ case runs 20 minutes since: the slower climb puts the first landing 35 s later.
 | `jsbsim/aircraft/A320-fit/seeds.csv` | each aerodynamic coefficient's seed, prior width, limits and source |
 | `jsbsim/aircraft/A320-fit/Engines/CFM56-5A1-fit.xml` | its engines: CFM56_5's, with a take-off and idle thrust lapse of ours |
 | `jsbsim/aircraft/A320-fit/thrust-seeds.csv` | the same for the thrust numbers, seeded from CFM56_5 and the harness's schedule |
+| `jsbsim/aircraft/A320-fit/poststall-seeds.csv` | the same for what lies past the stall: the pitch break, the tail's fade with alpha, the lift past the peak |
 | `harness/main.cpp` | the runner: the non-finite scan, the law decoding, the gate, the expectations, the crash check |
-| `harness/score.cpp` | the scorer: the airframe measured bare (lift sweeps, drag, trims, a pitch pulse, thrust, gradients) and flown (the circuit), against the targets; the fit rows alone, with a cost, for the fitter |
-| `harness/fit.cpp` | the fitter: CMA-ES over our A320's coefficients, or with `--thrust` its engines', each candidate scored by the scorer in a process of its own |
+| `harness/score.cpp` | the scorer: the airframe measured bare (lift sweeps, drag, the static pitching moment at 1 g, trims, a pitch pulse, thrust, gradients) and flown (the circuit), against the targets; the fit rows alone, with a cost, for the fitter |
+| `harness/fit.cpp` | the fitter: CMA-ES over our A320's coefficients, with `--thrust` its engines', with `--poststall` what lies past its stall, each candidate scored by the scorer in a process of its own |
 | `targets/a320.csv` | the A320's acceptance targets: band, weight, fit or held out, and source, row by row |
 | `targets/a320-speeds.csv` | VS1g and VLS by configuration and weight, from A32NX's tables, three points corrected |
 
@@ -628,6 +737,31 @@ From the thrust fit:
 - **The fit repeats across compilers.** The aerodynamic fit took another path on GCC 13.3; the thrust
   fit, whose rows read only the engines, lands on the same eight numbers to the last printed digit on
   GCC as on MSVC, in 169 generations either way.
+
+From the fit past the stall:
+
+- **A static moment needs a static aeroplane.** JSBSim computes alpha's rate at an initial condition
+  from the accelerations its forces give, so a pitching moment read at an alpha off 1 g carries the
+  airframe's alpha-rate damping. The first fit, its moment read at 150 kt whatever the alpha, used that
+  term as a lever, moving `cm-alphadot` to meet a row about the stall. The scorer now reads the moment
+  in level flight at 1 g, the speed found from the lift twice over, with idle thrust's share across the
+  flight path counted: at 15° in CONF FULL, with −40 per rad of damping, the lift balanced once left
+  0.0006 of Cm, balanced twice without the thrust 0.0009, and with it 0.00001.
+- **And an idle one.** A measurement that leaves the thrust levers where an earlier trim set them gives
+  the next one thrust across the flight path at high alpha: the same row read 20.36° alone and 20.42°
+  after the short-period trims. The static moment sets idle itself.
+- **Our A320 does not overshoot its short period in CONF FULL near VLS**, within 12 s of a 2° pulse,
+  so the extrema the clean row reads cannot see it. Equation error, a least-squares fit of alpha's and
+  pitch rate's equations to the same pulse, reads 0.63 at 0.92 rad/s; where both readings work they
+  agree within 0.07 of damping and 0.05 rad/s.
+- **One row about the stall moved the pitch of normal flight** when the fitter was free to use it:
+  with every coefficient a fit row answered to free, Cm_α went from −1.5 to −1.28 and four other pitch
+  numbers moved, to meet `elevator-alpha-full`. The fit past the stall now holds them, as the thrust
+  fit holds the aerodynamics.
+- **NASA's TCM report gives a Generic Transport Model with numbers on its axes**, unlike the papers on
+  the company data behind it, whose figures carry none: lift by flap setting to 85° and the pitching
+  moment with the flaps up (NASA/TM-2011-217169, figures 33 and 34). Its moment was not corrected for
+  Reynolds number where its lift was.
 
 From the view and the replays, 2026-11-01:
 
@@ -894,18 +1028,20 @@ and 33° once let go — and the ELAC's own numbers (A32NX 66021c2): alpha max 8
 the airframe's stall 1° above it (`targets/a320.csv`); high-speed protection engaging at VMO, 350 kt, or
 MMO, 0.82, and holding at 380 kt or Mach 0.88 at most. What holds is judged; what does not hold yet, or
 rests on what the airframe has not been fitted to, is printed as a note with its limit. The fitted A320,
-in normal law throughout:
+in normal law throughout, since what lies past its stall was fitted
+([above](#past-the-stall-and-how-it-was-fitted)), with what it read before in brackets where that moved:
 
 | manoeuvre | judged | noted, not judged yet |
 |---|---|---|
-| bank | stops at 65.7° against 67°; 2.17 g | let go, 26.5° after 20 s where the FCOM says 33° |
-| pull, 250 kt clean | 2.14 g against 2.5; pitch 23.7° against 30° | alpha 13.5° against alpha max 8.7° |
+| bank | stops at 65.7° against 67°; 2.09 g (2.17) | let go, 26.4° (26.5°) after 20 s where the FCOM says 33° |
+| pull, 250 kt clean | 2.09 g (2.14) against 2.5; pitch 27.5° (23.7°) against 30° | alpha 11.5° (13.5°) against alpha max 8.7° |
 | push | −1.07 g against −1.0 (+0.1 allowed) | pitch −17.7° against −15° |
-| alpha, slowed at idle | full back stick holds 8.9° against alpha max 8.7°, 8.4° at the end; no stall | let go with TOGA, 8.6° 10 s later where alpha prot is 6.5° |
+| alpha, slowed at idle | full back stick holds 8.7° (8.9°) against alpha max 8.7°, 8.4° at the end; no stall | let go with TOGA, 8.6° 10 s later where alpha prot is 6.5° |
 | speed, 15,000 ft | past VMO, where it engages | 381.3 kt at most against the ELAC's 380 |
 
-Why the notes are not judged. At 250 kt and 10,000 ft, Mach 0.45, the fitted A320 runs out of lift near
-2 g — 11.9° of alpha for 1.96 g in a steady pull — where the real one reaches 2.5 g with margin: the
+Why the notes are not judged. At 250 kt and 10,000 ft, Mach 0.45, the fitted A320 ran out of lift near
+2 g before its stall was fitted — 11.9° of alpha for 1.96 g in a steady pull — where the real one
+reaches 2.5 g with margin: the
 fit covers the stall at low Mach (VS1g and alpha max) and nothing measures it at Mach 0.45, so a full
 pull there passes alpha max before the protection brings it back, as the airframe stalls under it.
 High speed rests on the transonic pitching moment and drag rise, which no target measures either. The
@@ -1145,8 +1281,9 @@ and bands written down. Its judge, its recordings, its repeatability and the pag
 (above, with the runbook in *Flying the gate*); five approaches flown by hand remain, the operator's. The browser steps (5 to 8), the runway, ILS and wind (step 2), the failures and
 their laws (step 3) and the protections (step 4) are above, with what step 4 leaves open: the airframe's
 stall above Mach 0.3 and its transonic aerodynamics, to be fitted, and a fast entry into high alpha in
-CONF FULL. Our fitted A320 flies all of it from
-here, its engines fitted too ([above](#its-engines-and-how-they-were-fitted)).
+CONF FULL, which fitting the airframe past its stall did not cure. Our fitted A320 flies all of it from
+here, its engines fitted too ([above](#its-engines-and-how-they-were-fitted)), and what lies past its
+stall ([above](#past-the-stall-and-how-it-was-fitted)).
 
 ## What is here
 
