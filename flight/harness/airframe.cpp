@@ -221,7 +221,7 @@ struct Airframe::Impl {
                  *groundSpeed = nullptr, *gamma = nullptr, *latitude = nullptr, *longitude = nullptr, *agl = nullptr,
                  *wow[3] = {}, *wheelSpeed[2] = {}, *gearPos = nullptr, *n1[2] = {}, *weight = nullptr,
                  *cgX = nullptr, *aeroRpX = nullptr, *mac = nullptr, *cgY = nullptr, *cgZ = nullptr,
-                 *eye[3] = {}, *n2[2] = {};
+                 *eye[3] = {}, *n2[2] = {}, *windNorth = nullptr, *windEast = nullptr;
   // ground idle and the reversers, where the aircraft file declares them (above); null where it does not
   SGPropertyNode *groundIdleSelect = nullptr, *reverseEfficiency = nullptr, *reverseMax = nullptr,
                  *reverserAngle[2] = {};
@@ -287,6 +287,8 @@ struct Airframe::Impl {
     vNorth = node("velocities/v-north-fps");
     vEast = node("velocities/v-east-fps");
     groundSpeed = node("velocities/vg-fps");
+    windNorth = node("atmosphere/total-wind-north-fps");  // FGWinds: the steady wind, gusts and turbulence, NED
+    windEast = node("atmosphere/total-wind-east-fps");
     gamma = node("flight-path/gamma-deg");
     latitude = node("position/lat-geod-deg");
     longitude = node("position/long-gc-deg");
@@ -375,6 +377,8 @@ struct Airframe::Impl {
     s.ny = ny->getDoubleValue();
     s.nz = nz->getDoubleValue();
     s.groundSpeedKn = groundSpeed->getDoubleValue() / kFpsPerKt;
+    s.windNorthKn = windNorth->getDoubleValue() / kFpsPerKt;
+    s.windEastKn = windEast->getDoubleValue() / kFpsPerKt;
     s.trackDeg = s.groundSpeedKn > 0.5 ? wrap360(std::atan2(vEast->getDoubleValue(), vNorth->getDoubleValue()) / kRad)
                                        : s.headingDeg;
     s.flightPathDeg = gamma->getDoubleValue();

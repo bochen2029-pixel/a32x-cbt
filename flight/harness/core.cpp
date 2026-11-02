@@ -32,9 +32,9 @@ const std::vector<const char*> kInputs = {
     "pitch_trim"};
 
 // State slots. Air data in ISA with the standard setting; attitude and rates in degrees; heading and
-// track true; ra_ft, RA 1 as it reads (ra2_ft, height_true_ft below), zero standing on the runway. Surfaces in the computers' frame, except the
-// spoilers, given as extension (+ out). pitch_law, lateral_law and phase are codes; flight_state_text
-// names them.
+// track true; ra_ft, RA 1 as it reads (ra2_ft, height_true_ft below), zero standing on the runway.
+// Surfaces in the computers' frame, except the spoilers, given as extension (+ out). pitch_law,
+// lateral_law, phase and flare_by are codes; flight_state_text names them.
 const std::vector<const char*> kState = {
     "t_s",          "lat_deg",      "lon_deg",       "alt_ft",       "ra_ft",
     "cas_kn",       "tas_kn",       "gs_kn",         "vs_fpm",       "mach",
@@ -65,7 +65,13 @@ const std::vector<const char*> kState = {
     "ground_idle",  "reverser_1",   "reverser_2",
     // the radio altimeters (world.h, raFt): ra_ft is RA 1 as it reads, ra2_ft RA 2, each the true height plus its
     // bias and NaN once failed; height_true_ft is the truth they measure, for a judge, never for the crew
-    "ra2_ft",       "height_true_ft"};
+    "ra2_ft",       "height_true_ft",
+    // the flare (world.h, FlareOptions): whether the aircraft is in it now, and what began it: 0 nothing yet, 1 the
+    // crew's formula, 2 a command (flight_command), 3 the floor
+    "flaring",      "flare_by",
+    // the wind as the aircraft feels it, steady wind, gusts and turbulence together, against the runway it is
+    // judged on: along it, + a headwind; across it, + from the right
+    "wind_head_kn", "wind_cross_kn"};
 
 int slot(const std::vector<const char*>& names, const char* name) {
   for (size_t k = 0; k < names.size(); ++k) {
@@ -238,6 +244,7 @@ void FlightCore::writeState(std::vector<double>& s) const {
   const Transmitted& tx = Efcs::instance().transmitted();
   const IlsReading ils = w.ils();
   const Runway& r = w.runway();
+  const double rwy = r.headingDeg * std::acos(-1.0) / 180;  // the wind's components along and across it
   double thrLat = 0, thrLon = 0;
   threshold(r, thrLat, thrLon);
   auto extension = [&f](int side) {
@@ -313,8 +320,12 @@ void FlightCore::writeState(std::vector<double>& s) const {
                            a.reverser[0],
                            a.reverser[1],
                            w.raFt(1),
-                           a.radioHeightFt};
-  static_assert(sizeof values / sizeof values[0] == 69, "one value per state slot");
+                           a.radioHeightFt,
+                           w.phase() == Phase::Flare ? 1.0 : 0.0,
+                           static_cast<double>(w.flareBy()),
+                           -(a.windNorthKn * std::cos(rwy) + a.windEastKn * std::sin(rwy)),
+                           -(a.windEastKn * std::cos(rwy) - a.windNorthKn * std::sin(rwy))};
+  static_assert(sizeof values / sizeof values[0] == 73, "one value per state slot");
   s.assign(std::begin(values), std::end(values));
 }
 
@@ -323,7 +334,16 @@ const char* FlightCore::stateText(int index) const {
   if (index == slot(kState, "pitch_law")) return name(pitchLaw(word));
   if (index == slot(kState, "lateral_law")) return name(lateralLaw(word));
   if (index == slot(kState, "phase")) return world_.scripted ? phaseName(world_.phase()) : "crew";
+  if (index == slot(kState, "flare_by")) {
+    static const char* const kBy[] = {"none", "formula", "command", "floor"};
+    return kBy[world_.flareBy()];
+  }
   return nullptr;
+}
+
+const char* FlightCore::crewName() const {
+  if (!world_.scripted) return "hands";
+  return world_.flareOptions().external ? world_.flareOptions().driver.c_str() : "script";
 }
 
 bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string& error) {
@@ -387,8 +407,33 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       if (key != "ra1_bias") start.raBiasFt[1] = v;
       continue;
     }
+    if (key == "flare" || key == "flare_law" || key == "driver") {  // on any start: world.h, FlareOptions
+      if (key == "flare" && (value == "formula" || value == "external")) {
+        start.flare.external = value == "external";
+      } else if (key == "flare_law" && (value == "rad" || value == "time")) {
+        start.flare.timeLaw = value == "time";
+      } else if (key == "driver" && !value.empty() && value.size() <= 32 &&
+                 value.find_first_not_of("abcdefghijklmnopqrstuvwxyz0123456789_-") == std::string::npos &&
+                 value.front() >= 'a' && value.front() <= 'z') {
+        start.flare.driver = value;
+      } else {
+        error = "'" + parts[k] + "': flare=formula|external, flare_law=rad|time, driver=a lower-case name";
+        return false;
+      }
+      continue;
+    }
+    if (key == "floor") {
+      char* end = nullptr;
+      const double v = std::strtod(value.c_str(), &end);
+      if (value.empty() || !end || *end != '\0' || !(v >= 0 && v <= 100)) {
+        error = "'" + parts[k] + "': the flare's floor is a true height in feet, from 0 (none) to 100";
+        return false;
+      }
+      start.flare.floorFt = v;
+      continue;
+    }
     if (kind == "runway") {
-      error = "the runway start takes only runway=, fail= and the radio altimeters' bias";
+      error = "the runway start takes only runway=, fail=, the radio altimeters' bias and the flare's options";
       return false;
     }
     char* end = nullptr;
@@ -417,6 +462,11 @@ bool FlightCore::parseScenario(const char* text, WorldStart& start, std::string&
       return false;
     }
   }
+  if (!start.flare.driver.empty() && !start.flare.external) {
+    error = "driver= names who commands an external flare: give flare=external with it";
+    return false;
+  }
+  if (start.flare.external && start.flare.driver.empty()) start.flare.driver = "external";
   AirframeStart& a = start.airframe;
   a.geodetic = true;
   a.fieldElevationFt = r.elevationFt;
@@ -492,6 +542,14 @@ int flight_input_count(void) {
 
 const char* flight_input_name(int index) {
   return index >= 0 && index < static_cast<int>(kInputs.size()) ? kInputs[index] : nullptr;
+}
+
+int flight_command(const char* name) {
+  return g_core && name && g_core->world().command(name) ? 1 : 0;
+}
+
+const char* flight_crew(void) {
+  return g_core ? g_core->crewName() : nullptr;
 }
 
 int flight_step(int ticks) {

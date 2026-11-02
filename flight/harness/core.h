@@ -50,8 +50,16 @@ int flight_step(int ticks);
 const double* flight_state(void);
 int flight_state_count(void);
 const char* flight_state_name(int index);  // null past the last
-// A field's value as a word, for the fields that are names (laws, phase); null for the rest.
+// A field's value as a word, for the fields that are names (laws, phase, flare_by); null for the rest.
 const char* flight_state_text(int index);
+
+// A command from outside, to the scripted crew (world.h, World::command): "flare" begins its flare at the next step
+// when its flare is external (flare=external) and the approach is flown down to it. 1 if taken, 0 if not.
+int flight_command(const char* name);
+
+// Who flies it, for a recording's crew line: "script", the harness's crew; "hands", the caller's inputs; or the
+// driver's name (driver=) when the scripted crew's flare waits for a command. Null before flight_start.
+const char* flight_crew(void);
 
 // The gate's judge of an approach start (judge.h; ROADMAP.md, P7: how a hand-flown ILS is judged), as
 // text: a line a band, "pass", "FAIL" or "...." while it cannot be judged yet, each with its worst and
@@ -111,6 +119,8 @@ class FlightCore {
   static const std::vector<const char*>& stateNames();
   void writeState(std::vector<double>& state) const;
   const char* stateText(int index) const;
+  // Who flies it (flight_crew).
+  const char* crewName() const;
 
  private:
   World world_;

@@ -107,6 +107,7 @@ const double kVNextStage[4] = {215, 203, 183, 168};
 // 15 ft the rudder takes the crab out.
 constexpr double kLocCloseS = 20, kGsCloseS = 10, kGsAuthorityDeg = 1.0, kInterceptDeg = 30;
 constexpr double kShortFinalFt = 1500, kDecrabFt = 15, kDecrabGain = 0.08;
+constexpr double kRetardFt = 20;  // the levers to idle, in the flare
 constexpr double kMsPerKt = 0.514444, kMPerFt = 0.3048, kRadPerDeg = 3.14159265358979323846 / 180;
 // The crew's hand in direct law (directLawHands): over how long it feels what it has been holding; the
 // held stick at which it starts trimming, the one at which it stops, and the one it trims at full rate.
@@ -207,6 +208,7 @@ World::World(const WorldStart& start) : airframe_(std::make_unique<Airframe>(con
   failures = start.failures;
   raBiasFt_[0] = start.raBiasFt[0];
   raBiasFt_[1] = start.raBiasFt[1];
+  flare_ = start.flare;
   if (start.airframe.airborne) {
     // In the air: the levers and the surfaces where the trim left them, the brakes off, the flight
     // controls on, and the scripted crew established on the final approach.
@@ -386,8 +388,6 @@ void World::flyIls(double dt) {
   holdPath(-runway_.glideDeg + std::atan(rising / v) / kRadPerDeg, kVApp, dt);
 }
 
-// The scripted crew: a circuit, flown through the laws, repeated until the run ends; or, from an
-// approach start, the ILS to a landing and a stop.
 double World::raFt(int k) const {
   if (failed(failures.ra[k])) return NAN;
   const double h = air().radioHeightFt;
@@ -399,6 +399,35 @@ double World::crewRadioHeightFt() const {
   return std::isnan(ra1) ? raFt(1) : ra1;
 }
 
+bool World::command(const std::string& name) {
+  if (name != "flare" || !scripted || !flare_.external || flareBy_ != kFlareByNone) return false;
+  if (phase_ != Phase::Approach || !(ilsCrew_ || stage_ == 5)) return false;
+  flareCommanded_ = true;
+  return true;
+}
+
+// Whether the flare begins at this step, and what began it (FlareOptions): a command waiting; else the crew's
+// formula, the radio height as it reads it below kFlareFt, unless the flare is external; else the floor, in true
+// height. Whatever began it, the trigger stands for kFlareFt: under flare_law=time the law flies on that height,
+// carried down from here by the aircraft's own vertical speed.
+bool World::beginFlare(double radio) {
+  int by = kFlareByNone;
+  if (flareCommanded_) {
+    by = kFlareByCommand;
+  } else if (!flare_.external && radio < kFlareFt) {
+    by = kFlareByFormula;
+  } else if (flare_.floorFt > 0 && air().radioHeightFt < flare_.floorFt) {
+    by = kFlareByFloor;
+  }
+  if (by == kFlareByNone) return false;
+  flareBy_ = by;
+  flareHeightFt_ = kFlareFt;
+  flareCommanded_ = false;
+  return true;
+}
+
+// The scripted crew: a circuit, flown through the laws, repeated until the run ends; or, from an
+// approach start, the ILS to a landing and a stop.
 void World::fly(double dt) {
   const AirframeState& a = air();
   const double radio = crewRadioHeightFt();  // the radio height, as the crew reads it: the instrument
@@ -509,7 +538,7 @@ void World::fly(double dt) {
     case Phase::Approach: {  // down to 2000 ft, configure as the speed comes back, then three degrees
       if (ilsCrew_) {
         flyIls(dt);
-        if (radio < kFlareFt) enter(Phase::Flare);
+        if (beginFlare(radio)) enter(Phase::Flare);
         break;
       }
       if (stage_ < 4 && a.casKn < kVNextStage[stage_] && (stage_ > 0 || h < kPatternFt + 150)) {
@@ -525,17 +554,20 @@ void World::fly(double dt) {
         holdPath(-3.0, kVApp, dt);
       }
       c.roll = rollFor(runway_.headingDeg, psi, phi, p);
-      if (stage_ == 5 && radio < kFlareFt) enter(Phase::Flare);
+      if (stage_ == 5 && beginFlare(radio)) enter(Phase::Flare);
       break;
     }
 
     case Phase::Flare: {  // sink rate down exponentially, to two feet a second at the wheels
-      const double height = std::max(0.0, radio);
+      // the height it flies on (FlareOptions): the radio height as the crew reads it; or, from the trigger on, the
+      // height the trigger stood for, carried down by the aircraft's own vertical speed, reading no altimeter
+      if (flare_.timeLaw) flareHeightFt_ += a.verticalSpeedFpm / 60 * dt;
+      const double height = std::max(0.0, flare_.timeLaw ? flareHeightFt_ : radio);
       const double sinkTarget = height / kFlareTauS + 2.0;  // ft/s
       const double sink = -a.verticalSpeedFpm / 60;
       c.pitch = clamp(kFlareGain * (sink - sinkTarget) - kFlarePitchRate * q - kFlareLoad * (a.nz - 1), -0.3, 0.8);
       gammaCmd_ = gammaSpeed_ = gamma;
-      if (height < 20) {
+      if (height < kRetardFt) {
         tla_ = 0;  // retard
       } else {
         thrustFor(kVApp, 25, dt);

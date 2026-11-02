@@ -20,7 +20,10 @@ const skip = !path || !existsSync(path) ? 'FLIGHT_CORE_JS does not name a built 
 const createFlightCore = skip ? null : createRequire(import.meta.url)(path);
 const airframe = process.env.FLIGHT_AIRFRAME || '';  // as for every other case: the default, or the 737
 
-const kTicks = 18 * 60 * 50;  // eighteen minutes: the scripted circuit's first landing comes at about 17
+const kTicks = 18 * 60 * 50;
+// What only the scripted crew keeps, so that a replay of its inputs by hands has none of it: its phase, and its flare,
+// begun or not and by what (world.h, FlareOptions).
+const CREW_ONLY = ['phase', 'flaring', 'flare_by'];  // eighteen minutes: the scripted circuit's first landing comes at about 17
 
 // FNV-1a over a Float64Array's bytes, folded into a running hash.
 function fold(h, values) {
@@ -30,7 +33,8 @@ function fold(h, values) {
 }
 
 // Steps a session tick by tick; returns the state hash, the first touchdown and what each tick cost.
-// The hash leaves out the phase, which only the scripted crew keeps; everything the aircraft does is in.
+// The hash leaves out what only the scripted crew keeps, its phase and its flare (CREW_ONLY); everything the
+// aircraft does is in.
 function fly(session, inputsFor) {
   const f = session.field;
   let hash = 2166136261, airborne = false, lastVs = 0, touchdown = null, ms = 0;
@@ -41,7 +45,7 @@ function fly(session, inputsFor) {
     ms += performance.now() - t0;
     if (!inputsFor) recorded.push(session.inputs());
     const s = session.state();
-    s[f.phase] = 0;
+    for (const name of CREW_ONLY) s[f[name]] = 0;
     hash = fold(hash, s);
     if (!s[f.on_ground]) airborne = true;
     if (airborne && s[f.on_ground] && !touchdown) {
@@ -107,7 +111,7 @@ test('the page records its flight as law_harness reads it, and the recording rep
   const replay = new CoreSession(await createFlightCore(), lines[1].slice(12), false, lines[0].slice(12));
   for (const line of rows) replay.step(1, line.split(',').map(Number));
   const a = flown.state(), b = replay.state();
-  a[flown.field.phase] = b[replay.field.phase] = 0;  // only the scripted crew keeps a phase
+  for (const name of CREW_ONLY) a[flown.field[name]] = b[replay.field[name]] = 0;  // only the scripted crew keeps them
   assert.deepEqual(Array.from(b), Array.from(a), 'the same state, slot for slot');
   assert.equal(replay.debrief(), verdict, 'and the same verdict from the gate\'s judge');
   assert.equal(replay.recording(), text.replace('# crew: script', '# crew: hands'),
@@ -118,6 +122,28 @@ test('the page records its flight as law_harness reads it, and the recording rep
   assert.throws(() => replay.recording({ crew: 'script' }), /no header line called crew/, 'and nobody rewrites who flew it');
   assert.throws(() => replay.recording({ build: 'abcdef0' }), /no header line called build/, 'nor on which build');
   assert.throws(() => replay.recording({ judged: 'STABLE' }), /no header line called judged/, 'nor what was judged');
+});
+
+// A driver outside the page (world.h, FlareOptions; the Jev landing experiment): with flare=external the scripted
+// crew's formula takes no part, the driver's command begins the flare at the next step, once, and the recording says
+// whose it was. A crew of hands takes no command.
+test('a driver commands the scripted crew\'s flare through the page, and the recording names it', { skip }, async () => {
+  const s = new CoreSession(await createFlightCore(), airframe, true, 'approach;distance=3.5;flare=external;driver=jev');
+  const f = s.field;
+  let state = s.state();
+  while (state[f.height_true_ft] >= 31) {
+    s.step(1);
+    state = s.state();
+  }
+  assert.equal(state[f.flare_by], 0, 'down to 31 ft no flare: the formula takes no part');
+  assert.equal(s.command('flare'), true, 'the command is taken');
+  s.step(1);
+  assert.deepEqual([s.state()[f.flare_by], s.state()[f.flaring]], [2, 1], 'and has begun the flare by the next step');
+  assert.equal(s.command('flare'), false, 'once');
+  assert.match(s.recording(), /^# crew: jev$/m, 'the recording says the flare was the driver\'s');
+  const hands = new CoreSession(await createFlightCore(), airframe, false, 'approach');
+  assert.equal(hands.command('flare'), false, 'hands at the controls take no command');
+  assert.match(hands.recording(), /^# crew: hands$/m);
 });
 
 // A recording saved by the page, opened again in the page (core-session.js, Replay): its rows flown through a fresh
@@ -148,7 +174,7 @@ test('a recording saved by the page replays in the page to the identical debrief
   assert.deepEqual(v.changed, []);
   assert.equal(replay.session.debrief(), flown.debrief(), 'the judge saying it in the same words');
   const a = flown.state(), b = replay.session.state();
-  a[flown.field.phase] = b[replay.session.field.phase] = 0;  // only the scripted crew keeps a phase
+  for (const name of CREW_ONLY) a[flown.field[name]] = b[replay.session.field[name]] = 0;  // only the scripted crew keeps them
   assert.deepEqual(Array.from(b), Array.from(a), 'and it ends in the same state, slot for slot');
 
   // another build's copy opens and says so; one older than build lines counts as v0.1.0's, with no verdict to compare

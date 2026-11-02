@@ -1806,6 +1806,77 @@ reversers held their engines at idle). Our A320 on MSVC 19.44:
 - Every thrust row reads as before, as the scorer measures at flight idle and steady state; the
   spool-up row moves from 5.80 s to 4.05 s, inside. The landing roll's length was not measured here.
 
+## A driver outside the harness: the flare and the pipe (P7, the Jev landing experiment)
+
+The operator's idea, 2026-11-01: the flare and the rollout are a sequence a type flies the same way every time, so a
+landing comes down to when the sequence begins, and a fast judging model could decide that, from the numbers and from
+a camera in the nose, with a third watching both. TypeSafe's Jev is such a model. The experiment belongs to the Jev
+Park session (`C:/code/jev-park`), which agreed its terms with fbw-parent: it drives this simulator only across a
+process or page boundary and links none of it; nothing shipped calls the network; a recording flown that way says
+`# crew: jev`, which `law_harness --repeatable` refuses, since the gate takes hand-flown approaches only; and the
+gate's five come first. What the simulator gives it, off unless a scenario asks:
+
+- **The trigger** (`world.h`, `FlareOptions`): `flare=formula`, today's crew, begins the flare when the radio height
+  as the crew reads it is below 33 ft; `flare=external` never does, and waits for a command, `driver=NAME` saying
+  whose (`external` unnamed). `floor=FT` begins it by that true height whatever the trigger, and the state says so.
+- **The law** once begun: `flare_law=rad`, today's, steers the sink rate down to two feet a second against the radio
+  height; `flare_law=time` flies the same law on the height the trigger stands for, 33 ft, carried down from there by
+  the aircraft's own vertical speed, so that nothing after the trigger reads an altimeter and in an A/B the trigger is
+  the only difference. A sink rate decaying on the clock, tried first, levelled off high and sank again: 696 fpm
+  when begun at 45 ft.
+- **The command**: `flight_command("flare")` in the C API, `{type: 'command', name: 'flare'}` to the page's worker,
+  or `flare` through `law_harness --pipe`; taken once, in the approach, where the flare waits for it, acting at the
+  next step. `flight_crew` names who flies it — `script`, `hands` or the driver — for a recording's crew line.
+- **The pipe**: `law_harness --scenario "approach;flare=external;driver=jev" --pipe [--pipe-every TICKS]`, a JSON
+  object a line. First a header: the build, the airframe, the scenario, the driver, the frame's interval, and the
+  runway's heading, glide angle, threshold crossing height and touchdown zone elevation. Then every `--pipe-every`
+  ticks (5: a tenth of a second) a frame, every state slot by name, the codes that have names as words and NaN as
+  null, with `command_taken` for the last answer; after each frame the harness waits for one line, `go`, `flare` or
+  `quit`, the end of input being `quit`. Then an end line, the touchdown, what began the flare and the judge's
+  verdict, and the run's report as text. Nothing moves while the driver thinks, so latency is the driver's to model,
+  and the same answers give the same bytes.
+- **The state**: `flaring`, `flare_by` (0 none, 1 formula, 2 command, 3 floor), and the wind the aircraft feels,
+  steady wind, gusts and turbulence together, against the runway: `wind_head_kn`, + a headwind, and `wind_cross_kn`,
+  + from the right; with the radio altimeters' `ra_ft`, `ra2_ft` and the truth, `height_true_ft` (above).
+
+None of it moves a scripted flight: compared compiler for compiler, every scripted ILS and landing line and every
+reference and gate digest is as before. What the trigger is worth, measured through the pipe (MSVC 19.44): the
+scripted ILS from 10 nm to 17C, its flare commanded at a range of true heights, `floor=10` under it.
+
+| law | trigger, true height | first touchdown | touchdowns | past the threshold | the judge |
+|---|---|---|---|---|---|
+| rad | 49.7 ft | 978 fpm, 4.12 g | 2 | 228 m | NOT STABLE: 4 bands broken |
+| rad | 44.7 ft | 627 fpm, 3.12 g | 2 | 255 m | NOT STABLE: 4 bands broken |
+| rad | 39.8 ft | 278 fpm, 1.74 g | 1 | 423 m | NOT STABLE: 1 band broken |
+| rad | 34.8 ft | 139 fpm, 1.41 g | 1 | 327 m | STABLE |
+| rad | 32.3 ft | 160 fpm, 1.46 g | 1 | 328 m | STABLE |
+| rad | 29.8 ft | 159 fpm, 1.47 g | 1 | 325 m | STABLE |
+| rad | 26.0 ft | 285 fpm, 1.96 g | 2 | 304 m | NOT STABLE: 1 band broken |
+| rad | 19.7 ft | 683 fpm, 3.11 g | 2 | 285 m | NOT STABLE: 4 bands broken |
+| time | 49.7 ft | 609 fpm, 2.98 g | 2 | 404 m | NOT STABLE: 3 bands broken |
+| time | 44.7 ft | 728 fpm, 3.17 g | 2 | 399 m | NOT STABLE: 3 bands broken |
+| time | 39.8 ft | 573 fpm, 2.61 g | 1 | 396 m | NOT STABLE: 2 bands broken |
+| time | 34.8 ft | 220 fpm, 1.51 g | 1 | 371 m | STABLE |
+| time | 32.3 ft | 230 fpm, 1.72 g | 1 | 315 m | STABLE |
+| time | 29.8 ft | 439 fpm, 2.37 g | 1 | 297 m | NOT STABLE: 2 bands broken |
+| time | 26.0 ft | 615 fpm, 2.86 g | 1 | 288 m | NOT STABLE: 3 bands broken |
+| time | 19.7 ft | 726 fpm, 3.12 g | 1 | 287 m | NOT STABLE: 3 bands broken |
+
+Today's law, closed on the radio height, lands STABLE begun anywhere from about 30 to 35 ft; flown on the trigger's
+height alone, from about 32 to 35 ft, a few tenths of a second at 750 fpm either way. Begun early, both level off
+high, the stick relaxes, the nose comes down and the aircraft sinks again, so that it lands hard rather than
+floating; begun late, it lands hard. A trigger to within a quarter of a second is what the sequence asks of whoever
+begins it.
+
+New `ctest` cases: `the_crew_s_formula_begins_the_flare_and_takes_no_command`, `an_external_flare_waits_for_its_command`,
+`with_nobody_commanding_the_floor_begins_the_flare`, `the_flare_flown_on_the_trigger_s_height_lands` and
+`the_flare_s_options_are_checked` (`flare_test.c`, natively and under node);
+`the_wind_across_kdfw_17c_is_from_the_right` and `the_wind_along_kdfw_17c_is_a_headwind`; and natively, since it
+starts a process, `a_driver_flies_the_flare_through_the_pipe` (`harness/pipe_test.mjs`): a frame every tenth of a
+second, the formula taking no part, the command taken once, the verdict in the end line, `# crew: jev` in the
+recording, and the same answers giving the same bytes. In the module test, a driver's command through the page's
+session.
+
 ## What P7 still has to build
 
 `ROADMAP.md` §4, *P7 in detail*: the gate — a hand-flown ILS, stable and repeatable, with its measures

@@ -9,9 +9,12 @@
 //                                               the recording's rows fly, a row a tick, and inputs are passed over
 //               {type: 'recording', extra}      at any time; extra: header lines by name (CoreSession); in a
 //                                               replay, the recording as it was opened: a replay is not a flight
+//               {type: 'command', name}         to the scripted crew (core.h, flight_command): "flare", where
+//                                               its flare waits for one (flare=external); never in a replay
 // Messages out: {type: 'ready', inputNames, stateNames, build, state, texts, inputs, debrief, replay}
 //               {type: 'state', state, texts, inputs, debrief, ticks, ms, replay}   ms: what the ticks cost in here
 //               {type: 'recording', text, steps, replayed}  the flight so far, as law_harness --replay reads it
+//               {type: 'command', name, taken}   whether the command was taken
 //               {type: 'error', message}
 // debrief is the gate's judge as text (core.h, flight_debrief), on every message. replay, in a replay only: on
 // 'ready' what the recording says of itself (Replay.info: where, on what, by whom and on which build it was
@@ -52,6 +55,8 @@ self.onmessage = async (event) => {
       const t0 = performance.now();
       const ticks = replay ? replay.step(m.ticks) : (session.step(m.ticks, m.inputs), m.ticks);
       report('state', { ticks, ms: performance.now() - t0, ...(replay ? { replay: replay.progress() } : {}) });
+    } else if (m.type === 'command') {
+      self.postMessage({ type: 'command', name: m.name, taken: !replay && session.command(m.name) });
     } else if (m.type === 'recording') {
       if (replay) self.postMessage({ type: 'recording', text: replay.text, steps: replay.steps, replayed: true });
       else self.postMessage({ type: 'recording', text: session.recording(m.extra || {}), steps: session.steps });

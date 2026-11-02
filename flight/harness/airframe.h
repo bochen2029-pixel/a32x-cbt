@@ -54,6 +54,7 @@ struct AirframeState {
   double rollRateDegS = 0, pitchRateDegS = 0, headingRateDegS = 0;  // Euler angle rates
   double nx = 0, ny = 0, nz = 1;                        // specific force, g: what accelerometers feel
   double groundSpeedKn = 0, trackDeg = 360, flightPathDeg = 0;
+  double windNorthKn = 0, windEastKn = 0;               // where the air moves: steady wind, gusts and turbulence
   double latitudeDeg = 0, longitudeDeg = 0;
   double radioHeightFt = 0;                             // reads zero standing on the runway
   // gear, engines, mass

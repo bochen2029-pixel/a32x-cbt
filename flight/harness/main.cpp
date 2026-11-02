@@ -148,6 +148,8 @@ struct Options {
   std::string trace;
   std::string record, replay;  // a crew recording to write from the scripted crew, or to fly from
   std::string scenario;        // where the flight starts (core.h, flight_start_scenario); empty: the runway
+  bool pipe = false;           // a driver outside the harness, in lockstep on stdin and stdout (pipeFrame)
+  long long pipeEvery = 5;     // ticks between its frames: 5, a tenth of a second
 };
 
 // The worst a measure reached, and the height above the threshold (or the distance past it) where.
@@ -235,7 +237,8 @@ struct RecordingHeader {
   long long rows = -1;  // the column names
   std::string who() const {
     if (crew == "script") return "the scripted crew";
-    if (crew != "hands") return "nobody said: the recording has no crew line";
+    if (crew.empty()) return "nobody said: the recording has no crew line";
+    if (crew != "hands") return "the scripted crew, its flare begun by " + crew + " (flare=external)";
     return "hand" + (hands.empty() ? std::string() : " (" + hands + ")") + (flown.empty() ? std::string() : ", " + flown);
   }
   std::string flownOn() const { return build.empty() ? kUnnamedBuild : build; }
@@ -243,14 +246,14 @@ struct RecordingHeader {
 
 class Recording {
  public:
-  bool open(const std::string& path, bool write, const std::string& scenario = "") {
+  bool open(const std::string& path, bool write, const std::string& scenario = "", const std::string& crew = "script") {
     f_ = std::fopen(path.c_str(), write ? "w" : "r");
     if (!f_) return fail("cannot " + std::string(write ? "write " : "read ") + path);
     std::string names;
     for (const char* n : FlightCore::inputNames()) names += (names.empty() ? "" : ",") + std::string(n);
     if (write) {
-      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n# crew: script\n# build: %s\n%s\n", scenario.c_str(),
-                   Airframe::selected().c_str(), flight_build(), names.c_str());
+      std::fprintf(f_, "# scenario: %s\n# airframe: %s\n# crew: %s\n# build: %s\n%s\n", scenario.c_str(),
+                   Airframe::selected().c_str(), crew.c_str(), flight_build(), names.c_str());
       return true;
     }
     char line[4096] = "";
@@ -349,23 +352,97 @@ double earliestFailure(const Failures& f) {
   take(f.hyd, 3);
   take(f.elac, 2);
   take(f.sec, 3);
+  take(f.ra, 2);
   return at;
 }
 
-Results run(const Options& opt, FILE* trace) {
-  Recording recording;
-  const bool replaying = !opt.replay.empty();
-  if (replaying || !opt.record.empty()) {
-    if (!recording.open(replaying ? opt.replay : opt.record, !replaying, opt.scenario)) {
-      std::printf("%s\n", recording.error().c_str());
-      std::exit(2);
+// --- --pipe: a driver outside the harness (the Jev landing experiment, flight/README.md) -----------------------------
+// In lockstep on stdin and stdout, one JSON object a line: a header; then every --pipe-every ticks a frame, the state
+// by name as the C API gives it (core.h; a code that has a name, as a word; NaN as null), after which the harness
+// waits for one line from the driver: "go" flies on, "flare" commands the flare (World::command) and flies on, and
+// "quit", or the end of stdin, ends the run; then an end line, and the run's report as text. Nothing moves while the
+// driver thinks, so the same answers give the same bytes.
+
+std::string jsonNumber(double v) {
+  if (!std::isfinite(v)) return "null";
+  char b[40];
+  std::snprintf(b, sizeof b, "%.10g", v);
+  return b;
+}
+
+std::string jsonString(const std::string& s) {
+  std::string out = "\"";
+  for (const unsigned char c : s) {
+    if (c == '"' || c == '\\') {
+      out += '\\';
+      out += static_cast<char>(c);
+    } else if (c < 0x20) {
+      char b[8];
+      std::snprintf(b, sizeof b, "\\u%04x", c);
+      out += b;
+    } else {
+      out += static_cast<char>(c);
     }
   }
+  return out + "\"";
+}
+
+void pipeLine(const std::string& line) {
+  std::printf("%s\n", line.c_str());
+  std::fflush(stdout);
+}
+
+void pipeHeader(const FlightCore& core, const Options& opt) {
+  const Runway& r = core.world().runway();
+  pipeLine("{\"pipe\":1,\"build\":" + jsonString(flight_build()) + ",\"airframe\":" + jsonString(Airframe::selected()) +
+           ",\"scenario\":" + jsonString(opt.scenario) + ",\"crew\":" + jsonString(core.crewName()) +
+           ",\"every\":" + std::to_string(opt.pipeEvery) + ",\"dt\":" + jsonNumber(kDt) + ",\"runway\":" +
+           jsonString(r.name) + ",\"rwy_heading_deg\":" + jsonNumber(r.headingDeg) + ",\"glide_deg\":" +
+           jsonNumber(r.glideDeg) + ",\"tch_ft\":" + jsonNumber(r.tchFt) + ",\"tdze_ft\":" + jsonNumber(r.elevationFt) + "}");
+}
+
+// taken: what became of the driver's last answer, when it was a command: -1 none, 0 refused, 1 taken.
+void pipeFrame(const FlightCore& core, std::vector<double>& state, int taken) {
+  core.writeState(state);
+  const std::vector<const char*>& names = FlightCore::stateNames();
+  std::string line = "{";
+  for (size_t i = 0; i < names.size(); ++i) {
+    const char* text = core.stateText(static_cast<int>(i));
+    line += (i ? ",\"" : "\"") + std::string(names[i]) + "\":" + (text ? jsonString(text) : jsonNumber(state[i]));
+  }
+  pipeLine(line + ",\"command_taken\":" + (taken < 0 ? "null" : taken ? "true" : "false") + "}");
+}
+
+int stateIndex(const char* name) {
+  const std::vector<const char*>& names = FlightCore::stateNames();
+  for (size_t i = 0; i < names.size(); ++i) {
+    if (std::strcmp(names[i], name) == 0) return static_cast<int>(i);
+  }
+  return -1;
+}
+
+std::string pipeAnswer() {
+  char line[256];
+  if (!std::fgets(line, sizeof line, stdin)) return "quit";
+  return std::string(line, std::strcspn(line, "\r\n"));
+}
+
+Results run(const Options& opt, FILE* trace) {
   WorldStart worldStart;
   std::string why;
   if (!FlightCore::parseScenario(opt.scenario.c_str(), worldStart, why)) {
     std::printf("--scenario: %s\n", why.c_str());
     std::exit(2);
+  }
+  Recording recording;
+  const bool replaying = !opt.replay.empty();
+  if (replaying || !opt.record.empty()) {
+    // who flies it: this harness's crew, or its crew with a driver's flare (FlightCore::crewName)
+    const std::string crew = worldStart.flare.external ? worldStart.flare.driver : "script";
+    if (!recording.open(replaying ? opt.replay : opt.record, !replaying, opt.scenario, crew)) {
+      std::printf("%s\n", recording.error().c_str());
+      std::exit(2);
+    }
   }
   FlightCore core(!replaying, worldStart);
   World& world = core.world();
@@ -396,8 +473,24 @@ Results run(const Options& opt, FILE* trace) {
                  "cas_kn,ra_ft,vs_fpm,alpha_deg,beta_deg,gamma_deg,r_deg_s,pedals,rudder,tla,flap_deg\n");
   }
 
+  std::vector<double> pipeState;
+  int pipeTaken = -1;
+  if (opt.pipe) pipeHeader(core, opt);
+
   const auto start = std::chrono::steady_clock::now();
   for (long long k = 0; k < ticks; ++k) {
+    if (opt.pipe && k % opt.pipeEvery == 0) {
+      pipeFrame(core, pipeState, pipeTaken);
+      const std::string answer = pipeAnswer();
+      if (answer == "quit") break;
+      pipeTaken = -1;
+      if (answer == "flare") {
+        pipeTaken = world.command("flare") ? 1 : 0;
+      } else if (answer != "go") {
+        std::fprintf(stderr, "--pipe: '%s' is not go, flare or quit\n", answer.c_str());
+        std::exit(2);
+      }
+    }
     if (replaying && !recording.read(core.inputs())) {
       std::printf("%s, at %.2f s\n", recording.error().c_str(), world.time());
       std::exit(2);
@@ -569,6 +662,14 @@ Results run(const Options& opt, FILE* trace) {
   r.crashedAt = world.crashedAt();
   r.judge = core.judge();
   if (!opt.record.empty()) recording.trailer(r.judge.debrief());
+  if (opt.pipe) {
+    const ApproachJudge& j = r.judge;
+    pipeLine("{\"end\":true,\"t_s\":" + jsonNumber(world.time()) + ",\"touchdown_t_s\":" +
+             (r.landings.empty() ? std::string("null") : jsonNumber(r.landings.front().at)) +
+             ",\"touchdown_past_m\":" + jsonNumber(j.touchdown().pastM) + ",\"flare_by\":" +
+             jsonString(core.stateText(stateIndex("flare_by"))) +
+             ",\"judge\":" + (j.active() ? jsonString(j.summary()) : std::string("null")) + "}");
+  }
   return r;
 }
 
@@ -1175,7 +1276,7 @@ void usage() {
       "law_harness [--minutes N] [--gate] [--check-determinism] [--check-replay] [--trace file.csv] [--digest]\n"
       "            [--expect power-up|ground-check|normal-law|stick-response|autotrim|pedal-kick|rudder-trim|landing|\n"
       "                      law-degrades|ils|turbulence|scanner-catches-nan]\n"
-      "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv]\n"
+      "            [--fail-adr-at SECONDS] [--record crew.csv | --replay crew.csv] [--pipe [--pipe-every TICKS]]\n"
       "            [--repeatable approach1.csv ... approach5.csv] [--rejudge approach1.csv ... approach5.csv]\n"
       "            [--check-repeatable]\n"
       "            [--scenario \"runway;runway=LSZH14\" | \"approach;distance=10;loc=0;gs=0;cas=140;wind=270/15\" | \"reference\"]\n");
@@ -1216,6 +1317,8 @@ int main(int argc, char** argv) {
     else if (a == "--expect") opt.expect = next("--expect");
     else if (a == "--fail-adr-at") opt.failAdrAt = std::atof(next("--fail-adr-at").c_str());
     else if (a == "--trace") opt.trace = next("--trace");
+    else if (a == "--pipe") opt.pipe = true;
+    else if (a == "--pipe-every") opt.pipeEvery = std::atoll(next("--pipe-every").c_str());
     else {
       usage();
       return 2;
@@ -1223,6 +1326,11 @@ int main(int argc, char** argv) {
   }
   if (!(opt.minutes > 0)) {
     std::printf("--minutes must be positive\n");
+    return 2;
+  }
+  if (opt.pipe && (opt.pipeEvery < 1 || !opt.replay.empty() || opt.determinism || opt.replayCheck ||
+                   opt.repeatableCheck || !opt.repeatable.empty() || !opt.rejudge.empty())) {
+    std::printf("--pipe drives one flight, the harness's crew flying it, a frame every --pipe-every ticks (1 or more)\n");
     return 2;
   }
   if (opt.expect == "scanner-catches-nan") {

@@ -121,6 +121,9 @@ export class CoreSession {
     this.scenario = scenario || '';
     this.airframe = mod.UTF8ToString(mod._flight_airframe());
     this.build = mod.UTF8ToString(mod._flight_build());  // the commit this module was built from (core.h)
+    // who flies it (core.h, flight_crew): script, hands, or a driver's name when the scripted crew's flare waits for
+    // one (flare=external;driver=NAME); a module older than flight_crew knows only the first two
+    this.crew = mod._flight_crew ? mod.UTF8ToString(mod._flight_crew()) : scripted ? 'script' : 'hands';
     this.rows = new Float64Array(1024 * this.inputNames.length);
     this.steps = 0;
   }
@@ -146,7 +149,7 @@ export class CoreSession {
   // build says which bands it would judge otherwise (--rejudge).
   recording(extra = {}) {
     const n = this.inputNames.length;
-    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, `# crew: ${this.scripted ? 'script' : 'hands'}`,
+    const lines = [`# scenario: ${this.scenario}`, `# airframe: ${this.airframe}`, `# crew: ${this.crew}`,
                    `# build: ${this.build}`];
     for (const [key, value] of Object.entries(extra)) {
       const ours = ['scenario', 'airframe', 'crew', 'build', 'judged'];
@@ -157,6 +160,12 @@ export class CoreSession {
     for (let k = 0; k < this.steps; ++k) lines.push(Array.from(this.rows.subarray(k * n, (k + 1) * n), String).join(','));
     for (const line of this.debrief().split('\n')) if (line) lines.push(`# judged: ${line}`);
     return lines.join('\n') + '\n';
+  }
+
+  // A command to the scripted crew (core.h, flight_command): "flare" begins its flare at the next step, where the
+  // flare waits for one (flare=external). Whether it was taken.
+  command(name) {
+    return this.mod.ccall('flight_command', 'number', ['string'], [String(name)]) === 1;
   }
 
   // The gate's judge as text (core.h, flight_debrief): a line a band, then STABLE, NOT STABLE or flying.

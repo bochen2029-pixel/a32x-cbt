@@ -194,6 +194,13 @@ set_target_properties(ra_test PROPERTIES LINKER_LANGUAGE CXX)
 flight_warnings(ra_test)
 flight_node_program(ra_test)
 
+# The scripted crew's flare through the C API: what begins it, a command, the floor, the law on the trigger, the wind.
+add_executable(flare_test harness/flare_test.c)
+target_link_libraries(flare_test PRIVATE flight_world)
+set_target_properties(flare_test PROPERTIES LINKER_LANGUAGE CXX)
+flight_warnings(flare_test)
+flight_node_program(flare_test)
+
 # The scorer: the airframe against the A320's targets, so a fitted A320 has numbers to beat.
 add_executable(airframe_score harness/score.cpp)
 target_link_libraries(airframe_score PRIVATE flight_world)
@@ -245,7 +252,7 @@ if(EMSCRIPTEN)
   flight_warnings(flight_core)
   target_link_options(flight_core PRIVATE
     --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createFlightCore -sENVIRONMENT=worker,node -sSINGLE_FILE=1
-    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief,_flight_airframe,_flight_build"
+    "SHELL:-sEXPORTED_FUNCTIONS=_flight_start,_flight_start_scenario,_flight_inputs,_flight_input_count,_flight_input_name,_flight_step,_flight_state,_flight_state_count,_flight_state_name,_flight_state_text,_flight_debrief,_flight_airframe,_flight_build,_flight_command,_flight_crew"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=ccall,UTF8ToString,HEAPF64"
     ${FLIGHT_EMBED_OPTIONS})
   set_target_properties(flight_core PROPERTIES LINK_DEPENDS "${FLIGHT_EMBED_FILES}")
@@ -304,6 +311,16 @@ add_test(NAME radio_altimeters_reading_high_make_the_crew_flare_late COMMAND ra_
 add_test(NAME radio_altimeters_reading_low_make_the_crew_flare_early COMMAND ra_test bias -15)
 add_test(NAME with_radio_altimeter_1_failed_the_crew_flies_by_radio_altimeter_2 COMMAND ra_test one)
 add_test(NAME with_both_radio_altimeters_failed_the_flight_goes_on COMMAND ra_test both)
+# The flare (world.h, FlareOptions), for a driver outside the harness: today's crew begins it by its formula and takes
+# no command; flare=external waits for one, with floor= under it; flare_law=time flies today's law on the height the
+# trigger stood for. And the wind the aircraft lands in, along and across the runway.
+add_test(NAME the_crew_s_formula_begins_the_flare_and_takes_no_command COMMAND flare_test formula)
+add_test(NAME an_external_flare_waits_for_its_command COMMAND flare_test command)
+add_test(NAME with_nobody_commanding_the_floor_begins_the_flare COMMAND flare_test floor)
+add_test(NAME the_flare_flown_on_the_trigger_s_height_lands COMMAND flare_test time)
+add_test(NAME the_flare_s_options_are_checked COMMAND flare_test options)
+add_test(NAME the_wind_across_kdfw_17c_is_from_the_right COMMAND flare_test wind 270/15 0 15)
+add_test(NAME the_wind_along_kdfw_17c_is_a_headwind COMMAND flare_test wind 180/10 10 0)
 
 # The scripted crew flies KDFW 17C's ILS from 10 nm to a stop, judged by the hand-flown ILS's bands
 # (ROADMAP.md, P7): on the beams, a dot off each of them either way, 10 kt fast and slow, a 15 kt
@@ -446,6 +463,10 @@ if(FLIGHT_NODE)
   # refuse it, and its replay's verdict is set against the saved one (core-session.js); the module test flies it.
   add_test(NAME the_page_reads_a_recording_as_law_harness_does COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/recording.test.mjs")
+  if(NOT EMSCRIPTEN)  # law_harness --pipe, driven from outside in lockstep: it starts a process
+    add_test(NAME a_driver_flies_the_flare_through_the_pipe COMMAND "${FLIGHT_NODE}"
+             "${CMAKE_CURRENT_SOURCE_DIR}/harness/pipe_test.mjs" "$<TARGET_FILE:law_harness>" "${CMAKE_CURRENT_BINARY_DIR}")
+  endif()
   add_test(NAME the_view_puts_the_eye_where_the_flight_is COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/scene.test.mjs")
   add_test(NAME kdfw_is_laid_out_as_ourairports_and_the_faa_have_it COMMAND "${FLIGHT_NODE}" --test

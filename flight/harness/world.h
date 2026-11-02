@@ -89,6 +89,17 @@ struct Failures {
   double ra[2] = {-1, -1};       // the radio altimeters
 };
 
+// How the scripted crew begins its flare and flies it, so that a driver outside the harness can decide when (the
+// Jev landing experiment, flight/README.md; core.h, flare=). The default is today's crew: its formula begins the
+// flare when the radio height, as the crew reads it, is below 33 ft, and its law steers the sink rate down against
+// that height.
+struct FlareOptions {
+  bool external = false;  // flare=external: the formula never begins it; a command does (World::command)
+  bool timeLaw = false;   // flare_law=time: today's law flown from the trigger on, not on a radio height (World)
+  double floorFt = 0;     // floor=FT: whatever the trigger, the flare begins by this true height (0: never)
+  std::string driver;     // driver=NAME: who sends the command, for a recording's crew line
+};
+
 // Where the world begins: the airframe's start, the runway it is judged against, the levers the crew
 // finds set, and what will fail. The default is P7's slice 1: on the gear at the start, a runway drawn
 // 150 m behind it.
@@ -104,6 +115,7 @@ struct WorldStart {
   // In the air, a test pilot's manoeuvre (core.h, "air"): hold, bank, pull, push, alpha or speed. Empty:
   // the scripted circuit, or the ILS from an approach start.
   std::string manoeuvre;
+  FlareOptions flare;
 };
 
 class World {
@@ -151,6 +163,14 @@ class World {
   // height the crew flies by: RA 1, or RA 2 when RA 1 has failed, NaN when both have.
   double raFt(int k) const;
   double crewRadioHeightFt() const;
+
+  // A command from outside the harness (core.h, flight_command). "flare" begins the scripted crew's flare at its
+  // next step, where its flare is external (FlareOptions) and the approach is flown down to it; true if taken.
+  bool command(const std::string& name);
+  // What began the flare: nothing yet, the crew's formula, a command, or the floor.
+  enum FlareBy { kFlareByNone = 0, kFlareByFormula = 1, kFlareByCommand = 2, kFlareByFloor = 3 };
+  int flareBy() const { return flareBy_; }
+  const FlareOptions& flareOptions() const { return flare_; }
   double tasKn() const { return air().tasKn; }
   double casKn() const { return air().casKn; }
   double groundSpeedKn() const { return air().groundSpeedKn; }
@@ -245,6 +265,13 @@ class World {
   // what the crew carries from one step to the next
   double tla_ = 0;
   double lastCas_ = 0, casRate_ = 0;      // kt, kt/s
+  // the flare (FlareOptions): how it is begun and flown; what began it; under flare_law=time the height it flies
+  // on, the trigger's height carried down by the vertical speed; a command waiting for the next step
+  bool beginFlare(double radio);
+  FlareOptions flare_;
+  int flareBy_ = kFlareByNone;
+  double flareHeightFt_ = 0;
+  bool flareCommanded_ = false;
   double gammaCmd_ = 0, gammaSpeed_ = 0;  // deg: the flight path being flown, and the one the speed asks for
 
   // flaps and slats: the pick-off angles the SFCCs report, and the flap surface they move
