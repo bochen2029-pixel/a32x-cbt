@@ -1252,9 +1252,13 @@ N) looks ahead from 0.3 m in front of the nose along the fuselage, 60 degrees ac
 (quality 0.85) or a PNG, 280 to 1568 px a side, and `flightDebug.papi()` says how many of the landing runway's PAPI
 units show white from there, by the rule that colours the lights drawn: for grading what a camera sees, never for
 flying. Neither moves the flight. `flightDebug.flare()` sends the flare command of a core flown with
-`flare=external` (P7's), and refuses, saying why, a core without one. drive.mjs's `frame` step saves the frames.
+`flare=external` (P7's) and settles on the core's answer: taken once, on the approach; refused, saying why,
+otherwise, as by a crew on the formula or a core without the command. drive.mjs's `frame` step saves the frames.
 Checked on the scripted crew from 3 nm: `step(50)` flew 50 ticks to the tick; a stop's frames left its time
-untouched; with `ra_bias=100` the nose frames were byte for byte those without it.
+untouched; with `ra_bias=100` the nose frames were byte for byte those without it; and with
+`flare=external;driver=jev`, held down to 33 ft and flared from the page, it landed STABLE 327 m past the
+threshold at 171 fpm, its recording's crew line `jev` (commanded at 39 ft it floated long, NOT STABLE, as P7's
+table has a flare begun above 35 ft).
 
 **VR, for a Quest headset: untested on hardware.** The VR button at the page's bottom right (`web/src/vr.js`)
 puts the view in a headset through WebXR, in true stereo: three.js draws each eye from its own place, the eyes as

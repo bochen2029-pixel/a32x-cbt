@@ -411,8 +411,17 @@ globalThis.flightDebug = {
     if (!flight.field || !('flaring' in flight.field)) {
       return Promise.reject(new Error('flare: this core takes no flare command; it needs one that does, flown with flare=external (P7)'));
     }
-    flight.command('flare');
-    return Promise.resolve(ticksFlown);
+    // after any step asked before it, and settled by the core's own answer: it takes one, on the approach, from a
+    // scripted crew flown with flare=external (world.cpp, World::command), and none in a replay (worker.js)
+    return exclusive(async () => {
+      const answer = await Promise.race([flight.command('flare'), new Promise((resolve) => setTimeout(() => resolve(null), 5000))]);
+      if (answer === null) throw new Error('flare: the worker did not answer');
+      if (!answer) {
+        throw new Error('flare: the core did not take it: it takes one, on the approach, from a crew flown with ' +
+          'flare=external, and none in a replay');
+      }
+      return ticksFlown;
+    });
   },
   // the nose camera's view at this stop as an image, and the landing runway's PAPI as seen from it (view.js, capture
   // and papiAt; nose.js): neither moves the flight or its clock

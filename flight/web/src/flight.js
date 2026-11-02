@@ -38,6 +38,7 @@ export class Flight {
     this.onError = onError;
     this.busy = false;
     this.recordings = [];  // what recording() waits on, oldest first: the worker answers in order
+    this.commands = [];    // what command() waits on, oldest first: the worker answers each, in order
     this.inputNames = [];
     this.stateNames = [];
     this.worker.onmessage = (e) => this.receive(e.data);
@@ -69,9 +70,13 @@ export class Flight {
     return true;
   }
 
-  // A command to the core, carried out before the next tick it flies (worker.js; P7's flare=external: 'flare').
+  // A command to the core, carried out before the next tick it flies (worker.js; P7's flare=external: 'flare'): a
+  // promise of whether the core took it, as the worker answers (never in a replay).
   command(name) {
-    this.worker.postMessage({ type: 'command', name });
+    return new Promise((resolve) => {
+      this.commands.push(resolve);
+      this.worker.postMessage({ type: 'command', name });
+    });
   }
 
   // The flight so far, as law_harness --replay reads it: a promise of {text, steps}. extra: header lines
@@ -100,6 +105,8 @@ export class Flight {
       this.onState(m);
     } else if (m.type === 'recording') {
       this.recordings.shift()(m);
+    } else if (m.type === 'command') {
+      this.commands.shift()?.(m.taken === true);
     } else if (m.type === 'error') {
       this.busy = false;
       if (this.started && !this.inputNames.length) this.started.reject(new Error(m.message));

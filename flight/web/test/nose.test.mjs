@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import A320 from '../data/a320.json' with { type: 'json' };
 import { FlightLog } from '../src/events.js';
+import { Flight } from '../src/flight.js';
 import { frameRefusal, NOSE_AHEAD_M, NOSE_HFOV_DEG, nosePoint, papiSeen, vfov } from '../src/nose.js';
 import { eye, heightFt, origin } from '../src/scene-math.js';
 import { validateAirframe } from '../src/world-data.js';
@@ -61,6 +62,18 @@ test('the landing PAPI from the glide path shows two white, more when high, fewe
   assert.deepEqual(on.lamps.map((l) => l.white), [false, false, true, true]);
   assert.ok(on.lamps.every((l) => Math.abs(l.elevationDeg - 3) < 0.05), 'the angle each is seen at');
   assert.deepEqual(papiSeen(lamps, '17L', from(3)), { white: 0, lamps: [] }, 'a runway end with no PAPI here');
+});
+
+test("a flare command settles with the core's answer, each in its turn", async () => {
+  // a Flight without its worker: the messages it posts kept, the worker's answers handed to it
+  const posted = [];
+  const f = Object.assign(Object.create(Flight.prototype), { worker: { postMessage: (m) => posted.push(m) }, commands: [], recordings: [] });
+  const first = f.command('flare'), second = f.command('flare');
+  assert.deepEqual(posted, [{ type: 'command', name: 'flare' }, { type: 'command', name: 'flare' }]);
+  f.receive({ type: 'command', name: 'flare', taken: true });
+  f.receive({ type: 'command', name: 'flare', taken: false });
+  assert.equal(await first, true, 'taken');
+  assert.equal(await second, false, 'the second refused: a crew flares once');
 });
 
 test('the world is placed by the true height: a failed or biased radio altimeter moves only its own reading', () => {

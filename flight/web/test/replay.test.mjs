@@ -52,6 +52,8 @@ test('the status line says whose flight, how far it has replayed, and the note o
   assert.ok(lines.slice(3).every(([l, warn]) => warn && l.length <= 60), 'the note in amber, in lines that fit');
   assert.equal(lines.slice(3).map(([l]) => l).join(' '), other.note.text);
   assert.deepEqual(replayStatus(null, null, 'f.csv'), [['replay: f.csv', false], ['reading the recording', false]]);
+  const jev = replayStatus({ ...info, crew: 'jev', hands: '' }, { at: 0, steps: 9500, ended: false });
+  assert.equal(jev[1][0], 'flown 2026-11-01 22:30 UTC, by the scripted crew, its flare by jev', 'a driver named by its crew line');
 });
 
 test("the replay's verdict against the one saved with it: the same, each band changed, or nothing to compare", () => {

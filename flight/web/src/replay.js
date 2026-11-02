@@ -80,7 +80,11 @@ export function replayStatus(info, progress, name = '') {
   const lines = [[`replay${name ? `: ${name}` : ''}`, false]];
   if (!info) return [...lines, ['reading the recording', false]];
   const when = /^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(info.flown || '') ? `flown ${info.flown.slice(0, 16).replace('T', ' ')} UTC` : '';
-  const who = info.crew === 'script' ? 'by the scripted crew' : info.hands ? `by ${info.hands}` : '';
+  // who: the scripted crew, a pilot's hands (and on what), or the scripted crew with its flare left to a driver
+  // outside the page, whom its crew line names (flare=external;driver=NAME; core.h, flight_crew)
+  const who = info.crew === 'script' ? 'by the scripted crew'
+    : info.crew && info.crew !== 'hands' ? `by the scripted crew, its flare by ${info.crew}`
+      : info.hands ? `by ${info.hands}` : '';
   if (when || who) lines.push([[when, who].filter(Boolean).join(', '), false]);
   const steps = progress?.steps ?? info.steps;
   const s = (n) => `${(n * 0.02).toFixed(1)} s`;   // a step is a fiftieth of a second
