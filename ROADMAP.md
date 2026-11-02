@@ -797,11 +797,15 @@ guidance, a real path through the world — with the CBT's procedures and scorin
       visuals study (*"yes i aoprove the threejs"*). Built in `c8415a1`: an A320 of our own, shaped by eye
       to Airbus's published dimensions, its gear and engines placed from `A320-fit.xml`, a house livery
       with no airline's marks (`docs/provenance.md` §1g). Parked aircraft at the gates are not built.
-- [ ] **VR, later, as a toggle** — back burner, not to be built now. Meta Quest 3 and 3S only (a
-      Quest 2 may work but is not a target; no Apple headset), with true stereo depth. Relayed on
-      2026-11-01 by the session researching visuals, which noted the route: three.js's built-in
-      WebXR for real per-eye stereo, through Quest Link and Chrome on Windows so the joystick stays
-      on the PC, with the standalone Quest browser as the lightest tier. Not scheduled.
+- [x] **VR as a toggle**, for a Meta Quest headset, with true stereo depth. Relayed on 2026-11-01 by
+      the session researching visuals; asked for again by the operator that evening (a button at the
+      bottom right, Quest 2 and 3); built and released in 0.1.6 (`flight/web/src/vr.js`): three.js's
+      WebXR, `immersive-vr` in the seated space, each eye drawn from its own place, starting at the
+      captain's eyepoint; off, the page is unchanged to the byte. Two routes: the live simulator in
+      the Quest's own browser, or Chrome or Edge on a PC with Quest Link so the joystick stays on the
+      PC. **Not yet tried on a headset.** Not built: the Quest's controllers on the stick and thrust
+      levers, and an in-world HUD and debrief (the overlay and the status text are flat page elements,
+      so the headset does not show them).
 - [x] **A 3D debrief in the manner of ACMI/Tacview**: the flown trail coloured by the gate's bands, a
       timeline and an event log, built on the deterministic replay (house rule 7). Relayed the same
       day by the same session. Begun in `c8415a1`: ten cameras, a debrief view (K) and the flown trail

@@ -9,6 +9,9 @@ real A32NX flight-control computers, hand-flown in the browser from Dallas Fort 
 **[Download for Windows](https://github.com/bochen2029-pixel/a32x-cbt/releases)** (unzip, double-click
 `A32X.exe`) · **[The pilot's guide](docs/pilots-guide.md)**
 
+**In VR:** open the site in a Meta Quest's browser and press **VR** at the bottom right, for the flight
+deck in true stereo (not yet tried on a headset).
+
 It has two parts:
 
 - **A flight simulator** (`flight/`, GPLv3). The real FlyByWire A32NX flight-control computers — two
