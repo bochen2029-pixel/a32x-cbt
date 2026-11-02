@@ -10,8 +10,9 @@ replaced and which stays selectable. A scripted crew flies either through the co
 runway, round a circuit and back onto the runway, headless, in normal law. The 737 is A320-class, not
 an A320: `docs/provenance.md` says why it is not JSBSim's A320. P6 passed against a point-mass stub;
 the same gate, unchanged, passes against both. The A320's numbers are written down
-(`targets/a320.csv`, 76 targets): our A320 is inside 75, all but its pitching moment deep past the
-stall ([below](#the-pitching-moment-deep-past-the-stall)), the 737 inside 21. The A320 replaced the
+(`targets/a320.csv`, 80 targets): our A320 is inside 77, all but its pitching moment deep past the
+stall ([below](#the-pitching-moment-deep-past-the-stall)) and its stall at Mach 0.70 and 0.78
+([below](#the-stall-above-mach-03)), the 737 inside 25. The A320 replaced the
 737 under the swap rule ([below](#the-swap-made-2026-11-01)) on its aerodynamics, and its engines
 were fitted after ([below](#its-engines-and-how-they-were-fitted)), and then what lies past its stall
 ([below](#past-the-stall-and-how-it-was-fitted)), the drag of its landing flaps and gear
@@ -120,7 +121,7 @@ at that instant, so the computers never see what JSBSim makes of an aeroplane un
 ## The A320's targets, and the two airframes against them
 
 The operator chose to fly the 737 for P7 and swap in a fitted A320 later. `targets/a320.csv` is the
-bar for that swap: 76 targets an airframe is counted against and 4 context rows scored but not
+bar for that swap: 80 targets an airframe is counted against and 4 context rows scored but not
 counted. Each row names its source in the file's header: A32NX's VS1g and VLS tables
 (`targets/a320-speeds.csv`, a community reconstruction of Airbus's, sampled on a weight grid), the
 ELAC's own α max and α prot, a recorded A320 approach (VT-WGR's flight data, from AAIB India's
@@ -135,7 +136,7 @@ Airbus's drag-to-lift ratios in ANP again, on approach and on departure, and DLR
 identified from A320 flight data; and for the pace of the engines' spool-up, the FAA's limit for
 certifying an engine. OpenAP WRAP's distributions fitted to ADS-B are the four context rows.
 Thirty-five rows are marked *fit*, for an optimiser to tune against, the static thrust at an 8,000 ft
-airfield the last; forty-one are *held out*, so that a fit which only memorises is caught.
+airfield the last; forty-five are *held out*, so that a fit which only memorises is caught.
 Rows that depend on weight are measured at two: 48.5 t, the weight the 737 is loaded to, and 65 t,
 between an A320-251N's maximum zero-fuel and landing weights. The rule for the swap is in
 `ROADMAP.md`, P7.
@@ -237,6 +238,10 @@ held-out rows, the aerodynamics:
 | `short-period-full` | 65 | 0.35..1.30 ratio | 0.63 | **inside** | 0.47 | **inside** |
 | `short-period-freq-full` | 65 | 0.70.. rad/s | 0.92 | **inside** | 1.04 | **inside** |
 | `short-period-cap-full` | 65 | 0.16..3.60 1/(g s2) | 0.24 | **inside** | 0.50 | **inside** |
+| `stall-alpha-clean-m045` |  | 9.70.. deg | 11.25 | **inside** | 13.25 | **inside** |
+| `stall-alpha-clean-m060` |  | 9.12.. deg | 9.75 | **inside** | 13.25 | **inside** |
+| `stall-alpha-clean-m070` |  | 8.55.. deg | 8.50 | outside -0.1 | 13.25 | **inside** |
+| `stall-alpha-clean-m078` |  | 8.09.. deg | 7.50 | outside -0.6 | 13.25 | **inside** |
 
 held-out rows, past the stall:
 
@@ -281,12 +286,13 @@ context rows, not counted:
 | `climb-rate` |  | 1500.00..2530.00 ft/min | 3352.66 | (outside +822.7) | 4602.18 | (outside +2072.2) | 3962.64 | (outside +1432.6) |
 | `descent-rate` |  | -1550.00..-840.00 ft/min | -1113.99 | (inside) | -1033.95 | (inside) | -1699.40 | (outside -149.4) |
 
-**Our A320: inside 75 of 76 targets — 35 of 35 fit rows, 40 of 41 held out, all but its pitching
-moment deep past the stall — the engines' 27 rows among them, where on JSBSim's CFM56_5 it was inside
-3 of the first 24, and before their fit inside 1 of the 3 at a high airfield; the 5 past the stall
-that came with their fit, where before that fit it was inside 1; the 6 for the drag of the
-flaps and the gear, where before their fits it was inside 3; and its engine's spool-up, outside
-before its fit. The 737: inside 21 of 76 — 7 of 35 fit, 14 of 41 held out.** Our
+**Our A320: inside 77 of 80 targets — 35 of 35 fit rows, 42 of 45 held out, all but its pitching
+moment deep past the stall and its stall at Mach 0.70 and 0.78 — the engines' 27 rows among them,
+where on JSBSim's CFM56_5 it was inside 3 of the first 24, and before their fit inside 1 of the 3 at a
+high airfield; the 5 past the stall that came with their fit, where before that fit it was inside 1;
+the 6 for the drag of the flaps and the gear, where before their fits it was inside 3; and its
+engine's spool-up, outside before its fit. The 737: inside 25 of 80 — 7 of 35 fit, 18 of 45 held
+out.** Our
 A320 is inside every row the 737 is inside, and every row it was inside before its engines, what lies
 past its stall or the drag of its flaps and gear were fitted. Every row but the five past the stall
 reads as it did before that fit, every row but the gear's as it did before the drag fit, every target
@@ -329,8 +335,9 @@ How much the held-out rows say, row by row:
   optimiser never saw these rows, but the person who wrote the seeds did, so they are weaker
   evidence than the rest. Two pass with almost nothing to spare: clean alpha at VLS, 6.25° at 48.5 t
   and 6.49° at 65 t, against 6.5°.
-- No row measures the stall at high Mach, the transonic pitching moment or ground effect. Their
-  coefficients are the seeds' estimates; P7's protections step was the first to fly them.
+- No row measures the transonic pitching moment or ground effect: their coefficients are the seeds'
+  estimates, and P7's protections step was the first to fly them. The stall at Mach has four held-out
+  rows since, two of them outside ([below](#the-stall-above-mach-03)).
 - The three short-period rows in CONF FULL are MIL-F-8785C's Level 1 for large aircraft on approach:
   floors, not A320 data, and wide. Both airframes are inside them and they move nothing; the fit past
   the stall cannot reach them. Ours is the slower: 0.92 rad/s and a control anticipation parameter of
@@ -783,6 +790,44 @@ candidate to take with part 7 after the operator's gate. Nothing in the airframe
 What changes in flight: nothing. The airframe is as it was, so every flight is the same, bit for bit.
 Seventy-five native cases pass with either airframe on MSVC 19.44 and on GCC 13.3, and seventy under
 node, on master with the replay (`60371d0`) and part 2.
+
+### The stall above Mach 0.3
+
+Part 4 of the airframe plan (`ROADMAP.md`), decided on 2026-11-02, done as a check. The peak lift of our
+A320 falls above Mach 0.3 by `clmax-mach`, 0.60 of the lift coefficient per unit of Mach, an estimate
+(`seeds.csv`: peak lift near 1.0 at Mach 0.78, where buffet begins near 0.8). The plan looked to
+Airbus's performance brochure and NASA's Common Research Model; the first is on SKYbrary, not on
+Airbus's own pages, which the decisions ask for, and the second is another wing. The source was in
+hand: the ELAC's own alpha max, which the stall rows at low speed already take for Mach 0 to 0.5,
+carries a Mach column. In A32NX's tables (`ElacComputer_P`; the FAC's are the same), a community
+reconstruction as the low-speed values are, the clean alpha max holds at 8.7° to Mach 0.5 and falls
+linearly to 6.4° at Mach 0.9: the law lets the pilot take the wing less far as the Mach rises, as a
+wing's lift peaks at a lower alpha there. So the wing must still be lifting a degree past it, as at low
+speed. Four held-out rows, the clean lift peak at a Mach and a height the A320 flies it at, found by
+sweeping alpha 0.25° apart:
+
+| row | condition | floor | our A320 | | JSBSim's 737 | |
+|---|---|---|---|---|---|---|
+| `stall-alpha-clean-m045` | Mach 0.45, 10,000 ft | 9.70 deg | 11.25, CL max 1.21 | **inside** | 13.25 | **inside** |
+| `stall-alpha-clean-m060` | Mach 0.60, FL250 | 9.12 deg | 9.75, CL max 1.12 | **inside** | 13.25 | **inside** |
+| `stall-alpha-clean-m070` | Mach 0.70, FL300 | 8.55 deg | 8.50, CL max 1.06 | outside -0.1 | 13.25 | **inside** |
+| `stall-alpha-clean-m078` | Mach 0.78, FL350 | 8.09 deg | 7.50, CL max 1.01 | outside -0.6 | 13.25 | **inside** |
+
+Read plainly: at cruise, Mach 0.78, ours stalls at 7.50°, 0.41° past the alpha max the law lets the
+pilot reach, where the rows ask a degree; at Mach 0.70 it keeps 0.95°. A full pull at cruise in normal
+law would take ours to the edge of its stall. The 737's peak does not move with Mach at all: JSBSim's
+737 has no compressibility in its lift. Inside 77 of 80, the 737 inside 25.
+
+Why, and why no fit here: the floor is an alpha, and our stall alpha at a Mach comes from two things,
+the peak lift there and how fast lift rises with alpha there. Our peak at Mach 0.78, 1.01, is where the
+seed put it, and no row says whether it is low or our lift rises too fast with alpha at that Mach. A
+fit of `clmax-mach` alone on these rows would raise the peak until the fitter's margin for a floor is
+met, a degree clear, whatever the wing's real peak is. So nothing in the airframe changed here; whether
+to fit, and what, is fbw-parent's to decide (the plan, part 4).
+
+What changes in flight: nothing; every flight is the same, bit for bit. The scorer gains the
+measurement, a lift peak at a Mach beside its sweep at low speed. Eighty-one native cases pass with
+either airframe on MSVC 19.44 and on GCC 13.3, and seventy-six under node, on `68f2f68`.
 
 ## The swap: made, 2026-11-01
 

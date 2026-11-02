@@ -107,7 +107,7 @@ A phase is done when its gate passes, not when the code exists.
 | P4 | **Instructor mode** — freeze, inject, reposition | an instructor can drop a fault into a live aircraft and the score records the disruption | **passed** [M] |
 | P5 | **Ship A** — packaging, notices, reference machine | a stranger runs it from a zip on a 2014 laptop | in progress — zip gate passes from `file://` [M]; never run on a 2014 laptop; reset misses 20 ms at 3× CPU slowdown |
 | P6 | **Law harness** — the A32NX computers standalone | ELAC/SEC/FAC step at 50 Hz against a stub world for 30 minutes, no NaN | **passed** [M] — 30 min, 0 non-finite of 20.5 M, normal law throughout; MSVC and GCC |
-| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside 75 of 76 A320 targets, all but its pitching moment deep past the stall, its engines' 27, the 5 past its stall, the 6 for its flaps' and gear's drag and its engines' spool-up among them, where the 737 it replaced is inside 21 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate ready to fly: its judge, recordings, repeatability and the page's half built [M]; five hand-flown approaches to come, the operator's (flight/README.md, *Flying the gate*) |
+| P7 | **Aero** — JSBSim airframe, law↔surface↔air data | a hand-flown ILS is stable and repeatable | in progress — slice 1 done [M]: the computers fly an airframe headless, takeoff to landing, normal law throughout; since 2026-11-01 the airframe is our fitted A320, inside 77 of 80 A320 targets, all but its pitching moment deep past the stall and its stall at Mach 0.70 and 0.78, its engines' 27, the 5 past its stall, the 6 for its flaps' and gear's drag and its engines' spool-up among them, where the 737 it replaced is inside 25 [M]; steps 5–8 done [M]: the flight core as a library, WebAssembly, joystick and loop, the view — in a browser from file://; step 2 done [M]: a real runway, its ILS and the wind, the scripted crew inside every band; step 3 done [M]: the instructor's failures and the laws they leave, each flown to a landing; step 4 done [M]: the protections, judged where they hold, the rest measured; the gate ready to fly: its judge, recordings, repeatability and the page's half built [M]; five hand-flown approaches to come, the operator's (flight/README.md, *Flying the gate*) |
 | P8 | **Displays** — PFD/ND/EWD/SD from law state | six tubes render from real law output at 20 Hz | not started; planned (*P8 in detail*), to begin after P7's gate |
 | P9 | **FMS** — route, LNAV and VNAV, performance, progress, DIR | one flight plan flies end to end | not started |
 | P10 | **Bridge** — socket to MSFS for people with a GPU | the same course runs on both machine tiers | not started |
@@ -250,6 +250,9 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
 - [x] the pitching moment deep past the stall checked, part 3: the Transport Class Model's levels off
       past the stall and ours does not; a held-out row, outside, an open finding, its fix deferred.
       Inside 75 of 76, the 737 inside 21 [M]
+- [x] the stall above Mach 0.3 checked, part 4: the ELAC's own alpha max falls with Mach, and ours
+      stalls within a degree of it at Mach 0.70 and 0.78; four held-out rows, two outside, the fit
+      for fbw-parent to decide. Inside 77 of 80, the 737 inside 25 [M]
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
@@ -541,12 +544,15 @@ source might come from, and an order, the parts whose sources are in hand first.
    tail's power, as its control power does (`flight/README.md`, *The pitching moment deep past the
    stall*); decided not now (*Decisions*, (d)). The row stays an open finding: held out, outside by
    0.08, the cause understood.
-4. **The stall above Mach 0.3** (`clmax-mach`, an estimate). Moves the 1-g stall and alpha max's margin
-   at altitude, and step 4's full pull at Mach 0.45, where ours runs out of lift near 2 g. To look for:
-   Airbus's public flight-operations brochure on performance, *Getting to Grips with Aircraft
-   Performance*, for the A320's buffet onset with Mach; NASA's Common Research Model, a generic
-   transport's public transonic test data, for the trend. Rows on lift at buffet onset by Mach, banded
-   wide.
+4. **The stall above Mach 0.3** (`clmax-mach`, an estimate). Done as a check, 2026-11-02: the source was
+   in hand, the ELAC's own alpha max, which falls with Mach past 0.5, from 8.7° clean to 6.4° at Mach
+   0.9. Four held-out rows on the clean lift peak at Mach 0.45 to 0.78, a degree past alpha max as at
+   low speed; ours is outside at 0.70 and 0.78, stalling 0.41° past alpha max at cruise
+   (`flight/README.md`, *The stall above Mach 0.3*). For fbw-parent to decide: whether to fit
+   `clmax-mach` on them, the fitter then aiming a degree clear of a floor, or first to find what sets
+   the alpha there, the peak lift or the lift slope at Mach. Airbus's performance brochure is on
+   SKYbrary, not on Airbus's own pages, so outside the decisions' rule; NASA's Common Research Model
+   is another wing.
 5. **The transonic pitching moment and drag past the drag rise** (`cm-mach-tuck`, an estimate, and the
    wave drag past Mach 0.85). Moves high-speed protection, where step 4 reached 381 kt against the ELAC's
    380. To look for: the Common Research Model's pitching moment with Mach at a fixed lift, another
