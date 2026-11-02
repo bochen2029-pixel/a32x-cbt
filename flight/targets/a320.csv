@@ -36,7 +36,11 @@
 #                       the band of 3 kt either side is ours
 #   elac-alpha-max+1    the ELAC's own alpha max (A32NX 66021c2, ElacComputer_P, Mach 0 to 0.5: clean 8.7,
 #                       CONF 1 and 1+F 13.6, CONF 2 14.2, CONF 3 13.1, FULL 13.0 deg) plus 1 deg: the wing
-#                       must still be lifting where the law lets the pilot take it. The margin is ours
+#                       must still be lifting where the law lets the pilot take it. The margin is ours.
+#                       Past Mach 0.5 the same table takes the clean alpha max down, linearly to 6.4 deg at
+#                       Mach 0.9 (its Mach breakpoints 0, 0.5, 0.9 and 1.0): 8.13 deg at Mach 0.60, 7.55 at
+#                       0.70, 7.09 at 0.78. The rows at a Mach sweep alpha there, at the height the condition
+#                       names, for the peak
 #   elac-alpha-prot     the ELAC's alpha prot (clean 6.5, CONF 1 and 1+F 11.7, CONF 2 11.9, CONF 3 11.0,
 #                       FULL 10.6 deg). VLS lies above the alpha-prot speed by design, so at VLS the
 #                       airframe must fly below alpha prot
@@ -205,6 +209,10 @@ stall-alpha-conf1f,target,alpha,alpha of maximum lift,CONF 1+F,,,14.6,,deg,fit,e
 stall-alpha-conf2,target,alpha,alpha of maximum lift,CONF 2,,,15.2,,deg,fit,elac-alpha-max+1
 stall-alpha-conf3,target,alpha,alpha of maximum lift,CONF 3,,,14.1,,deg,fit,elac-alpha-max+1
 stall-alpha-full,target,alpha,alpha of maximum lift,CONF FULL,,,14.0,,deg,fit,elac-alpha-max+1
+stall-alpha-clean-m045,target,alpha,alpha of maximum lift,clean; Mach 0.45; 10000 ft,,,9.70,,deg,check,elac-alpha-max+1
+stall-alpha-clean-m060,target,alpha,alpha of maximum lift,clean; Mach 0.60; FL250,,,9.12,,deg,check,elac-alpha-max+1
+stall-alpha-clean-m070,target,alpha,alpha of maximum lift,clean; Mach 0.70; FL300,,,8.55,,deg,check,elac-alpha-max+1
+stall-alpha-clean-m078,target,alpha,alpha of maximum lift,clean; Mach 0.78; FL350,,,8.09,,deg,check,elac-alpha-max+1
 drag-rise,target,performance,Mach at which drag has risen 20 counts,clean; lift coefficient 0.5; FL350; against Mach 0.6,,,0.81,0.85,Mach,fit,korn-lock
 vls-alpha-clean,target,alpha,alpha in level flight at VLS,clean; gear up; 1000 ft,48.5,,,6.5,deg,check,elac-alpha-prot
 vls-alpha-conf2,target,alpha,alpha in level flight at VLS,CONF 2; gear up; 1000 ft,48.5,,,11.9,deg,check,elac-alpha-prot

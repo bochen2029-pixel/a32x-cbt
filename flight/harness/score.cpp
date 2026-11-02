@@ -432,6 +432,21 @@ Measured liftPastStall(Airframe& a, const Configuration& c, const LiftPeak& p, d
   return {cl / p.clMax, fmt("CL %.3f at %.2f deg; ", cl, p.alphaDeg + pastDeg) + fmt("CL max %.3f at %.2f deg", p.clMax, p.alphaDeg)};
 }
 
+// The lift peak at a Mach and a height, where the low-speed sweep (Airframe::liftPeak) flies at 150 kt:
+// the alpha of maximum lift in a sweep 0.25 deg apart, from 0 to 25 deg.
+Measured machLiftPeak(Airframe& a, const Configuration& c, double altitudeFt, double mach) {
+  double best = -1, bestAlpha = kNaN;
+  for (int k = 0; k <= 100; ++k) {
+    const double alpha = 0.25 * k;
+    const double cl = a.aero(altitudeFt, mach, alpha, c).cl;
+    if (cl > best) {
+      best = cl;
+      bestAlpha = alpha;
+    }
+  }
+  return {bestAlpha, fmt("CL max %.2f at Mach %.2f", best, mach)};
+}
+
 // The bare airframe, measured row by row at the weight each row names: lift peaks once per
 // configuration, everything else on demand.
 class Bare {
@@ -511,6 +526,12 @@ class Bare {
       const LiftPeak& p = peak(*config(family.substr(12)));
       return {p.alphaDeg, fmt("CL max %.2f", p.clMax)};
     }
+    if (family.rfind("stall-alpha-", 0) == 0) {
+      // "stall-alpha-clean-m078": the lift peak at the Mach and the height its condition names
+      const Condition c = parseCondition(id, condition, false);
+      if (!c.config || !(c.mach > 0)) return {kNaN, "a lift peak at a Mach needs a configuration and a Mach"};
+      return machLiftPeak(a_, c.config->surfaces, c.altitudeFt, c.mach);
+    }
     if (family.rfind("vls-alpha-", 0) == 0 && config(family.substr(10))) {
       const Config& c = *config(family.substr(10));
       const double vls = speeds_.at("vls:" + c.name, tonnes);
@@ -580,6 +601,7 @@ class Bare {
       if (family.rfind(prefix, 0) == 0 && config(family.substr(n))) return true;
     }
     return family == "app-pitch-full" || family == "cruise-pitch" || family == "cruise-tla" || id == "drag-rise" ||
+           family.rfind("stall-alpha-", 0) == 0 ||
            id == "short-period" || id == "spool-up" || family.rfind("short-period-", 0) == 0 || family.rfind("lift-past-stall-", 0) == 0 ||
            id.rfind("thrust-", 0) == 0 || endsWith(id, "-gradient");
   }
