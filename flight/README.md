@@ -1199,6 +1199,18 @@ PgDn held from the runway start, the reversers read from the state as they moved
 deployed by 1.8 s), REV photographed amber then green on the overlay and the EWD, and the doors from the orbit
 camera at 17 m. The idea is the Booster Lander's (`tools/cockpit_verify` there), at its smallest.
 
+**Lockstep and the nose camera, for the Jev experiment.** `?lockstep=1` starts the page held: no tick flies until
+`flightDebug.step(n)` flies exactly `n` and holds, settling with the state once those ticks are in and drawn;
+`pause()` and `resume()` hold and free the clock, which owes nothing for the time held. The nose camera (`cam=nose`,
+N) looks ahead from 0.3 m in front of the nose along the fuselage, 60 degrees across, with no overlay
+(`web/src/nose.js`); `flightDebug.frame({ width, height, type, quality, hfovDeg })` renders it at the stop as a JPEG
+(quality 0.85) or a PNG, 280 to 1568 px a side, and `flightDebug.papi()` says how many of the landing runway's PAPI
+units show white from there, by the rule that colours the lights drawn: for grading what a camera sees, never for
+flying. Neither moves the flight. `flightDebug.flare()` sends the flare command of a core flown with
+`flare=external` (P7's), and refuses, saying why, a core without one. drive.mjs's `frame` step saves the frames.
+Checked on the scripted crew from 3 nm: `step(50)` flew 50 ticks to the tick; a stop's frames left its time
+untouched; with `ra_bias=100` the nose frames were byte for byte those without it.
+
 The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach_the_controls`,
 `the_view_puts_the_eye_where_the_flight_is`, `kdfw_is_laid_out_as_ourairports_and_the_faa_have_it`,
 `the_view_draws_the_flight_model_s_airframe_under_its_sun` (the drawn airframe's points against
@@ -1331,7 +1343,9 @@ word, as a failed ADR does. The computers are given what the radio altimeters re
 scripted crew: it flies by RA 1, or by RA 2 when RA 1 has failed, for its gear, its flare and its retard,
 as a crew flies by its instruments, while the crash check and the ILS's geometry keep the truth. The
 state reports `ra_ft` as RA 1 reads, `ra2_ft` as RA 2 reads, each NaN once failed, and `height_true_ft`,
-the truth they measure, for a judge and never for the crew. None of it acts unless a scenario asks for
+the truth they measure, for a judge and never for the crew. The page draws the world by the truth and shows
+the instruments' readings (`scene-math.js`, `heightFt`): a failed RA 1 is an amber RA flag where its height was,
+on the HUD and the PFD. None of it acts unless a scenario asks for
 it: every scripted flight, digest and ILS line is as it was. It exists for the Jev landing experiment
 (the operator's idea; owned by the Jev Park session, agreed with fbw-parent): a flare triggered by a
 formula on the radio height is fooled by an altimeter that lies, and a camera is not.

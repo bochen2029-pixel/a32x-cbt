@@ -95,6 +95,7 @@ Reverse thrust is a held button: D-pad up on a standard gamepad, or the one you 
 | key or mouse | does |
 |---------|-------------------------|
 | 1 to 9, 0 | cameras: **1** the pilot's eye, **2** the flight deck, **3** chase, **4** orbit, **5** tower, **6** flyby, **7** cabin, **8** skyline, **9** side, **0** satellite |
+| N | the nose camera: the view ahead from the nose, with no overlay |
 | V | the next camera |
 | [  ] | the hour back and on, a quarter of an hour a press (GPU tier) |
 | K | the debrief, on and off |
@@ -132,7 +133,8 @@ target, *Vapp*, appears in magenta under the speed about 24 s after the start: t
 selectable speed (VLS) plus 5 kt. From the normal 10 nm start it is fixed at 134 kt as you pass
 1,000 ft above the threshold. Hold it between 5 kt below and 10 kt above.
 
-**The landing.** The radio height, in the middle, turns amber below 400 ft. From about 30 ft begin a
+**The landing.** The radio height, in the middle, turns amber below 400 ft (a failed radio altimeter shows an
+amber RA flag there instead). From about 30 ft begin a
 gentle, growing pull, and at 20 ft close the thrust levers (where the real A320 calls RETARD). The
 scripted crew flares that way and touches down at about 160 fpm, the nose 5.8° up, 330 m past the
 threshold. Keep straight on the centreline with the rudder; on the ground, Shift + PgDn pulls the
