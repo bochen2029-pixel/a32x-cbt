@@ -251,8 +251,8 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
       past the stall and ours does not; a held-out row, outside, an open finding, its fix deferred.
       Inside 75 of 76, the 737 inside 21 [M]
 - [x] the stall above Mach 0.3 checked, part 4: the ELAC's own alpha max falls with Mach, and ours
-      stalls within a degree of it at Mach 0.70 and 0.78; four held-out rows, two outside, the fit
-      for fbw-parent to decide. Inside 77 of 80, the 737 inside 25 [M]
+      stalls within a degree of it at Mach 0.70 and 0.78; four held-out rows, two outside, open
+      findings, not fitted. Inside 77 of 80, the 737 inside 25 [M]
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
@@ -510,7 +510,8 @@ trainer's debrief does.
 ### The airframe, where it is still unfitted — a plan
 
 A plan for the operator, written when our A320 came inside all 69 of its targets (`3e1c191`); its
-decisions are taken below, and parts 1 to 3 started on them. Each part starts on the operator's word and
+decisions are taken below. Parts 1 to 5 are done as far as public sources allow; 6 and 7 wait for the
+operator's gate, and 8 is blocked on DTIC. Each part starts on the operator's word and
 lands as a merge of its own under the swap rule
 (P7, *Decisions*), with its own re-baseline; where a flight moves, the gate's five recordings are
 re-judged on the new build (`law_harness --rejudge`) or flown again.
@@ -548,15 +549,17 @@ source might come from, and an order, the parts whose sources are in hand first.
    in hand, the ELAC's own alpha max, which falls with Mach past 0.5, from 8.7° clean to 6.4° at Mach
    0.9. Four held-out rows on the clean lift peak at Mach 0.45 to 0.78, a degree past alpha max as at
    low speed; ours is outside at 0.70 and 0.78, stalling 0.41° past alpha max at cruise
-   (`flight/README.md`, *The stall above Mach 0.3*). For fbw-parent to decide: whether to fit
-   `clmax-mach` on them, the fitter then aiming a degree clear of a floor, or first to find what sets
-   the alpha there, the peak lift or the lift slope at Mach. Airbus's performance brochure is on
+   (`flight/README.md`, *The stall above Mach 0.3*). Not fitted (*Decisions*, (e)): the two misses
+   stay open findings, held out, until a published lift slope or peak at Mach for the A320 or a close
+   wing turns up. Airbus's performance brochure is on
    SKYbrary, not on Airbus's own pages, so outside the decisions' rule; NASA's Common Research Model
    is another wing.
 5. **The transonic pitching moment and drag past the drag rise** (`cm-mach-tuck`, an estimate, and the
-   wave drag past Mach 0.85). Moves high-speed protection, where step 4 reached 381 kt against the ELAC's
-   380. To look for: the Common Research Model's pitching moment with Mach at a fixed lift, another
-   wing's trend, so held out or banded wide.
+   wave drag past Mach 0.85). Deferred, 2026-11-02 (*Decisions*, (f)): no public source gives the
+   A320's. A32NX's own flight model has no Mach effect on the pitch, NASA's Common Research Model is a
+   widebody wing designed for Mach 0.85, and our wave drag already comes from the model that would
+   check it. Both stay estimates, acting only beyond MMO 0.82, where the high-speed protection holds
+   the aircraft (step 4 reached 381 kt against the ELAC's 380).
 6. **Ground effect** (`cm-ground`, and McCormick's factor on the induced drag: estimates). Moves every
    flare, so the gate's own flights: best taken after the gate is flown, with its recordings re-judged.
    To look for: NASA's wind-tunnel reports on transport configurations near the ground.
@@ -583,6 +586,19 @@ static moment fading past the stall, not now. The share has no source and would 
 the fix would move the stall, Foster's rows, P7's step-4 protection cases and the CONF FULL
 fast-pull figures put to FlyByWire in discussion #11009. It is a candidate to take with part 7 after
 the operator's gate, with P7's agreement then and preferably a source for the tail's share.
+(e) Taken on 2026-11-02 too, after part 4, on the same delegation: the clean stall at Mach 0.70 and
+0.78, outside its held-out rows, stays an open finding, as part 3's does, and `clmax-mach` is not
+fitted: on floors the fitter would put the peak wherever its margin puts it. The lift slope at Mach
+is DATCOM's method for this wing (`aero/a320/k-mach`), a published method though not a
+measurement, so the misses point at the peak lift at Mach, `clmax-mach`'s estimate, or at how the
+lift curve rounds into it. A published peak or lift slope at Mach for the A320 or a close wing, from
+NTRS or Airbus, would reopen it; until then it is a background look.
+(f) Taken on 2026-11-02 too, after part 5's look for sources, on the same delegation: part 5
+deferred, and no context rows from NASA's Common Research Model. No source gives the A320's transonic
+pitch or drag; the Common Research Model is a widebody wing designed for Mach 0.85, so scaling it
+would be our assumption; and checking our wave drag against OpenAP's Korn and Lock model, its own
+source, would be circular. `cm-mach-tuck` and the wave drag past Mach 0.85 stay estimates: they act
+only beyond MMO 0.82, where the high-speed protection holds the aircraft.
 
 ---
 

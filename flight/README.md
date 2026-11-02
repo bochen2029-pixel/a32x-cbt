@@ -337,7 +337,9 @@ How much the held-out rows say, row by row:
   and 6.49° at 65 t, against 6.5°.
 - No row measures the transonic pitching moment or ground effect: their coefficients are the seeds'
   estimates, and P7's protections step was the first to fly them. The stall at Mach has four held-out
-  rows since, two of them outside ([below](#the-stall-above-mach-03)).
+  rows since, two of them outside ([below](#the-stall-above-mach-03)). The transonic pitch and the drag
+  past Mach 0.85 stay estimates by decision, no public source giving the A320's (`ROADMAP.md`, the
+  airframe plan's *Decisions*, (f)); ground effect waits for the operator's gate.
 - The three short-period rows in CONF FULL are MIL-F-8785C's Level 1 for large aircraft on approach:
   floors, not A320 data, and wide. Both airframes are inside them and they move nothing; the fit past
   the stall cannot reach them. Ours is the slower: 0.92 rad/s and a control anticipation parameter of
@@ -822,8 +824,12 @@ Why, and why no fit here: the floor is an alpha, and our stall alpha at a Mach c
 the peak lift there and how fast lift rises with alpha there. Our peak at Mach 0.78, 1.01, is where the
 seed put it, and no row says whether it is low or our lift rises too fast with alpha at that Mach. A
 fit of `clmax-mach` alone on these rows would raise the peak until the fitter's margin for a floor is
-met, a degree clear, whatever the wing's real peak is. So nothing in the airframe changed here; whether
-to fit, and what, is fbw-parent's to decide (the plan, part 4).
+met, a degree clear, whatever the wing's real peak is. So nothing in the airframe changed here, and
+fbw-parent decided, under the operator's delegation, to leave the two misses as open findings, held
+out, as part 3's is (the plan's *Decisions*, (e)). Of the two, the lift slope at Mach is already a
+published method's, DATCOM's formula for this wing (`aero/a320/k-mach`, 1.32 times its value at Mach
+0.2 by Mach 0.78), though not a measurement; a published lift slope or peak at Mach for the A320 or
+a close wing, from NTRS or Airbus, would reopen them.
 
 What changes in flight: nothing; every flight is the same, bit for bit. The scorer gains the
 measurement, a lift peak at a Mach beside its sweep at low speed. Eighty-one native cases pass with
