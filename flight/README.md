@@ -1455,6 +1455,11 @@ reaches 2.5 g with margin: the
 fit covers the stall at low Mach (VS1g and alpha max) and nothing measures it at Mach 0.45, so a full
 pull there passes alpha max before the protection brings it back, as the airframe stalls under it.
 High speed rests on the transonic pitching moment and drag rise, which no target measures either. The
+airframe fit's part 4 checked our clean stall against the ELAC's own alpha max at Mach: at Mach 0.78 our wing's
+lift peaks at 7.50°, only 0.41° past the alpha max the law lets a pilot reach, short of the held-out floor of
+alpha max + 1°, and at Mach 0.70 at 8.50° against a floor of 8.55°. It is left open, not fitted, since nothing yet
+separates a peak too low from a lift slope too steep: a full pull at cruise in normal law takes ours to within half
+a degree of its stall. The
 bank's return to 26.5° rather than 33° and the slow return from alpha max after letting go are the
 computers' and the airframe's together, not yet separated. And one finding at low Mach, inside the fit,
 not registered as a case: a full pull in CONF FULL at 150 kt holds 1.80 g against 2.0, but its pitch
