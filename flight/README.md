@@ -1691,8 +1691,8 @@ New `ctest` cases: `the_judge_finds_the_scripted_approach_stable`,
 `five_scripted_approaches_are_repeatable`, which also tries the build rules on copies of its five,
 relabelled as only a test may: the gate refuses five flown on two builds and five flown on another build
 than its own, and `--rejudge` passes another build's five that are stable on this one and names the one
-band whose saved verdict a copy was given wrong. Eighty-one native cases pass with either airframe on
-MSVC 19.44 and on GCC 13.3; seventy-six under node, the WebAssembly build leaving out the five that start
+band whose saved verdict a copy was given wrong. Ninety-one native cases pass with either airframe on
+MSVC 19.44 and on GCC 13.3; eighty-five under node, the WebAssembly build leaving out the six that start
 processes.
 
 ## The Windows release (P7, packaging)
