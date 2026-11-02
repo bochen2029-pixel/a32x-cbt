@@ -1,11 +1,15 @@
 // The debrief's aircraft in vectors is carried by its parts: each part's lines go where the part goes and hide when
 // it hides, as a retracting gear does; the painted surfaces are off while they show, and back after; a part an edge
-// finder cannot draw gets the lines it is given. GPLv3.
+// finder cannot draw gets the lines it is given. The parts are three.js objects: the tests skip, saying so, where
+// flight/web's packages are not installed. GPLv3.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import * as THREE from 'three';
-import { linesShown, showVectors, vectorize } from '../src/vectors.js';
+
+const three = await import('three').then(() => true, () => false);
+const needsThree = !three && 'three.js is not installed here (npm ci in flight/web)';
+const THREE = three ? await import('three') : null;
+const { linesShown, showVectors, vectorize } = three ? await import('../src/vectors.js') : {};
 
 // a body, a gear leg that swings and hides as the airliner's does, and a cockpit the vectors pass over
 function model() {
@@ -22,7 +26,7 @@ function model() {
   return { root, body, leg, legMesh, cockpit, paint, strut };
 }
 
-test('each part carries its own lines: they go where it goes and hide when it hides', () => {
+test('each part carries its own lines: they go where it goes and hide when it hides', { skip: needsThree }, () => {
   const m = model();
   const v = vectorize(m.root, new THREE.LineBasicMaterial(), { skip: (o) => Boolean(m.cockpit.getObjectById(o.id)) });
   assert.equal(v.lines.length, 2, 'the body and the leg; the cockpit passed over');
@@ -45,7 +49,7 @@ test('each part carries its own lines: they go where it goes and hide when it hi
   assert.deepEqual(linesShown(v), { shown: 0, total: 2 }, 'the lines off');
 });
 
-test('a part an edge finder cannot draw gets the lines it is given, in its own frame', () => {
+test('a part an edge finder cannot draw gets the lines it is given, in its own frame', { skip: needsThree }, () => {
   const m = model();
   const given = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 5, 0, 0], 3));
   const v = vectorize(m.root, new THREE.LineBasicMaterial(), { extra: [[m.body, given]] });

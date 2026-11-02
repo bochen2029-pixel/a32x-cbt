@@ -1,12 +1,17 @@
 // The debrief's aircraft in vectors has a fuselage: lines along it and frames across it that lie on the painted
 // fuselage's own surface, from nose to tail, the same on both sides. A smooth body gives an edge finder no lines, so
-// without them the debrief's aircraft was wings, tail, engines and gear with nothing joining them. GPLv3.
+// without them the debrief's aircraft was wings, tail, engines and gear with nothing joining them. The lines are
+// three.js geometry: the tests skip, saying so, where flight/web's packages are not installed. GPLv3.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import A320 from '../data/a320.json' with { type: 'json' };
-import { FRAME_SIDES, FUSELAGE_FRAMES, FUSELAGE_LINES, fuselageLines, profile } from '../src/airliner.js';
 import { validateAirframe } from '../src/world-data.js';
+
+const three = await import('three').then(() => true, () => false);
+const needsThree = !three && 'three.js is not installed here (npm ci in flight/web)';
+// airliner.js draws with three.js, so it loads only where three.js does
+const { FRAME_SIDES, FUSELAGE_FRAMES, FUSELAGE_LINES, fuselageLines, profile } = three ? await import('../src/airliner.js') : {};
 
 const A = validateAirframe(A320);   // the airframe as the view has it
 const points = (g) => {
@@ -15,7 +20,7 @@ const points = (g) => {
   return out;
 };
 
-test("the fuselage's lines lie on the painted fuselage, from its nose to its tail", () => {
+test("the fuselage's lines lie on the painted fuselage, from its nose to its tail", { skip: needsThree }, () => {
   const g = fuselageLines(A.fuselage, A.length), prof = profile(A.fuselage), pts = points(g);
   for (const [x, y, z] of pts) {
     const p = prof(x);
@@ -33,7 +38,7 @@ test("the fuselage's lines lie on the painted fuselage, from its nose to its tai
   }
 });
 
-test('the same on both sides', () => {
+test('the same on both sides', { skip: needsThree }, () => {
   // to a millimetre, a negative zero the same as zero
   const key = (p) => p.map((v) => Math.round(v * 1000) + 0).join(',');
   const pts = points(fuselageLines(A.fuselage, A.length));
