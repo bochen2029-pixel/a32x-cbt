@@ -21,6 +21,7 @@ import { escapeHtml, looksLikeRecording, pack, replayStatus, replayTicks, replay
 import { runwayFromState } from './scene-math.js';
 import { drawTimeline, momentAt, Playhead, readout, sampleAt, timeAt } from './timeline.js';
 import { CAMERAS, softwareRendering, View, VIEW_KEYS } from './view.js';
+import { VR_SESSION, vrRefusal } from './vr.js';
 
 const params = new URLSearchParams(location.search);
 const airframe = params.get('airframe') || '';
@@ -93,8 +94,50 @@ eventsBox.addEventListener('click', (e) => {
 let shownVerdict = '';   // the verdict the panel shows
 let saved = '';          // what the last save did, for the status line
 let opening = '';        // why a recording could not be opened, for the status line
+let vrNote = '';         // what VR said, for the status line
 document.getElementById('save').addEventListener('click', () => save());
 document.getElementById('save').hidden = replayMode;   // a replay is not saved again (save)
+
+// VR (vr.js): the button at the bottom right, dim where a browser cannot have it and saying why when pressed; the
+// headset's frames drive the loop while VR lasts, the page's own once it is left.
+const vrButton = document.getElementById('vr');
+let vrWhy = 'VR: still asking the browser whether it can';
+let xrSession = null;
+vrRefusal().then((why) => {
+  vrWhy = why;
+  vrButton.classList.toggle('off', Boolean(why));
+  vrButton.title = why || 'VR: the flight deck in stereo, your head\'s pose about the seat; press again, or leave from the headset, to come out';
+  vrButton.hidden = false;
+});
+vrButton.addEventListener('click', () => {
+  vrButton.blur();   // a key meant for the flight must not press it again
+  if (xrSession) xrSession.end();
+  else if (vrWhy) vrNote = vrWhy;
+  else enterVr();
+});
+async function enterVr() {
+  let session = null;
+  try {
+    session = await navigator.xr.requestSession(VR_SESSION.mode, VR_SESSION.options);
+    await view.vrBegin(session, VR_SESSION.space);
+    xrSession = session;
+    session.addEventListener('end', leaveVr, { once: true });
+    view.renderer.setAnimationLoop(frame);   // the headset's frames drive the loop now
+    vrButton.textContent = 'EXIT VR';
+    vrNote = '';
+  } catch (e) {
+    vrNote = `VR could not start: ${e.message}`;
+    if (view.renderer.xr.enabled) view.vrEnd();
+    if (session) session.end().catch(() => {});
+  }
+}
+function leaveVr() {
+  view.renderer.setAnimationLoop(null);
+  view.vrEnd();
+  xrSession = null;
+  vrButton.textContent = 'VR';
+  if (!error) requestAnimationFrame(frame);   // the page's own frames again
+}
 
 // A recording opened, with Ctrl+O, the panel's button or a file dropped on the page: the page reloads to fly it
 // again, the recording carried across in sessionStorage (replay.js).
@@ -417,7 +460,8 @@ function show() {
     (replayMode ? `${replayLines()}\n` : '') + `${view.describe()}\n` +
     `tick ${r.tickUs.mean.toFixed(0)} µs mean, ${r.tickUs.max.toFixed(0)} max of 20000\n` +
     `<span class="${cls}">${r.stepsDropped} steps dropped</span>` + (saved ? `\n${saved}` : '') +
-    (opening ? `\n<span class="bad">${escapeHtml(opening)}</span>` : '');
+    (opening ? `\n<span class="bad">${escapeHtml(opening)}</span>` : '') +
+    (vrNote ? `\n<span class="warn">${escapeHtml(vrNote)}</span>` : '');
   // the gate's verdict once the core has stopped judging, as the core words it (flight_debrief())
   const judged = Number.isFinite(value('judge_stable'));
   // a worker too old to send the core's words gets the verdict from the slots, said as plainly
@@ -571,7 +615,7 @@ function frame(now) {
     waiting = null;
     w.resolve();
   }
-  if (!error) requestAnimationFrame(frame);
+  if (!error && !xrSession) requestAnimationFrame(frame);   // in VR the headset's frames call it (enterVr)
 }
 
 function keep(list, v) {

@@ -1256,6 +1256,18 @@ flying. Neither moves the flight. `flightDebug.flare()` sends the flare command 
 Checked on the scripted crew from 3 nm: `step(50)` flew 50 ticks to the tick; a stop's frames left its time
 untouched; with `ra_bias=100` the nose frames were byte for byte those without it.
 
+**VR, for a Quest headset: untested on hardware.** The VR button at the page's bottom right (`web/src/vr.js`)
+puts the view in a headset through WebXR, in true stereo: three.js draws each eye from its own place, the eyes as
+far apart as the headset says, so depth is seen as it is, not painted on. VR starts in the flight deck's left
+seat at the airframe's eyepoint, the head's pose about it (a seated 'local' space); the number keys still change
+the camera, and the headset goes with it. It is meant for a Quest 2 or 3 in its own browser at
+flightsim.bochen.xyz (WebXR is given only to pages served securely), or for Chrome or Edge on a PC with Quest
+Link, whose joystick and keyboard then fly as ever. The Quest's own controllers are not mapped yet, and the
+overlay, the status line and the debrief's panel are flat and stay on the page. Where a browser cannot have VR
+the button is dim and, pressed, says why. Off, nothing changes: a nose frame at tick 1,500 was byte for byte the
+same with VR's code as without it, and both tiers flew 20 s with no step dropped. **No headset has tried it**:
+none was here when it was written, and the first flight in one is its test.
+
 The page's own cases, in `ctest`: `the_page_clock_keeps_50_hz`, `the_hands_reach_the_controls`,
 `the_view_puts_the_eye_where_the_flight_is`, `kdfw_is_laid_out_as_ourairports_and_the_faa_have_it`,
 `the_view_draws_the_flight_model_s_airframe_under_its_sun` (the drawn airframe's points against

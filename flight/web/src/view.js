@@ -506,6 +506,7 @@ export class View {
       if (root.visible) this.airliner.update(s, dt);
     }
     this.placeCamera(s, dt);
+    if (this.vr) this.vrFollow();
     const cam = this.camera.position;
     this.record(s);
     if (this.scenery) {
@@ -585,6 +586,7 @@ export class View {
   // frame of it is ever shown; its light points sized as at a pixel ratio of one, so that a frame is the same on any
   // screen. Nothing of the flight moves.
   capture({ width, height, hfovDeg = NOSE_HFOV_DEG, type = 'image/jpeg', quality = 0.85 }) {
+    if (this.vr) throw new Error('frame: not while the page is in VR, whose canvas the headset holds');
     const r = this.renderer, cam = (this.frameCam ||= new THREE.PerspectiveCamera());
     this.nosePose(this.body.position, this.body.quaternion, cam.position, cam.quaternion);
     cam.aspect = width / height;
@@ -747,9 +749,51 @@ export class View {
     this.renderer.getContext().finish();
   }
 
+  // VR entered (vr.js): a dolly where the page's camera stands, turned as it is, and in it the headset's camera, whose
+  // pose about the dolly three.js sets from the headset each frame (WebXRManager.updateCamera: each eye's world, the
+  // dolly's times the head's); the flight deck's left seat to start in. space: the reference space ('local', seated).
+  async vrBegin(session, space) {
+    const r = this.renderer;
+    if (!this.vrRig) {
+      this.vrRig = new THREE.Group();
+      this.vrCam = new THREE.PerspectiveCamera();
+      this.vrRig.add(this.vrCam);
+      this.scene.add(this.vrRig);
+    }
+    this.vrWas = this.mode;
+    this.setCamera('cockpit');
+    r.xr.enabled = true;
+    r.xr.setReferenceSpaceType(space);
+    await r.xr.setSession(session);
+    this.vr = true;
+    this.vrFollow();
+  }
+
+  // VR left: the page's own camera again, the one it had before.
+  vrEnd() {
+    this.vr = false;
+    this.renderer.xr.enabled = false;
+    this.setCamera(this.vrWas || 'eye');
+  }
+
+  // Each frame in VR: the dolly brought to where the page's camera now stands, and its clipping the camera's (5 cm in
+  // the flight deck), so that the number keys move the headset's place as they move the camera.
+  vrFollow() {
+    this.vrRig.position.copy(this.camera.position);
+    this.vrRig.quaternion.copy(this.camera.quaternion);
+    this.vrRig.updateMatrixWorld(true);
+    this.vrCam.near = this.camera.near;
+    this.vrCam.far = this.camera.far;
+  }
+
   render() {
     const r = this.renderer;
     r.info.reset();
+    // in VR, the headset's camera about the page's (vrFollow), each eye from its own place; no shadow pass
+    if (this.vr) {
+      r.render(this.scene, this.vrCam);
+      return;
+    }
     r.render(this.scene, this.camera);
     if (this.shadowOn) {
       r.autoClear = false;

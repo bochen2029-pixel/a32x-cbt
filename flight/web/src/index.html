@@ -23,6 +23,13 @@
     max-height: 30vh; overflow: auto; }
   #debrief button { font: inherit; color: var(--fg); background: rgba(40,60,45,0.8);
     border: 1px solid rgba(160,200,160,0.4); border-radius: 3px; margin-top: 8px; cursor: pointer; }
+  /* VR (vr.js): at the bottom right, above the overlay's REV, flaps and gear and the debrief's timeline; dim where
+     a browser cannot have it */
+  #vr { position: fixed; right: 12px; bottom: 104px; font: 600 13px/1 ui-monospace, "Cascadia Mono", Consolas, monospace;
+    letter-spacing: 0.14em; color: var(--fg); background: rgba(0,0,0,0.55); border: 1px solid rgba(160,200,160,0.5);
+    border-radius: 4px; padding: 8px 11px; cursor: pointer; }
+  #vr:hover { background: rgba(40,60,45,0.85); }
+  #vr.off { color: var(--dim); border-color: rgba(122,154,122,0.3); }
   /* the debrief's timeline along the foot (timeline.js); in the debrief the HUD moves up over it */
   #timeline { position: fixed; left: 12px; bottom: 12px; width: calc(100% - 24px); height: 54px; cursor: pointer;
     touch-action: none; }
@@ -44,6 +51,7 @@
 <div id="notice">Unofficial. Not affiliated with Airbus, FlyByWire Simulations or Aerowinx. Not for type training.</div>
 <div id="debrief" hidden><div id="verdict"></div><div id="events"></div><button id="save" type="button">save the recording (Ctrl+S)</button> <button id="open-button" type="button">open a recording (Ctrl+O)</button></div>
 <input type="file" id="open" accept=".csv,text/csv,text/plain" hidden>
+<button id="vr" type="button" hidden>VR</button>
 <script src="core.js"></script>
 <script src="flight.js"></script>
 </body>

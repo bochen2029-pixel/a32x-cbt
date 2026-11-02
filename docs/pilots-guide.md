@@ -109,6 +109,11 @@ Reverse thrust is a held button: D-pad up on a standard gamepad, or the one you 
 The pilot's eye (1) is the airframe's own eye point, and it is the only view with the overlay: the
 overlay's horizon and pitch ladder are drawn for exactly that eye.
 
+**VR.** With a Quest headset, the **VR** button at the bottom right puts the view in the headset in
+stereo, starting in the flight deck's left seat: look round it by turning your head. Open the live
+simulator in the Quest's own browser, or use Chrome or Edge on a PC with Quest Link to keep your joystick.
+Where VR cannot be had, the button is dim and says why. It has not yet been tried on a headset.
+
 ![The flight deck (2) at golden hour: the glareshield, the FCU, and the screens, which are placeholders
 until the next phase draws the real ones.](guide/approach-cockpit.jpg)
 

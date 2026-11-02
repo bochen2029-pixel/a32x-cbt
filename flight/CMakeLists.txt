@@ -494,6 +494,8 @@ if(FLIGHT_NODE)
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/vectors.test.mjs")
   add_test(NAME the_nose_camera_and_its_frames_for_the_jev_experiment COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/nose.test.mjs")
+  add_test(NAME vr_says_why_it_cannot_be_had_where_it_cannot COMMAND "${FLIGHT_NODE}" --test
+           "${CMAKE_CURRENT_SOURCE_DIR}/web/test/vr.test.mjs")
   add_test(NAME the_pilots_guide_ships_as_a_page_with_its_pictures COMMAND "${FLIGHT_NODE}" --test
            "${CMAKE_CURRENT_SOURCE_DIR}/web/test/guide-html.test.mjs")
   if(EMSCRIPTEN)
