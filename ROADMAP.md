@@ -248,8 +248,8 @@ after it is a plan, and waits for the operator's agreement: no browser work and 
       three rows, one fitted and two held out, the form given one more number; above 10,000 ft no
       source would check the lapse. Inside 75 of 75, the 737 inside 21 [M]
 - [x] the pitching moment deep past the stall checked, part 3: the Transport Class Model's levels off
-      past the stall and ours does not; a held-out row, outside, and a fix proposed. Inside 75 of 76,
-      the 737 inside 21 [M]
+      past the stall and ours does not; a held-out row, outside, an open finding, its fix deferred.
+      Inside 75 of 76, the 737 inside 21 [M]
 
 Known limits of slice 1, all of them the airframe's or the crew's:
 
@@ -537,10 +537,10 @@ source might come from, and an order, the parts whose sources are in hand first.
    its figure 33, levels off past the stall (0.009 per degree from 6° to 16° past the lift peak, against
    0.022 before it), and ours, one slope throughout, does not: −0.27 over those 10° against the GTM's
    −0.09, outside its held-out row. The elevator's power at very high alpha still has no source.
-   Proposed, for fbw-parent and P7 to decide: let the tail's share of the static moment fade with the
+   The fix that suggests itself, part 3b, lets the tail's share of the static moment fade with the
    tail's power, as its control power does (`flight/README.md`, *The pitching moment deep past the
-   stall*). It would move the stall and the CONF FULL fast pull, so it wants a refit of the post-stall
-   group and P7's step-4 cases re-baselined.
+   stall*); decided not now (*Decisions*, (d)). The row stays an open finding: held out, outside by
+   0.08, the cause understood.
 4. **The stall above Mach 0.3** (`clmax-mach`, an estimate). Moves the 1-g stall and alpha max's margin
    at altitude, and step 4's full pull at Mach 0.45, where ours runs out of lift near 2 g. To look for:
    Airbus's public flight-operations brochure on performance, *Getting to Grips with Aircraft
@@ -557,11 +557,12 @@ source might come from, and an order, the parts whose sources are in hand first.
 7. **The pitch of normal flight in CONF FULL** (reached only through the rows about the stall). Moves the
    handling of the approach and the flare, the gate's own. No public A320 data found; accident reports
    with an A320's flight-data traces in the landing configuration are the only candidates, and anything
-   taken from them would be a held-out check.
+   taken from them would be a held-out check. Part 3b goes with it: both move the pitch the protections
+   act on.
 8. **MAX REV** (`reverse-max`, provisional at 0.7). The FAA's statistical-loads report on the A320,
    DOT/FAA/AR-02/35, the source of Volpe's 32 %, plots the N1 its engines use in reverse, and its top
    would bound MAX REV's N1. Turning N1 into thrust needs the CFM56-5A1's own curve, which is not public;
-   and the report is on DTIC, a download not yet allowed.
+   and the report is only on DTIC, which the decisions below refuse by any route.
 
 **Decisions**, taken by fbw-parent under the operator's standing delegation ("go with your own best
 recommendation for all") on 2026-11-02. (a) Order: 1, 2 and 3 start now, in that order, each a merge
@@ -571,6 +572,11 @@ NASA's technical reports server (ntrs.nasa.gov; NASA's works are public domain) 
 public pages, beside EASA's and EUROCONTROL's, each file's URL, version or date, SHA-256 and terms
 recorded in `docs/provenance.md` before it is used, read as untrusted data and copied by value; not
 DTIC, by any route, so 8 stays provisional. (c) CFD stays much later, the operator's own word.
+(d) Taken on 2026-11-02 too, after part 3, on the same delegation: part 3b, the tail's share of the
+static moment fading past the stall, not now. The share has no source and would be an estimate, and
+the fix would move the stall, Foster's rows, P7's step-4 protection cases and the CONF FULL
+fast-pull figures put to FlyByWire in discussion #11009. It is a candidate to take with part 7 after
+the operator's gate, with P7's agreement then and preferably a source for the tail's share.
 
 ---
 

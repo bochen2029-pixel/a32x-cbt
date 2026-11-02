@@ -774,12 +774,15 @@ the static moment fade with the same factor, the wing and body's share staying. 
 1.3 times the whole slope (an estimate for a transport whose tail-off moment is destabilising, to be
 sourced), the row would read about −0.12 on today's fit, inside it. But that weakens the static
 stability from 10.95° up, by about 30 % at 15°: it moves the stall, Foster's rows and the CONF FULL
-fast pull of P7's step 4, and wants a refit of the post-stall group and those cases re-baselined. It
-is left for fbw-parent and P7 to decide; nothing in the airframe changed here.
+fast pull of P7's step 4, and wants a refit of the post-stall group and those cases re-baselined.
+fbw-parent decided not now, under the operator's delegation: the share has no source, and the fix
+would also change the fast-pull figures put to FlyByWire in discussion #11009. The row stays an open
+finding, held out and outside by 0.08, its cause understood; the fix, part 3b of the plan, is a
+candidate to take with part 7 after the operator's gate. Nothing in the airframe changed here.
 
 What changes in flight: nothing. The airframe is as it was, so every flight is the same, bit for bit.
 Seventy-five native cases pass with either airframe on MSVC 19.44 and on GCC 13.3, and seventy under
-node.
+node, on master with the replay (`60371d0`) and part 2.
 
 ## The swap: made, 2026-11-01
 
