@@ -1388,9 +1388,12 @@ word, as a failed ADR does. The computers are given what the radio altimeters re
 scripted crew: it flies by RA 1, or by RA 2 when RA 1 has failed, for its gear, its flare and its retard,
 as a crew flies by its instruments, while the crash check and the ILS's geometry keep the truth. The
 state reports `ra_ft` as RA 1 reads, `ra2_ft` as RA 2 reads, each NaN once failed, and `height_true_ft`,
-the truth they measure, for a judge and never for the crew. The page draws the world by the truth and shows
-the instruments' readings (`scene-math.js`, `heightFt`): a failed RA 1 is an amber RA flag where its height was,
-on the HUD and the PFD. None of it acts unless a scenario asks for
+the truth they measure, for a judge and never for the crew. A view places the aircraft, its eye and its
+cameras by `height_true_ft`, never by `ra_ft`, which a failure makes NaN and a bias makes wrong. The page draws
+the world by the truth and shows the instruments' readings (`scene-math.js`, `heightFt`): a failed RA 1 is an
+amber RA flag where its height was, on the HUD and the PFD. It did not before fbw-desktop's fix for 0.1.6: under
+these options 0.1.5 lost its view when both failed and drew the world from the wrong height when they read
+wrong, a known issue of that release. None of it acts unless a scenario asks for
 it: every scripted flight, digest and ILS line is as it was. It exists for the Jev landing experiment
 (the operator's idea; owned by the Jev Park session, agreed with fbw-parent): a flare triggered by a
 formula on the radio height is fooled by an altimeter that lies, and a camera is not.
