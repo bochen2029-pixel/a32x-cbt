@@ -309,8 +309,10 @@ function pfd({ g }, s, f) {
     g.beginPath(); g.moveTo(lx, 392); g.lineTo(lx - 9, 400); g.lineTo(lx, 408); g.lineTo(lx + 9, 400); g.fill();
     g.beginPath(); g.moveTo(370, gy - 9); g.lineTo(378, gy); g.lineTo(370, gy + 9); g.lineTo(362, gy); g.fill();
   }
-  const ra = s.ra_ft || 0;
-  if (ra < 2500) text(g, `${Math.max(0, Math.round(ra / (ra < 50 ? 1 : ra < 200 ? 5 : 10)) * (ra < 50 ? 1 : ra < 200 ? 5 : 10))}`, cx, 360, ra < 200 ? AMBER : GREEN, 26);
+  // the radio height as RA 1 reads it; a failed one (NaN) a flag in its place, never a number (it read 0)
+  const ra = s.ra_ft;
+  if (Number.isNaN(ra)) text(g, 'RA', cx, 360, AMBER, 26);
+  else if (ra < 2500) text(g, `${Math.max(0, Math.round(ra / (ra < 50 ? 1 : ra < 200 ? 5 : 10)) * (ra < 50 ? 1 : ra < 200 ? 5 : 10))}`, cx, 360, ra < 200 ? AMBER : GREEN, 26);
   g.strokeStyle = '#555'; g.lineWidth = 2;
   for (const x of [100, 200, 300, 400]) { g.beginPath(); g.moveTo(x, 8); g.lineTo(x, 80); g.stroke(); }
   for (const [x, a, b] of [[50, f.fma[0], ''], [150, f.fma[1], ''], [250, f.fma[2], ''], [350, f.fma[3], ''], [456, '', '']]) {

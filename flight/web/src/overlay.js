@@ -98,7 +98,10 @@ export class Overlay {
     if (Number.isFinite(s.vapp_kn)) box(cx - W * 0.3, cy + 28 * r, `${s.vapp_kn.toFixed(0)} VAPP`, 'right', '#ff40ff');
     box(cx + W * 0.3, cy, `${s.alt_ft.toFixed(0)} FT`, 'left');
     box(cx + W * 0.3, cy + 28 * r, `${s.vs_fpm >= 0 ? '+' : ''}${(s.vs_fpm / 100).toFixed(0)} V/S`, 'left');
-    if (s.ra_ft < 2500) box(cx, cy + H * 0.22, `${s.ra_ft.toFixed(0)}`, 'center', s.ra_ft < 400 ? AMBER : GREEN);
+    // the radio height as RA 1 reads it (ra_ft); a failed one (NaN) a flag where its reading was, never a number:
+    // the true height (height_true_ft) is never shown to the pilot
+    if (Number.isNaN(s.ra_ft)) box(cx, cy + H * 0.22, 'RA', 'center', AMBER);
+    else if (s.ra_ft < 2500) box(cx, cy + H * 0.22, `${s.ra_ft.toFixed(0)}`, 'center', s.ra_ft < 400 ? AMBER : GREEN);
     box(cx, H - 28 * r, `HDG ${String(Math.round(s.heading_deg) % 360).padStart(3, '0')}`, 'center');
 
     // localizer below, glideslope right: two dots each way, and each beam's diamond where the beam lies

@@ -69,6 +69,11 @@ export class Flight {
     return true;
   }
 
+  // A command to the core, carried out before the next tick it flies (worker.js; P7's flare=external: 'flare').
+  command(name) {
+    this.worker.postMessage({ type: 'command', name });
+  }
+
   // The flight so far, as law_harness --replay reads it: a promise of {text, steps}. extra: header lines
   // by name, {hands: the device, flown: the wall-clock time} (CoreSession.recording).
   recording(extra = {}) {

@@ -4,6 +4,8 @@
 // flown at a dozen times its pace, then the debrief over the whole of it, the replay's verdict set against the one
 // saved with the recording. Plain functions: node tests them. GPLv3.
 
+import { heightFt } from './scene-math.js';
+
 export const STORE = 'a32x-replay';      // sessionStorage: the recording, packed (pack), and its file's name
 export const REPLAY_TICKS = 13;           // the ticks a frame asks for in a replay, 0.26 s of the flight: a dozen times
                                           // its pace at 50 frames a second, and every frame a sample for the view,
@@ -18,7 +20,7 @@ export const REPLAY_FLARE_FT = 60;        // below this, in the air, a replay st
 export function replayTicks(s) {
   if (!s) return REPLAY_TICKS;
   const transit = (v) => v > 0.001 && v < 0.999;
-  const flare = !(s.on_ground > 0.5) && s.ra_ft < REPLAY_FLARE_FT;
+  const flare = !(s.on_ground > 0.5) && heightFt(s) < REPLAY_FLARE_FT;   // the true height: an RA may have failed
   return flare || transit(s.reverser_1) || transit(s.reverser_2) ? 1 : REPLAY_TICKS;
 }
 

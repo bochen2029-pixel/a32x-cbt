@@ -30,8 +30,16 @@ export function runwayFromState(s) {
   };
 }
 
+// The aircraft's true height above the ground, ft, for placing it, its eye and its camera in the world:
+// height_true_ft where the core gives it, which stays the truth when the radio altimeters fail or read wrong
+// (fail=ra1, ra_bias=); ra_ft on a core older than them, whose ra_ft was the truth. Never shown to the pilot:
+// the instruments show ra_ft, RA 1 as it reads.
+export function heightFt(s) {
+  return Number.isFinite(s.height_true_ft) ? s.height_true_ft : s.ra_ft;
+}
+
 // The pilot's eye, from the flight core's state s, by name: the CG over the ground (cg_height_m standing
-// on the gear, ra_ft above that), then the airframe definition's own eyepoint, the left seat, from the
+// on the gear, the true height above that, heightFt), then the airframe definition's own eyepoint, the left seat, from the
 // CG in body axes (eye_fwd_m, eye_right_m, eye_up_m), turned by the attitude: heading, pitch, roll.
 export function eye(o, s) {
   const p = localMetres(o, s.lat_deg, s.lon_deg);
@@ -44,7 +52,7 @@ export function eye(o, s) {
   const up = f * sth - r * sph * cth + u * cph * cth;
   const sps = Math.sin(psi), cps = Math.cos(psi);
   const east = along * sps + across * cps, north = along * cps - across * sps;
-  const height = s.cg_height_m + Math.max(0, s.ra_ft) * FT + up;
+  const height = s.cg_height_m + Math.max(0, heightFt(s)) * FT + up;
   return { x: p.east + east, y: height, z: -(p.north + north) };
 }
 

@@ -88,7 +88,7 @@ export class Airport {
     }
     for (const l of lay.papi) {
       const p = world(l.x, l.y, l.z);
-      this.papiLamps.push({ x: p.x, y: p.y, z: p.z, angle: l.angle });
+      this.papiLamps.push({ x: p.x, y: p.y, z: p.z, angle: l.angle, end: l.end, unit: l.unit });
       this.papiSet.add(p.x, p.y, p.z, COLOURS.red, { axis: turn(l.axis), beam: [0.85, 0.3], size: 2.9 });
     }
     for (const d of lay.designators) this.designators.push({ ...d, M });

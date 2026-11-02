@@ -6,6 +6,8 @@
 // the time does not depend on how often the page looked. No three.js and no browser: node tests it.
 // GPLv3.
 
+import { heightFt } from './scene-math.js';
+
 export const GATES_FT = [1000, 500, 100, 50];
 const MOST_BAND_CHANGES = 12;   // a pilot hunting at a band's edge would fill the log; past this, a note
 const MOST_REVERSE = 6;         // the reversers deployed and stowed: a landing has two, a rejected one more
@@ -85,7 +87,7 @@ export class FlightLog {
   }
 
   add(t, kind, text, at, tag = '') {
-    this.events.push({ t, kind, text, tag, lat: at.lat_deg, lon: at.lon_deg, raFt: Math.max(0, at.ra_ft || 0) });
+    this.events.push({ t, kind, text, tag, lat: at.lat_deg, lon: at.lon_deg, raFt: Math.max(0, heightFt(at) || 0) });   // where it was, truly
     ++this.version;
   }
 

@@ -14,6 +14,7 @@ import { apply, controlsFromInputs, coreInputs, initialControls } from './contro
 import { eventLine, FlightLog } from './events.js';
 import { buildNote, Flight, recordingName } from './flight.js';
 import { Hands, KEY_HELP } from './hands.js';
+import { frameRefusal, NOSE_HFOV_DEG } from './nose.js';
 import { Overlay } from './overlay.js';
 import { centre, drag, wheel } from './pointer.js';
 import { escapeHtml, looksLikeRecording, pack, replayStatus, replayTicks, replayUrl, replayVerdict, STORE, unpack } from './replay.js';
@@ -175,6 +176,7 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === ']') view.moveHour(0.25);
   else if (e.key === 'k' || e.key === 'K') view.setDebrief(!view.debriefOn);
   else if (e.key === 'l' || e.key === 'L') view.setTrail(!view.trailOn);
+  else if (e.key === 'n' || e.key === 'N') view.setCamera('nose');
 });
 function resize() {
   const ratio = Math.min(2, window.devicePixelRatio || 1);
@@ -192,6 +194,28 @@ const clock = new Clock(20, 5);
 const hands = new Hands(window);
 let controls = initialControls();
 let inputs = null;       // the core's input slots as the page sends them: the ready message's, then ours
+// Lockstep (?lockstep=1; flightDebug.pause, step and resume): the clock held and the flight flown only as asked, so
+// that two arms of an experiment compare on the flight's own time, not the wall's (the Jev experiment; drive.mjs).
+// Without them nothing here changes.
+const MOST_STEP_TICKS = 30000;   // ten minutes of the flight in one step
+let held = params.get('lockstep') === '1';   // the clock stopped: nothing flies but flightDebug.step(n)
+let stepAsk = 0;         // ticks flightDebug.step asked for, not yet sent
+let ticksFlown = 0;      // the core's ticks so far, as the worker answered them
+let waiting = null;      // { target, resolve, reject }: a step or a pause, settled once its state is in and drawn
+let lastDrawnT = NaN;    // the flight's time last drawn: held, the view's motions follow it, not the wall's
+let lockQueue = Promise.resolve();   // lockstep's calls, one at a time
+function exclusive(fn) {
+  const run = lockQueue.then(fn);
+  lockQueue = run.catch(() => {});
+  return run;
+}
+// settles once the worker is idle, has flown target ticks in all and that state is drawn (frame)
+function drawnAt(target) {
+  return new Promise((resolve, reject) => {
+    waiting = { target, resolve, reject };
+  });
+}
+
 let latest = null;       // the last state message from the worker
 let error = null;
 const tickUs = [];       // what each tick cost in the worker, microseconds
@@ -201,6 +225,7 @@ const flight = new Flight(
   (m) => {
     latest = m;
     if (m.type !== 'state' || !(m.ticks > 0)) return;
+    ticksFlown += m.ticks;
     if (!bench.done) {
       bench.ticks += m.ticks;
       bench.ms += m.ms;
@@ -220,6 +245,10 @@ const flight = new Flight(
     error = message;
     // a replay's error may quote its file (core-session.js, parseRecording): said as text, never markup
     status.innerHTML = `<span class="bad">${escapeHtml(message)}</span>`;
+    if (waiting) {
+      waiting.reject(new Error(message));
+      waiting = null;
+    }
   });
 
 function value(name) {
@@ -306,6 +335,53 @@ globalThis.flightDebug = {
   head: () => ({ t: playhead.t, playing: playhead.playing,
     readout: readout(playhead.live ? view.history.at(-1) : sampleAt(view.history, playhead.t)) }),
   moments: () => log.events.map((e) => ({ t: e.t, kind: e.kind, text: e.text })),
+  // lockstep (?lockstep=1): the flight flown only as asked. step(n) flies n ticks and holds, settling with the state by
+  // name once they are in and drawn; pause holds the clock once what was asked has flown; resume lets it run from
+  // then, owing nothing. One at a time: each waits for the one before.
+  step(n) {
+    if (!Number.isInteger(n) || n < 1 || n > MOST_STEP_TICKS) {
+      return Promise.reject(new RangeError(`step(n): n whole ticks, 1 to ${MOST_STEP_TICKS.toLocaleString('en-US')}`));
+    }
+    return exclusive(async () => {
+      held = true;
+      pending = 0;
+      await drawnAt(ticksFlown);
+      stepAsk = n;
+      await drawnAt(ticksFlown + n);
+      return flightDebug.state();
+    });
+  },
+  pause: () => exclusive(async () => {
+    held = true;
+    pending = 0;
+    await drawnAt(ticksFlown);
+    return flightDebug.state();
+  }),
+  resume: () => exclusive(async () => {
+    held = false;
+    return ticksFlown;
+  }),
+  ticks: () => ticksFlown,
+  // the core flares now, before the next tick it flies (flare=external; P7's command): refused, with the reason, by a
+  // core that cannot be told to, rather than passed over in silence
+  flare() {
+    if (!flight.field || !('flaring' in flight.field)) {
+      return Promise.reject(new Error('flare: this core takes no flare command; it needs one that does, flown with flare=external (P7)'));
+    }
+    flight.command('flare');
+    return Promise.resolve(ticksFlown);
+  },
+  // the nose camera's view at this stop as an image, and the landing runway's PAPI as seen from it (view.js, capture
+  // and papiAt; nose.js): neither moves the flight or its clock
+  async frame({ width = 512, height = 512, type = 'image/jpeg', quality = 0.85, hfovDeg = NOSE_HFOV_DEG } = {}) {
+    const why = frameRefusal({ width, height, type, quality, hfovDeg });
+    if (why) throw new RangeError(`frame: ${why}`);
+    if (!latest || !view.airport) throw new Error('frame: the flight has not started');
+    const url = view.capture({ width, height, type, quality, hfovDeg });
+    if (!url.startsWith(`data:${type};base64,`)) throw new Error(`frame: this browser does not encode ${type}`);
+    return { t: value('t_s'), ticks: ticksFlown, width, height, type, data: url.slice(url.indexOf(',') + 1), papi: flightDebug.papi() };
+  },
+  papi: () => (view.airport ? view.papiAt(view.nosePose(view.body.position, view.body.quaternion).pos) : null),
 };
 
 const FLAPS = ['0', '1', '2', '3', 'FULL'];
@@ -425,26 +501,32 @@ function frame(now) {
   // The clock decides the steps. While the worker still owes the last answer they wait, up to five;
   // past that they are dropped, as the clock drops its own.
   const droppedBefore = clock.dropped + droppedWaiting;
-  // a replay flies as fast as a frame's ticks allow (replayTicks), not on the clock, and nothing of it is dropped
-  if (replayMode) pending = flight.ended ? 0 : replayTicks(latest ? {
-    on_ground: value('on_ground'), ra_ft: value('ra_ft'), reverser_1: value('reverser_1'), reverser_2: value('reverser_2') } : null);
+  // a replay flies as fast as a frame's ticks allow (replayTicks), not on the clock, and nothing of it is dropped;
+  // held (lockstep), the ticks flightDebug.step asked for and none on the clock
+  if (held) {
+    pending += stepAsk;
+    stepAsk = 0;
+  } else if (replayMode) pending = flight.ended ? 0 : replayTicks(latest ? {
+    on_ground: value('on_ground'), ra_ft: value('ra_ft'), height_true_ft: value('height_true_ft'),
+    reverser_1: value('reverser_1'), reverser_2: value('reverser_2') } : null);
   else pending += clock.advance(realMs);
-  if (!replayMode && pending > clock.maxCatchUp) {
+  if (!replayMode && !held && pending > clock.maxCatchUp) {
     droppedWaiting += pending - clock.maxCatchUp;
     pending = clock.maxCatchUp;
   }
   if (clock.dropped + droppedWaiting > droppedBefore) lastDropS = value('t_s');
 
-  // The hands, once a frame; the steps this frame asks for all fly what they did.
-  const h = hands.read(realMs / 1000);
-  controls = apply(controls, h.axes, h.held, h.pressed, realMs / 1000);
+  // The hands, once a frame; the steps this frame asks for all fly what they did. Held, the controls wait too.
+  const handsDt = held ? 0 : realMs / 1000;
+  const h = hands.read(handsDt);
+  controls = apply(controls, h.axes, h.held, h.pressed, handsDt);
   for (const [name, v] of Object.entries(coreInputs(controls))) inputs[flight.input[name]] = v;
 
   if (pending && flight.step(pending, driven ? null : inputs.slice())) {
     ++requests;
     pending = 0;
   }
-  if (!started && !kicked && flight.step(1, driven ? null : inputs.slice())) {
+  if (!started && !kicked && !held && flight.step(1, driven ? null : inputs.slice())) {
     kicked = true;
     ++requests;
   }
@@ -459,7 +541,9 @@ function frame(now) {
     if (view.debriefOn) playhead.advance(realMs / 1000, view.history);
     else if (!playhead.live) playhead.goLive();
     view.setHead(playhead.live ? null : sampleAt(view.history, playhead.t));
-    view.update(s, realMs / 1000);
+    // held, the view's motions (wheels, fans) follow the flight's own time between the states drawn
+    view.update(s, held ? Math.max(0, (s.t_s - lastDrawnT) || 0) : realMs / 1000);
+    lastDrawnT = s.t_s;
     log.observe(s, latest.texts);
     view.tags(log.events);
     const t0 = performance.now();
@@ -481,6 +565,12 @@ function frame(now) {
     }
   }
   show();
+  // a step or a pause settles once the worker is idle, has flown what was asked and that state is drawn
+  if (waiting && latest && !flight.busy && !pending && !stepAsk && ticksFlown >= waiting.target) {
+    const w = waiting;
+    waiting = null;
+    w.resolve();
+  }
   if (!error) requestAnimationFrame(frame);
 }
 

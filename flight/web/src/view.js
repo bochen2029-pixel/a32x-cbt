@@ -19,7 +19,8 @@ import { airportFromRunway, findRunwayEnd, runwayFrame, validateAirport } from '
 import { Cockpit } from './cockpit.js';
 import { ambient, haze } from './haze.js';
 import { hazedLightMaterial, lightMaterial } from './lights.js';
-import { eye, origin, xz } from './scene-math.js';
+import { NOSE_HFOV_DEG, nosePoint, papiSeen, vfov } from './nose.js';
+import { eye, heightFt, origin, xz } from './scene-math.js';
 import { HOURS, Scenery } from './scenery.js';
 import { sampleState } from './timeline.js';
 import { EDGE_DEG, linesShown, showVectors, vectorize } from './vectors.js';
@@ -42,8 +43,8 @@ const SKY_M = 35000;
 
 // The cameras, on keys 1 to 9 and 0 in this order; V steps through them. The pilot's eye, the one the
 // overlay is drawn for, comes first.
-export const CAMERAS = ['eye', 'cockpit', 'chase', 'orbit', 'tower', 'flyby', 'cabin', 'skyline', 'side', 'satellite'];
-export const VIEW_KEYS = ['1-9 0  cameras, V the next', '[ ]  the hour, back / on (GPU)', 'K  debrief: drag the bar at its foot, , . a second (< > ten), Space plays; click a moment', 'L  the flown path',
+export const CAMERAS = ['eye', 'cockpit', 'chase', 'orbit', 'tower', 'flyby', 'cabin', 'skyline', 'side', 'satellite', 'nose'];
+export const VIEW_KEYS = ['1-9 0  cameras, V the next, N the nose', '[ ]  the hour, back / on (GPU)', 'K  debrief: drag the bar at its foot, , . a second (< > ten), Space plays; click a moment', 'L  the flown path',
   'mouse  drag: look round the deck (2), swing round (4); wheel: zoom; double click: back'];
 
 // A deterministic pseudo-random sequence, so the scene is the same every time.
@@ -102,6 +103,7 @@ export class View {
     this.airframe = validateAirframe(A320);
     this.structural = structuralMatrix(this.airframe.cg);
     this.cgNow = this.airframe.cg.slice();   // the CG the drawn structure hangs from (update)
+    this.nose = new THREE.Vector3(...nosePoint(this.airframe.fuselage));   // the nose camera's place, the structure's metres
     this.mode = 'eye';
     this.look = { yaw: 0, pitch: -10 };
     this.orbit = { yaw: 2.4, pitch: 0.14, dist: 80 };
@@ -160,6 +162,7 @@ export class View {
     this.origin = origin(rwy.lat, rwy.lon);
     const found = findRunwayEnd([validateAirport(KDFW)], rwy.lat, rwy.lon, rwy.headingDeg);
     const data = found ? found.airport : airportFromRunway(rwy);
+    this.landingEnd = found ? found.end : data.runways[0].ends[0].id;   // the end flown to: its PAPI (papiAt)
     this.airport = new Airport(data, this.origin, {
       software: this.software, gain: this.t.lights, windows: this.floor ? this.t.windows : 0.8, pixelRatio: this.renderer.getPixelRatio(),
     });
@@ -435,7 +438,7 @@ export class View {
     this.mode = mode === 'skyline' && !this.landmarks.length ? 'chase' : mode;
     this.chasePos = null;
     this.flyby = null;
-    if (this.mode !== 'eye') this.build();
+    if (this.mode !== 'eye' && this.mode !== 'nose') this.build();   // neither sees the aircraft
     if (!this.airliner) return;
     this.cockpit.group.visible = this.mode === 'cockpit' && !this.debriefOn;   // its paint would cover the vectors
     this.airliner.fuselage.visible = this.mode !== 'cockpit';
@@ -473,12 +476,13 @@ export class View {
   // sky, the PAPI as the camera sees it, the flashers at the flight's own time, the flight's record.
   update(s, dt = 0) {
     const body = this.body, root = this.airliner?.root;
+    this.lastT = s.t_s;   // the flight's time the view was last brought to (capture)
     const [x, z] = xz(this.origin, s.lat_deg, s.lon_deg);
     // the CG over the ground as the core has it for the airframe flying (cg_height_m), so the wheels
-    // touch where ra_ft reads zero; the drawn A320's own where a core does not say
+    // touch where the true height (heightFt) is zero; the drawn A320's own where a core does not say
     const own = this.flying !== '737';   // the drawn airframe is the one flying
     const cgHeight = own && Number.isFinite(s.cg_height_m) ? s.cg_height_m : this.airframe.cgHeightM;
-    body.position.set(x, cgHeight + Math.max(0, s.ra_ft) * FT, z);
+    body.position.set(x, cgHeight + Math.max(0, heightFt(s)) * FT, z);
     this.cgHeight = cgHeight;
     body.rotation.set(s.pitch_deg * DEG, -s.heading_deg * DEG, -s.roll_deg * DEG);
     body.updateMatrixWorld();
@@ -498,18 +502,14 @@ export class View {
       root.position.copy(body.position);
       root.quaternion.copy(body.quaternion);
       root.updateMatrixWorld(true);
-      root.visible = this.mode !== 'eye' || this.debriefOn;
+      root.visible = (this.mode !== 'eye' && this.mode !== 'nose') || this.debriefOn;
       if (root.visible) this.airliner.update(s, dt);
     }
     this.placeCamera(s, dt);
     const cam = this.camera.position;
     this.record(s);
     if (this.scenery) {
-      if (this.scenery.update(cam, s.t_s)) {
-        const lit = 0.25 + 0.75 * smooth(-6, 2, this.scenery.elevation);
-        for (const m of this.airliner.materials) m.envMapIntensity = lit;
-        this.cockpit.flood(0.35 / this.scenery.exposure);
-      }
+      if (this.scenery.update(cam, s.t_s)) this.relight();
     } else {
       this.skyDome.position.copy(cam);
       if (this.navLights) this.navLights.uniforms.uTime.value = s.t_s;
@@ -528,7 +528,7 @@ export class View {
     }
     this.shadowOn = false;
     if (this.proxies && root.visible && !this.debriefOn && this.mode !== 'cockpit') {
-      const opacity = 0.55 * smooth(2, 12, this.scenery.elevation) * (1 - Math.min(1, s.ra_ft / 1200));
+      const opacity = 0.55 * smooth(2, 12, this.scenery.elevation) * (1 - Math.min(1, heightFt(s) / 1200));
       this.shadowOn = opacity > 0.01 && Math.hypot(x, z) < 12000;
       if (this.shadowOn) {
         this.shadowU.uOpacity.value = opacity;
@@ -542,6 +542,83 @@ export class View {
       }
     }
     return cam;
+  }
+
+  // What the scenery's light sets on the aircraft and its deck, once that light has changed (scenery.update).
+  relight() {
+    const lit = 0.25 + 0.75 * smooth(-6, 2, this.scenery.elevation);
+    for (const m of this.airliner.materials) m.envMapIntensity = lit;
+    this.cockpit.flood(0.35 / this.scenery.exposure);
+  }
+
+  // The nose camera's place and boresight about an aircraft at P turned by Q (the body's, or the debrief's playhead's),
+  // into pos and quat: the nose point (nose.js) hung as the structure is, looking along the fuselage.
+  nosePose(P, Q, pos = new THREE.Vector3(), quat = new THREE.Quaternion()) {
+    pos.copy(this.nose).applyMatrix4(this.structural).applyQuaternion(Q).add(P);
+    quat.copy(Q);
+    return { pos, quat };
+  }
+
+  // The scene's parts that follow the eye, brought to an eye at p at the flight's time t: the sky and the light it
+  // gives (the GPU tier's), the PAPI as p sees them, the flashers.
+  toEye(p, t) {
+    if (this.scenery) {
+      if (this.scenery.update(p, t)) this.relight();
+    } else {
+      this.skyDome.position.copy(p);
+    }
+    this.airport.update(p, t);
+  }
+
+  // The light points' pixel-ratio uniforms: every one a material of the scene's has (lights.js).
+  pixelRatioUniforms() {
+    const found = new Set();
+    this.scene.traverse((o) => {
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m?.uniforms?.uPixelRatio) found.add(m.uniforms.uPixelRatio);
+    });
+    return [...found];
+  }
+
+  // The world from the live aircraft's nose camera at this stop, width by height pixels and hfovDeg across, as an
+  // image's data URL (flightDebug.frame): the screen's own scene, colours and exposure, without the aircraft or the
+  // overlay, rendered into the page's canvas resized for the moment and put back as it was in the same task, so no
+  // frame of it is ever shown; its light points sized as at a pixel ratio of one, so that a frame is the same on any
+  // screen. Nothing of the flight moves.
+  capture({ width, height, hfovDeg = NOSE_HFOV_DEG, type = 'image/jpeg', quality = 0.85 }) {
+    const r = this.renderer, cam = (this.frameCam ||= new THREE.PerspectiveCamera());
+    this.nosePose(this.body.position, this.body.quaternion, cam.position, cam.quaternion);
+    cam.aspect = width / height;
+    cam.fov = vfov(hfovDeg, cam.aspect);
+    cam.near = this.floor ? 1 : 0.3;
+    cam.far = this.camera.far;
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld();
+    const t = this.lastT, root = this.airliner?.root, rootShown = root?.visible;
+    const ratios = this.pixelRatioUniforms(), was = ratios.map((u) => u.value);
+    const size = r.getSize(new THREE.Vector2()), ratio = r.getPixelRatio();
+    try {
+      this.toEye(cam.position, t);
+      if (root) root.visible = false;
+      for (const u of ratios) u.value = 1;
+      r.setPixelRatio(1);
+      r.setSize(width, height, false);
+      r.render(this.scene, cam);
+      return r.domElement.toDataURL(type, quality);
+    } finally {
+      r.setPixelRatio(ratio);
+      r.setSize(size.x, size.y, false);
+      ratios.forEach((u, k) => {
+        u.value = was[k];
+      });
+      if (root) root.visible = rootShown;
+      this.toEye(this.camera.position, t);
+      this.render();   // the screen as it was
+    }
+  }
+
+  // The landing runway's PAPI as seen from p (nose.js, papiSeen): for grading what a camera sees, never for flying.
+  papiAt(p) {
+    return this.airport ? papiSeen(this.airport.papiLamps, this.landingEnd, p) : null;
   }
 
   placeCamera(s, dt) {
@@ -558,6 +635,13 @@ export class View {
         cam.position.set(e.x, e.y, e.z);
         cam.rotation.set(s.pitch_deg * DEG, -s.heading_deg * DEG, -s.roll_deg * DEG);
         near = 2;
+        break;
+      }
+      case 'nose': {
+        // in the nose, boresighted along the fuselage: the world ahead as an enhanced-vision camera sees it, no
+        // overlay (nose.js), NOSE_HFOV_DEG across whatever the window's shape
+        this.nosePose(P, Q, cam.position, cam.quaternion);
+        fov = vfov(NOSE_HFOV_DEG, cam.aspect);
         break;
       }
       case 'cockpit': {

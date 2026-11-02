@@ -15,6 +15,8 @@
 //   { "pose": { "camera": "orbit", "yaw": 0.7, "pitch": 0.25, "dist": 16 } }   flightDebug.pose
 //   { "eval": "<expression>" }                      its value printed as JSON; an async expression is awaited
 //   { "shot": "<name>" }                            <out>/<name>.png, the viewport
+//   { "frame": "<name>", "with": {...} }            flightDebug.frame(with): the nose camera at this stop, saved
+//                                                   as <out>/<name>.jpg or .png, what it says of itself printed
 // and "note": "..." on any step is printed before it runs. Chrome is found where Windows installs it, or named by
 // BROWSER. The DevTools protocol is spoken with node's own WebSocket; nothing is installed.
 
@@ -138,6 +140,12 @@ try {
     } else if ('eval' in step) {
       const r = await evaluate(step.eval);
       console.log(r.error ? `eval error: ${r.error}` : JSON.stringify(r.value));
+    } else if ('frame' in step) {
+      const r = await evaluate(`flightDebug.frame(${JSON.stringify(step.with ?? {})})`);
+      if (r.error) throw new Error(`frame: ${r.error}`);
+      const f = r.value, file = join(out, `${step.frame}.${f.type === 'image/png' ? 'png' : 'jpg'}`);
+      writeFileSync(file, Buffer.from(f.data, 'base64'));
+      console.log(`frame ${file} ${JSON.stringify({ t: f.t, ticks: f.ticks, width: f.width, height: f.height, papi: f.papi?.white })}`);
     } else if ('shot' in step) {
       const shot = await call('Page.captureScreenshot', { format: 'png' });
       const file = join(out, `${step.shot}.png`);
