@@ -8,7 +8,12 @@
  *   ra_test one       RA 1 failed from the start: ra_ft reads nothing, ra2_ft the truth, and the crew, flying
  *                     by RA 2, flares at 33 ft of true height, as with both
  *   ra_test both      both failed a minute into the approach: neither reads anything from then on, and the
- *                     flight goes on under the computers, its true height still known */
+ *                     flight goes on under the computers, its true height still known
+ *   ra_test none      both failed from the start, the flare commanded at 33 ft of true height (flare=external): with
+ *                     no radio height the law flies on the trigger's, carried down by the vertical speed, so the
+ *                     levers come back about 1.2 s on, at its 20 ft, not at once; and it touches down inside
+ *                     the judge's 360 fpm (its verdict is the approach's too: on the 737, in direct law without
+ *                     radio altimeters, the approach leaves the glideslope band at 50 ft, before the flare) */
 
 #include <math.h>
 #include <stdio.h>
@@ -34,6 +39,15 @@ static int field(const char* name) {
 
 static double get(const char* name) {
   return flight_state()[field(name)];
+}
+
+/* An input's slot: for a scripted crew, what it did at the last step. */
+static int input(const char* name) {
+  for (int i = 0; i < flight_input_count(); ++i) {
+    if (strcmp(flight_input_name(i), name) == 0) return i;
+  }
+  fprintf(stderr, "no input %s\n", name);
+  exit(2);
 }
 
 static const char* phase(void) {
@@ -113,8 +127,32 @@ int main(int argc, char** argv) {
     check(isnan(get("ra_ft")) && isnan(get("ra2_ft")), "after it, neither reads anything", get("ra_ft"));
     check(get("height_true_ft") < high && get("crashed") == 0, "and the flight goes on, still descending, its true height known",
           get("height_true_ft"));
+  } else if (strcmp(mode, "none") == 0) {
+    if (flight_start_scenario(NULL, 1, "approach;fail=ra1+ra2;flare=external;driver=test") != 0) {
+      return printf("FAILED: did not start\n"), 1;
+    }
+    const int tla = input("tla_1");
+    while (get("height_true_ft") >= 33 && get("crashed") == 0) flight_step(1);
+    check(flight_command("flare") == 1, "with no radio altimeter, the flare commanded at 33 ft", get("height_true_ft"));
+    const double began = get("t_s");
+    double retardAt = NAN;
+    for (int tick = 0; tick < 10 * 50 && isnan(retardAt); ++tick) {
+      flight_step(1);
+      if (flight_inputs()[tla] == 0) retardAt = get("t_s");
+    }
+    printf("  the levers came back %.2f s after the flare began\n", retardAt - began);
+    check(retardAt - began > 0.8 && retardAt - began < 2.0,
+          "on the trigger's height carried down, at its 20 ft, not at once on a height of zero", retardAt - began);
+    double sink = NAN;
+    for (int tick = 0; tick < 3 * 60 * 50; ++tick) {
+      flight_step(1);
+      if (isnan(sink) && get("on_ground") == 1) sink = get("vs_fpm");
+      if (!isnan(get("judge_stable"))) break;
+    }
+    printf("  touchdown at %.0f fpm; the judge: %s\n", sink, get("judge_stable") == 1 ? "STABLE" : "NOT STABLE");
+    check(sink > -360 && get("crashed") == 0, "and it touches down inside the judge's 360 fpm", sink);
   } else {
-    fprintf(stderr, "ra_test bias FT | one | both\n");
+    fprintf(stderr, "ra_test bias FT | one | both | none\n");
     return 2;
   }
   printf("%s\n", failures ? "FAILED" : "PASSED");

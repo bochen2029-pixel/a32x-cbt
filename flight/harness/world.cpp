@@ -560,9 +560,11 @@ void World::fly(double dt) {
 
     case Phase::Flare: {  // sink rate down exponentially, to two feet a second at the wheels
       // the height it flies on (FlareOptions): the radio height as the crew reads it; or, from the trigger on, the
-      // height the trigger stood for, carried down by the aircraft's own vertical speed, reading no altimeter
-      if (flare_.timeLaw) flareHeightFt_ += a.verticalSpeedFpm / 60 * dt;
-      const double height = std::max(0.0, flare_.timeLaw ? flareHeightFt_ : radio);
+      // height the trigger stood for, carried down by the aircraft's own vertical speed, reading no altimeter, as
+      // the law must too when both radio altimeters have failed (it flew on max(0, NaN) = 0: a retard at once)
+      flareHeightFt_ += a.verticalSpeedFpm / 60 * dt;
+      const bool onTrigger = flare_.timeLaw || std::isnan(radio);
+      const double height = std::max(0.0, onTrigger ? flareHeightFt_ : radio);
       const double sinkTarget = height / kFlareTauS + 2.0;  // ft/s
       const double sink = -a.verticalSpeedFpm / 60;
       c.pitch = clamp(kFlareGain * (sink - sinkTarget) - kFlarePitchRate * q - kFlareLoad * (a.nz - 1), -0.3, 0.8);

@@ -311,6 +311,8 @@ add_test(NAME radio_altimeters_reading_high_make_the_crew_flare_late COMMAND ra_
 add_test(NAME radio_altimeters_reading_low_make_the_crew_flare_early COMMAND ra_test bias -15)
 add_test(NAME with_radio_altimeter_1_failed_the_crew_flies_by_radio_altimeter_2 COMMAND ra_test one)
 add_test(NAME with_both_radio_altimeters_failed_the_flight_goes_on COMMAND ra_test both)
+# With neither, the flare flies on the height its trigger stood for, carried down by the vertical speed, not on zero.
+add_test(NAME with_no_radio_altimeter_the_flare_flies_on_the_trigger_s_height COMMAND ra_test none)
 # The flare (world.h, FlareOptions), for a driver outside the harness: today's crew begins it by its formula and takes
 # no command; flare=external waits for one, with floor= under it; flare_law=time flies today's law on the height the
 # trigger stood for. And the wind the aircraft lands in, along and across the runway.
