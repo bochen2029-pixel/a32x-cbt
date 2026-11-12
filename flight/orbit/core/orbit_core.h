@@ -130,6 +130,17 @@ enum {
     OC_PORT_RANGE, /* m to the approach's hold point, OC_STANDOFF_M off the hub's port */
     OC_AIR_LAW,    /* 1 while the hand-flying law is the air's (pitch and bank hold), 0 rate command: it takes
                       over above 400 Pa and hands back below 200 Pa, and holds on the ground */
+    /* the flight director (orbit_fd.h): what the crew's guidance would command now, while a person flies */
+    OC_FD_VALID,      /* 1 while the command below is a guidance's; 0: hide the cues */
+    OC_FD_PHASE,      /* OC_FD_PH_*: whose guidance, and where it is */
+    OC_FD_PITCH_DEG,  /* the attitude it asks for, as OC_PITCH_DEG, OC_HDG_DEG and OC_ROLL_DEG reckon the craft's. */
+    OC_FD_HDG_DEG,    /* The heading is where it points the nose; in the air its laws turn by the bank, and the */
+    OC_FD_BANK_DEG,   /* heading is the craft's own */
+    OC_FD_THROTTLE,   /* 0..1 */
+    OC_FD_ALPHA_DEG,  /* the flight home's angle of attack, from the coast to the flare; else 0 */
+    OC_FD_LIFT_BANK_DEG, /* and its bank of the lift about the air's velocity, + right (OC_RET_BANK_CMD_DEG) */
+    OC_FD_GEAR,       /* 1: the guidance has the gear down */
+    OC_FD_ON,         /* 1 while the director is switched on (oc_fd) */
     OC_COUNT
 };
 

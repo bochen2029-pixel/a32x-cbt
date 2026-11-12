@@ -39,6 +39,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | , . | bumpers | time slower, faster (up to 100×) |
 | V | B | view: chase, cockpit, from the Ring |
 | F | | the Moon through a telescope, and back |
+| 8 | | the flight director: shown while you fly, while the crew flies too, off |
 | 9 | | graphics: auto, low, medium, high (also GFX) |
 | drag, wheel | | look round the craft, zoom |
 | H, Backspace | | help, start again |
@@ -94,8 +95,8 @@ holding off its hub reads about 0.7 m/s there.
 
 The core is one program in parts, each with its own header, readouts and tests: `core/orbit_core.cpp`
 (the flight, the crew to orbit, the approach), `return.cpp` (the flight home), `dock.cpp` (docking and
-contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `walk.cpp` (a person inside
-the Ring); `internal.h` is what they share. The
+contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `fd.cpp` (the flight
+director), `walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
 page is the same: `web/src/main.js` flies and draws, and each further part is a module of its own
 (`web/src/features.js` lists them and says what each may do). The Ring's shape is one set of numbers,
 in `orbit_core.h`, that the core and the drawing both use.
@@ -740,13 +741,107 @@ It takes about ten minutes on a desktop. Any command but one that only changes w
 and takes over from there. `tour-plan.js` is the plan, pure and tested on made-up states;
 `tour.js` is the button, the caption and the commands.
 
+### The flight director
+
+The crews fly by guidance: a pitch schedule through the air and the Shuttle's powered explicit guidance
+above it on the way up; on the way home the entry's predictor-corrector, the terminal area and the
+approach. The flight director lets a person fly the same paths by hand, on keys or a stick: while the
+pilot has the controls, the crew's guidance for the phase the craft is in runs in the shadow and says what
+it would command, without commanding it, and the page draws it as an airliner's director does.
+
+**In the core** (`core/fd.cpp`, `orbit_fd.h`). Before each step's law, the crew's own functions, `crew()`
+for the climb to orbit and `returnCrew()` for the flight home, run on a copy of the state that carries the
+guidance's memory: its phase, its pitch and bank targets, its insertion plan, the flight home's whole
+state. What the law aimed at is the director's attitude (`ratesToward`'s target, or the air law's pitch and
+bank); the throttle and the gear are what it set. Nothing but the director's own memory is written, and
+that memory is in the state and the hash, so a run replays. Its readouts are the last of `oc_out`'s:
+`OC_FD_VALID`, `OC_FD_PHASE` (the crew's phases, then the flight home's), the pitch, heading and bank it asks
+for, as the craft's own are reckoned (above the air the heading is where it points the nose; in the air its
+laws turn by the bank, and the heading is the craft's), the throttle, the gear, and on the way home its bank
+about the air's velocity and its angle of attack. `oc_fd(0)` switches it off.
+
+Whose guidance. Beside the crew to orbit the same shadow runs, and its command is the crew's own; the
+flight home's command is read after the crew's law (its predictor flies the rest of the entry every two
+seconds, too dear to run twice). Taking the controls from either crew, the shadow carries on from the
+crew's memory as it stands. Taking them from anyone else, or switching the director on, it starts as the
+crew would if handed the craft: the crew to orbit from where the craft is (`oc_auto`'s pick), or the
+flight home if one is under way (its crew has flown and it has not ended). A craft that goes back past the
+crew's phase, down into the air again or back onto the runway, is taken up where the crew would, with a
+margin so that a craft flown along a boundary does not flicker between two phases. Near the Ring, docked,
+on the port or deck holds, and while the approach, docking or the deck landing fly, the director says
+nothing: the docking reticle and the deck's display are drawn there.
+
+**On the page** (`web/src/fd-view.js`; the numbers in `fd-hud.js`).
+
+- **The primary flight display**, at the foot of the screen: the attitude ball, a magenta pitch bar and
+  bank bar to fly the yellow aircraft symbol onto (nose up when the pitch bar is above it, bank toward the
+  bank bar), the bank scale with the director's bank as a magenta index beside the craft's white pointer,
+  the throttle with the hand's setting in cyan and the director's in a magenta caret, and the gear when it
+  should move. Above the air, where the stick turns the craft at rates, the upright bar is dashed and is the
+  heading's: yaw toward it (Q E), roll to the bank index (A D).
+- **In the view**, chase or cockpit, beside the velocity vector the HUD draws: a magenta ring with wings
+  where the director wants the nose, banked as it asks, and a white W where the nose is. Fly the W onto the
+  ring. In the cockpit it is a head-up display's cue; in the chase view it is off the top of the screen
+  while the climb is steep, and the display below is the cue.
+- **The entry**: the director's bank about the air and its angle of attack are written under the ball
+  and in the readouts (`FD ENTRY bank R 50° about the air, α 40.0°`), and its bank index sits on the
+  scale where the attitude that gives them is banked.
+- **The ILS to 17C**, when the craft is on an approach (off the ground, short of the threshold, within 90°
+  of the course and below 8 km): the localizer under the ball, the glide slope at its right, a diamond
+  each, green inside half a dot. From the runway's geometry in `flight/web`'s data, as the A320's
+  runway (`docs/provenance.md`, 1f): the localizer's course is the centreline, 180.3° true, its antenna
+  1,000 ft past the far end, full scale (two dots) 350 ft either side at the threshold, received within
+  18 NM and 35° of the course; the glide slope is the PAPI's 3° through 50 ft over the threshold, a dot
+  0.12 of its angle, received within 10 NM and 8°, judged at the wheels (the centre of mass's height less
+  3 m). The crew's own approach puts its wheels 15 m over the threshold on 3°: the same path.
+- **The path to follow**, in the world on the same approach: magenta gates 120 m wide and 60 m tall down
+  the glide slope and the localizer's course, a kilometre apart from 18 km to 1 km out, each where the
+  craft's centre of mass is on the path, the Earth's curve under the start point's plane allowed for (25 m
+  at 18 km). Fly through them.
+- **8** cycles it: shown while you fly (the default, remembered), shown while the crew flies too (its bars
+  then sit on the craft, as an autopilot's do), and off, when the core stops computing it. It leaves the
+  tour running.
+
+From the tests (`test/test_fd.cpp`, `web/test/fd.test.mjs`; these numbers are the tests' own and are not yet
+certified in `evidence/`):
+
+| | |
+|---|---|
+| beside the crew, to orbit | the director's command is the crew's, bit for bit, at every one of 37,629 steps: the phase, the targets, the plan, the attitude its law aims at, the throttle, the gear. A pitch target spoiled by 0.01° is told apart for 374 steps |
+| taken over | at 10, 25, 35.5, 60, 150, 300 and 760 s of the climb, and in the fall to the air, the entry, the terminal area and on final coming home, the director's first command is the crew's next, bit for bit; 250,029 steps of the crew flying home read out as the director's |
+| on or off | the same controls give the same flight, the state's hash less the director's own and the place and velocity bit for bit, at every mark: a pilot's climb (240), the crew's flight to orbit (753), the flight home with a pilot in the entry for a minute (501). A throttle of 0.999 for a second is told apart |
+| a person flying by the cues alone, 0.3 s late, the stick proportional to each cue's error (full at 10° of pitch, 60° of bank in the air), the throttle toward its cue at the keys' rate or slammed | off the ground at 40.3 s; the cue to shut at 749.4 s, shut at 750.5 s; ten seconds later **504.1 × 500.0 km**, inclined 32.86°, 4,376 kg left. The crew, measured the same way (the engine's tail and all): 501.2 × 500.0 km, 32.84°, 4,388 kg. Max q 35.8 kPa, 2.17 g. The cues flown within 3.0° in pitch and 2.3° in bank where they move smoothly (0.24° and 0.06° on the mean) |
+| the same person, the throttle full until its cue says shut | 572.0 × 499.1 km: the cue's taper is what puts the orbit at the Ring's height |
+| the flight home, the crew's from the insertion orbit until the person takes it, who also leads the cue by 0.4 s and brakes once down | taken waiting for the pass (the burn by hand too), falling to the air, or on final: **down 310 to 311 m past the threshold, 0.10 m off the centreline**, sinking 3.8 to 3.9 m/s at 106 m/s, stopped 2.25 km down the runway 0.2 m off; heat 387 to 438 kW/m², 1.63 to 1.96 g, 9.5 kPa at most. The crew's own: 432 m, 0.07 m, 0.74 m/s |
+| the same, without the lead, taken falling to the air | down 305 m past, 0.10 m off, but 4.87 m/s and 2.70 g: past the load's 2.5 g limit |
+| the crew's own final into 17C | within 0.021 dot of the localizer and 0.020 dot of the glide slope from 12 km to 1 km out |
+
+The check on the person is 10 km at either end of the orbit, 0.3° of inclination, 5° of each cue where it
+moves smoothly; where a cue steps (a new phase, the turn's bank, the insertion's first pitch) the 5 s after
+are left out. Coming home it is the flight home's own judge of a landing (the first 900 m, 3 m of the
+centreline, stopped on the runway, inside the limits), with the sink under 5 m/s.
+
+What is weak. Where the climb's pitch schedule hands over to the insertion guidance, at 38 km, the pitch cue
+steps 15° up while the hand-flying law is still the air's, down to 200 Pa, in air too thin for its roll: a
+person who grabs the bank, full stick at 30° of bank error, flies a roll oscillation there that rolls the
+craft past 90° before the rate law takes over; the test's person, at 60°, does not. The director's
+throttle and pitch are the crew's, not smoothed for a hand. Coming home they are an attitude, and the
+air law holds an attitude by pitch and bank: in the entry's bank reversals, at 70° of bank, its pitch
+target turns the nose mostly in yaw, and the angle of attack the guidance wants is hard to hold by it; a
+person who does not lead the cue passes 2.5 g. The entry asks for up to 85° of bank about the air, and the
+air law stops its bank at 75°. The flare is 2 s long, from 12 m: a hand 0.3 s late lands at about 4 m/s
+where the crew lands at 0.74. The director follows the crew to orbit unless a flight home is under way, so
+a hand-flown circuit back to 17C from a take-off gets the climb's cues; the ILS is there for it. The
+localizer's antenna and coverage are a textbook ILS's, not KDFW's published one.
+
 ### Rigour
 
 `INVARIANTS.md` writes down what the core promises, in the owner's manner from Subsim: each rule with
 why it holds and what enforces it. The rules cover conservation in a vacuum, thin air as the only loss
 in orbit, work and energy on the ascent, the propellant's bookkeeping, one frame seen three ways, replay
-bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, and a
-receipt for every number. `test/test_invariants.cpp` holds them as physics, with tolerances derived from
+bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, a
+receipt for every number, and a flight director that is the crew's guidance and changes nothing (O15,
+held by `test/test_fd.cpp`). `test/test_invariants.cpp` holds the rest as physics, with tolerances derived from
 RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`).
 Three defects it found are fixed and their tests run with the rest: the hash missed fields, non-finite
 controls were taken, and an escape path's periapsis was wrong. `INVARIANTS.md` keeps what was found. `evidence/` keeps the receipts. Every constant and

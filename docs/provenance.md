@@ -374,6 +374,19 @@ is taken as ideas, numbers and methods, and the code is this project's.
 | J. W. Cooley and J. W. Tukey, *An algorithm for the machine calculation of complex Fourier series*, Math. Comp. 19 (1965) | textbook method | the transform the rooms' answers are made with, frame by frame in the frequency domain |
 | this project | — | the sound's instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the flight deck's voices (the hover's thrum and its mode, the duct, the lift jet's whine, the roll posts, the actuators, the plating's modes) and how the jets' work is found from the craft's motion; the Ring's rooms' shapes, their echoes and the band's 20 dB lift; the footsteps' surfaces, the canal, the town's hum, the draught, the lifts, the hatch; the tour's tone. The map's views, its layout and the Ring's orbit found from the readouts |
 
+#### The flight director
+
+`core/fd.cpp`, `orbit_fd.h`, `fd_state.h`, `web/src/fd-view.js`, `fd-hud.js` and their tests are ours,
+GPLv3. The guidance it shows is the crews' own (above, and "The flight home"); it runs their functions on a
+copy of the state. What is taken below is taken as ideas and methods; no code is copied.
+
+| source | licence | what is taken |
+|---|---|---|
+| the flight director and the primary flight display: a pitch bar and a bank bar the pilot flies the aircraft symbol onto, a bank scale with a commanded index, a flight path director to fly the velocity onto | general aviation knowledge | the ideas only: the bars, the single cue (here for the nose, since the crews command an attitude), magenta for what is commanded. The layout, the soft scales and the colours are this project's |
+| the ILS's geometry: ICAO Annex 10, Volume I, as in 1f; and the FAA's *Aeronautical Information Manual*, 1-1-9, Instrument Landing System: a localizer course tailored to 700 ft wide at the threshold, a glide slope's coverage | public domain (the AIM, a work of the US government); ICAO as a method | as in 1f: full scale two dots, 350 ft either side of the centreline at the threshold in angle from the antenna; a dot of the glide slope 0.12 of its angle; the localizer received within 18 NM and 35° of the course, the glide slope within 10 NM and 8°. The runway's place, heading and length are `flight/web`'s (1f); the 3° path through 50 ft is the PAPI's there (`GLIDE`) |
+| D. T. McRuer and H. R. Jex, "A review of quasi-linear pilot models", *IEEE Transactions on Human Factors in Electronics* HFE-8(3), 1967 | the paper's method | the test's person: a gain on each cue's error, limited at the stick's stops, a reaction time, 0.3 s, and lead where the craft lags (the flight home's person leads by 0.4 s); and that a gain too high for the delay and the craft's lag oscillates (here the roll in thin air). The gains are this project's |
+| this project | — | which guidance runs in the shadow and when, the margins on its phases, the readouts, the shadow's start from oc_auto's pick and returnEngage, the localizer's antenna 1,000 ft past the far end (1f's typical siting) and the glide slope judged at the wheels, the 8 key's three modes, and the person's gains |
+
 #### Rigour
 
 `flight/orbit/INVARIANTS.md`, `flight/orbit/test/test_invariants.cpp` and `flight/orbit/evidence/` are

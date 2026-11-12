@@ -16,6 +16,7 @@ Site site;
 Ring ring;
 V3 sunEci;
 Controls hands;
+Aim aim;
 
 namespace {
 double out[OC_COUNT];
@@ -305,8 +306,10 @@ Q attitudeToward(V3 dir, V3 up, double roll, Q fallback) {
     return fromAxes(x, y, z);
 }
 
-// The body rates that turn the craft toward a target attitude.
+// The body rates that turn the craft toward a target attitude. The target is what the flight director reads
+// as the law's aim (internal.h, Aim).
 V3 ratesToward(const State& s, Q target, double gain, double limit) {
+    aim = {1, 0, target, 0, 0};
     Q e = qmul(qconj(s.q), target);
     if (e.w < 0) e = {-e.w, -e.x, -e.y, -e.z};
     V3 w = V3{e.x, e.y, e.z} * (2 * gain);
@@ -334,6 +337,7 @@ void rateLoop(State& s, const Local& L, V3 wc) {
 
 // The law in the air: hold a pitch and a bank, and turn in balance.
 V3 airLaw(State& s, const Local& L, double yawRate) {
+    aim = {1, 1, s.q, s.thetaT, s.phiT};
     const double thetaDot = 1.5 * (s.thetaT - L.pitch), phiDot = 2.0 * wrap(s.phiT - L.roll);
     const double vh = std::fmax(40.0, L.tas * std::cos(L.pitch));
     double psiDot = s.onGround ? 0 : clampd(G0 * std::tan(clampd(L.roll, -1.2, 1.2)) / vh, -0.3, 0.3);
@@ -409,6 +413,15 @@ void pegSolve(State& s, const Local& L) {
     s.pegT = Ts;   // the steering's own burn time; the update after its solve would belong to the next
     s.pegAt = timeOf(s);
     s.pegValid = 1;
+}
+
+// The phase the crew picks up from, taking the craft where it is (oc_auto; and the flight director, fd.cpp).
+int crewPhaseFor(const State& s, const Local& L) {
+    if (orbitOf(s).peri > 150000) return OC_PH_ORBIT;
+    if (s.onGround) return L.tas >= 95 ? OC_PH_ROTATE : timeOf(s) < T_GO ? OC_PH_HOLD : OC_PH_ROLL;
+    if (L.alt < 2000) return OC_PH_CLIMB;
+    if (L.alt < 30000 || L.qbar > 1000) return OC_PH_ASCENT;
+    return OC_PH_INSERT;
 }
 
 void crew(State& s, const Local& L, double* throttle) {
@@ -549,12 +562,14 @@ void stepOnce(State& s) {
     s.rcs = {0, 0, 0};
     s.nozzleCmd = 0;   // a law that does not swivel the drive flies with it aft
     double throttle = 0;
+    fdBefore(s, L);   // the flight director: the crew's guidance on a copy of the state (fd.cpp)
     if (s.autoMode == OC_AUTO_CREW) crew(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_APPROACH) approach(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_RETURN) returnCrew(s, L, &throttle);   // return.cpp
     else if (s.autoMode == OC_AUTO_DOCK) dockCrew(s, L, &throttle);       // dock.cpp
     else if (s.autoMode == OC_AUTO_DECK) deckCrew(s, L, &throttle);       // deck.cpp
     else pilot(s, L, &throttle);
+    fdAfter(s, L, throttle);
     s.thr += (throttle - s.thr) * (OC_DT / 0.4);
     if ((throttle == 0 && s.thr < 1e-3) || s.prop <= 0) s.thr = 0;   // shut down, not idling forever
     s.nozzle += clampd(clampd(s.nozzleCmd, 0, NOZZLE_MAX) - s.nozzle, -NOZZLE_RATE * OC_DT, NOZZLE_RATE * OC_DT);   // the swivel at its rate
@@ -577,6 +592,7 @@ void stepOnce(State& s) {
 void placeRing() {
     State f = g;
     f.autoMode = OC_AUTO_CREW;
+    f.fd.on = 0;   // no one to show it to
     ring.valid = 0;
     const long long limit = (long long)(3000.0 / OC_DT);
     while (f.phase != OC_PH_ORBIT && !f.crashed && f.n < limit) stepOnce(f);
@@ -655,9 +671,26 @@ void writeOut() {
     out[OC_VREL_E] = vrel.x; out[OC_VREL_N] = vrel.y; out[OC_VREL_U] = vrel.z;
     out[OC_PORT_RANGE] = norm(holdPoint(t) - s.r);
     out[OC_AIR_LAW] = s.atmoLaw;
+    fdWriteOut(s, out);
     returnWriteOut(s);
     dockWriteOut(s);
     deckWriteOut(s);
+}
+
+// FNV-1a over the doubles that are the state, then the features' own; the flight director's apart (oc_hash)
+unsigned flightHash() {
+    const double v[] = {(double)g.n, g.r.x, g.r.y, g.r.z, g.v.x, g.v.y, g.v.z, g.q.w, g.q.x, g.q.y, g.q.z,
+                        g.w.x, g.w.y, g.w.z, g.prop, g.thr, (double)g.phase, (double)g.crashed,
+                        (double)g.gear, (double)g.onGround, (double)g.autoMode, (double)g.sas, (double)g.atmoLaw, g.thetaT, g.phiT,
+                        g.pegF0, g.pegF1, g.pegT, g.pegAt, (double)g.pegValid, g.hold.w, g.hold.x, g.hold.y, g.hold.z, (double)g.holdValid,
+                        g.torque.x, g.torque.y, g.torque.z, g.rcs.x, g.rcs.y, g.rcs.z, g.steer, g.brake,
+                        hands.pitch, hands.roll, hands.yaw, hands.throttle, hands.tx, hands.ty, hands.tz, (double)hands.gearDown, hands.brake};
+    unsigned h = 2166136261u;
+    hashDoubles(h, v, sizeof v / sizeof v[0]);
+    returnHash(g, h);
+    dockHash(g, h);
+    deckHash(g, h);
+    return h;
 }
 
 }   // namespace oc
@@ -679,6 +712,7 @@ void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
     returnReset(g);
     dockReset(g);
     deckReset(g);
+    fdReset(g);
     hands.gearDown = 1;
     hands.brake = 1;
     const V3 fwd = site.e * std::sin(site.hdg) + site.n * std::cos(site.hdg);
@@ -718,6 +752,7 @@ void oc_auto(int mode) {
         if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
     }
     const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK;
+    fdHanded(g, g.autoMode);   // the flight director takes up the guidance afresh (fd.cpp)
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
     g.holdValid = 0;
@@ -727,12 +762,7 @@ void oc_auto(int mode) {
     if (g.autoMode != OC_AUTO_CREW) { writeOut(); return; }
     // The crew picks up where the craft is, not where it last left off.
     const Local L = localOf(g);
-    const Orbit o = orbitOf(g);
-    if (o.peri > 150000) g.phase = OC_PH_ORBIT;
-    else if (g.onGround) g.phase = L.tas >= 95 ? OC_PH_ROTATE : timeOf(g) < T_GO ? OC_PH_HOLD : OC_PH_ROLL;
-    else if (L.alt < 2000) g.phase = OC_PH_CLIMB;
-    else if (L.alt < 30000 || L.qbar > 1000) g.phase = OC_PH_ASCENT;
-    else g.phase = OC_PH_INSERT;
+    g.phase = crewPhaseFor(g, L);
     if (!g.onGround && L.alt > 40) g.gear = 0;
     g.thetaT = L.pitch;
     g.phiT = L.roll;
@@ -755,20 +785,13 @@ void oc_step(int n) {
 const double* oc_out(void) { return out; }
 int oc_out_len(void) { return OC_COUNT; }
 
-unsigned oc_hash(void) {   // FNV-1a over the doubles that are the state, then the features' own
-    const double v[] = {(double)g.n, g.r.x, g.r.y, g.r.z, g.v.x, g.v.y, g.v.z, g.q.w, g.q.x, g.q.y, g.q.z,
-                        g.w.x, g.w.y, g.w.z, g.prop, g.thr, (double)g.phase, (double)g.crashed,
-                        (double)g.gear, (double)g.onGround, (double)g.autoMode, (double)g.sas, (double)g.atmoLaw, g.thetaT, g.phiT,
-                        g.pegF0, g.pegF1, g.pegT, g.pegAt, (double)g.pegValid, g.hold.w, g.hold.x, g.hold.y, g.hold.z, (double)g.holdValid,
-                        g.torque.x, g.torque.y, g.torque.z, g.rcs.x, g.rcs.y, g.rcs.z, g.steer, g.brake,
-                        hands.pitch, hands.roll, hands.yaw, hands.throttle, hands.tx, hands.ty, hands.tz, (double)hands.gearDown, hands.brake};
-    unsigned h = 2166136261u;
-    hashDoubles(h, v, sizeof v / sizeof v[0]);
-    returnHash(g, h);
-    dockHash(g, h);
-    deckHash(g, h);
+unsigned oc_hash(void) {   // the flight's, then the flight director's (fd.cpp)
+    unsigned h = flightHash();
+    fdHash(g, h);
     return h;
 }
+
+unsigned oc_flight_hash(void) { return flightHash(); }
 
 void oc_eci(double* r3, double* v3) {
     r3[0] = g.r.x; r3[1] = g.r.y; r3[2] = g.r.z;
