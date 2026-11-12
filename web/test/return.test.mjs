@@ -85,17 +85,26 @@ const air = { mach: 24.4, alt: 70000, tas: 7000 };
 
 test('the status line says what the crew is doing, phase by phase', { skip: noThree }, () => {
   const { RET_PH: P, RET_EV: E } = view;
-  assert.equal(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air).line, 'HOME · WAITING FOR THE PASS · the burn in 1 h 02 min');
+  assert.equal(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air).line, 'HOME · WAITING · the burn in 1 h 02 min');
   assert.match(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air).hint, /^R again: skip ahead/);
   assert.match(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { touch: true }).hint, /^RETURN again/);
-  assert.equal(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { skipping: true }).line, 'HOME · SKIPPING AHEAD · the burn in 1 h 02 min');
-  assert.match(view.returnStatus(flight(P.wait), air).line, /NO PASS WITHIN REACH/);
-  assert.equal(view.returnStatus(flight(P.burn), air).line, 'HOME · DE-ORBIT BURN · 127 m/s, tail first');
+  assert.equal(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { skipping: true }).line, 'HOME · SKIPPING · the burn in 1 h 02 min');
+  assert.equal(view.returnStatus(flight(P.wait), air).line, 'HOME · NO PASS WITHIN REACH YET');
+  assert.equal(view.returnStatus(flight(P.burn), air).line, 'HOME · DE-ORBIT BURN · 127 m/s');
   assert.equal(view.returnStatus(flight(P.coast, { tEvent: 1980 }), air).line, 'HOME · FALLING TO THE AIR · entry in 33:00');
   assert.equal(view.returnStatus(flight(P.entry), air).line, 'HOME · ENTRY · Mach 24 · 1240 km to go');
   assert.equal(view.returnStatus(flight(P.approach, { togo: 9500 }), air).line, 'HOME · APPROACH · 17C in 9.50 km');
-  assert.equal(view.returnStatus(flight(P.stopped, { stopAlong: 2121 }), air).line, 'HOME · STOPPED ON 17C · 2.12 km past the threshold');
+  assert.equal(view.returnStatus(flight(P.stopped, { stopAlong: 2121 }), air).line, 'HOME · STOPPED ON 17C · 2.12 km down');
   assert.equal(view.returnStatus(flight(P.none), air), null);
+  // short enough for a phone's status line, every phase, its longest numbers: a day's wait, a coast of
+  // most of an orbit, half the world to go
+  const longest = { [P.depart]: 3000, [P.wait]: 86000, [P.coast]: 3500 };
+  for (let ph = 1; ph <= 10; ph++) {
+    for (const ev of [E.none, E.burn]) {
+      const st = view.returnStatus(flight(ph, { event: ev, tEvent: longest[ph] ?? 600, togo: 14614000, stopAlong: 4085 }), { mach: 26, tas: 120, alt: 30000 }, { skipping: ph === 2 });
+      assert.ok(st.line.length <= 46, `a phone's status line: ${st.line}`);
+    }
+  }
 });
 
 test('the readouts: where the runway is, the heat and the load, the guidance, the landing', { skip: noThree }, () => {
@@ -146,5 +155,5 @@ test('the core\'s block reads through the page, and RETURN\'s plan shows in it',
   assert.equal(r.phase, view.RET_PH.wait);
   assert.equal(r.event, view.RET_EV.burn);
   assert.ok(r.tEvent > 0 && r.dv > 80 && r.dv < 200, `the burn in ${r.tEvent} s, ${r.dv} m/s`);
-  assert.match(view.returnStatus(r, s).line, /^HOME · WAITING FOR THE PASS · the burn in/);
+  assert.match(view.returnStatus(r, s).line, /^HOME · WAITING · the burn in/);
 });
