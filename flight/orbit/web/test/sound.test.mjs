@@ -48,6 +48,11 @@ test('a chase camera 70 m behind a parked drive hears it about 0.2 s late, and t
   const m = run({ thr: 1, rho: 0, onGround: 0, gear: 0, tas: 7600, mach: 25, qbar: 0 });
   for (const k of ['roar', 'tear', 'crack', 'wind', 'windLow', 'buffet', 'plasma', 'plasCrack', 'knocksAir']) assert.equal(m[k], 0, k);
   assert.ok(m.vib > 0.3 && m.hum > 0.15, 'the drive is felt through the structure');
+  // a camera outside, in vacuum, hears nothing of the craft: not the drive, not its hull, not its cabin
+  const o = run({ thr: 1, rho: 0, onGround: 0, gear: 0, tas: 7600, mach: 25, qbar: 0, outside: 1 });
+  for (const k of ['hullView', 'cabinView', 'jetAboard', 'skinAboard']) assert.equal(o[k], 0, `${k} outside in vacuum`);   // the drive through the air: carried(), above
+  const a = run({ thr: 1, onGround: 1, tas: 40, mach: 0.12, qbar: 980, outside: 1 });
+  assert.ok(a.hullView > 0.4 && a.cabinView > 0.35, 'and in the air near the ground it does');
 });
 
 test('flying along, the sound takes the time that solves |d + v t| = c t: behind sooner, ahead later', () => {

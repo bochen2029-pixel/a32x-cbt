@@ -24,7 +24,7 @@ enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN =
 /* The ring's shape, one for the core and the page. Its frame: the axis, fixed among the stars, and ref,
    a unit vector in its plane that turns with it at OC_RING_SPIN about the axis. The floor and the roof
    are cylinders about the axis, OC_RING_WIDTH_M long, centred on the ring's plane; the rim walls close
-   them from OC_RING_RIM_M out to the hull. Spoke k (of OC_RING_SPOKES) runs from the hub to the rim
+   them from OC_RING_RIM_M out to the hull. Spoke k (of OC_RING_SPOKES) runs from the hub to the roof
    along sin(2 pi k / OC_RING_SPOKES) ref + cos(2 pi k / OC_RING_SPOKES) (ref x axis), in the plane. The
    hub is a cylinder on the axis, its port at -axis, OC_HUB_PORT_M from the centre. */
 #define OC_RING_SPIN 0.0443     /* rad/s: one g at the floor, a turn in 142 s */
@@ -110,6 +110,8 @@ enum {
     OC_VREL_N,
     OC_VREL_U,
     OC_PORT_RANGE, /* m to the approach's hold point, OC_STANDOFF_M off the hub's port */
+    OC_AIR_LAW,    /* 1 while the hand-flying law is the air's (pitch and bank hold), 0 rate command: it takes
+                      over above 400 Pa and hands back below 200 Pa, and holds on the ground */
     OC_COUNT
 };
 

@@ -25,6 +25,8 @@
 // TEST: hash_covers_the_state
 // TEST: nonfinite_controls_refused
 // TEST: escape_periapsis
+// TEST: lift_from_the_windward_face
+// TEST: peg_plan_is_its_own
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_dock.h"
@@ -36,6 +38,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <vector>
 
@@ -1044,6 +1047,63 @@ void nonfiniteControlsRefused() {
 
 // On a path that leaves the Earth for good, the periapsis read out is the hyperbola's, h^2/(mu (1 + e))
 // above the sphere. Today orbitOf writes the parabola's, h^2/(2 mu), which is (1 + e)/2 times as far out.
+// The air pushes a flat body away from the face it meets: the force normal to the wing (lift and the drag
+// that comes with it, less the drag at zero lift) has the sign of sin(alpha) at every angle of attack,
+// flying forward or backward, is odd in alpha, and blends with Mach without a jump. A tail slide, a flip,
+// flight backward: the wing is still pushed off its windward face. (Found by the audit of c56d77b: the
+// slender delta's potential term pointed into the windward face past 155 degrees.)
+void liftFromTheWindwardFace() {
+    double worstSign = 0, worstOdd = 0;
+    int wrong = 0;
+    for (double mach : {0.3, 0.9, 1.5, 2.5, 4.0, 6.0}) {
+        double cl0, cd0;
+        oc::liftDrag(0, mach, &cl0, &cd0);
+        for (int deg = -179; deg <= 179; ++deg) {
+            if (deg == 0) continue;
+            const double a = deg * oc::D2R;
+            double cl, cd, clm, cdm;
+            oc::liftDrag(a, mach, &cl, &cd);
+            oc::liftDrag(-a, mach, &clm, &cdm);
+            const double cn = cl * std::cos(a) + (cd - cd0) * std::sin(a);
+            if (cn * std::sin(a) <= 0) { ++wrong; worstSign = std::fmax(worstSign, std::fabs(cn)); if (wrong <= 3) std::printf("  Mach %.1f, %d deg: normal force %.3f against sin %.3f\n", mach, deg, cn, std::sin(a)); }
+            worstOdd = std::fmax(worstOdd, std::fabs(cl + clm) + std::fabs(cd - cdm));
+        }
+    }
+    std::printf("  %d angles with the normal force into the windward face (worst %.3f); odd in alpha to %.2e\n", wrong, worstSign, worstOdd);
+    CHECK(wrong == 0, "%d angles with the normal force into the windward face", wrong);
+    CHECK(worstOdd < 1e-12, "lift odd and drag even in alpha, to %.2e", worstOdd);
+}
+
+// The insertion guidance's plan is one plan: the steering it keeps (the sine of the thrust's elevation,
+// f0 + f1 t) meets its own end conditions, the vertical speed and the height at cutoff, over the burn time it
+// keeps with it. (Found by the audit of c56d77b: the burn time was updated after the solve, so the stored
+// steering belonged to another, and missed by up to 5 m/s and 164 m.)
+void pegPlanIsItsOwn() {
+    using namespace oc;
+    oc_reset(LAT, LON, HDG);
+    double worstV = 0, worstH = 0;
+    int plans = 0;
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500 && get(OC_CRASHED) == 0) {
+        oc_step(50);
+        if (get(OC_PHASE) != OC_PH_INSERT) continue;
+        const Local L = localOf(g);
+        pegSolve(g, L);
+        const double rT = RE + H_TARGET, rm = norm(g.r), vh = dot(g.v, alongTrack(g, L)), vs = L.vs;
+        const double ve = ISP * G0, mdot = T_MAX / ve, tau = (M_DRY + g.prop) / mdot, g0 = MU / (rm * rm) - vh * vh / rm;
+        const double T = g.pegT;
+        if (T <= 1) continue;
+        const double L0 = ve * std::log(tau / (tau - T)), L1 = tau * L0 - ve * T;
+        const double S0 = T * L0 - L1, J = tau * L1 - ve * T * T / 2, S1 = T * L1 - J;
+        const double B1 = g0 * T / 2 - vs, B2 = rT - rm - vs * T + g0 * T * T / 3;
+        worstV = std::fmax(worstV, std::fabs(L0 * g.pegF0 + L1 * g.pegF1 - B1));
+        worstH = std::fmax(worstH, std::fabs(S0 * g.pegF0 + S1 * g.pegF1 - B2));
+        ++plans;
+    }
+    std::printf("  %d plans: the kept steering misses its own cutoff by %.2e m/s and %.2e m at most\n", plans, worstV, worstH);
+    CHECK(plans > 100, "%d plans", plans);
+    CHECK(worstV < 1e-6 && worstH < 1e-3, "%.2e m/s, %.2e m", worstV, worstH);
+}
+
 void escapePeriapsis() {
     oc_reset(LAT, LON, HDG);
     while (get(OC_T) < 350) oc_step(1);
@@ -1079,9 +1139,11 @@ const Test tests[] = {
     {"crew_flight_finite", crewFlightFinite, false},
     {"abuse_finite", abuseFinite, false},
     {"ring_shape", ringShape, false},
-    {"hash_covers_the_state", hashCoversTheState, true},
-    {"nonfinite_controls_refused", nonfiniteControlsRefused, true},
-    {"escape_periapsis", escapePeriapsis, true},
+    {"hash_covers_the_state", hashCoversTheState, false},          // found as defects, fixed at a3556c9
+    {"nonfinite_controls_refused", nonfiniteControlsRefused, false},
+    {"escape_periapsis", escapePeriapsis, false},
+    {"lift_from_the_windward_face", liftFromTheWindwardFace, false},
+    {"peg_plan_is_its_own", pegPlanIsItsOwn, false},
 };
 
 }   // namespace

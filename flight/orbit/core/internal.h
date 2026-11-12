@@ -176,6 +176,7 @@ void rateLoop(State& s, const Local& L, V3 wc);           // body rates in, torq
 V3 airLaw(State& s, const Local& L, double yawRate);      // hold s.thetaT and s.phiT, turn in balance
 V3 alongTrack(const State& s, const Local& L);
 V3 point(const State& s, const Local& L, V3 dir, double gain, double limit);
+void pegSolve(State& s, const Local& L);   // the crew's insertion guidance: sets pegF0, pegF1, pegT, pegAt
 
 // ---- the features' hooks ------------------------------------------------------------------------
 // return.cpp: the flight home (OC_AUTO_RETURN). dock.cpp: docking at the hub and contact with the ring

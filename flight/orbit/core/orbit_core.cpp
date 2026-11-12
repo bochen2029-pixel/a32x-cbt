@@ -89,10 +89,12 @@ double cd0(double mach) {
     return c[5];
 }
 
-// Lift and drag coefficients: a slender delta's below Mach 1.5, Newtonian impact above Mach 5.
+// Lift and drag coefficients: a slender delta's below Mach 1.5, Newtonian impact above Mach 5. Polhamus's
+// normal force, KP sin a |cos a| + KV sin a |sin a|, pushes off the windward face at any angle, flying
+// forward or backward; lift is its cos a part and the drag it brings its sin a part.
 void liftDrag(double alpha, double mach, double* cl, double* cd) {
     const double sa = std::sin(alpha), ca = std::cos(alpha);
-    const double cls = KP_LIFT * sa * ca * ca + KV_LIFT * std::fabs(sa) * sa * ca;
+    const double cls = KP_LIFT * sa * ca * std::fabs(ca) + KV_LIFT * std::fabs(sa) * sa * ca;
     const double cds = KP_LIFT * sa * sa * std::fabs(ca) + KV_LIFT * std::fabs(sa * sa * sa);
     const double cn = 2 * sa * std::fabs(sa);
     const double w = clampd((mach - 1.5) / 3.5, 0, 1);
@@ -372,8 +374,9 @@ void pegSolve(State& s, const Local& L) {
     const double need = horizontalToGo(s, L);
     const double tMax = 0.999 * s.prop / mdot;
     double T = std::fmin(tMax, tau * (1 - std::exp(-need / ve)));
-    double f0 = 0, f1 = 0;
+    double f0 = 0, f1 = 0, Ts = T;   // Ts: the burn time f0 and f1 were solved for
     for (int k = 0; k < 6 && T > 1; ++k) {
+        Ts = T;
         const double L0 = ve * std::log(tau / (tau - T)), L1 = tau * L0 - ve * T;
         const double S0 = T * L0 - L1, J = tau * L1 - ve * T * T / 2, S1 = T * L1 - J;
         const double B1 = g0 * T / 2 - vs, B2 = rT - rm - vs * T + g0 * T * T / 3;
@@ -393,7 +396,7 @@ void pegSolve(State& s, const Local& L) {
     }
     s.pegF0 = f0;
     s.pegF1 = f1;
-    s.pegT = T;
+    s.pegT = Ts;   // the steering's own burn time; the update after its solve would belong to the next
     s.pegAt = timeOf(s);
     s.pegValid = 1;
 }
@@ -636,6 +639,7 @@ void writeOut() {
     const V3 vrel = toSite(s.v - rv - cross(ring.normal * ring.rate, s.r - rr));
     out[OC_VREL_E] = vrel.x; out[OC_VREL_N] = vrel.y; out[OC_VREL_U] = vrel.z;
     out[OC_PORT_RANGE] = norm(holdPoint(t) - s.r);
+    out[OC_AIR_LAW] = s.atmoLaw;
     returnWriteOut(s);
     dockWriteOut(s);
 }
@@ -686,6 +690,16 @@ void oc_controls(double pitch, double roll, double yaw, double throttle, double 
 
 void oc_auto(int mode) {
     if (mode == g.autoMode) return;
+    // The approach steers on the plain difference from the Ring's velocity, which is off the relative motion
+    // of two orbits d apart by about n d: far out, cancelling it drops the periapsis into the air (from 380
+    // km behind, into the ground). So it is taken where docking's is (dock.cpp): in orbit, within
+    // OC_DOCK_ENGAGE_M of the Ring, passing it slower than OC_DOCK_ENGAGE_SPEED in the frame turning with its
+    // orbit. Refused, the call changes nothing.
+    if (mode == OC_AUTO_APPROACH) {
+        const double t = timeOf(g);
+        const V3 d = g.r - ringPos(t), passing = g.v - ringVel(t) - cross(ring.normal * ring.rate, d);
+        if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
+    }
     const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK;
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
