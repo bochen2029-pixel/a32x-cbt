@@ -67,7 +67,7 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | the crew's approach | 729 s to the hold point, 300 m off the hub's port, on the small thrusters |
 | one revolution | 5,669 s, Kepler's period for the orbit to 0.02 s |
 | the crew docks, from orbit (`test_return`'s `lands_after_undocking`) | at the hub's port at 1,807 s |
-| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,868 s: 432 m past the threshold, 0.07 m off the centreline, sinking 0.74 m/s |
+| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,652 s: 437 m past the threshold, 0.02 m off the centreline, sinking 0.73 m/s |
 
 ## What is in it
 

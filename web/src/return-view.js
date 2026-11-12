@@ -138,6 +138,11 @@ export function returnHud(r, s, narrow = false) {
     const dev = r.glideDev;
     lines.push(`GLIDE ${Math.abs(dev).toFixed(0)} m ${dev >= 0 ? 'above' : 'below'} the 3° path`);
   }
+  const wind = Math.hypot(r.windE || 0, r.windN || 0);
+  if (!narrow && ph >= RET_PH.terminal && ph <= RET_PH.flare && wind > 0.5) {   // the wind the crew has worked out: where it blows from
+    const from = Math.round(((Math.atan2(-r.windE, -r.windN) * 180) / Math.PI + 360) % 360);
+    lines.push(`WIND ${String(from).padStart(3, '0')}° ${wind.toFixed(0)} m/s, as the crew reckons it from air data`);
+  }
   if (r.touched > 0) {
     const off = `${Math.abs(r.tdOff).toFixed(1)} m ${r.tdOff >= 0 ? 'right' : 'left'}`;
     if (narrow) lines.push(`DOWN ${r.tdAlong.toFixed(0)} m  ${Math.abs(r.tdOff).toFixed(1)} ${r.tdOff >= 0 ? 'R' : 'L'}  ${r.tdSink.toFixed(1)} m/s`);
