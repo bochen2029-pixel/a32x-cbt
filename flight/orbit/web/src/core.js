@@ -45,8 +45,9 @@ export class Core {
     this.m._oc_controls(c.pitch, c.roll, c.yaw, c.throttle, c.tx, c.ty, c.tz, c.gear ? 1 : 0, c.brake);
   }
 
-  auto(mode) { this.m._oc_auto(mode); }
-  sas(mode) { this.m._oc_sas(mode); }
+  // A change of who flies, or of the hold, shows in the readouts at once.
+  auto(mode) { this.m._oc_auto(mode); this.read(); }
+  sas(mode) { this.m._oc_sas(mode); this.read(); }
 
   step(n) {
     if (n > 0) this.m._oc_step(n);

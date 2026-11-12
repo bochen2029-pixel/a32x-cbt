@@ -203,7 +203,7 @@ The page, which uses `flight/web`'s three.js and esbuild (`npm ci` in `flight/we
 
 ```
 node flight/orbit/web/tools/build.mjs --core flight/orbit/build-wasm/orbit_core.js --core-js flight/orbit/build-wasm/orbit_core_plain.js
-node --test flight/orbit/web/test/
+node --test flight/orbit/web/test/*.test.mjs
 ```
 
 `build-web/index.html` is the whole page in one file, about 1 MB; `build-web/page.html` is the same
