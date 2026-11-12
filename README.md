@@ -616,46 +616,115 @@ cabin: fans and a 400 Hz hum.
 
 | | what is heard |
 |---|---|
-| the air | wind rising with dynamic pressure; a rumble through Mach 1, and a thump crossing it; buffet past 14° of α |
-| an entry | the plasma's roar and crackle as loud as the stagnation heating (Sutton and Graves: as √ρ v³); a boom going subsonic |
-| the gear | tyres and joints, the brakes, a thud and a chirp at touchdown as hard as the sink rate, the legs' motor and lock |
+| the air | wind rising with dynamic pressure; a rumble through Mach 1, and aboard a thump crossing it; buffet past 14° of α |
+| an entry | the plasma's roar and crackle as loud as the stagnation heating (Sutton and Graves: as √ρ v³); aboard, a thump going subsonic |
+| the gear | tyres and joints, the brakes, a thud and a chirp at touchdown as hard as the sink rate (back down within 2 s, a bounce: softer, no chirp), the legs' motor and lock |
+| the drive | a thump and a knock as it lights and as it stops: lit from 1 % of thrust until under 0.3 %, so the approach's throttle, held near 5 %, lights it once |
 | docking | read from `core.dock.docked` when the docking part gives it: a clunk, the latches, a hiss as the pressures meet; a bang on a hard contact, found from a jolt with nothing pushing |
+| the flight deck | in vacuum, so all of it the structure's: below |
+| inside the Ring | the band, the hub's lobby or a lift's car, each its own room: below |
 | a crash | one heavy impact, then silence |
-| inside the Ring | a large airy room, six seconds long, its roof 300 m up; the hub quieter |
+| the tour | a soft tone, two notes a fifth apart at −30 dBFS, as each part's caption first shows; no words spoken |
 
-A camera outside hears only what the air carries to it, late by the time the sound takes (a chase camera
-70 m behind hears the drive 0.2 s late), thinned as 1 / r, its high notes taken by the distance first,
-and from where the drive is, through a head (HRTF). Past the speed of sound only a camera inside the
-drive's Mach cone hears it: in the crew's steep climb the chase camera, trailing level behind, is outside
-it and hears only the structure. Above the air nothing comes through the air at all. Time run
-faster is played 3 dB quieter at each doubling and not at all from 50×, and the moments only near real
-time.
+A camera outside hears only what the air carries to it: the drive, and the hull and the cabin as they sound
+through the skin, late by the time the sound takes (a chase camera 70 m behind hears the drive 0.2 s late),
+thinned as 1 / r, its high notes taken by the distance first, and from where the drive is, through a head
+(HRTF). Past the speed of sound only a camera inside the drive's Mach cone hears it: in the crew's steep
+climb the chase camera, trailing level behind, is outside it. The cone's surface passing the camera is
+the boom, an N-wave (a sharp rise, a fall through nothing to as far below, a sharp return) heard there and
+then, as strong as the distance to the −¾ (Whitham's far field) and the air's density's square root, 1 at
+70 m at sea level: a peak of −8 dBFS. It is found for any camera, still or riding along: `carried()` with
+the craft's velocity is the wait for what a listener hears now wherever it stands, and the cone has passed
+when it first finds one. Flying the crew's return, the chase camera crosses the cone three times between
+Mach 3.3 and 3.1 as the craft banks, a faint boom each in the thin air at 34 km, and a listener at the
+threshold of 17C would hear the cone arrive when the craft is 91 km off at 25 km, at Mach 1.14 (at
+−54 dBFS). Above the air nothing comes through the air at all. Time run faster is played 3 dB quieter at
+each doubling and not at all from 50×, and the moments only near real time.
 
-The mix is set so the drive at full power at sea level is the loudest thing: about −20 dBFS root mean
-square at the default volume (70 %), its peaks under −8 dBFS; max q −22 to −25, an entry's hottest −26,
-full power above the air −30 in the cockpit, the cabin alone −41, a crash's peak −8. Each voice's gain was
-measured by rendering it alone on an `OfflineAudioContext` in Chromium, so that one asked for 1 comes out
-at 0.1 RMS, and the same renders check that no throttle step or mute clicks, that a note swept across the
-hull's modes swells by 6 dB at most, and that the crackle's pressure leans positive outside (the measured
-signature of a rocket's), softened through the cabin's wall.
+**The flight deck.** Over the deck the craft is in vacuum, the deck's roof being open, so a camera outside
+hears nothing and the cockpit hears only what the structure carries; the deck's moments are found from its
+readouts (`orbit_deck.h`), and the jets' work from the craft's own angular acceleration.
+
+| | what is heard aboard |
+|---|---|
+| the hover | a loaded thrum, a mode of its own swelling and falling three or four times a second, as loud as the thrust through the swivel to the 0.8 power: over a pad the drive's thrust there is the craft's weight to 0.1 % |
+| the swivel | the flow turned in its duct roaring as 1 − cos of the turn; the actuators' motor and grind while it turns, as fast as it turns (15°/s at most); a lock when it stops |
+| the lift jet | a whine under the cockpit, 2.1 to 3.3 kHz, rising with its flow |
+| the roll posts | their trim flow's hiss, and a puff from the side that fires when the law asks for roll: the share of what the posts and the thrusters can give together that the roll acceleration takes |
+| the touchdown | the gear on the plating: the struts' thump and the oil in them, the plate's ring, as hard as the sink; no tyre's squeal, which is the air's |
+| the take-off | the three struts topping out as the legs leave the deck |
+
+**Inside the Ring** the air is the sea level's at 20 °C, turning with the Ring, so in its frame it is still
+and sound crosses it at 343.2 m/s. The walk's own readouts drive it: where the walker is, the floor's plan
+under the feet, the lifts, the ball. What happens near the ear comes in dry, late by its distance over the
+speed of sound and thinned as 1 / d, from where it is (through a head), and into its room's answer, which
+does not thin. Each room's answer is made from its size and surfaces: Eyring's reverberation time with the
+air's absorption by ISO 9613-1 (20 °C, 50 %), octave by octave, and noise made in the frequency domain so
+that each octave dies away at its own time; its level against a sound at a metre is the critical distance's,
+√(A / 16π).
+
+| room | volume | reverberation time, 125 Hz, 1 kHz, 4 kHz | critical distance | what else |
+|---|---|---|---|---|
+| the band, floor to roof, wall to wall, but for the deck's sector | 8.7 km³ | 109, 26, 5.3 s | 1,040 m | the roof's glass 298 m over the ear answers 1.74 s after any sound, with more energy than the band's whole diffuse answer, then the floor and the roof again at 3.49 s |
+| the hub's lobby, a drum 300 m across and 80 m long | 5.7 million m³ | 18, 4.5, 3.3 s | 64 m | its far side, a concave mirror, sends a sound back focused, 1.75 s on |
+| a lift's car, 10 m square, 3 m high, its ceiling lined | 300 m³ | 1.0, 0.44, 0.54 s | 1.5 m | boxy |
+
+So a footstep is nearly dry in the band and roomy in a car. At its diffuse field's own level the band's answer
+to a footstep is 56 dB under it, deep under the band's own hum: it is lifted 20 dB (`ROOMS.band.lift`), as
+the Moon's earthshine is lifted, so that the band's size is heard at all; even so it stays the driest. A
+room's answer is made the first time the ear is in it: a tenth of a second's work for the band.
+
+| | what is heard |
+|---|---|
+| the band | its air, all its far sounds together; the air handling; the town's hum far off, swelling and falling |
+| the canal | its water lapping in slow lumps and its bubbles, each ringing at Minnaert's frequency for its size (3.26 m/s over the radius) and rising; a line of sound, so 3 dB less each time the distance doubles, not a point's 6, heard from the nearest open water and muffled where a street or a plaza decks it over |
+| footsteps | one a stride: the cadence 1.87 steps a second at a walk and 2.85 running at one g, and, the Froude number's similarity, as g to the 0.3 at a given speed, so in the lobby's 0.03 g a walk is a slow bound; as hard as the weight's and the speed's square roots; on what the plan says is under the foot: grass (soft, dark), paving (a sharp heel), tarmac, gravel (a crunch), a bridge's hollow deck, the lobby's grip floor, a car's steel |
+| a jump | both feet and the body coming down, as hard as the fall: √(2 a h) |
+| the ball | each bounce from where it is, as hard as the fastest it fell before it turned back |
+| the lifts | the doors sliding and stopping, the brakes setting and letting go, from where they are; aboard a moving car its motor, the air in the tube and the rails' rumble rising with its speed |
+| a draught | at an open lift door: a spoke's tube is a chimney 4.7 km tall, and the least difference of warmth between its air and the band's draws a wind through a door left open in it |
+| the hub's lobby | near-silence: its vents, a low hum, no town |
+| the hatch | its latches, the seal's breath, its weight swinging shut, going in and coming back aboard |
+
+The mix is set so the drive at full power at sea level is the loudest thing: about −20 dBFS root mean square
+at the default volume (70 %), its peaks under −8 dBFS; max q −22 to −25, an entry's hottest −26, full power
+above the air −30 in the cockpit, the cabin alone −41, a crash's peak −8. Over the deck, the crew's hover
+about −40 in the cockpit at its 45 % throttle (a firm touchdown's peak −9) and nothing outside; in the Ring,
+the band −40 (a step on paving peaking at −24, on grass −27), by the canal −38, the lobby −50, a car at its
+cruise −38; a boom at 70 m peaks at −8. Each voice's gain was measured by rendering it alone on an
+`OfflineAudioContext` in Chromium, so that one asked for 1 comes out at 0.1 RMS, and the same renders check
+that no throttle step or mute clicks, that a note swept across the hull's modes swells by 6 dB at most, and
+that the crackle's pressure leans positive outside (the measured signature of a rocket's), softened through
+the cabin's wall. `web/test/sound-render.test.mjs` renders the instrument so in headless Chromium when
+Playwright is there: every cue sounds, peaks under 0 dBFS and makes no NaN; a camera outside the deck hears
+exactly nothing.
 
 Other parts play their moments through `ctx.sound`:
 
 | call | does |
 |---|---|
-| `cue(name, params)` | plays a moment: `strike` {strength, hz}, `thump` {strength, from, to, seconds}, `contact` {speed m/s}, `latch` {n}, `capture`, `release`, `hiss` {seconds, strength}, `boom` {n}, `ignition`, `shutdown`, `gear` {down}, `touchdown` {strength, screech}, `crash`, `step` {surface: grass or paving, side, weight}, `door` {open}; each also takes `delay` (s). An unknown name is refused and said once |
-| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift moving), `walk` m/s (the walker's speed; footsteps follow it), `surface` |
-| `scene(name)` | where the ear is: `flight`, `ring`, `hub`, or null to follow whoever draws the frame (the walk's frames are the Ring's) |
-| `volume(v)`, `mute(on)`, `on`, `state`, `level()` | the master, and what a test reads: whether it sounds and how loud |
+| `cue(name, params)` | plays a moment: `strike` {strength, hz}, `thump` {strength, from, to, seconds}, `contact` {speed m/s}, `latch` {n}, `capture`, `release`, `hiss` {seconds, strength}, `boom` {n}, `nwave` {strength, seconds}, `ignition`, `shutdown`, `gear` {down}, `touchdown` {strength, screech}, `pad` {strength, sink}, `liftoff`, `swivel` {strength}, `puff` {strength, side}, `crash`, `step` {surface, side, weight}, `land` {surface, strength}, `ball` {strength, distance, dir, surface}, `door` {open, distance, dir}, `brake` {aboard, distance, dir}, `hatch` {open}, `bubble` {radius, strength}, `chime`; each also takes `delay` (s). What is not a number in its range gets its default. An unknown name is refused and said once |
+| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift's motor, beside the walk's own), `walk` m/s (a walker's speed, in place of the walk's own footsteps; NaN: the walk's), `surface` |
+| `scene(name)` | where the ear is: `flight`, `ring` (the band), `hub`, `car`, or null to follow the walk's readouts, or the flight |
+| `volume(v)`, `mute(on)`, `on`, `state`, `level()`, `engine` | the master, and what a test reads: whether it sounds, how loud, the instrument |
 
 The flight's own moments (the drive lighting and stopping, the gear, a touchdown, the speed of sound,
-docking and undocking, a crash) are found from the readouts and need no call.
+docking and undocking, a crash, the cone passing an outside camera), the deck's and the walk's are found
+from the readouts and need no call. While the walk draws the frame its readouts are the sound's, from the
+sound's own frame (the walk calls the other parts' updates for the sky, and the sound leaves those to it).
+
+What is weak. The rooms are statistical (Eyring's diffuse field), not traced: the band's nearer buildings,
+its spokes and the deck's bulkheads give no early reflections of their own, and its low notes ring for a
+minute or two where its answer is cut at 8 s. The materials stand for what the drawing shows. The walk's
+sounds come from the walker's spoke's lift only, and a ball bounces only off floors (not the blocks'
+walls). The boom's strength is a rule of scale, not Carlson's whole method, and no view yet stands on the
+ground to hear the flight home's.
 
 ### The tour
 
 For whoever has no stick, or wants to see the whole of it first: TOUR (or 0) flies the loop by the crew's
-own modes, as a person pressing the buttons would, with a caption for each part and the time warp and
-the view set for it:
+own modes, as a person pressing the buttons would, with a caption for each part (and a soft tone as it
+first shows) and the time warp and the view set for it:
 1. The take-off from 17C at one to one, and the climb through the air.
 2. The guidance above the air, and orbit.
 3. Docking at the hub, seen from the Ring for the last of it.
