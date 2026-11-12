@@ -83,10 +83,10 @@ enum {
     OC_BETA_DEG,
     OC_G,         /* felt acceleration, g */
     OC_VORB,      /* m/s, inertial */
-    OC_APO,       /* m above the sphere; the highest point of the present orbit */
+    OC_APO,       /* m above the sphere; the highest point of the present orbit; 1e12 on an escape path */
     OC_PERI,      /* m above the sphere; negative while the path still meets the ground */
     OC_INC_DEG,
-    OC_T_APO,     /* s to the highest point */
+    OC_T_APO,     /* s to the highest point; 0 on an escape path */
     OC_THROTTLE,  /* 0..1, what the engine is giving */
     OC_PROP,      /* kg of propellant left */
     OC_MASS,      /* kg */
