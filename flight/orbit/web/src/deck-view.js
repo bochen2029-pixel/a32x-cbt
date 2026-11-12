@@ -3,11 +3,11 @@
 // control); taking the controls from the crew over the deck gives the pilot that hold, not the plain one. It
 // adds the pads, their lights and the deck's markings, which turn with the Ring; the swivelling nozzles, the
 // lift jet's and the roll posts' glow on the craft; the deck's lines on the HUD and the status line; the
-// approach display (the deck's ILS needles, the flight director, the hover's plan and a height tape); a chase
-// view that rides with the deck, its up the Ring's axis-ward, so that the floor rises ahead like a ramp; and
-// the touchdown's and the swivel's sounds. The deck itself is the core's (core/deck.cpp, orbit_deck.h); the
-// words and the display's layout are deck-hud.js's. The deck's structure (the roof's gap, the bulkheads, the
-// deck's surface) is the Ring's drawing's. GPLv3.
+// approach display (the deck's ILS needles, the flight director, the hover's plan and a height tape); and a
+// chase view that rides with the deck, its up the Ring's axis-ward, so that the floor rises ahead like a ramp.
+// The deck itself is the core's (core/deck.cpp, orbit_deck.h); the words and the display's layout are
+// deck-hud.js's; its sounds are found from its readouts by sound.js. The deck's structure (the roof's gap,
+// the bulkheads, the deck's surface) is the Ring's drawing's. GPLv3.
 
 import * as THREE from 'three';
 import { AUTO, RING, SAS } from './core.js';
@@ -226,7 +226,7 @@ export const deck = {
 
   init(ctx) {
     this.d = ctx.core.addBlock('deck', '_oc_deck_out', '_oc_deck_out_len', DECK_OUT);
-    this.seen = { tdT: this.d.tdT, nozzle: this.d.nozzle, moving: 0, phase: Math.round(this.d.phase) };
+    this.seen = { tdT: this.d.tdT, phase: Math.round(this.d.phase) };
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.marks = deckMarks();
     ctx.ring.spin.add(this.marks.group);
@@ -301,8 +301,7 @@ export const deck = {
     // the touchdown, and the crew handing the craft over on the deck
     if (d.tdT !== this.seen.tdT) {
       if (d.tdT > 0 && Math.round(d.tdVerdict) !== DECK_V.crashed) {
-        ctx.say(touchdownText(d));
-        if (ctx.sound && ctx.sound.cue) ctx.sound.cue('touchdown', { strength: Math.min(1, 0.25 + d.tdSink / 2), screech: 0 });
+        ctx.say(touchdownText(d));   // heard from the readouts (sound.js): the gear on the plating
       }
       this.seen.tdT = d.tdT;
     }
@@ -314,12 +313,8 @@ export const deck = {
       }
       this.seen.phase = phase;
     }
-    // the swivel's actuators, heard as they start
-    const turning = Math.abs(d.nozzle - this.seen.nozzle) > 0.05;
-    if (turning && !this.seen.moving && ctx.sound && ctx.sound.cue && ctx.state.warp <= 2) ctx.sound.cue('hiss', { seconds: 0.6, strength: 0.25 });
-    this.seen.moving = turning ? 1 : 0;
-    this.seen.nozzle = d.nozzle;
-    // the swivel and the jets on the craft
+    // the swivel and the jets on the craft (the swivel's actuators, the jets and the gear are heard from the
+    // readouts, sound.js)
     const nz = d.nozzle * D2R, thrust = s.throttle, jet = thrust * Math.sin(nz);
     const swivelled = d.nozzle > 2;
     for (const [k, duct] of this.jet.ducts.entries()) {
