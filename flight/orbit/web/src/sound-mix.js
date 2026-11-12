@@ -324,8 +324,8 @@ export function mix(i, out) {
   // where the ear is: aboard, or with a camera outside
   const outside = num(i.outside) > 0.5;
   const heard = sat(num(i.heard)), path = Math.max(0, num(i.path));
-  out.hullView = flight ? (outside ? 0.5 : 1) : 0;
-  out.cabinView = flight ? (outside ? 0.45 : 1) : 0;
+  out.hullView = flight ? (outside ? 0.5 * air : 1) : 0;    // a camera outside hears the craft only through the air
+  out.cabinView = flight ? (outside ? 0.45 * air : 1) : 0;
   out.jetAboard = flight && !outside ? 1 - smooth(0.6, 1.0, mach) : 0;   // the cabin is ahead of the drive
   out.skinAboard = flight && !outside ? 1 : 0;
   const reach = heard > 0 && Number.isFinite(i.delay) && i.delay >= 0 && i.delay <= MAX_DELAY;

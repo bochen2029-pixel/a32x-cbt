@@ -11,7 +11,8 @@
 //   frame(ctx, dt)       then, each frame: step and draw it
 // A feature imports three.js itself (so the page's bundle keeps only what is used).
 // ctx is main.js's: the core and its readouts (ctx.s), the renderer, the camera, the two scenes (near,
-// far), the craft, the ring, the airport, the Earth, the input, say(text), the page's state, and each
+// far), the craft, the ring, the airport, the Earth, the input, say(text), command(name) to give a command
+// as a button would, the page's state, and each
 // frame the camera's place (ctx.cam, site frame, doubles), rel(sitePoint) -> three.js offset from it,
 // the body axes (ctx.axes), the craft's place (ctx.P), now and dt.
 
@@ -21,6 +22,8 @@ import { map } from './map.js';
 import { ret } from './return-view.js';
 import { sky } from './sky.js';
 import { sound } from './sound.js';
+import { tour } from './tour.js';
 import { walk } from './walk-view.js';
 
-export const FEATURES = [sky, dock, ret, walk, map, deck, sound];
+// The tour comes first: it sees every command before the others, so anyone's command can end it.
+export const FEATURES = [tour, sky, dock, ret, walk, map, deck, sound];

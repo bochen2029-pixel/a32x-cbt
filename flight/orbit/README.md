@@ -36,10 +36,12 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | O | Start | skip ahead to orbit |
 | , . | bumpers | time slower, faster (up to 100×) |
 | V | B | view: chase, cockpit, from the Ring |
+| F | | the Moon through a telescope, and back |
 | drag, wheel | | look round the craft, zoom |
 | H, Backspace | | help, start again |
 | N | | the map: the orbit, the Ring close to, the ground track; shift-N the next of them |
 | Y | | sound off, on (it starts on the first key or tap) |
+| 0 | | the tour: the whole loop flown by the crew, with words; any key or button takes over |
 
 On a touch screen: a stick under the left thumb, a throttle under the right, and the buttons.
 
@@ -63,6 +65,8 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | the Ring | 25.0 km ahead, closing at 0.3 m/s |
 | the crew's approach | 729 s to the hold point, 300 m off the hub's port, on the small thrusters |
 | one revolution | 5,669 s, Kepler's period for the orbit to 0.02 s |
+| the crew docks, from orbit (`test_return`'s `lands_after_undocking`) | at the hub's port at 1,807 s |
+| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,868 s: 432 m past the threshold, 0.07 m off the centreline, sinking 0.74 m/s |
 
 ## What is in it
 
@@ -75,7 +79,7 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | control | a rate loop by dynamic inversion, inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give | ours |
 | the crew | take-off, climb, a pitch schedule through the air, then a cut-down version of the Shuttle's powered explicit guidance: the sine of the thrust's elevation linear in time, solved each step so that the burn ends at the Ring's height with no climb left and a round orbit's speed | ours, after the Shuttle's method |
 | the Ring | 5 km in radius, a 1 km band, spinning at 0.0443 rad/s for 1 g at the floor; a roof 300 m above it, six spokes, a hub with its port 350 m out along the axis. In a round 500 km orbit in the crew's plane, 25 km ahead of where the crew arrives: the core flies the crew once at reset to find that place. Its axis is fixed among the stars, as a spinning wheel's is | ours |
-| the Sun | 12 November at 1 pm local solar time at the start (declination −17.9°), fixed among the stars for the flight | ours |
+| the Sun, the Moon and the stars | where they really are on 12 November 2026 from 19:00 UTC, one in the afternoon at KDFW, or on another date; they move with the flight's clock. The Moon's face painted from the real maria and craters; 8,615 real stars ("The Sun and the Moon", below) | Meeus's methods; the IAU's Gazetteer; Wikidata |
 | the globe | drawn per pixel: each ray meets the sphere exactly, so it is as round from the runway as from orbit; Natural Earth's coastlines and lakes; a single-scattering atmosphere; land coloured by latitude and a few desert boxes, clouds made up, a clear day over Texas | Natural Earth's coastlines; the rest ours |
 | KDFW | `flight/web`'s drawing of the field, unchanged | `docs/provenance.md`, 1f |
 
@@ -258,15 +262,230 @@ None of them describes a real aircraft, ship or station.
 
 ### The walk
 
-To come.
+Off the craft, through the hatch into the hub, down a spoke in a lift, and out onto a floor that curves up
+ahead and behind until it meets itself overhead. The walk has its own core, `core/walk.cpp` (`orbit_walk.h`),
+on the flight's fixed steps, and its own page, `web/src/walk-view.js`, which draws the whole frame while
+walking. **Enter** (or WALK) starts it when the craft is docked at the hub; until docking is built, add
+`?walk` to the address (`?walk=lift` starts in lift 1's car, `?walk=floor` on the floor by it). At the
+hatch, **E** goes back aboard and the flight returns.
+
+| keys | gamepad | touch | does |
+|---|---|---|---|
+| W S, ↑ ↓; A D | left stick | the stick | walk; step aside |
+| ← →, drag, or a click to hold the mouse (Esc lets go) | right stick | drag | turn and look |
+| Shift | B | RUN | run |
+| Space | A | JUMP | jump |
+| E, Enter | X | USE, WALK | ride a lift, call one, go back aboard at the hatch |
+| F, G | Y | BALL | drop a ball; throw one |
+| , . | bumpers | TIME − + | time 1× to 50× (the lift takes 5½ minutes) |
+| Backspace, H | | RESTART, HELP | back to the hatch; help |
+
+The physics is the ring's turning frame and nothing else: a body in it feels the centrifugal pull ω²r
+outward and Coriolis's −2ω×v, and whatever holds it. Seen from outside, a body let go goes straight, and the
+tests (`test/test_walk.cpp`) work each motion out again that way and hold the two equal:
+
+| | |
+|---|---|
+| standing on the floor | 1.0004 g; at rest nothing moves in five minutes |
+| walking at 1.4 m/s | the floor pushes 1.27 % harder going spinward, 1.26 % softer against: 2ωv, and v²/r besides |
+| a 1 m jump | 0.903 s, and it comes down 53.3 mm **spinward**, on the straight line outside to 1e-9 m. On the Earth a jump lands to the west, against the spin; in the ring, up is toward the axis, so a jumper's turn about it speeds up on the way up |
+| a ball dropped from 2 m | 0.639 s, and it lands 37.7 mm antispinward of straight below |
+| a ball thrown at 12 m/s, 34° up | 14.6 m spinward, 16.7 m antispinward: lighter that way |
+| the hub's lobby, 150 m from the axis | 0.03 g. A jump is a leap of 25 m that lasts 21 s and comes down 38.5 m spinward |
+| the legs | push up to 4 m/s² on the rim; where the weight is next to nothing the soles are the limit, μ times it (the lobby's grip floor adds 1 m/s²) |
+| the lift, hub to floor | 334 s: ω²r at each height, 0.19 g at 560 m, 0.82 g at 4 km; pushed sideways at 2ωv, 1.5 m/s²; at rest at the floor at one g; up the same |
+| the floor's plan | 1,824 solid things: 1,500 low blocks, 240 parapets along the canal and across it at the bridges, the spokes' feet, the lifts' shafts |
+
+The lift's ride is chosen for its riders. Coriolis's push 2ωv is sideways and the same at any height, so the
+cruise is the speed that holds it to 1.5 m/s², 16.9 m/s. At the hub the riders weigh three hundredths of a g,
+and a car that left faster than they fall would leave them on its ceiling: it leaves, and arrives, at half
+their weight, which makes its distance from the axis a hyperbolic cosine in time. At the floor it starts and
+stops at 1 m/s². While it moves the riders hold its rail.
+
+The page draws three passes: the real sky first, the flight's own far scene (the ray-cast Earth, its air,
+the stars), from where the eye is in the site frame as the ring turns once in 142 s; then the ring's inside
+over it, far (40 m to 16 km) and near, in the ring's frame, built from the core's plan so the walker meets
+what is drawn. The floor is painted from where it is (grass, the canal's promenade, streets and bridges, the
+spokes' plazas, lanes, paths under the walls); the blocks carry storeys and windows; the roof is glass on a
+lattice with lamps along it. The Sun lights the band only where it gets in over a rim wall's top, worked out
+for each pixel, with the lattice's soft shadow: on the 12th of November it stands 23.7° out of the ring's
+plane, so the middle of the band has about 50 s of sunlight in each turn and the strip under the wall on the
+Sun's side none. A fill from the roof's lamps lights the rest, and the band's air hazes what is seen through
+it. The view leans a quarter of the way toward the felt up, so the lift's sideways push is felt.
+
+Not in the walk: people, furnishing, doors into the blocks (they are solid), water to swim in (the parapets
+keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the Earth's light, the way
+from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g).
 
 ### The flight home
 
-To come.
+**RETURN** (R) hands the craft to the crew to fly home to KDFW 17C from wherever it is in orbit: the
+insertion orbit, held off the Ring's hub (it backs away first, on the small thrusters), docked (it lets
+go of the port first), or an orbit the pilot has changed. The crew waits for a pass from which the
+runway can be reached, burns tail first, falls to the air, flies the entry nose high and banked, glides
+round a circle onto a long final from the north, and lands under power. The wait can be most of a day:
+**RETURN** again, or TO ORBIT, skips ahead to a minute before the burn. Space takes the controls at any
+point and gives them back; the crew picks the flight home up from wherever the craft is.
+
+How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
+throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the
+flight, the craft does not arrive.
+
+- **The plan.** The orbit's plane stands still among the stars while the Earth turns KDFW under it.
+  KDFW lies at almost the orbit's inclination, so it passes close to the plane once a day, under the
+  orbit's northernmost point. The entry can reach about 1,500 km either side of the plane, and from
+  21,000 to 31,000 km along the track after the burn, by how much of its lift it banks away. Within
+  1,200 km, the plan's limit, the runway is in reach for about 3½ hours either side of that daily
+  passing: four or five passes a day, and a wait of up to about 19 hours. The plan shoots a trial
+  entry, finds pass by pass the burn time that puts its end abeam the runway, then shoots the first
+  pass in reach properly, moving the burn until the shot, flown with the entry's own law, ends at the
+  gate. A pass just missed is still taken by burning at once and banking more. The plan is made again
+  every ten minutes while the craft waits.
+- **The burn.** Tail first at 30 % thrust, until the orbit's low point is 60 km: cut on the orbit
+  flown, not on a clock. 121 to 127 m/s from the round orbit.
+- **The entry.** Nose 40° above the air's flow (easing below Mach 5 to hold the lift coefficient),
+  the bank's size setting the range: every 2 s a predictor flies the rest of the entry with the core's
+  air and lift, and a corrector moves the bank until the predicted end is the gate, 200 km of path short
+  of the threshold at 800 m/s. The bank's side sets the cross-range: it reverses when the runway's
+  bearing drifts past a deadband of 8 to 12°. A feedback on the sink rate keeps the glide from skipping,
+  and the bank is held to what the equilibrium glide allows inside the limits.
+- **What it learns.** Each step it feels its own acceleration (the change in velocity, less gravity and
+  the known thrust) and compares the drag and lift in it with its model's. Two pairs of fading-memory
+  filters keep the ratios. Against the model's air, they scale the entry's predictor and law; against
+  the air data's dynamic pressure, below Mach 4, they correct the coefficients the glide and the
+  approach fly by.
+- **The terminal area.** From Mach 2.6 and about 31 km: a glide to a circle of 5 km radius that touches
+  the extended centreline 14 km north of the threshold, round it, and onto the final, the energy spent
+  by angle of attack; whole turns round the circle when too high.
+- **The approach.** The drive relit at low throttle: level until the 3° glide path comes down, then
+  down it as an airliner flies it, gear down, the speed held by the throttle; a flare from 12 m, the
+  wheels on, the nose lowered, the brakes, the nose wheel on the centreline. The lateral law feeds
+  forward the Earth's turn, which pushes a craft flying south at 100 m/s 8 mm/s² to the right.
+
+The limits (`orbit_return.h`, chosen; the guidance keeps 15 to 20 % inside them): heat 600 kW/m² at the
+stagnation point of a 1 m nose, where the skin in radiative equilibrium (emissivity 0.85) is at 1,880 K,
+about 1,600 °C, the range reinforced carbon–carbon, the Shuttle's nose cap, is made for; 2.5 g; 20 kPa
+of dynamic pressure. The heat flux is Sutton and Graves's; the readouts give it, its peak, its sum, the
+skin's temperature and a glow for the page.
+
+From the tests (`test/test_return.cpp`):
+
+| started | burn | entry interface | touchdown | heat, peak | load, peak | propellant |
+|---|---|---|---|---|---|---|
+| at insertion, 800 s | 2,675 s, 127 m/s | 4,754 s, 11,200 km out | 7,881 s, 2.0 h later | 387 kW/m², 1,683 K | 1.63 g | 1.12 t |
+| a pass just missed, 2,620 s | 2,790 s, 127 m/s | 4,869 s | 7,870 s | 412 kW/m² | 1.66 g | 1.12 t |
+| after the day's last pass, 3,700 s | 69,696 s (the runway 1,028 km off the plane) | 71,775 s | 74,679 s, 19.7 h later | 389 kW/m² | 1.65 g | 0.47 t |
+| off the Ring's hub, 1,600 s | 2,766 s, 121 m/s | 4,731 s | 7,865 s | 387 kW/m² | 1.65 g | 1.11 t |
+| the far side raised to 806 km | 71,731 s, 196 m/s | 74,198 s | 77,343 s | 387 kW/m² | 1.68 g | 1.34 t |
+
+Every one touches down 429 to 437 m past the threshold, 0.07 m left of the centreline, sinking 0.74 m/s
+at 99 to 100 m/s, and stops 2.1 km down the runway on its centreline. Peak dynamic pressure 9.0 to
+9.4 kPa. The tests also start it from six times round the day, from a lowered orbit, with the pilot
+taking the controls in the entry, the glide and on final and giving them back, and with the
+guidance's model wrong at the corners of the box below. They check that the same inputs give the same
+flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g).
+
+**Robustness.** The guidance's model of the air and the craft made wrong while the craft flies the
+core's own (`oc_return_model_error`): the density off by a factor and a wave of 12 km in height, the
+lift and drag coefficients each by a factor, all drawn at random, with the return started anywhere in
+a day. A landing counts when it touches down in the first 900 m, within 3 m of the centreline, sinking
+under 2 m/s, stops on the runway and stays inside the limits. Pools 1 and 2 were flown while the
+guidance was being built, and it was changed after them; 2026 and 2027 were drawn afterwards and flown
+once, with nothing changed since.
+
+| pool | the guidance's model wrong by, each drawn evenly | runs | landed | 95 % interval |
+|---|---|---|---|---|
+| 1, while building | density ×0.75 to 1.25 and a wave of up to 15 %; lift and drag each ×0.9 to 1.1 | 64 | 64 | 94.3–100 % |
+| 2026, held out | the same | 200 | **200** | **98.1–100 %** |
+| 2, while building | density ×0.6 to 1.4 and a wave of up to 25 %; lift and drag each ×0.8 to 1.2 | 64 | 60 | 85.0–97.5 % |
+| 2027, held out | the same | 100 | **91** | **83.8–95.2 %** |
+
+Every landing in them touches down 424 to 437 m past the threshold, 0.07 m left of the line, sinking
+0.73 to 0.74 m/s: once the approach has learned the coefficients it flies the same. Peak heat 308 to
+517 kW/m², peak load 1.49 to 2.11 g, peak dynamic pressure 10.2 kPa at most. Every run lost had a model
+whose lift over drag was off by more than a factor of 1.2 either way (×0.74 to 0.80, ×1.22 to 1.45): the
+entry's reach then fell short of where the plan, made in orbit before anything could be learned, sent
+it. In the wide pools, 118 of 118 runs with that factor within 1.2 landed; beyond it, 15 of 16 where the
+runway lay within 700 km of the plane, and 18 of 30 where it lay 1,000 km off, on the first pass of the
+day's window, the one most starts take. The plan takes the first pass in reach; preferring a nearer
+pass, one or two later, would buy margin for an hour or three of waiting.
+
+Run it: `flight/orbit/build/test_return monte_carlo <first> <count> <pool> [density wave coefficients]`
+prints a line for each run and the rate with a 95 % Wilson interval; shard a pool across processes by
+`first`.
+
+What is weak. The plan's reach (1,200 km off the plane) and its search are for round orbits and
+moderately eccentric ones: an orbit raised to 1,475 km is planned, one to 2,650 km is not. A craft
+dropped into the air beyond the entry's reach glides toward the runway and comes down short; there is
+no landing elsewhere. Every dispersed landing ends almost the same, because the entry delivers the same
+gate and the approach learns the coefficients: winds, a different runway or a failure would test the
+terminal area as the dispersions do not. The predictor knows the craft's mass exactly and has no sensor
+noise. Seen from the chase view, the trail's near end can show as pale bands against a bright limb.
 
 ### The Sun and the Moon
 
-To come.
+The flight has a date: 12 November 2026 at 19:00:00 UTC unless the address says otherwise, as
+`?date=2026-12-24T03:00Z` (UTC unless a zone is written; 1900 to 2100). That is one in the afternoon at
+KDFW, the Sun 38° up in the south-south-west and still 32° up where the crew reaches the Ring; a thin
+Moon, 11 % lit, stands 23° up in the south-south-east, 39° from the Sun. From there the sky moves with
+the flight's clock, so the Moon goes its half a degree an hour among the stars and the Sun its degree a
+day. A date the page cannot take stops it and says why.
+
+The core (`core/sky.cpp`, `orbit_sky.h`) works the sky out from J. Meeus's *Astronomical Algorithms*:
+the Sun to 0.01°, the Moon from the whole of his tables to about 10″, the Earth's sidereal time,
+precession and nutation, and the Moon's attitude by Cassini's laws, which gives its librations. It gives
+them as readouts of their own: where the Sun and the Moon are from the Earth's centre, how far, the Moon's
+pole and the middle of its near side, its phase, and the axes of J2000.0 for the stars. The eye is not at
+the Earth's centre: from the runway the Moon stands 0.83° lower than from there, and the page draws it
+from wherever the eye is. Nothing in the flight depends on the date.
+
+The page (`web/src/sky.js`):
+
+- **The Moon**, a sphere of its true angular size along the true line to it (drawn 80,000 km out, inside
+  the far pass, and scaled to match), turned as the core says, its near side to the Earth, lit by the Sun
+  at its phase, with earthshine on its night side against a dark sky. Its face is painted by code
+  (`moon-face.js`) from the IAU's Gazetteer of Planetary Nomenclature: 44 maria, lacus, sinus and paludes
+  at its outlines (two drawn here, where it gives only a box and a circle), every named crater of 8 km
+  and more on the near side (4,164) at its place and size, as a bowl and rim after Pike's measures of
+  fresh lunar craters, worn by a seeded amount, and rays from Tycho, Copernicus, Kepler, Aristarchus and
+  a dozen more. It is drawn before the Earth and its sky, which
+  hide it below the horizon and behind the Earth and lay the day's blue over it: from the runway by day
+  it is pale, as it is. **F** turns the view to it through a telescope, 1.4° across.
+- **The Sun**: its disc is the sky pass's; above the air the page adds a glare (a core, a halo over a few
+  degrees, four faint spikes and two lens ghosts), dimmed and reddened where its light grazes the air and
+  gone as the Earth covers it.
+- **The stars**, 8,615 of them to magnitude 6.5, from Wikidata, at their places for J2000.0 and turned by
+  the core's sidereal time, precession and nutation: Orion is where Orion is. Sized and tinted by their
+  magnitude and spectral class; seen by night and above the air.
+- Two lines in the readouts: the date and time, UTC, and the Sun's and the Moon's height above the
+  horizon with how much of the Moon is lit.
+
+From the tests (`test/test_sky.cpp`, `web/test/sky.test.mjs`), against the book's worked examples and
+against JPL's Horizons (DE441), which shares nothing with the book:
+
+| | the core or the page | Horizons |
+|---|---|---|
+| the Sun from KDFW, 2026-11-12 19:00 UTC | az 194.453°, el 37.968° | 194.452°, 37.968° |
+| the Moon from KDFW | az 151.806°, el 22.562°, 405,165 km from the Earth's centre | 151.804°, 22.563°, 405,192 km |
+| the Moon seen from KDFW, as the page draws it | 11.478 % lit, phase angle 140.393°, 1779.9″ across, the eye over 0.77° E 6.18° N of its globe, its pole 1.03° east of north | 11.481 %, 140.393°, 1779.9″, 0.79° E 6.21° N, 1.04° |
+| the full Moon of 2026-12-24 03:00 UTC | az 82.527°, el 43.545°, 99.88 % lit, 2034.5″ across | 82.522°, 43.543°, 99.88 %, 2034.5″ |
+| an hour of flight | the Moon 0.4940° among the stars, the Sun 0.0419° | 0.4940°, 0.0420° |
+| 2024-04-08 over KDFW, the eclipse | the centres 0.0114° apart at 18:43:21 UTC | 0.0110° at 18:42:32 |
+| 2018 to 2034 | the Moon within 7″ and 41 km, the Sun within 21″ | |
+
+What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own and
+no tone curve, as an eye adapted to it sees it, the full Moon's highlands at three quarters of white; its
+fall with phase is taken at the power 0.35, so a crescent is brighter than a camera would show it; and
+earthshine is lifted 250 times from its true ten-thousandth of sunlight, and shown only against a dark
+sky. What is not here: the planets; refraction, which lifts the Sun and the Moon half a degree at the
+horizon; the Earth's shadow on the Moon in a lunar eclipse and the Moon's on the Earth in a solar one;
+moonlight on the ground and in the night sky; the Moon's physical libration (0.04°). The plains' tones,
+the craters' wear and the rays' directions are this project's; the maria's outlines and the craters'
+places are the Gazetteer's.
+
+`web/data/moon.js` is made by `node flight/orbit/web/tools/moon.mjs <MOON_nomenclature_center_pts.dbf> <pages>`,
+and `web/data/stars.js` by `node flight/orbit/web/tools/stars.mjs <slice.csv> ...`; each tool says where its
+inputs come from.
 
 ### Graphics, from a phone to a big card
 
@@ -349,6 +568,21 @@ Other parts play their moments through `ctx.sound`:
 The flight's own moments (the drive lighting and stopping, the gear, a touchdown, the speed of sound,
 docking and undocking, a crash) are found from the readouts and need no call.
 
+### The tour
+
+For whoever has no stick, or wants to see the whole of it first: TOUR (or 0) flies the loop by the crew's
+own modes, as a person pressing the buttons would, with a caption for each part and the time warp and
+the view set for it:
+1. The take-off from 17C at one to one, and the climb through the air.
+2. The guidance above the air, and orbit.
+3. Docking at the hub, seen from the Ring for the last of it.
+4. A look round the hub's lobby, and a moment on the floor.
+5. The way home, skipping the wait for a pass, through entry, to a stop on 17C.
+
+It takes about ten minutes on a desktop. Any command but one that only changes what is shown ends it
+and takes over from there. `tour-plan.js` is the plan, pure and tested on made-up states;
+`tour.js` is the button, the caption and the commands.
+
 ### Rigour
 
 `INVARIANTS.md` writes down what the core promises, in the owner's manner from Subsim: each rule with
@@ -357,15 +591,14 @@ in orbit, work and energy on the ascent, the propellant's bookkeeping, one frame
 bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, and a
 receipt for every number. `test/test_invariants.cpp` holds them as physics, with tolerances derived from
 RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`). Its
-`// DEFECT:` lines are three invariants the core breaks today, each with a fix proposed in
-`INVARIANTS.md`; `test_invariants defects` runs them. `evidence/` keeps the receipts. Every constant and
+Three defects it found are fixed and their tests run with the rest: the hash missed fields, non-finite
+controls were taken, and an escape path's periapsis was wrong. `INVARIANTS.md` keeps what was found. `evidence/` keeps the receipts. Every constant and
 every number stated here is certified by Abacus, the owner's tool of certified arithmetic, or cited
 where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists the mismatches found.
 
 ## What is not
 
-Re-entry and landing back. The
-Ring's inside, its people, anything furnished. Terrain: the globe is smooth and the field flat. The
+The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Wind. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
 
 ## Handoff to Unreal

@@ -25,6 +25,8 @@
 // TEST: hash_covers_the_state
 // TEST: nonfinite_controls_refused
 // TEST: escape_periapsis
+// TEST: lift_from_the_windward_face
+// TEST: peg_plan_is_its_own
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
@@ -37,6 +39,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 #include <limits>
 #include <vector>
 
@@ -489,15 +492,19 @@ double wrapDeg(double d) { while (d > 180) d -= 360; while (d < -180) d += 360; 
 // approach: the site position reported, carried back through the Earth-fixed frame, is the inertial
 // position; latitude, longitude and height are that point's on the sphere; the body-to-site quaternion is
 // a unit one, its axes orthonormal and right-handed, and they give the heading, pitch and roll reported;
-// the Ring's axis and reference are unit and square; the Sun stays fixed among the stars; the core's two
+// the Ring's axis and reference are unit and square; the Sun moves among the stars only at its own pace,
+// a degree a day along the ecliptic, never faster, and does move; the core's two
 // copies of the transform (writeOut's and sitePos's) agree; and the frame comes back to itself after a
 // sidereal day. Each bound is a few unit roundoffs of the quantity. The check can fail: the Earth's turn
 // read one step late misses by metres.
 void framesRoundTrip() {
     const SiteAxes S;
     double worstPos = 0, nearestLate = 1e30, worstLat = 0, worstLon = 0, worstAlt = 0, worstQ = 0, worstAxes = 0, worstAngles = 0, worstRing = 0,
-           worstSun = 0, worstCopy = 0;
+           worstSun = 0, worstCopy = 0, sunGone = 0, sunTime = 0, t0 = 0;
     V3 sun0{0, 0, 0};
+    // The Sun's apparent motion along the ecliptic: 61.2' a day at perihelion in early January, 57.2' at
+    // aphelion in early July (the Earth's orbit, e = 0.0167: the rate goes as 1/r^2). Rad/s.
+    const double SUN_FASTEST = 1.020 * PI / 180 / 86400, SUN_SLOWEST = 0.952 * PI / 180 / 86400;
     long n = 0;
     auto check = [&]() {
         const double t = get(OC_T);
@@ -530,8 +537,11 @@ void framesRoundTrip() {
         const V3 ax{get(OC_RING_AX_E), get(OC_RING_AX_N), get(OC_RING_AX_U)}, ref{get(OC_RING_REF_E), get(OC_RING_REF_N), get(OC_RING_REF_U)};
         worstRing = std::fmax(worstRing, std::fmax(std::fabs(oc::norm(ax) - 1), std::fmax(std::fabs(oc::norm(ref) - 1), std::fabs(oc::dot(ax, ref)))) / (8 * U));
         const V3 sun{get(OC_SUN_E), get(OC_SUN_N), get(OC_SUN_U)}, sunI = S.toInertial(sun, t, false);
-        if (n == 0) sun0 = sunI;
-        worstSun = std::fmax(worstSun, oc::norm(sunI - sun0) / (16 * U));
+        if (n == 0) { sun0 = sunI; t0 = t; }
+        // the angle it has gone since the start, against the most the Sun's apparent motion allows
+        sunGone = std::atan2(oc::norm(oc::cross(sun0, sunI)), oc::dot(sun0, sunI));
+        sunTime = t - t0;
+        worstSun = std::fmax(worstSun, std::fmax(0.0, sunGone - SUN_FASTEST * sunTime) / (16 * U));
         worstCopy = std::fmax(worstCopy, std::fmax(oc::norm(oc::sitePos(oc::g.r, t) - p) / tolPos, oc::norm(oc::siteDir(oc::sunEci, t) - sun) / (8 * U)));
         ++n;
     };
@@ -557,7 +567,9 @@ void framesRoundTrip() {
     CHECK(worstQ <= 1 && worstAxes <= 1, "the site quaternion: |q| %.3g, axes %.3g bounds off", worstQ, worstAxes);
     CHECK(worstAngles <= 1, "heading, pitch and roll %.3g bounds off", worstAngles);
     CHECK(worstRing <= 1, "the Ring's axes %.3g bounds off", worstRing);
-    CHECK(worstSun <= 1, "the Sun moved among the stars: %.3g bounds", worstSun);
+    CHECK(worstSun <= 1, "the Sun outran its own pace among the stars: %.3g bounds", worstSun);
+    std::printf("  the Sun went %.5f deg among the stars in %.1f s: %.4f deg a day\n", sunGone * 180 / PI, sunTime, sunGone * 180 / PI / sunTime * 86400);
+    CHECK(sunGone >= SUN_SLOWEST * sunTime - 16 * U, "the Sun stood still among the stars: %.3g deg in %.0f s", sunGone * 180 / PI, sunTime);
     CHECK(worstCopy <= 1, "the core's two transforms part: %.3g bounds", worstCopy);
     CHECK(worstDay <= 1, "a sidereal day does not bring the frame back: %.3g bounds", worstDay);
     CHECK(nearestLate > 1, "a step late still comes back within %.3g m", nearestLate);
@@ -970,7 +982,7 @@ void ringShape() {
                 OC_HUB_PORT_M + OC_STANDOFF_M, OC_RING_WIDTH_M / 2);
 }
 
-// ---- the defects: each test states an invariant the core breaks today -----------------------------
+// ---- the defects found: each test states an invariant the core broke, fixed at the merge (a3556c9) --
 
 // The hash is the state's (orbit_core.h: "a hash of the whole state"): equal hashes, equal futures. Who
 // flies, what the hold points at and the pilot's hands all decide the future; a change of any must change
@@ -1036,6 +1048,63 @@ void nonfiniteControlsRefused() {
 
 // On a path that leaves the Earth for good, the periapsis read out is the hyperbola's, h^2/(mu (1 + e))
 // above the sphere. Today orbitOf writes the parabola's, h^2/(2 mu), which is (1 + e)/2 times as far out.
+// The air pushes a flat body away from the face it meets: the force normal to the wing (lift and the drag
+// that comes with it, less the drag at zero lift) has the sign of sin(alpha) at every angle of attack,
+// flying forward or backward, is odd in alpha, and blends with Mach without a jump. A tail slide, a flip,
+// flight backward: the wing is still pushed off its windward face. (Found by the audit of c56d77b: the
+// slender delta's potential term pointed into the windward face past 155 degrees.)
+void liftFromTheWindwardFace() {
+    double worstSign = 0, worstOdd = 0;
+    int wrong = 0;
+    for (double mach : {0.3, 0.9, 1.5, 2.5, 4.0, 6.0}) {
+        double cl0, cd0;
+        oc::liftDrag(0, mach, &cl0, &cd0);
+        for (int deg = -179; deg <= 179; ++deg) {
+            if (deg == 0) continue;
+            const double a = deg * oc::D2R;
+            double cl, cd, clm, cdm;
+            oc::liftDrag(a, mach, &cl, &cd);
+            oc::liftDrag(-a, mach, &clm, &cdm);
+            const double cn = cl * std::cos(a) + (cd - cd0) * std::sin(a);
+            if (cn * std::sin(a) <= 0) { ++wrong; worstSign = std::fmax(worstSign, std::fabs(cn)); if (wrong <= 3) std::printf("  Mach %.1f, %d deg: normal force %.3f against sin %.3f\n", mach, deg, cn, std::sin(a)); }
+            worstOdd = std::fmax(worstOdd, std::fabs(cl + clm) + std::fabs(cd - cdm));
+        }
+    }
+    std::printf("  %d angles with the normal force into the windward face (worst %.3f); odd in alpha to %.2e\n", wrong, worstSign, worstOdd);
+    CHECK(wrong == 0, "%d angles with the normal force into the windward face", wrong);
+    CHECK(worstOdd < 1e-12, "lift odd and drag even in alpha, to %.2e", worstOdd);
+}
+
+// The insertion guidance's plan is one plan: the steering it keeps (the sine of the thrust's elevation,
+// f0 + f1 t) meets its own end conditions, the vertical speed and the height at cutoff, over the burn time it
+// keeps with it. (Found by the audit of c56d77b: the burn time was updated after the solve, so the stored
+// steering belonged to another, and missed by up to 5 m/s and 164 m.)
+void pegPlanIsItsOwn() {
+    using namespace oc;
+    oc_reset(LAT, LON, HDG);
+    double worstV = 0, worstH = 0;
+    int plans = 0;
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500 && get(OC_CRASHED) == 0) {
+        oc_step(50);
+        if (get(OC_PHASE) != OC_PH_INSERT) continue;
+        const Local L = localOf(g);
+        pegSolve(g, L);
+        const double rT = RE + H_TARGET, rm = norm(g.r), vh = dot(g.v, alongTrack(g, L)), vs = L.vs;
+        const double ve = ISP * G0, mdot = T_MAX / ve, tau = (M_DRY + g.prop) / mdot, g0 = MU / (rm * rm) - vh * vh / rm;
+        const double T = g.pegT;
+        if (T <= 1) continue;
+        const double L0 = ve * std::log(tau / (tau - T)), L1 = tau * L0 - ve * T;
+        const double S0 = T * L0 - L1, J = tau * L1 - ve * T * T / 2, S1 = T * L1 - J;
+        const double B1 = g0 * T / 2 - vs, B2 = rT - rm - vs * T + g0 * T * T / 3;
+        worstV = std::fmax(worstV, std::fabs(L0 * g.pegF0 + L1 * g.pegF1 - B1));
+        worstH = std::fmax(worstH, std::fabs(S0 * g.pegF0 + S1 * g.pegF1 - B2));
+        ++plans;
+    }
+    std::printf("  %d plans: the kept steering misses its own cutoff by %.2e m/s and %.2e m at most\n", plans, worstV, worstH);
+    CHECK(plans > 100, "%d plans", plans);
+    CHECK(worstV < 1e-6 && worstH < 1e-3, "%.2e m/s, %.2e m", worstV, worstH);
+}
+
 void escapePeriapsis() {
     oc_reset(LAT, LON, HDG);
     while (get(OC_T) < 350) oc_step(1);
@@ -1071,9 +1140,11 @@ const Test tests[] = {
     {"crew_flight_finite", crewFlightFinite, false},
     {"abuse_finite", abuseFinite, false},
     {"ring_shape", ringShape, false},
-    {"hash_covers_the_state", hashCoversTheState, true},
-    {"nonfinite_controls_refused", nonfiniteControlsRefused, true},
-    {"escape_periapsis", escapePeriapsis, true},
+    {"hash_covers_the_state", hashCoversTheState, false},          // found as defects, fixed at a3556c9
+    {"nonfinite_controls_refused", nonfiniteControlsRefused, false},
+    {"escape_periapsis", escapePeriapsis, false},
+    {"lift_from_the_windward_face", liftFromTheWindwardFace, false},
+    {"peg_plan_is_its_own", pegPlanIsItsOwn, false},
 };
 
 }   // namespace

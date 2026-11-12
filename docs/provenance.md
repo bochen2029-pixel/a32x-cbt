@@ -246,7 +246,7 @@ font file ships.
 | E. C. Polhamus, *A concept of the vortex lift of sharp-edge delta wings based on a leading-edge-suction analogy*, NASA TN D-3767 (1966) | public domain, a work of the US government | the form of a slender delta's lift and drag: a potential term and a vortex term. The two constants, 2.4 and 3.0, are this project's |
 | Newtonian impact theory | textbook | the lift and drag of a surface at hypersonic speed, blended in from Mach 1.5 to 5 |
 | R. F. Jaggers, *An explicit solution to the exoatmospheric powered flight guidance and trajectory optimization problem for rocket propelled vehicles*, AIAA Guidance and Control Conference (1977): the Space Shuttle's powered explicit guidance | the paper's method | as a method: steering linear in time, solved again each step for the time still to burn, with the rocket equation's integrals for thrust over a falling mass. Cut down for this sketch, a flat-Earth gravity term falling to nothing at orbital speed; the code is ours |
-| this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the Sun's place on 12 November, the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
+| this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the flight's date (12 November 2026, 19:00 UTC), the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
 
 Each further part of the sketch keeps its own sources here, in the subsection below that names it.
 
@@ -280,15 +280,57 @@ craft that lands like this on a turning deck has never been built.
 
 #### The walk
 
-Nothing taken from outside yet.
+`flight/orbit/core/walk.cpp` and `orbit_walk.h`, `flight/orbit/web/src/walk-*.js` are ours, GPLv3.
+
+| source | licence | what is taken |
+|---|---|---|
+| Newtonian mechanics in a rotating frame: the centrifugal and Coriolis terms | textbook | as a method: the walker's and a ball's motion in the ring's frame, held by its floors. The tests work each motion out again in the frame that does not turn, where it is a straight line |
+| the classical fourth-order Runge–Kutta method | textbook | as a method: free flight in the ring's frame |
+| C. Schlick, *An Inexpensive BRDF Model for Physically-based Rendering*, Computer Graphics Forum 13(3), 1994 | the paper's method | the Fresnel term of the canal's water and the lifts' glass, as a formula |
+| this project | — | the walker's size, pace, push, friction and jump; the hub's lobby; the lifts and their ride (the sideways push held to 1.5 m/s², the hub's easing at half the riders' weight, the braking); the floor's plan (streets, the canal and its bridges, the plazas, the paths, 1,500 blocks laid out from a seeded hash); the Sun's way into the band; the roof's lattice and lamps; the fill light and the haze; the signs, canvas text in the system's fonts |
+
+The walk's physics is Newton's; its numbers are chosen, and the place is drawn by code. It describes no real
+station.
 
 #### The flight home
 
-Nothing taken from outside yet.
+`core/return.cpp`, `web/src/return-view.js`. Methods only: no code or data file is taken from any of
+these, and the code is ours.
+
+| source | licence | what is taken |
+|---|---|---|
+| K. Sutton and R. A. Graves Jr., *A general stagnation-point convective-heating equation for arbitrary gas mixtures*, NASA TR R-376 (1971) | public domain, a work of the US government | the stagnation point's heat flux, q̇ = k √(ρ / R<sub>n</sub>) V³, and its constant for the Earth's air, 1.7415 × 10⁻⁴ in SI units. The nose radius, 1 m, is ours |
+| P. Lu, "Entry guidance: a unified method", *Journal of Guidance, Control, and Dynamics* 37(3), 2014 | the paper's method | the numerical predictor-corrector: the rest of the entry flown forward with the vehicle's own model each guidance cycle, the bank's size on a profile whose one parameter is moved until the predicted miss at the entry's end is nil; the quasi-equilibrium glide as the condition a steady glide's sink rate is damped toward. Ours is simpler: the profile linear in speed (Lu's is in energy), a secant step on its start, the miss measured as path to go at a gate |
+| P. Lu, C. J. Brunner, S. J. Stachowiak, G. F. Mendeck, M. A. Tigges and C. J. Cerimele, "Verification of a fully numerical entry guidance algorithm", *Journal of Guidance, Control, and Dynamics* 40(2), 2017 | the paper's method | after it: fading-memory filters on the ratios of the sensed to the modelled lift and drag accelerations, which scale the predictor's model in flight. The memory (10 s), the threshold below which the air teaches nothing, and the second pair against the air data's dynamic pressure below Mach 4 are ours |
+| J. C. Harpold and C. A. Graves Jr., "Shuttle entry guidance", *Journal of the Astronautical Sciences* 27(3), 1979 | the paper's method | the lateral logic: the bank reverses when the bearing to the target passes a deadband that narrows as the speed falls. Our deadband, 8 to 12°, is on the bearing to where the glide joins the circle below |
+| T. E. Moore, *Space Shuttle entry terminal area energy management*, NASA TM-104744 (1991) | public domain, a work of the US government | the heading alignment circle: a circle tangent to the extended centreline, flown to and round onto the final, with the energy to spend reckoned over the path to go. Ours spends it by angle of attack and whole turns round the circle, not a speed brake, and the drive is relit for a powered final |
+| radiative equilibrium (Stefan and Boltzmann) | physics | the skin's temperature, the heat flux and the air's own temperature against εσT⁴, emissivity 0.85 (ours) |
+| E. B. Wilson, "Probable inference, the law of succession, and statistical inference", *Journal of the American Statistical Association* 22 (1927) | the paper's method | the 95 % interval on a Monte Carlo's success rate |
+| SplitMix64: G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014; S. Vigna's C version | the published algorithm; Vigna's code is public domain | the Monte Carlo's generator: its increment and its two multipliers |
+| `booster-lander-simulator`, this project's owner's 6-DOF propulsive-landing simulator | MIT | a practice, read and not ported: predictors shoot forward only, never integrating the plant back; a controller is judged by its success rate over many dispersed runs, with an interval, and development pools are kept apart from held-out pools flown once. No code taken |
+| this project | — | the plan (the pass search, the late pass taken with more bank, the burn to a 60 km low point), the entry's angle of attack schedule and its easing, the limits and their margins, the gate, the terminal area's and the approach's laws, the flare and the rollout, the feed-forward of the Earth's turn on the final, the dispersions and their boxes, the glow and the trail |
 
 #### The Sun and the Moon
 
-Nothing taken from outside yet.
+`core/sky.cpp` and `core/orbit_sky.h` are ours: the code is written from the methods below, and
+`test/test_sky.cpp` holds it to each method's worked example and to an ephemeris that shares nothing
+with them. The page's part (`web/src/sky.js`, `sky-model.js`, `moon-face.js`) is ours too: the Moon's
+face is painted by code from the Gazetteer's numbers, the stars drawn from Wikidata's, and no image of
+the Moon or the sky was copied or ships. `web/test/sky.test.mjs` holds the page's Moon, as seen from
+KDFW, to Horizons.
+
+| source | licence | what is taken |
+|---|---|---|
+| J. Meeus, *Astronomical Algorithms*, 2nd ed. (Willmann-Bell, 1998) | a textbook's methods and published constants; it prints no code | the Julian Day (ch. 7); Greenwich sidereal time (ch. 12); precession from J2000.0 (ch. 21); the mean obliquity and the nutation's four largest terms (ch. 22); the Sun by the low-accuracy method, 0.01° (ch. 25); the Moon (ch. 47): the five fundamental arguments and tables 47.A and 47.B whole, 60 terms in longitude and distance, 60 in latitude, and the additive terms, about 10″; the phase angle (ch. 48); the Moon's attitude from Cassini's laws, which gives the optical librations (ch. 53). Formulae and coefficients are written out in `sky.cpp`; the tests reproduce the book's examples 7.a, 12.a, 12.b, 21.b, 25.a, 47.a, 48.a and 53.a: its series and sums to the last digit it prints, its apparent places to an arcsecond (the book's examples carry the full nutation or a one-term shortcut, the core the four terms) |
+| M. Chapront-Touzé and J. Chapront, *The lunar ephemeris ELP 2000*, Astronomy and Astrophysics 124 (1983) | — | named for the record: the lunar theory whose principal terms the book's tables carry. Nothing is taken from the paper itself |
+| NASA/JPL Horizons (ssd.jpl.nasa.gov/horizons), ephemeris DE441, queried 2026-11-12 | a public service of the US government; nothing of it ships | the independent values the tests hold the core to, copied by value into `test_sky.cpp`: the Sun's and the Moon's apparent places, distances and place in KDFW's sky on 2026-11-12 at 19:00 and 20:00 UTC and on 2026-12-24 at 03:00 UTC, the Moon's lit fraction, phase angle, sub-Earth point and pole angle there, the local sidereal time, the Moon's lit fraction on 1969-07-20, and the Sun's and the Moon's closest approach over KDFW on 2024-04-08. Against it over 2018 to 2034 the core's Moon stays within 7″ and 41 km and its Sun within 21″. And into `sky.test.mjs`, the Moon as seen from KDFW at those three times: its lit fraction, phase angle, sub-observer point, pole angle and angular diameter |
+| Gazetteer of Planetary Nomenclature, IAU Working Group for Planetary System Nomenclature and USGS Astrogeology Science Center (planetarynames.wr.usgs.gov): the Moon's named features as a shapefile, `MOON_nomenclature_center_pts.zip` (23,845,070 bytes, SHA-256 `8093d4028a944f0db5a16a96262f1117872440edd599241df7278065f2b8a9d3`), and the pages of 42 features, downloaded 2026-11-12 | public domain: the shapefile's metadata gives its use constraints as "Public domain."; a work of the US government | packed by `web/tools/moon.mjs` into `web/data/moon.js` (the inputs' sizes and digests in its header): the outlines of 42 maria, lacus, sinus and paludes, simplified to 0.15°, and the centre and diameter of the 4,164 named craters of 8 km and more within 100° of the near side's middle; the names, centres and diameters of 40 craters treated by name (rays, dark floors). The shapefile and the pages are not in the repository |
+| Wikidata (www.wikidata.org), through its query service, 2026-11-12 | CC0 1.0 | packed by `web/tools/stars.mjs` into `web/data/stars.js` (the answers' sizes and digests in its header): the 8,615 stars with a V magnitude under 6.5, their right ascension and declination for J2000.0, their magnitude, and their spectral class, read as a B−V colour. Clusters, nebulae, galaxies, novae, supernovae, planets and entries with no spectral class are left out. The Yale Bright Star Catalogue was the first choice; HEASARC, which serves its fifth edition, says Yale or its authors may still hold its copyright, so it is not used |
+| R. J. Pike, *Size-dependence in the shape of fresh craters on the Moon*, in *Impact and Explosion Cratering* (Pergamon, 1977) | the paper's measured relations | the depth and rim height of a fresh lunar crater from its diameter: 0.196 D^1.010 and 0.036 D^1.014 km below 15 km, 1.044 D^0.301 and 0.236 D^0.399 above. How far each crater is worn is this project's |
+| H. Seeliger (1888), the Lommel–Seeliger law of a dusty surface: brightness as cos i / (cos i + cos e) | textbook | the Moon's shading, which leaves its full disc as bright at the limb as at the middle; and the law's whole-disc light at phase angle α, 1 − sin(α/2) tan(α/2) ln cot(α/4) |
+| *Allen's Astrophysical Quantities* (4th ed., A. N. Cox, ed., 2000): the Moon's magnitude with phase angle, 0.026 \|α\| + 4 × 10⁻⁹ α⁴ | published values | how much faster the real Moon fades with phase than the law alone: the ratio, held beyond 150° |
+| the IAU's radii: the Moon's mean 1,737.4 km; the Sun's nominal 695,700 km (IAU 2015 Resolution B3) | facts | the discs' sizes |
+| this project | — | the default epoch; Terrestrial Time taken as UTC + 69.184 s and UT1 as UTC; the range of dates taken, 1900 to 2100. On the page: the plains' tones and colours, the highlands' mottling, how worn each crater is, the rays (how many, how long, and their directions, a seeded draw but for Tycho's long ray to Bessel), the dark floors and the bright young craters, Reiner Gamma's swirl and the Aristarchus plateau's dark patch, and the outlines of Mare Frigoris and Mare Insularum, where the Gazetteer gives a box and a circle; the eye's adjustments (the Moon's own exposure with no tone curve, its fall with phase at the power 0.35, earthshine lifted 250 times); the Sun's glare; the stars' sizes, brightness and tints, and the spectral classes' B−V; the telescope's 1.4° |
 
 #### Graphics
 
