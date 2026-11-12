@@ -178,6 +178,10 @@ Re-entry and landing back. The
 Ring's inside, its people, anything furnished. Terrain: the globe is smooth and the field flat. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. Sound, VR, failures.
 
+## Handoff to Unreal
+
+`handoff/README.md` starts a kit for building this sketch in Unreal Engine 5.8 from cold on another machine: what it settles against the canon, the port part by part, the first slice, the licence question, and the zip to carry.
+
 ## Build and test
 
 The core and its tests, natively:
