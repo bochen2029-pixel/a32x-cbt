@@ -14,10 +14,10 @@ export const RET_OUT = [
   'phase', 'event', 'tEvent', 'range', 'cross', 'togo', 'bankCmd', 'alphaCmd', 'miss', 'reversals', 'dv', 'passes',
   'heat', 'heatPeak', 'heatLoad', 'temp', 'glow', 'load', 'loadPeak', 'qbarPeak', 'over', 'glideDev',
   'touched', 'tdSink', 'tdAlong', 'tdOff', 'tdSpeed', 'tdPitch', 'tdT', 'stopped', 'stopAlong', 'stopOff', 'propUsed', 'refused',
-  'windE', 'windN', 'reach', 'skipped', 'tdCrab',
+  'windE', 'windN', 'reach', 'skipped', 'tdCrab', 'lowered',
 ];
 export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5, terminal: 6, approach: 7, flare: 8, rollout: 9, stopped: 10 };
-export const RET_EV = { none: 0, clear: 1, burn: 2, burnEnd: 3, interface: 4, terminal: 5, touchdown: 6 };
+export const RET_EV = { none: 0, clear: 1, burn: 2, burnEnd: 3, interface: 4, terminal: 5, touchdown: 6, lower: 7 };
 export const LIMITS = { heat: 600000, load: 2.5, qbar: 20000 };   // OC_RET_HEAT_LIMIT, _LOAD_LIMIT, _QBAR_LIMIT
 export const NEAR_RING = 9000;   // m, OC_RET_NEAR_RING_M: nearer the Ring's centre the crew backs away first
 export const RET_NO = { none: 0, deck: 1, riding: 2 };   // OC_RET_NO_*: why RETURN was refused
@@ -60,7 +60,8 @@ export function skipDone(r, auto, AUTO) {
   if (auto !== AUTO.return) return 'handed back';
   const ph = Math.round(r.phase);
   if (ph !== RET_PH.wait && ph !== RET_PH.depart) return 'past the wait';
-  if (ph === RET_PH.wait && Math.round(r.event) !== RET_EV.burn) return 'no pass in reach';
+  const ev = Math.round(r.event);
+  if (ph === RET_PH.wait && ev !== RET_EV.burn && ev !== RET_EV.lower) return 'no pass in reach';
   if (ph === RET_PH.wait && r.tEvent < SKIP_UNTIL) return 'the burn is near';
   return null;
 }
@@ -76,6 +77,10 @@ export function returnStatus(r, s, { touch = false, skipping = false } = {}) {
     case RET_PH.depart:
       return { line: `HOME · LEAVING THE RING · clear in ${fmtWait(r.tEvent)}`, hint: skipping ? 'skipping ahead…' : `${k.skip} · ${k.take}` };
     case RET_PH.wait:
+      if (Math.round(r.event) === RET_EV.lower) {   // from an orbit far from round: its top lowered first
+        if (skipping) return { line: `HOME · SKIPPING · round off in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
+        return { line: `HOME · ROUNDING OFF FIRST · in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
+      }
       if (Math.round(r.event) !== RET_EV.burn) return { line: 'HOME · NO PASS WITHIN REACH YET', hint: `the crew looks again every 10 min · ${k.take}` };
       if (skipping) return { line: `HOME · SKIPPING · the burn in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
       return { line: `HOME · WAITING · the burn in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
@@ -121,6 +126,9 @@ export function returnHud(r, s, narrow = false) {
   if (!narrow && (ph === RET_PH.coast || ph === RET_PH.entry)) {
     const miss = r.miss >= 0 ? `+${fmtDistance(r.miss)}` : `−${fmtDistance(-r.miss)}`;
     lines.push(`GUIDE bank ${r.bankCmd >= 0 ? 'R' : 'L'} ${Math.abs(r.bankCmd).toFixed(0)}°   α ${r.alphaCmd.toFixed(0)}°   ${Math.round(r.reversals)} reversals   gate ${miss}`);
+  }
+  if (!narrow && ph === RET_PH.wait && Math.round(r.event) === RET_EV.lower) {
+    lines.push(`PLAN first round the orbit off: ${r.dv.toFixed(0)} m/s at its lowest point in ${fmtWait(r.tEvent)}, then a pass`);
   }
   if (!narrow && (ph === RET_PH.wait || ph === RET_PH.depart) && Math.round(r.event) === RET_EV.burn) {
     const margin = r.skipped > 0 ? ` (${Math.round(r.skipped)} short of margin)` : '';
@@ -405,6 +413,7 @@ export const ret = {
     if (this.announce && core.s.t > this.engagedAt && Math.round(r.phase) === RET_PH.wait && Math.round(core.s.auto) === ctx.AUTO.return) {
       this.announce = false;
       if (Math.round(r.event) === RET_EV.burn) ctx.say(`The crew flies home to KDFW 17C: the de-orbit burn in ${fmtWait(r.tEvent)}`);
+      else if (Math.round(r.event) === RET_EV.lower) ctx.say(`No pass soon from an orbit this far from round: the crew lowers its top first, in ${fmtWait(r.tEvent)}`);
       else ctx.say('No pass within reach from this orbit yet: the crew waits and looks again');
     } else if (Math.round(r.phase) !== RET_PH.wait) this.announce = false;
     if (this.skipping) {

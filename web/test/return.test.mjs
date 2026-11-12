@@ -40,7 +40,7 @@ test('the phases, the events and the limits are the header\'s', { skip: noThree 
   const phases = enumNames('OC_RET_PH_NONE = 0', 'OC_RET_PH_STOPPED = 10', 'OC_RET_PH_').concat('OC_RET_PH_STOPPED');
   assert.deepEqual(phases.map((n) => camel(n, 'OC_RET_PH_')), Object.keys(view.RET_PH));
   assert.deepEqual(Object.values(view.RET_PH), phases.map((_, i) => i));
-  const events = enumNames('OC_RET_EV_NONE = 0', 'OC_RET_EV_TOUCHDOWN = 6', 'OC_RET_EV_').concat('OC_RET_EV_TOUCHDOWN');
+  const events = enumNames('OC_RET_EV_NONE = 0', 'OC_RET_EV_LOWER = 7', 'OC_RET_EV_').concat('OC_RET_EV_LOWER');
   assert.deepEqual(events.map((n) => camel(n, 'OC_RET_EV_')), Object.keys(view.RET_EV));
   assert.deepEqual(view.LIMITS, { heat: define('OC_RET_HEAT_LIMIT'), load: define('OC_RET_LOAD_LIMIT'), qbar: define('OC_RET_QBAR_LIMIT') });
   assert.equal(view.NEAR_RING, define('OC_RET_NEAR_RING_M'));
@@ -88,6 +88,8 @@ test('skipping ahead stops before the burn, or when there is nothing to wait for
   assert.equal(view.skipDone({ phase: P.depart, event: E.clear, tEvent: 300 }, AUTO.return, AUTO), null);
   assert.equal(view.skipDone({ phase: P.wait, event: E.burn, tEvent: 30 }, AUTO.return, AUTO), 'the burn is near');
   assert.equal(view.skipDone({ phase: P.wait, event: E.none, tEvent: -1 }, AUTO.return, AUTO), 'no pass in reach');
+  assert.equal(view.skipDone({ phase: P.wait, event: E.lower, tEvent: 5000 }, AUTO.return, AUTO), null, 'skipping on to the burn that rounds the orbit off');
+  assert.equal(view.skipDone({ phase: P.wait, event: E.lower, tEvent: 30 }, AUTO.return, AUTO), 'the burn is near');
   assert.equal(view.skipDone({ phase: P.burn, event: E.burnEnd, tEvent: 10 }, AUTO.return, AUTO), 'past the wait');
   assert.equal(view.skipDone({ phase: P.wait, event: E.burn, tEvent: 5000 }, AUTO.off, AUTO), 'handed back');
 });
@@ -106,6 +108,7 @@ test('the status line says what the crew is doing, phase by phase', { skip: noTh
   assert.match(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { touch: true }).hint, /^RETURN again/);
   assert.equal(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { skipping: true }).line, 'HOME · SKIPPING · the burn in 1 h 02 min');
   assert.equal(view.returnStatus(flight(P.wait), air).line, 'HOME · NO PASS WITHIN REACH YET');
+  assert.equal(view.returnStatus(flight(P.wait, { event: E.lower, tEvent: 9049 }), air).line, 'HOME · ROUNDING OFF FIRST · in 2 h 30 min');
   assert.equal(view.returnStatus(flight(P.burn), air).line, 'HOME · DE-ORBIT BURN · 127 m/s');
   assert.equal(view.returnStatus(flight(P.coast, { tEvent: 1980 }), air).line, 'HOME · FALLING TO THE AIR · entry in 33:00');
   assert.equal(view.returnStatus(flight(P.entry), air).line, 'HOME · ENTRY · Mach 24 · 1240 km to go');
@@ -116,7 +119,7 @@ test('the status line says what the crew is doing, phase by phase', { skip: noTh
   // most of an orbit, half the world to go
   const longest = { [P.depart]: 3000, [P.wait]: 86000, [P.coast]: 3500 };
   for (let ph = 1; ph <= 10; ph++) {
-    for (const ev of [E.none, E.burn]) {
+    for (const ev of [E.none, E.burn, E.lower]) {
       const st = view.returnStatus(flight(ph, { event: ev, tEvent: longest[ph] ?? 600, togo: 14614000, stopAlong: 4085 }), { mach: 26, tas: 120, alt: 30000 }, { skipping: ph === 2 });
       assert.ok(st.line.length <= 46, `a phone's status line: ${st.line}`);
     }
