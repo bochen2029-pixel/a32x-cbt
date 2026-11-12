@@ -273,7 +273,8 @@ Nothing taken from outside yet.
 #### The map and the sound
 
 The sound is made as it plays from the browser's Web Audio nodes; no sound file, sample or recording
-ships. The ideas below are taken as ideas and numbers, and the code is this project's.
+ships. The map is drawn by code from the core's state and the coastlines already here. What is taken below
+is taken as ideas, numbers and methods, and the code is this project's.
 
 | source | licence | what is taken |
 |---|---|---|
@@ -281,7 +282,10 @@ ships. The ideas below are taken as ideas and numbers, and the code is this proj
 | The operator's booster-lander simulator, `DECISIONS.md` D-011 and `ui/src/audio/propagation.ts` and `crackle.ts` (at `e0e5769`), Bo Chen, 2026 | MIT | sound as an observer that writes nothing back; the delay by the time sound takes to arrive, 1 / r spreading, and the air's absorption as a lowpass whose corner falls log-linearly from 18 kHz at 150 m to 30 Hz at 20 km (its two anchors); crackle as shocklets at random, up to 900 a second at full thrust, leaning positive; a reverb whose impulse response is made in code; a panner through a head (HRTF) |
 | The operator's subsim, `spec/SPEC-dsp.md` REQ-AUDIO-005 (at `ceb0059`), Bo Chen, unpublished | none stated; an idea only | that compressed time is not played as if it were real: here quieter at each doubling and silent from 50×, not muted above 1× |
 | K. Sutton and R. A. Graves, *A general stagnation-point convective-heating equation for arbitrary gas mixtures*, NASA TR R-376 (1971) | public domain, a work of the US government | the stagnation heating k √(ρ / r) v³ with k = 1.7415 × 10⁻⁴ for air, which an entry's plasma is as loud as |
-| this project | — | the instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the Ring's room |
+| H. D. Curtis, *Orbital Mechanics for Engineering Students*, algorithms 3.3 and 3.4; D. A. Vallado, *Fundamentals of Astrodynamics and Applications* | textbook methods | the map's Kepler's problem by the universal variable: Stumpff's functions, Newton's method on Kepler's equation, the Lagrange coefficients (Curtis), and the starting guess for a hyperbola (Vallado). As methods; the code is ours |
+| W. H. Clohessy and R. S. Wiltshire, *Terminal guidance system for satellite rendezvous*, Journal of the Aerospace Sciences 27 (1960) | the paper's result | the frame that turns with a round orbit (radial, along the track, across it) that the map draws a rendezvous in; and, as a test, that a craft 1 km below drifts ahead at 3/2 n Δh |
+| Natural Earth's coastlines and lakes (above) | public domain | drawn again by the map, on its globe and its ground track, from `web/data/land.js` |
+| this project | — | the sound's instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the Ring's room. The map's views, its layout and the Ring's orbit found from the readouts |
 
 The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
 and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
