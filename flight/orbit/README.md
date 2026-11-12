@@ -352,7 +352,7 @@ From the tests (`test/test_wind.cpp`; `invariants.windy_ledger`, `invariants.win
 | the gusts 50 ft up, 48 seeds | σ_w 1.006 of 0.1 W20; σ_u 1.853 of it, the specification's 1.839 |
 | parked in a 13 m/s wind | the airspeed reads the air's speed past the craft exactly; the craft rocks on its gear at 1 cm/s |
 | still air at v − w against the wind at v | the same push, to 2 × 10⁻¹⁴ |
-| the crew to orbit through severe winds, 24 to 28 m/s on the runway | 748 to 754 s, 500.5 × 499.7 km, the same as in still air within 6 s and 0.1 km |
+| the crew to orbit through three severe days, 12 to 28 m/s on the runway | 748 to 754 s, 500.4 to 500.5 × 499.6 to 499.7 km: as in still air (753 s, 500.4 × 499.7) within 5 s and 0.1 km |
 | the ascent's work and energy in a severe wind | the ledger closes to 4.4 × 10⁻⁵ J/kg; reckoned on the velocity over the ground instead, it misses by 7 × 10⁵ |
 
 The field's numbers are the specification's where it gives them and this sketch's elsewhere (the jet, the
@@ -774,7 +774,9 @@ without the document's skeleton, for a host that wraps a page in its own.
 
 Each part's tests are `test/test_<part>.cpp`, and ctest runs each test by the name it declares in a line
 reading `// TEST: <name>` (`ctest -R dock` runs docking's). `flight/orbit/build/orbit_run 10 900` prints
-the crew's flight every 10 s for 900 s.
+the crew's flight every 10 s for 900 s. `flight/orbit/build/orbit_fingerprint` prints the state's hash and
+every readout block's digest at 3,756 marks along twelve flights: built at two commits and diffed, it shows
+whether a change moved anything (`INVARIANTS.md`, O15).
 `web/data/land.js` is made by `node flight/orbit/web/tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>`.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
