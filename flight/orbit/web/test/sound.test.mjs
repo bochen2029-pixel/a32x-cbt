@@ -193,7 +193,9 @@ test('silence where it should be: after a crash, muted, and the flight not heard
 });
 
 test('the mix is defined for anything: missing or broken readouts make silence, never NaN', () => {
-  for (const i of [{}, { thr: NaN, rho: Infinity, mach: -3, tas: undefined }, { thr: 'a', qbar: null, scene: 'x', warp: NaN }]) {
+  for (const i of [{}, { thr: NaN, rho: Infinity, mach: -3, tas: undefined }, { thr: 'a', qbar: null, scene: 'x', warp: NaN },
+    { thr: 1, nozzle: NaN, nozzleRate: Infinity, posts: 'x', postsSide: -Infinity, liftJet: null, scene: 7, canal: -1, canalPan: NaN, draught: Infinity, car: NaN, lift: -3 },
+    { scene: 3, car: Infinity, nozzle: 1e9, volume: Infinity, muted: NaN }, { scene: -2, heat: Infinity, outside: NaN, heard: NaN, delay: Infinity, path: -1 }]) {
     const m = mix(i, newMix());
     for (const k of MIX_KEYS) assert.ok(Number.isFinite(m[k]), `${k} = ${m[k]}`);
   }
@@ -287,6 +289,28 @@ test('the moments: each found once, from the readouts, and none after a jump in 
   assert.ok(Object.values(step({ crashed: 0, throttle: 1, gear: 0, onGround: 0, mach: 3 })).every((v) => v === 0), 'not lived through');
 });
 
+test('the approach and the landing: a drive held low lights once and does not stop; a bounce touches down again softly', () => {
+  const mem = newMemory(), ev = newEvents(), extra = { docked: 0, rcs: 0 };
+  const s = { t: 7500, throttle: 0, mach: 0.37, gear: 1, onGround: 0, crashed: 0, vs: -3, g: 1, qbar: 9000, tas: 125 };
+  const step = (over = {}) => { Object.assign(s, over); s.t += 0.02; return detect(mem, s, extra, ev); };
+  step();
+  const count = { ignition: 0, shutdown: 0 };
+  // the crew's approach: relit at low throttle, then wandering between 2 % and 6 % for a minute
+  for (let k = 0; k < 3000; k++) {
+    const e = step({ throttle: k < 10 ? 0 : 0.04 + 0.02 * Math.sin(k / 37) });
+    count.ignition += e.ignition ? 1 : 0;
+    count.shutdown += e.shutdown ? 1 : 0;
+  }
+  assert.deepEqual(count, { ignition: 1, shutdown: 0 }, 'lit once, never stopped');
+  assert.ok(step({ throttle: 0 }).shutdown > 0, 'cut on the ground, it stops');
+  // the touchdown, a bounce, and down again half a second later: one chirp
+  const { touchdown: first, screech } = step({ onGround: 1, vs: 0 });   // (the events are one object, filled afresh each frame)
+  assert.ok(first > 0 && screech > 0);
+  step({ onGround: 0, vs: -0.5 });
+  const again = step({ onGround: 1 });
+  assert.ok(again.touchdown > 0 && again.touchdown < first && again.screech === 0, 'softly, the tyres already turning');
+});
+
 test('the small thrusters are heard when they push: the pilot\'s hands, or the crew\'s, felt above the air', () => {
   const hands = { tx: 0, ty: -0.5, tz: 0 }, orbit = { onGround: 0, crashed: 0, throttle: 0, qbar: 0, g: 0 };
   assert.equal(thrusting(orbit, hands, true), 0.5);
@@ -330,6 +354,10 @@ test('the instrument follows every target the mix makes, and each moment and cue
   e.apply(run({ thr: 1, onGround: 1, tas: 40, mach: 0.12, qbar: 980, outside: 1 }), 0.04);
   assert.equal(sent.length - before, e.keys.length, 'after forget(), all of them');
   for (const [name, play] of Object.entries(CUES)) play(e, 1, {});
+  // whatever another part passes, a cue plays with numbers only: its defaults for what is not one
+  const junk = { strength: NaN, hz: Infinity, from: -1, to: 1e9, seconds: NaN, speed: -Infinity, n: NaN, sink: NaN, side: NaN, weight: Infinity,
+    distance: NaN, dir: [NaN, 0, 1], radius: 0, surface: 'mud', open: false, aboard: false, down: false, screech: NaN };
+  for (const [name, play] of Object.entries(CUES)) play(e, 1.5, junk);
   for (const m of ['ignition', 'shutdown', 'touchdown', 'crash', 'capture', 'release', 'latch']) e[m](2);
   e.bump(3, 1);
   e.gear(3, false);
