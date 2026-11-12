@@ -27,6 +27,7 @@
 // TEST: escape_periapsis
 
 #include "../core/orbit_core.h"
+#include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"
 #include "../core/orbit_return.h"
 #include "../core/orbit_walk.h"
@@ -75,7 +76,7 @@ double get(int i) { return oc_out()[i]; }
 const char* firstNonFinite(int* index) {
     struct Block { const char* name; const double* v; int n; };
     const Block blocks[] = {{"oc_out", oc_out(), oc_out_len()}, {"oc_dock_out", oc_dock_out(), oc_dock_out_len()},
-                            {"oc_return_out", oc_return_out(), oc_return_out_len()}};
+                            {"oc_return_out", oc_return_out(), oc_return_out_len()}, {"oc_deck_out", oc_deck_out(), oc_deck_out_len()}};
     for (const Block& b : blocks)
         for (int i = 0; i < b.n; ++i)
             if (!std::isfinite(b.v[i])) { *index = i; return b.name; }
