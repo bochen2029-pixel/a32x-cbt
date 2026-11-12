@@ -35,6 +35,8 @@ const COMMON = /* glsl */ `
   uniform vec3 uFillSky;      // the roof's lamps and the sky's light, from up
   uniform vec3 uFillGround;   // and what the floor gives back, from down
   uniform vec3 uLobbyLight;   // the lobby's lamp along its axis
+  uniform vec3 uEarth;        // toward the Earth's centre, ring frame
+  uniform vec3 uEarthLight;   // its light: the part of its face the Sun lights, as the ring sees it
   uniform vec3 uHaze;         // the band's air, lit
   uniform float uHazeDist;    // m: the air's thickness, for one part in e
 
@@ -105,6 +107,8 @@ const COMMON = /* glsl */ `
     float ndu = dot(n, up);
     if (inHub(p)) return albedo * (uLobbyLight * (0.55 + 0.45 * ndu) + vec3(0.02));
     vec3 light = mix(uFillGround, uFillSky, 0.5 + 0.5 * ndu);
+    // the Earth's light, from a disc 136 degrees wide, where it stands above the level of the floor here
+    light += uEarthLight * (0.4 + 0.6 * max(dot(n, uEarth), 0.0)) * smoothstep(-0.35, 0.35, dot(up, uEarth));
     float ndl = dot(n, uSun);
     if (ndl > 0.0 && uSunLight.r + uSunLight.g > 0.0) {
       float reach = sunReach(p + n * 0.05, uSun);
@@ -250,6 +254,7 @@ const BOX_FRAGMENT = /* glsl */ `
           albedo = mix(albedo, mix(albedo, vec3(0.05, 0.065, 0.08), 0.42), (1.0 - fade) * 0.9);
           albedo = mix(albedo, vec3(0.04, 0.05, 0.065), win * fade);
           albedo *= 1.0 - 0.3 * lines(h, 3.5, 0.06, fh) * fade;
+          albedo *= 0.7 + 0.3 * smoothstep(0.0, 1.2, h);   // darker where it meets the ground
         }
       } else {
         albedo *= 1.0 - 0.35 * max(lines(u, 20.0, 0.12, fu), lines(h, 12.5, 0.12, fh));
@@ -330,6 +335,8 @@ export function makeLight() {
     uFillSky: { value: new THREE.Vector3(0.3, 0.33, 0.37) },
     uFillGround: { value: new THREE.Vector3(0.1, 0.1, 0.09) },
     uLobbyLight: { value: new THREE.Vector3(0.9, 0.88, 0.82) },
+    uEarth: { value: new THREE.Vector3(0, -1, 0) },
+    uEarthLight: { value: new THREE.Vector3(0, 0, 0) },
     uHaze: { value: new THREE.Vector3(0.3, 0.34, 0.4) },
     uHazeDist: { value: 14000 },
   };
