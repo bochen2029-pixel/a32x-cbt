@@ -232,6 +232,26 @@ system fonts (Arial, Consolas and their kin) and falls back to the browser's own
 The sky is computed, not photographed, and the Dallas country is drawn coarsely on purpose: a 1980s
 visual system's register. Nothing here is fit for navigation.
 
+### 1h · The orbit sketch: a spaceplane, a round Earth, a ring
+
+`flight/orbit` is ours, GPLv3: a sketch made on the operator's word of 2026-11-12, outside the roadmap's
+phases (`flight/orbit/README.md`). Its core links nothing from A32NX or JSBSim; its page reads
+`flight/web`'s KDFW drawing (1f, 1g) unchanged. Every texture is painted by code; no image, model or
+font file ships.
+
+| source | licence | what is taken |
+|---|---|---|
+| Natural Earth 1:50m land and lakes, `geojson/ne_50m_land.geojson` (1,636,166 bytes, SHA-256 `e874b27a51d146452be360cafb3cc50c86001074a67d534113e6534682f9826b`) and `ne_50m_lakes.geojson` (876,018 bytes, SHA-256 `d350b75978b26fe839b797c2c529b2fb8f47fb3983c03f4964e36d5df9378a52`), from `nvkelso/natural-earth-vector` at `ca96624` (version 5.2.0-pre), downloaded 2026-11-12 | public domain: "All versions of Natural Earth raster + vector map data … are in the public domain" (its `LICENSE.md`) | the coastlines and lakes the globe is painted from: simplified to 0.03° and kept in hundredths of a degree by `flight/orbit/web/tools/land.mjs` into `web/data/land.js`, 855 land rings and 393 lakes. The GeoJSON files are not in the repository |
+| U.S. Standard Atmosphere, 1976 (NOAA, NASA and the US Air Force) | public domain, a work of the US government | the atmosphere to 86 km: its layers' base heights and lapse rates, its sea-level values and constants, as a method; the densities at 86, 120, 200 and 500 km that the core's exponentials pass through above it. The tests check the core against its tables |
+| E. C. Polhamus, *A concept of the vortex lift of sharp-edge delta wings based on a leading-edge-suction analogy*, NASA TN D-3767 (1966) | public domain, a work of the US government | the form of a slender delta's lift and drag: a potential term and a vortex term. The two constants, 2.4 and 3.0, are this project's |
+| Newtonian impact theory | textbook | the lift and drag of a surface at hypersonic speed, blended in from Mach 1.5 to 5 |
+| R. F. Jaggers, *An explicit solution to the exoatmospheric powered flight guidance and trajectory optimization problem for rocket propelled vehicles*, AIAA Guidance and Control Conference (1977): the Space Shuttle's powered explicit guidance | the paper's method | as a method: steering linear in time, solved again each step for the time still to burn, with the rocket equation's integrals for thrust over a falling mass. Cut down for this sketch, a flat-Earth gravity term falling to nothing at orbital speed; the code is ours |
+| this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the Sun's place on 12 November, the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
+
+The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
+and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
+here is fit for navigation, and none of it describes a real vehicle.
+
 ---
 
 ## 2 · Third-party dependencies
@@ -244,8 +264,8 @@ visual system's register. Nothing here is fit for navigation.
 | JSBSim's 737 and CFM56 data | `flight/` from P7, read at run time | GPL; LGPL-2.1 | no, read from the JSBSim clone |
 | JSBSim's CFM56_5 data | `flight/`: the seed of our A320's engines, six of its numbers kept in our engine file (§1e); read at run time until those engines were fitted | LGPL-2.1 | no; not read since |
 | FlyByWire A32NX | `flight/` from P6 | GPLv3 | no, cloned separately, `66021c2` |
-| Emscripten (emsdk) | `flight/`'s WebAssembly build (P7): build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
-| three.js | `flight/web`: the out-the-window view, bundled into the page at build time | MIT | no, `npm i`, `0.186.1` |
+| Emscripten (emsdk) | `flight/`'s WebAssembly build (P7), and `flight/orbit`'s: build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
+| three.js | `flight/web`: the out-the-window view, bundled into the page at build time; `flight/orbit`'s page too, from `flight/web`'s install | MIT | no, `npm i`, `0.186.1` |
 | esbuild | `flight/web` too: bundles the page and its worker | MIT | no, `npm i`, `0.28.2` |
 | MSVC (Visual Studio 2022) | `flight/launcher`: builds `A32X.exe`, whose C runtime it links in statically (§2a) | Visual Studio's; the runtime a System Library in GPLv3's sense | no, installed separately |
 
