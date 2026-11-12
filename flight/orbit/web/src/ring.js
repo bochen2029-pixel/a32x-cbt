@@ -245,8 +245,10 @@ function paintFloor(T, plan, seed) {
   for (const u of SQUARES) {
     for (const du of [0, TILE]) {
       const c = u + du;
-      box(c - SQUARE, c + SQUARE, -QUAY - 60, QUAY + 60, { albedo: [0.46, 0.44, 0.4], rough: 0.6, glow: 0.25 });
+      box(c - SQUARE, c + SQUARE, -QUAY - 60, QUAY + 60, { albedo: [0.46, 0.44, 0.4], rough: 0.6, glow: 0 });
       box(c - 40, c + 40, -CANAL, CANAL, { albedo: [0.4, 0.38, 0.35] });   // the island the lift stands on
+      // lamps across the square at night, a grid of points rather than a lit slab
+      for (let u = c - SQUARE + 10; u < c + SQUARE; u += 24) for (let v = -QUAY - 50; v < QUAY + 60; v += 24) box(u, u + 2, v, v + 2, { glow: 0.9 });
     }
   }
   p.grain(r, 0.06);

@@ -132,7 +132,10 @@ async function main() {
     env = { target, camera: new THREE.CubeCamera(1e4, 1e8, target), pmrem: new THREE.PMREMGenerator(renderer), out: null, every: settings.envEvery, n: 0 };
   }
   function updateEnv() {
-    if (!env || (env.out && ++env.n % env.every !== 0)) return;
+    // every few frames, and at once when the flight's clock has jumped (skipping ahead, a high warp)
+    const jumped = env && Math.abs(s.t - (env.t ?? -1e9)) > 30;
+    if (!env || (env.out && ++env.n % env.every !== 0 && !jumped)) return;
+    env.t = s.t;
     const autoClear = renderer.autoClear;
     renderer.autoClear = true;
     env.camera.update(renderer, far);
