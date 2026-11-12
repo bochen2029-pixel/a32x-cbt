@@ -197,6 +197,9 @@ void dockAfterStep(State& s);                                  // contact with t
 void dockWriteOut(const State& s);
 void dockHash(const State& s, unsigned& h);
 
+// sky.cpp: where the Sun and the Moon are, for the flight's date and time; sets sunEci at oc_reset.
+void skyReset(const Site& site);
+
 // FNV-1a over bytes, for the state hash
 inline void hashBytes(unsigned& h, const void* p, unsigned long n) {
     const unsigned char* b = static_cast<const unsigned char*>(p);

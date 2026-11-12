@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_library(orbit_core STATIC core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp)
+add_library(orbit_core STATIC core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp core/sky.cpp)
 target_include_directories(orbit_core PUBLIC core)
 if(MSVC)
   target_compile_options(orbit_core PRIVATE /W4)
@@ -58,14 +58,14 @@ if(EMSCRIPTEN)
       string(APPEND ORBIT_EXPORTS ",_${n}")
     endforeach()
   endforeach()
-  add_executable(orbit_core_js core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp)
+  add_executable(orbit_core_js core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp core/sky.cpp)
   set_target_properties(orbit_core_js PROPERTIES OUTPUT_NAME orbit_core SUFFIX .js)
   target_link_options(orbit_core_js PRIVATE --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createOrbitCore
     -sENVIRONMENT=web,node -sSINGLE_FILE=1 -sFILESYSTEM=0
     "SHELL:-sEXPORTED_FUNCTIONS=${ORBIT_EXPORTS}"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=HEAPF64")
   # The same core as plain JavaScript, for a host that refuses WebAssembly; the page falls back to it.
-  add_executable(orbit_core_plainjs core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp)
+  add_executable(orbit_core_plainjs core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp core/sky.cpp)
   set_target_properties(orbit_core_plainjs PROPERTIES OUTPUT_NAME orbit_core_plain SUFFIX .js)
   target_link_options(orbit_core_plainjs PRIVATE --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createOrbitCoreJs -sWASM=0
     -sENVIRONMENT=web,node -sFILESYSTEM=0
