@@ -82,9 +82,15 @@ const double V_APPROACH = 104.0;          // m/s at 33 t: on the glide path, sca
 const double ALPHA_GLIDE_MAX = 30 * D2R;  // the steepest glide the terminal area asks for
 const double FLARE_M = 12.0;              // m: wheels this high, the flare begins
 const double SINK_TOUCH = 0.5;            // m/s: the sink rate the flare ends at
-const double DEPART_NEAR = 9000.0;        // m: nearer the ring than this, back away first
+const double DEPART_NEAR = OC_RET_NEAR_RING_M;   // m: nearer the ring than this, back away first
 const double DEPART_CLEAR = 12000.0;      // m: and this far is clear
 const double DEPART_SPEED = 20.0;         // m/s
+// On the ring's far side (+axis) the page draws the hub's solar mast out along the axis to 910 m, its arrays
+// 284 m round it from 475 to 905 m, and radiators to 470 m round the hub (web/src/ring-plan.js: MAST, ARRAYS,
+// RADIATORS). The core does not collide with them, so the way out keeps clear of them: first this far from
+// the axis, then out along it, until past FAR_MAST.
+const double FAR_CLEAR = 600.0;           // m from the axis
+const double FAR_MAST = 1000.0;           // m along it
 const double LEARN_TAU = 10.0;            // s: the memory of the filters that learn the model's error
 const double LEARN_FROM = 0.3;            // m/s2 of the model's drag: thinner air than this teaches nothing
 
@@ -768,7 +774,9 @@ double glidePath(double togo) {   // m: the craft's height on the glide path, wi
 const double H_PATTERN = CROSSING_M + 3.0 + FINAL_M * 0.052407779283041196;   // the glide path's height where the turn ends
 
 // Backing away from the ring, on the small thrusters: out along the hub's axis, on the craft's side of
-// the ring, where nothing of the ring is.
+// the ring, where nothing of the ring is. On the port's side (-axis), onto the axis near it and past the
+// hold point; on the far side, out from the axis first, clear of the mast, its arrays and the radiators,
+// then along it.
 void depart(State& s, const Local& L) {
     ReturnState& R = s.ret;
     const double t = timeOf(s);
@@ -776,8 +784,14 @@ void depart(State& s, const Local& L) {
     const double along = dot(rel, ring.axis), d = norm(rel);
     const V3 away = ring.axis * (along >= 0 ? 1.0 : -1.0);
     const V3 across = rel - ring.axis * along;
+    const double off = norm(across);
     V3 want = away * clampd(0.5 + 0.02 * (std::fabs(along) - 300.0), 0.5, DEPART_SPEED);
-    if (norm(across) < 400.0) want = want - across * 0.02;   // near the axis: stay on it
+    if (along < 0) {
+        if (off < 400.0) want = want - across * 0.02;   // near the axis: stay on it
+    } else if (along < FAR_MAST && off < FAR_CLEAR) {   // the far side, among what stands round the axis: out from it, not along
+        const V3 outward = off > 1.0 ? across * (1.0 / off) : unit(cross(ring.axis, ring.normal));   // on the axis, any way square to it
+        want = outward * clampd(0.5 + 0.02 * (FAR_CLEAR + 50.0 - off), 0.5, DEPART_SPEED);
+    }
     const V3 body = irot(s.q, (want - vrel) * 0.5);
     s.rcs = {clampd(body.x, -RCS_ACC, RCS_ACC), clampd(body.y, -RCS_ACC, RCS_ACC), clampd(body.z, -RCS_ACC, RCS_ACC)};
     rateLoop(s, L, point(s, L, ringPos(t) - s.r, 1.0, 0.15));   // watching it go
@@ -980,6 +994,20 @@ void returnReset(State& s) {
     for (int i = 0; i < TAB_N; ++i) field.alphaTab[i] = alphaForLift(field.clEntry, i * 0.05, 2 * D2R, ALPHA_ENTRY);
 }
 
+// Whether RETURN may start here: not on the deck, and not near the ring while moving past it faster than
+// docking's crew would close on it (riding with the deck, or flung off it), in the frame turning with its
+// orbit; there the way out, backing away on the small thrusters, is not for the craft. 0 if it may, else
+// OC_RET_NO_*. A craft that has left the deck and is clear of the ring, or slow by it, may.
+int returnRefusal(const State& s) {
+    if (s.deck.onDeck) return OC_RET_NO_DECK;
+    if (ring.valid) {
+        const double t = timeOf(s);
+        const V3 d = s.r - ringPos(t), past = s.v - ringVel(t) - cross(ring.normal * ring.rate, d);
+        if (norm(d) < DEPART_NEAR && norm(past) > OC_DOCK_ENGAGE_SPEED) return OC_RET_NO_RIDING;
+    }
+    return OC_RET_NO_NONE;
+}
+
 // The crew picks the flight home up from wherever the craft is.
 void returnEngage(State& s) {
     ReturnState& R = s.ret;
@@ -1007,14 +1035,15 @@ void returnEngage(State& s) {
     R.bankCmd = 0;
     R.bank0 = BANK_PLAN;
     R.vRef = V_TOP;
+    const int gearUp = s.deck.onDeck || s.deck.near ? s.gear : 0;   // never off the gear with the deck under it
     if (s.crashed) R.phase = OC_RET_PH_NONE;
     else if (s.onGround) { R.phase = OC_RET_PH_ROLLOUT; s.thetaT = L.pitch; s.phiT = 0; }
     else if (o.peri > 150000.0 && o.a > 0) {
         const bool near = ring.valid && norm(s.r - ringPos(timeOf(s))) < DEPART_NEAR;
         R.phase = near ? OC_RET_PH_DEPART : OC_RET_PH_WAIT;
-        s.gear = 0;
-    } else if (L.alt >= OC_RET_INTERFACE_M) { R.phase = OC_RET_PH_COAST; R.side = R.side ? R.side : 1; s.gear = 0; }
-    else if (L.tas > V_GATE) { R.phase = OC_RET_PH_ENTRY; R.side = R.side ? R.side : 1; R.bankCmd = bankOf(s); s.gear = 0; }
+        s.gear = gearUp;
+    } else if (L.alt >= OC_RET_INTERFACE_M) { R.phase = OC_RET_PH_COAST; R.side = R.side ? R.side : 1; s.gear = gearUp; }
+    else if (L.tas > V_GATE) { R.phase = OC_RET_PH_ENTRY; R.side = R.side ? R.side : 1; R.bankCmd = bankOf(s); s.gear = gearUp; }
     else startTerminal(s);
 }
 
@@ -1204,6 +1233,7 @@ void returnWriteOut(const State& s) {
     out[OC_RET_STOP_ALONG] = R.stopAlong;
     out[OC_RET_STOP_OFF] = R.stopOff;
     out[OC_RET_PROP_USED] = R.propAtEngage - s.prop;
+    out[OC_RET_REFUSED] = R.refused;
 }
 
 void returnHash(const State& s, unsigned& h) {
@@ -1218,6 +1248,11 @@ void returnHash(const State& s, unsigned& h) {
         R.kLift, R.kDrag, R.cLift, R.cDrag, (double)R.sensed, R.rPrev[0], R.rPrev[1], R.rPrev[2], R.vPrev[0], R.vPrev[1], R.vPrev[2],
     };
     hashDoubles(h, v, sizeof v / sizeof v[0]);
+    // what was added after the first build, each nought as reset: folded in only when one is not
+    const double more[] = {(double)R.refused};
+    bool used = false;
+    for (double x : more) used = used || x != 0;
+    if (used) hashDoubles(h, more, sizeof more / sizeof more[0]);
 }
 
 }   // namespace oc

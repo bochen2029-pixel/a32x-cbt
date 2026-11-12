@@ -721,6 +721,11 @@ void oc_auto(int mode) {
         const V3 d = g.r - ringPos(t), passing = g.v - ringVel(t) - cross(ring.normal * ring.rate, d);
         if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
     }
+    // The flight home is refused on the Ring's deck and riding with it (return.cpp): who was flying flies on.
+    if (mode == OC_AUTO_RETURN) {
+        g.ret.refused = returnRefusal(g);
+        if (g.ret.refused) { writeOut(); return; }
+    }
     const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK;
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;

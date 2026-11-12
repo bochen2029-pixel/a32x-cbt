@@ -368,6 +368,13 @@ round a circle onto a long final from the north, and lands under power. The wait
 **RETURN** again, or TO ORBIT, skips ahead to a minute before the burn. Space takes the controls at any
 point and gives them back; the crew picks the flight home up from wherever the craft is.
 
+It is refused, and whoever was flying flies on, on the Ring's deck and within 9 km of the Ring's centre
+while the craft moves past it faster than 50 m/s in the frame turning with its orbit, as it does riding
+with the deck: its way out, backing away on the small thrusters, is for a craft at rest by the Ring (from
+the deck it put the belly on the deck in 0.6 s). On the Ring's far side the way out keeps 600 m from the
+axis until 1 km out along it, clear of the hub's solar mast, its arrays and the radiators the page draws
+there, which the core does not collide with.
+
 How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
 throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the
 flight, the craft does not arrive.
@@ -424,7 +431,12 @@ at 99 to 100 m/s, and stops 2.1 km down the runway on its centreline. Peak dynam
 9.4 kPa. The tests also start it from six times round the day, from a lowered orbit, with the pilot
 taking the controls in the entry, the glide and on final and giving them back, and with the
 guidance's model wrong at the corners of the box below. They check that the same inputs give the same
-flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g).
+flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g). In still air with its
+instruments exact the guidance promises more than a landing, and these tests hold it to that: the wheels
+300 to 600 m past the threshold, sinking 0.5 to 1.0 m/s (the flare's aim and twice it), and within 0.3 m
+of the centreline (the final's lateral law, 0.012 s⁻² stiff, leaves 0.3 m for a side push of 3.6 mm/s²,
+under half the Earth's turn's 8 mm/s² it feeds forward). Looser, they let through an approach that never
+learned its coefficients (264 and 727 m, 1.57 and 0.16 m/s) and one blind to the Earth's turn (0.62 m).
 
 **Robustness.** The guidance's model of the air and the craft made wrong while the craft flies the
 core's own (`oc_return_model_error`): the density off by a factor and a wave of 12 km in height, the

@@ -200,6 +200,7 @@ void pegSolve(State& s, const Local& L);   // the crew's insertion guidance: set
 // readouts block and folds its state into the hash.
 
 void returnReset(State& s);                                    // at oc_reset
+int returnRefusal(const State& s);                             // OC_RET_NO_*: why oc_auto(OC_AUTO_RETURN) may not start here; 0 if it may
 void returnEngage(State& s);                                   // oc_auto(OC_AUTO_RETURN)
 void returnCrew(State& s, const Local& L, double* throttle);   // a step's commands, flying home
 void returnAfterStep(State& s);                                // after each step, whoever flies

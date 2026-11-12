@@ -67,6 +67,10 @@ struct ReturnState {
     double tdSink, tdAlong, tdOff, tdSpeed, tdPitch, tdTime;
     int stopped;
     double stopAlong, stopOff;
+
+    // Kept since the first build. Each is nought as reset, and the hash folds them in only when one is not,
+    // so a flight that never used them hashes as it did before they were added.
+    int refused;              // OC_RET_NO_*: why RETURN was last refused
 };
 
 }   // namespace oc
