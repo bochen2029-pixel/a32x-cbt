@@ -81,6 +81,8 @@ const double SINK_TOUCH = 0.5;            // m/s: the sink rate the flare ends a
 const double DEPART_NEAR = 9000.0;        // m: nearer the ring than this, back away first
 const double DEPART_CLEAR = 12000.0;      // m: and this far is clear
 const double DEPART_SPEED = 20.0;         // m/s
+const double LEARN_TAU = 10.0;            // s: the memory of the filters that learn the model's error
+const double LEARN_FROM = 0.3;            // m/s2 of the model's drag: thinner air than this teaches nothing
 
 // ---- the field: the runway's own frame, and what is worked out once ------------------------------
 
@@ -145,18 +147,66 @@ Path circlePath(XY p, int side) {
     return {straight + HAC_R * arc + FINAL_M, {-FINAL_M + HAC_R * std::cos(theta), (HAC_R + HAC_R * std::sin(theta)) * side}, arc, d, theta};
 }
 
+// ---- the guidance's model of the air and the craft -------------------------------------------------
+// The core's own (atmosphere, liftDrag), unless a test makes it wrong: its density off by a factor and a
+// wave in height, its lift and drag coefficients by factors (oc_return_model_error). The craft always
+// flies the core's. On top, what the guidance has learned in flight: its lift and drag scaled by the
+// ratios of what the craft has felt to what the model said (learn, below). Set from the state at each
+// entry into the guidance, so a run replays.
+
+struct Model { double rho, wave, phase, lift, drag, kLift, kDrag, cLift, cDrag; };
+const Model NOMINAL{1, 0, 0, 1, 1, 1, 1, 1, 1};
+Model model = NOMINAL;
+const double WAVE_M = 12000.0;            // m: the wavelength of the density's error in height
+
+Air modelAir(double alt) {
+    Air a = atmosphere(alt);
+    a.rho *= model.rho * (1 + model.wave * std::sin(2 * PI * alt / WAVE_M + model.phase));
+    return a;
+}
+
+// The lift and drag coefficients as the guidance was given them.
+void givenCoef(double alpha, double mach, double* cl, double* cd) {
+    liftDrag(alpha, mach, cl, cd);
+    *cl *= model.lift;
+    *cd *= model.drag;
+}
+
+// With what it has learned in flight, two ways. For the laws that fly by the air data's dynamic pressure
+// (the terminal glide, the approach, the flare): the coefficients' own error, learned against the air
+// data's dynamic pressure.
+void modelCoef(double alpha, double mach, double* cl, double* cd) {
+    givenCoef(alpha, mach, cl, cd);
+    *cl *= model.cLift;
+    *cd *= model.cDrag;
+}
+
+// For the entry's law and its predictor, which reckon the dynamic pressure from the model's air, too fast
+// for air data: the ratios learned against the model's air take in its error and the coefficients' alike.
+void modelAero(double alpha, double mach, double* cl, double* cd) {
+    givenCoef(alpha, mach, cl, cd);
+    *cl *= model.kLift;
+    *cd *= model.kDrag;
+}
+
+void useModelOf(const State& s) {
+    const ReturnState& R = s.ret;
+    model = {R.errRho, R.errWave, R.errPhase, R.errLift, R.errDrag, R.kLift > 0 ? R.kLift : 1, R.kDrag > 0 ? R.kDrag : 1,
+             R.cLift > 0 ? R.cLift : 1, R.cDrag > 0 ? R.cDrag : 1};
+}
+
 // ---- the craft's lift, turned round ---------------------------------------------------------------
 
 // The angle of attack between lo and hi that gives this lift coefficient (lift rising with it there).
 double alphaForLift(double want, double mach, double lo, double hi) {
     double cl, cd;
-    liftDrag(hi, mach, &cl, &cd);
+    modelCoef(hi, mach, &cl, &cd);
     if (cl <= want) return hi;
-    liftDrag(lo, mach, &cl, &cd);
+    modelCoef(lo, mach, &cl, &cd);
     if (cl >= want) return lo;
     for (int i = 0; i < 24; ++i) {
         const double mid = 0.5 * (lo + hi);
-        liftDrag(mid, mach, &cl, &cd);
+        modelCoef(mid, mach, &cl, &cd);
         if (cl < want) lo = mid; else hi = mid;
     }
     return 0.5 * (lo + hi);
@@ -164,7 +214,7 @@ double alphaForLift(double want, double mach, double lo, double hi) {
 
 double dragOverLift(double alpha, double mach) {
     double cl, cd;
-    liftDrag(alpha, mach, &cl, &cd);
+    modelCoef(alpha, mach, &cl, &cd);
     return cd / std::fmax(cl, 1e-6);
 }
 
@@ -241,9 +291,9 @@ V3 airAccel(V3 r, V3 v, double mass, double alpha, double bank) {
     const V3 vAir = v - cross(V3{0, 0, WE}, r);
     const double tas = norm(vAir);
     if (tas < 0.5) return {0, 0, 0};
-    const Air air = atmosphere(rm - RE);
+    const Air air = modelAir(rm - RE);
     double cl, cd;
-    liftDrag(alpha, tas / air.sound, &cl, &cd);
+    modelAero(alpha, tas / air.sound, &cl, &cd);
     const V3 vhat = vAir * (1.0 / tas);
     V3 l0, right;
     windAxes(r * (1.0 / rm), vhat, V3{0, 0, 1}, &l0, &right);
@@ -254,7 +304,7 @@ V3 airAccel(V3 r, V3 v, double mass, double alpha, double bank) {
 // The same on the entry's schedule: the angle of attack by Mach, plus what the law has eased it by.
 V3 entryAccel(V3 r, V3 v, double mass, double ease, double bank) {
     const V3 vAir = v - cross(V3{0, 0, WE}, r);
-    const Air air = atmosphere(norm(r) - RE);
+    const Air air = modelAir(norm(r) - RE);
     return gravity(r) + airAccel(r, v, mass, entryAlpha(norm(vAir) / air.sound) + ease, bank);
 }
 
@@ -295,7 +345,7 @@ Law entryLaw(V3 r, V3 v, double t, double mass, double bank0, double vRef, int s
     const V3 up = r * (1.0 / rm);
     const V3 vAir = v - cross(V3{0, 0, WE}, r);
     const double tas = norm(vAir);
-    const Air air = atmosphere(rm - RE);
+    const Air air = modelAir(rm - RE);
     const double mach = tas / air.sound, qbar = 0.5 * air.rho * tas * tas;
     g.tas = tas;
     g.alt = rm - RE;
@@ -303,17 +353,17 @@ Law entryLaw(V3 r, V3 v, double t, double mass, double bank0, double vRef, int s
 
     // The angle of attack: the schedule's, eased when the air's push would pass the load's margin.
     double alpha = entryAlpha(mach), cl, cd;
-    liftDrag(alpha, mach, &cl, &cd);
+    modelAero(alpha, mach, &cl, &cd);
     const double push = qbar * S_REF / (mass * G0);
     if (push * std::hypot(cl, cd) > LOAD_SOFT) {
         double lo = 4 * D2R, hi = alpha;
         for (int i = 0; i < 20; ++i) {
             const double mid = 0.5 * (lo + hi);
-            liftDrag(mid, mach, &cl, &cd);
+            modelAero(mid, mach, &cl, &cd);
             if (push * std::hypot(cl, cd) > LOAD_SOFT) hi = mid; else lo = mid;
         }
         alpha = lo;
-        liftDrag(alpha, mach, &cl, &cd);
+        modelAero(alpha, mach, &cl, &cd);
     }
     g.alpha = alpha;
     g.load = push * std::hypot(cl, cd);
@@ -327,11 +377,11 @@ Law entryLaw(V3 r, V3 v, double t, double mass, double bank0, double vRef, int s
     const double cb = std::cos(bankProfile(bank0, vRef, tas));
     const double dV = 20.0, tas2 = tas - dV, mach2 = tas2 / air.sound;
     double cl2, cd2;
-    liftDrag(entryAlpha(mach2), mach2, &cl2, &cd2);
+    modelAero(entryAlpha(mach2), mach2, &cl2, &cd2);
     const double weigh2 = std::fmax(0.3, MU / (rm * rm) - (vh - dV) * (vh - dV) / rm);
     const double cb2 = std::cos(bankProfile(bank0, vRef, tas2));
     const double dLnRho = (std::log(weigh / weigh2) - 2 * std::log(tas / tas2) - std::log(cl / cl2) - std::log(cb / cb2)) / dV;
-    const double scale = 1000.0 / std::log(air.rho / atmosphere(rm - RE + 1000.0).rho);
+    const double scale = 1000.0 / std::log(air.rho / modelAir(rm - RE + 1000.0).rho);
     const double vdot = -qbar * S_REF * cd / mass - MU / (rm * rm) * hdot / std::fmax(tas, 1.0);
     const double sinkRef = clampd(-scale * dLnRho * vdot, -400.0, 0.0);
 
@@ -415,7 +465,7 @@ Shot shoot(Pt p, double mass, double bank0, double vRef, int bankSide, double ba
         if ((g.tas <= V_GATE && alt < 90000.0) || alt < 12000.0) { o.ok = g.tas <= V_GATE; break; }
         if (p.t - t0 > 9000.0) break;
         const V3 vAir = p.v - cross(V3{0, 0, WE}, p.r);
-        entryStep(p, mass, g.alpha - entryAlpha(norm(vAir) / atmosphere(alt).sound), bank, h);
+        entryStep(p, mass, g.alpha - entryAlpha(norm(vAir) / modelAir(alt).sound), bank, h);
     }
     o.tGate = p.t;
     o.rGate = p.r;
@@ -618,6 +668,50 @@ void plan(State& s) {
     R.tPlan = R.tBurn - t > 260.0 ? std::fmin(t + 600.0, R.tBurn - 200.0) : 1e18;   // again while it waits; a last time before the burn
 }
 
+// ---- what the craft feels ---------------------------------------------------------------------------
+// Over the step just flown, the acceleration that is neither gravity's nor the drive's: the change in
+// velocity, less gravity's pull and the known thrust, as an accelerometer would read it. Along the air's
+// velocity it is the drag, across it the lift. Each over what the model gives for the same place, speed
+// and angle of attack says how wrong the model is there, and fading-memory filters keep the ratios
+// (after Lu's FNPEG). Against the model's own air (k): what the entry's predictor scales its lift and drag
+// by, so it flies the air the craft has met. Against the air data's dynamic pressure, below Mach 4 where
+// air data can be had (c): the coefficients' own error, for the laws that fly by the air data. In flight
+// only, the wheels up.
+
+void learn(State& s, const Local& L) {
+    ReturnState& R = s.ret;
+    const bool flying = !s.onGround && !s.gear && R.phase >= OC_RET_PH_COAST && R.phase <= OC_RET_PH_FLARE;
+    if (flying && R.sensed) {
+        const double mass = M_DRY + s.prop;
+        const V3 rp{R.rPrev[0], R.rPrev[1], R.rPrev[2]}, vp{R.vPrev[0], R.vPrev[1], R.vPrev[2]};
+        const V3 drive = rot(s.q, V3{s.prop > 0 ? s.thr * T_MAX / mass : 0, 0, 0});
+        const V3 felt = (s.v - vp) * (1.0 / OC_DT) - (gravity(s.r) + gravity(rp)) * 0.5 - drive;
+        const V3 rm = (s.r + rp) * 0.5, vm = (s.v + vp) * 0.5;
+        const V3 vAir = vm - cross(V3{0, 0, WE}, rm);
+        const double tas = norm(vAir);
+        const Air air = modelAir(norm(rm) - RE);
+        double cl, cd;
+        givenCoef(L.alpha, tas / air.sound, &cl, &cd);   // before what has been learned
+        const V3 vhat = vAir * (1.0 / tas);
+        const double dFelt = -dot(felt, vhat), lFelt = norm(felt + vhat * dFelt);
+        const double b = 1 - std::exp(-OC_DT / LEARN_TAU);
+        const double kModel = 0.5 * air.rho * tas * tas * S_REF / mass;   // the model's air
+        if (kModel * cd > LEARN_FROM && kModel * cl > 0.3 * LEARN_FROM) {
+            R.kDrag += (clampd(dFelt / (kModel * cd), 0.5, 2.0) - R.kDrag) * b;
+            R.kLift += (clampd(lFelt / (kModel * cl), 0.5, 2.0) - R.kLift) * b;
+        }
+        const double kData = L.qbar * S_REF / mass;   // the air data's
+        if (L.mach < 4 && L.qbar > 2000 && kData * cl > 0.3 * LEARN_FROM) {
+            R.cDrag += (clampd(dFelt / (kData * cd), 0.5, 2.0) - R.cDrag) * b;
+            R.cLift += (clampd(lFelt / (kData * cl), 0.5, 2.0) - R.cLift) * b;
+        }
+    }
+    R.sensed = flying;
+    R.rPrev[0] = s.r.x; R.rPrev[1] = s.r.y; R.rPrev[2] = s.r.z;
+    R.vPrev[0] = s.v.x; R.vPrev[1] = s.v.y; R.vPrev[2] = s.v.z;
+    useModelOf(s);
+}
+
 // ---- flying it ------------------------------------------------------------------------------------
 
 // Fly an angle of attack and a bank about the air's velocity, with no sideslip: the attitude that does
@@ -746,7 +840,11 @@ double followPath(State& s, const Ground& g, double limit, bool mayExit) {
         if (arc < 0) arc += 2 * PI;
         R.togo = HAC_R * arc + FINAL_M + R.laps * 2 * PI * HAC_R;
     } else {
-        turn = (-0.012 * y - 0.22 * vy) / speed;
+        // Down the centreline, and against the Earth's turn: flying along it at vx, the craft is pushed to
+        // the right of its path by 2 vx WE sin(latitude), 8 mm/s2 at 100 m/s here, which would hold it
+        // 0.7 m off the line.
+        const double coriolis = 2 * WE * std::sin(site.lat) * g.vx * side;
+        turn = (-0.012 * y - 0.22 * vy - coriolis) / speed;
         R.togo = -g.p.x;
     }
     return side * clampd(std::atan(turn * speed / G0), -limit, limit);
@@ -784,7 +882,7 @@ void terminal(State& s, const Local& L) {
     // Steadied, as holding the nose's attitude steadies a glide: the path steeper than this angle of
     // attack settles at wants more of it, a shallower one less. Fast and high, most of the energy spent
     // comes out of the speed, not the height, and the settled path is that much flatter.
-    const double scale = 1000.0 / std::log(L.air.rho / atmosphere(L.alt + 1000.0).rho);
+    const double scale = 1000.0 / std::log(modelAir(L.alt).rho / modelAir(L.alt + 1000.0).rho);
     const double settle = -std::atan(dragOverLift(alpha, L.mach) / (1 + L.tas * L.tas / (2 * G0 * scale)));
     const double gamma = std::asin(clampd(L.vs / std::fmax(L.tas, 1.0), -1, 1));
     alpha = clampd(alpha + 0.6 * (settle - gamma), best - 3 * D2R, steep + 4 * D2R);
@@ -834,7 +932,7 @@ void approach(State& s, const Local& L, double* throttle) {
     const double vApp = V_APPROACH * std::sqrt(mass / 33000.0);
     const double vRef = vApp + (V_PATTERN - vApp) * clampd((R.togo - 7000.0) / 4000.0, 0, 1);
     double cl, cd;
-    liftDrag(L.alpha, L.mach, &cl, &cd);
+    modelCoef(L.alpha, L.mach, &cl, &cd);
     const double drag = L.qbar * S_REF * cd;
     const double push = clampd(0.25 * (vRef - L.tas), -2.0, 2.5);
     R.thrust = clampd(R.thrust + 0.02 * (vRef - L.tas) * OC_DT, -0.05, 0.1);
@@ -868,6 +966,9 @@ void rollout(State& s, const Local& L) {
 
 void returnReset(State& s) {
     s.ret = ReturnState{};
+    s.ret.errRho = s.ret.errLift = s.ret.errDrag = 1;
+    s.ret.kLift = s.ret.kDrag = s.ret.cLift = s.ret.cDrag = 1;
+    model = NOMINAL;
     field.sinH = std::sin(site.hdg);
     field.cosH = std::cos(site.hdg);
     double cd;
@@ -884,6 +985,17 @@ void returnEngage(State& s) {
     R.airborne = was.airborne;
     R.sinkLast = was.sinkLast;
     R.propAtEngage = s.prop;
+    R.errRho = was.errRho; R.errWave = was.errWave; R.errPhase = was.errPhase; R.errLift = was.errLift; R.errDrag = was.errDrag;
+    R.kLift = R.kDrag = R.cLift = R.cDrag = 1;
+    if (was.phase >= OC_RET_PH_BURN && was.phase <= OC_RET_PH_FLARE && !s.onGround) {
+        // Taken back on the way down, after the pilot had it: the same flight home goes on, with what it
+        // has met and learned so far.
+        R.heatPeak = was.heatPeak; R.heatLoad = was.heatLoad; R.loadPeak = was.loadPeak; R.qbarPeak = was.qbarPeak; R.over = was.over;
+        R.propAtEngage = was.propAtEngage;
+        R.dv = was.dv; R.passes = was.passes; R.crossPlan = was.crossPlan; R.reversals = was.reversals;
+        R.kLift = was.kLift; R.kDrag = was.kDrag; R.cLift = was.cLift; R.cDrag = was.cDrag;
+        R.side = was.side;
+    }
     R.tEvent = -1;
     const Local L = localOf(s);
     const Orbit o = orbitOf(s);
@@ -897,13 +1009,15 @@ void returnEngage(State& s) {
         const bool near = ring.valid && norm(s.r - ringPos(timeOf(s))) < DEPART_NEAR;
         R.phase = near ? OC_RET_PH_DEPART : OC_RET_PH_WAIT;
         s.gear = 0;
-    } else if (L.alt >= OC_RET_INTERFACE_M) { R.phase = OC_RET_PH_COAST; R.side = 1; s.gear = 0; }
-    else if (L.tas > V_GATE) { R.phase = OC_RET_PH_ENTRY; R.side = 1; R.bankCmd = bankOf(s); s.gear = 0; }
+    } else if (L.alt >= OC_RET_INTERFACE_M) { R.phase = OC_RET_PH_COAST; R.side = R.side ? R.side : 1; s.gear = 0; }
+    else if (L.tas > V_GATE) { R.phase = OC_RET_PH_ENTRY; R.side = R.side ? R.side : 1; R.bankCmd = bankOf(s); s.gear = 0; }
     else startTerminal(s);
 }
 
 void returnCrew(State& s, const Local& L, double* throttle) {
     ReturnState& R = s.ret;
+    useModelOf(s);
+    learn(s, L);
     const double t = timeOf(s);
     *throttle = 0;
     s.brake = 0;
@@ -1067,7 +1181,8 @@ void returnWriteOut(const State& s) {
     out[OC_RET_HEAT] = R.heat;
     out[OC_RET_HEAT_PEAK] = R.heatPeak;
     out[OC_RET_HEAT_LOAD] = R.heatLoad;
-    out[OC_RET_TEMP] = std::pow(R.heat / (EMISSIVITY * STEFAN), 0.25);
+    const double ambient = atmosphere(norm(s.r) - RE).temp;   // with no heating, the air's own temperature
+    out[OC_RET_TEMP] = std::pow(R.heat / (EMISSIVITY * STEFAN) + ambient * ambient * ambient * ambient, 0.25);
     out[OC_RET_GLOW] = std::pow(clampd((R.heat - 2.0e4) / 4.3e5, 0, 1), 0.6);
     out[OC_RET_LOAD] = R.load;
     out[OC_RET_LOAD_PEAK] = R.loadPeak;
@@ -1095,7 +1210,8 @@ void returnHash(const State& s, unsigned& h) {
         R.bank0, R.vRef, R.slope, (double)R.bankSide, R.bankCmd, R.alphaCmd, R.miss, R.tGuide, (double)R.cycle, (double)R.reversals,
         (double)R.side, (double)R.leg, (double)R.laps, R.arc, R.togo, R.thrust, R.glideDev,
         (double)R.airborne, R.sinkLast, (double)R.touched, R.tdSink, R.tdAlong, R.tdOff, R.tdSpeed, R.tdPitch, R.tdTime,
-        (double)R.stopped, R.stopAlong, R.stopOff,
+        (double)R.stopped, R.stopAlong, R.stopOff, R.errRho, R.errWave, R.errPhase, R.errLift, R.errDrag,
+        R.kLift, R.kDrag, R.cLift, R.cDrag, (double)R.sensed, R.rPrev[0], R.rPrev[1], R.rPrev[2], R.vPrev[0], R.vPrev[1], R.vPrev[2],
     };
     hashDoubles(h, v, sizeof v / sizeof v[0]);
 }
@@ -1110,11 +1226,21 @@ int oc_return_out_len(void) { return OC_RET_COUNT; }
 double oc_return_model_g(void) {
     using namespace oc;
     const State& s = g;
+    useModelOf(s);
     const double mass = M_DRY + s.prop;
     const Local L = localOf(s);
     const V3 air = airAccel(s.r, s.v, mass, L.alpha, bankOf(s));
     const V3 drive = rot(s.q, V3{s.prop > 0 ? s.thr * T_MAX / mass : 0, 0, 0});
     return norm(air + drive) / G0;
+}
+
+void oc_return_model_error(double rho, double wave, double phase, double lift, double drag) {
+    oc::ReturnState& R = oc::g.ret;
+    R.errRho = rho > 0 ? rho : 1;
+    R.errWave = wave;
+    R.errPhase = phase;
+    R.errLift = lift > 0 ? lift : 1;
+    R.errDrag = drag > 0 ? drag : 1;
 }
 
 }   // extern "C"

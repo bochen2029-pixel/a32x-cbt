@@ -48,6 +48,18 @@ struct ReturnState {
     double thrust;            // 0..1: the speed loop's integral
     double glideDev;          // m above the glide path
 
+    // How wrong the guidance's model of the air and the craft is (oc_return_model_error): its density the
+    // air's times errRho (1 + errWave sin(2 pi h / 12 km + errPhase)), its lift and drag coefficients the
+    // craft's times errLift and errDrag. 1, 0, 0, 1, 1: the model is the craft.
+    double errRho, errWave, errPhase, errLift, errDrag;
+
+    // What the guidance has learned of its model in flight: the lift and drag felt over the model's, each
+    // a fading-memory average, against the model's air (k) and against the air data (c); and the step
+    // before, to feel by.
+    double kLift, kDrag, cLift, cDrag;
+    int sensed;               // 1: rPrev and vPrev are the step before, gliding
+    double rPrev[3], vPrev[3];
+
     // The landing's numbers, kept whoever lands it.
     int airborne;             // 1 once off the ground: a touch only counts after it
     double sinkLast;          // m/s down, the step before
