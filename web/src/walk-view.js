@@ -65,6 +65,7 @@ function urlPlace() {
 const v = {
   on: false, core: null, world: null, cam: null, warp: 1, debt: 0, look: { heading: 0, pitch: 0 },
   prev: null, cur: null, drag: null, was: {}, pads: [], usePulse: false, touchJump: false, touchRun: false, touchBall: false,
+  pressed: new Set(),   // keys pressed since the last frame: a tap shorter than a frame still counts
   hudNext: 0, sayUntil: 0, saved: null, lean: null, toEcef: null, sun: null, ballFrom: null, ballMark: null,
 };
 
@@ -150,6 +151,14 @@ function bindPointer(canvas) {
   canvas.addEventListener('pointercancel', up);
 }
 
+function bindKeys() {
+  window.addEventListener('keydown', (e) => {
+    if (!v.on || e.repeat) return;
+    const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+    if ([' ', 'e', 'f', 'g'].includes(k)) v.pressed.add(k);
+  });
+}
+
 function bindTouch() {
   const hud = document.getElementById('hud');
   if (!hud || document.getElementById('walk-touch')) return;
@@ -183,11 +192,11 @@ function hands(ctx, dt) {
   let fwd = (on('w', 'ArrowUp') ? 1 : 0) - (on('s', 'ArrowDown') ? 1 : 0);
   let right = (on('d') ? 1 : 0) - (on('a') ? 1 : 0);
   let turn = (on('ArrowRight') ? 1 : 0) - (on('ArrowLeft') ? 1 : 0), tilt = 0;
-  let run = on('Shift') || v.touchRun, jump = on(' ') || v.touchJump, use = on('e') || v.usePulse;
-  let drop = false, toss = false;
+  const tapped = (k) => v.pressed.has(k);
+  let run = on('Shift') || v.touchRun, jump = on(' ') || tapped(' ') || v.touchJump, use = on('e') || tapped('e') || v.usePulse;
+  let drop = tapped('f'), toss = tapped('g');
+  v.pressed.clear();
   const edge = (key, now) => { const was = v.was[key]; v.was[key] = now; return now && !was; };
-  if (edge('f', on('f'))) drop = true;
-  if (edge('g', on('g'))) toss = true;
   if (v.touchBall) { drop = true; v.touchBall = false; }
   v.usePulse = false;
   const t = ctx.input.touch;
@@ -308,6 +317,7 @@ export const walk = {
 
   init(ctx) {
     bindTouch();
+    bindKeys();
     bindPointer(ctx.renderer.domElement);
     ctx.walk = { v, start: (place) => start(ctx, place), stop: (text) => stop(ctx, text) };   // for the page's tests
     const place = urlPlace();

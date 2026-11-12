@@ -94,7 +94,60 @@ To come.
 
 ### The walk
 
-To come.
+Off the craft, through the hatch into the hub, down a spoke in a lift, and out onto a floor that curves up
+ahead and behind until it meets itself overhead. The walk has its own core, `core/walk.cpp` (`orbit_walk.h`),
+on the flight's fixed steps, and its own page, `web/src/walk-view.js`, which draws the whole frame while
+walking. **Enter** (or WALK) starts it when the craft is docked at the hub; until docking is built, add
+`?walk` to the address (`?walk=lift` starts in lift 1's car, `?walk=floor` on the floor by it). At the
+hatch, **E** goes back aboard and the flight returns.
+
+| keys | gamepad | touch | does |
+|---|---|---|---|
+| W S, ↑ ↓; A D | left stick | the stick | walk; step aside |
+| ← →, drag, or a click to hold the mouse (Esc lets go) | right stick | drag | turn and look |
+| Shift | B | RUN | run |
+| Space | A | JUMP | jump |
+| E, Enter | X | USE, WALK | ride a lift, call one, go back aboard at the hatch |
+| F, G | Y | BALL | drop a ball; throw one |
+| , . | bumpers | TIME − + | time 1× to 50× (the lift takes 5½ minutes) |
+| Backspace, H | | RESTART, HELP | back to the hatch; help |
+
+The physics is the ring's turning frame and nothing else: a body in it feels the centrifugal pull ω²r
+outward and Coriolis's −2ω×v, and whatever holds it. Seen from outside, a body let go goes straight, and the
+tests (`test/test_walk.cpp`) work each motion out again that way and hold the two equal:
+
+| | |
+|---|---|
+| standing on the floor | 1.0004 g; at rest nothing moves in five minutes |
+| walking at 1.4 m/s | the floor pushes 1.27 % harder going spinward, 1.26 % softer against: 2ωv, and v²/r besides |
+| a 1 m jump | 0.903 s, and it comes down 53.3 mm **spinward**, on the straight line outside to 1e-9 m. On the Earth a jump lands to the west, against the spin; in the ring, up is toward the axis, so a jumper's turn about it speeds up on the way up |
+| a ball dropped from 2 m | 0.639 s, and it lands 37.7 mm antispinward of straight below |
+| a ball thrown at 12 m/s, 34° up | 14.6 m spinward, 16.7 m antispinward: lighter that way |
+| the hub's lobby, 150 m from the axis | 0.03 g. A jump is a leap of 25 m that lasts 21 s and comes down 38.5 m spinward |
+| the legs | push up to 4 m/s² on the rim; where the weight is next to nothing the soles are the limit, μ times it (the lobby's grip floor adds 1 m/s²) |
+| the lift, hub to floor | 334 s: ω²r at each height, 0.19 g at 560 m, 0.82 g at 4 km; pushed sideways at 2ωv, 1.5 m/s²; at rest at the floor at one g; up the same |
+| the floor's plan | 1,824 solid things: 1,500 low blocks, 240 parapets along the canal and across it at the bridges, the spokes' feet, the lifts' shafts |
+
+The lift's ride is chosen for its riders. Coriolis's push 2ωv is sideways and the same at any height, so the
+cruise is the speed that holds it to 1.5 m/s², 16.9 m/s. At the hub the riders weigh three hundredths of a g,
+and a car that left faster than they fall would leave them on its ceiling: it leaves, and arrives, at half
+their weight, which makes its distance from the axis a hyperbolic cosine in time. At the floor it starts and
+stops at 1 m/s². While it moves the riders hold its rail.
+
+The page draws three passes: the real sky first, the flight's own far scene (the ray-cast Earth, its air,
+the stars), from where the eye is in the site frame as the ring turns once in 142 s; then the ring's inside
+over it, far (40 m to 16 km) and near, in the ring's frame, built from the core's plan so the walker meets
+what is drawn. The floor is painted from where it is (grass, the canal's promenade, streets and bridges, the
+spokes' plazas, lanes, paths under the walls); the blocks carry storeys and windows; the roof is glass on a
+lattice with lamps along it. The Sun lights the band only where it gets in over a rim wall's top, worked out
+for each pixel, with the lattice's soft shadow: on the 12th of November it stands 23.7° out of the ring's
+plane, so the middle of the band has about 50 s of sunlight in each turn and the strip under the wall on the
+Sun's side none. A fill from the roof's lamps lights the rest, and the band's air hazes what is seen through
+it. The view leans a quarter of the way toward the felt up, so the lift's sideways push is felt.
+
+Not in the walk: people, furnishing, doors into the blocks (they are solid), water to swim in (the parapets
+keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the Earth's light, the way
+from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g).
 
 ### The flight home
 
