@@ -73,6 +73,12 @@ const double LATE_MAX = 500.0;            // s: how far past its best burn time 
 const double MARGIN_LD = 0.8;
 const double BANK_MARGIN_LO = 15 * D2R;   // the least bank the check moves the profile to: below it the entry's law skips
 const double MARGIN_WAIT = 3.5 * 3600.0;  // s: up to two more passes, one to three hours more of waiting
+// From an orbit far from round the burn's place along it changes where the entry ends, and a pass in reach
+// can be days away, or none. When no pass is within LOWER_WAIT and the orbit's top is LOWER_ECC above its
+// bottom, the crew lowers the top first: tail first at the next lowest point, until the orbit is round there.
+const double LOWER_WAIT = 24 * 3600.0;    // s
+const double LOWER_ECC = 200000.0;        // m
+const double LOWER_ROUND = 20000.0;       // m: round enough, the top this near the bottom
 const double V_TOP = 7400.0;              // m/s: the bank profile's top; faster than this it is bank0
 
 const double ALPHA_ENTRY = 40 * D2R;
@@ -117,7 +123,7 @@ const double ADS_TAS = 0.005;             // of the airspeed: its error, wanderi
 const double ADS_ANGLE = 0.2 * D2R;       // the angles of attack and sideslip: their error, wandering
 const double ADS_ANGLE_NOISE = 0.05 * D2R;   // and their noise, each step
 const double ADS_QBAR = 0.01;             // of the dynamic pressure: its error, wandering
-const double WIND_TAU = 5.0;              // s: the memory of the wind the guidance works out
+const double WIND_TAU = 2.0;              // s: the memory of the wind the guidance works out
 
 // ---- the field: the runway's own frame, and what is worked out once ------------------------------
 
@@ -971,6 +977,48 @@ void correct(State& s, const Local& L) {
     R.bank0 = clampd(R.bank0 - clampd(a.miss / R.slope, -6 * D2R, 6 * D2R), BANK_LO, BANK_HI);
 }
 
+// Lowering the orbit's top, from an orbit far from round: at the next lowest point, tail first at the de-orbit
+// burn's thrust, until the top is within LOWER_ROUND of where the craft is; cut on the orbit flown. Then the
+// plan is made again, from a round orbit. R.lowering: 1 waiting for the lowest point, 2 burning.
+void lower(State& s, const Local& L, double* throttle) {
+    ReturnState& R = s.ret;
+    const double t = timeOf(s), mass = massOf(s);
+    const Orbit o = orbitOf(s);
+    const V3 back = unit(s.v) * -1.0;
+    if (R.lowering == 1) {
+        if (o.a <= 0) { R.lowering = 0; return; }
+        // when the next lowest point comes, and what it takes there to round the orbit off
+        const double period = 2 * PI * std::sqrt(o.a * o.a * o.a / MU);
+        double toPeri = o.tApo + 0.5 * period;
+        if (toPeri > period) toPeri -= period;
+        const double rp = o.a * (1 - o.e), vp = std::sqrt(MU * (2 / rp - 1 / o.a)), dv = vp - std::sqrt(MU / rp);
+        R.dv = dv;
+        R.tBurn = t + toPeri - dv * mass / (2 * BURN_THROTTLE * thrustOf(s));   // centred on the lowest point
+        if (R.tBurn < t + BURN_LEAD) R.tBurn += period;   // too soon to turn tail first: the next one
+        R.lowering = 3;   // planned
+    }
+    if (R.lowering == 3) {
+        R.tEvent = R.tBurn;
+        rateLoop(s, L, point(s, L, R.tBurn - t < BURN_LEAD ? back : s.v, 1.0, 0.15));
+        if (t >= R.tBurn) R.lowering = 2;
+        return;
+    }
+    // burning, tail first, until the top is down to here
+    const double above = o.apo - (norm(s.r) - RE);
+    const bool aimed = dot(rot(s.q, V3{1, 0, 0}), back) > 0.9986;
+    *throttle = aimed ? clampd(BURN_THROTTLE * above / 100000.0, 0.02, BURN_THROTTLE) : 0;
+    rateLoop(s, L, point(s, L, back, 1.5, 0.15));
+    R.tEvent = t + std::fmax(0.0, above) / 5000.0;
+    if (above <= LOWER_ROUND || o.a <= 0 || s.prop <= 0) {
+        *throttle = 0;
+        R.lowering = 0;
+        R.lowered = 1;
+        R.planned = 0;
+        R.tPlan = 0;   // plan again now, from the round orbit
+        R.tEvent = -1;
+    }
+}
+
 void startTerminal(State& s) {
     ReturnState& R = s.ret;
     const XY p = groundOf(s).p;
@@ -1086,7 +1134,7 @@ void approach(State& s, const Local& L, double* throttle) {
     const Ground g = groundOf(s);
     const double mass = massOf(s), wheels = wheelHeight(s, L);
     const bool flare = R.phase == OC_RET_PH_FLARE;
-    const double bank = followPath(s, g, (flare ? 4 : wheels < 60.0 ? 10 : 30) * D2R, true);
+    const double bank = followPath(s, g, (flare ? 8 : wheels < 60.0 ? 10 : 30) * D2R, true);
     const double gamma = std::asin(clampd(L.vs / std::fmax(L.tas, 1.0), -1, 1));
 
     // The height to hold and the sink rate that goes with it; in the flare, the sink rate alone.
@@ -1113,8 +1161,12 @@ void approach(State& s, const Local& L, double* throttle) {
     R.bankCmd = bank;
     flyWind(s, L, R.alphaCmd, bank, 2.0, 0.3, turnRates(L, bank, lift / std::fmax(L.tas, 30.0)));
 
-    // The speed: round the turn, then slowing to the approach's, which goes with the root of the weight.
-    const double vApp = V_APPROACH * std::sqrt(mass / 33000.0);
+    // The speed: round the turn, then slowing to the approach's, which goes with the root of the weight, and
+    // into a headwind a third of it more (up to 7.5 m/s), as airliners add, against its dropping off near the
+    // ground and taking the flare's lift with it.
+    const V3 rwy = fromEarth(site.e * std::sin(site.hdg) + site.n * std::cos(site.hdg), timeOf(s));
+    const double head = -dot(windSeen(s), rwy);
+    const double vApp = V_APPROACH * std::sqrt(mass / 33000.0) + clampd(head / 3, 0, 7.5);
     const double vRef = vApp + (V_PATTERN - vApp) * clampd((R.togo - 7000.0) / 4000.0, 0, 1);
     double cl, cd;
     modelCoef(L.alpha, L.mach, &cl, &cd);
@@ -1329,7 +1381,15 @@ void flyHome(State& s, const Local& L, double* throttle) {
         depart(s, L);
         break;
     case OC_RET_PH_WAIT: {
+        if (R.lowering) { lower(s, L, throttle); break; }
         if (t >= R.tPlan) plan(s);
+        const Orbit o = orbitOf(s);
+        if ((!R.planned || R.tBurn - t > LOWER_WAIT) && o.a > 0 && o.apo - o.peri > LOWER_ECC && o.peri > 150000.0) {   // lower first
+            R.lowering = 1;
+            R.planned = 0;
+            lower(s, L, throttle);
+            break;
+        }
         R.tEvent = R.planned ? R.tBurn : -1;
         const bool turn = R.planned && R.tBurn - t < BURN_LEAD;
         rateLoop(s, L, point(s, L, turn ? s.v * -1.0 : s.v, 1.0, 0.15));
@@ -1397,7 +1457,9 @@ void returnAfterStep(State& s) {
     ReturnState& R = s.ret;
     const double rm = norm(s.r), mass = M_DRY + s.prop;
     const V3 up = s.r * (1.0 / rm);
-    const V3 vAir = s.v - cross(V3{0, 0, WE}, s.r);
+    const V3 vGround = s.v - cross(V3{0, 0, WE}, s.r);
+    V3 vAir = vGround;   // the truth's own bookkeeping, not the guidance's: through the moving air
+    if (s.wind.strength > 0) vAir = vAir - windAt(s.wind, s.r, timeOf(s));
     const double tas = norm(vAir);
     const Air air = atmosphere(rm - RE);
     const double qbar = 0.5 * air.rho * tas * tas;
@@ -1427,7 +1489,7 @@ void returnAfterStep(State& s) {
     }
 
     // The landing: the first touch after flight, and the stop.
-    const double sink = -dot(vAir, up);
+    const double sink = -dot(vGround, up);
     if (!s.onGround && rm - RE > 20.0) {
         R.airborne = 1;
         R.touched = 0;
@@ -1447,7 +1509,7 @@ void returnAfterStep(State& s) {
         const V3 nh = nose - up * dot(nose, up), th = vg - up * dot(vg, up);
         R.tdCrab = norm(th) > 1.0 ? std::atan2(dot(cross(th, nh), up) * -1.0, dot(th, nh)) : 0;
     }
-    if (R.touched && !R.stopped && s.onGround && tas < 0.3) {
+    if (R.touched && !R.stopped && s.onGround && norm(vGround) < 0.3) {   // stopped on the ground, whatever the wind
         const Ground g = groundOf(s);
         R.stopped = 1;
         R.stopAlong = g.p.x;
@@ -1465,7 +1527,7 @@ void returnWriteOut(const State& s) {
     static const int events[] = {OC_RET_EV_NONE, OC_RET_EV_CLEAR, OC_RET_EV_BURN, OC_RET_EV_BURN_END, OC_RET_EV_INTERFACE, OC_RET_EV_TERMINAL,
                                  OC_RET_EV_TOUCHDOWN, OC_RET_EV_TOUCHDOWN, OC_RET_EV_TOUCHDOWN, OC_RET_EV_NONE, OC_RET_EV_NONE};
     const bool counting = flying && R.tEvent >= 0;
-    out[OC_RET_EVENT] = counting ? events[R.phase] : OC_RET_EV_NONE;
+    out[OC_RET_EVENT] = counting ? (R.phase == OC_RET_PH_WAIT && R.lowering ? OC_RET_EV_LOWER : events[R.phase]) : OC_RET_EV_NONE;
     out[OC_RET_T_EVENT] = counting ? std::fmax(0.0, R.tEvent - t) : -1;
     const V3 here = unit(s.r), fieldNow = unit(fromEarth(site.p0, t));
     const double range = RE * std::acos(clampd(dot(here, fieldNow), -1, 1));
@@ -1516,6 +1578,7 @@ void returnWriteOut(const State& s) {
     out[OC_RET_REACH] = R.reach;
     out[OC_RET_SKIPPED] = R.skipped;
     out[OC_RET_TD_CRAB_DEG] = R.tdCrab * R2D;
+    out[OC_RET_LOWERED] = R.lowered;
 }
 
 void returnHash(const State& s, unsigned& h) {
@@ -1531,7 +1594,7 @@ void returnHash(const State& s, unsigned& h) {
     };
     hashDoubles(h, v, sizeof v / sizeof v[0]);
     // what was added after the first build, each nought as reset: folded in only when one is not
-    const double more[] = {(double)R.refused, R.errMass, R.errThrust, R.noise, R.noiseSeed, R.windEst[0], R.windEst[1], R.windEst[2], R.reach, (double)R.skipped, R.tdCrab};
+    const double more[] = {(double)R.refused, R.errMass, R.errThrust, R.noise, R.noiseSeed, R.windEst[0], R.windEst[1], R.windEst[2], R.reach, (double)R.skipped, R.tdCrab, (double)R.lowering, (double)R.lowered};
     bool used = false;
     for (double x : more) used = used || x != 0;
     if (used) hashDoubles(h, more, sizeof more / sizeof more[0]);

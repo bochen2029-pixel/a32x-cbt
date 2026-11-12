@@ -31,7 +31,8 @@ enum {
     OC_RET_EV_BURN_END = 3,  /* the burn ends */
     OC_RET_EV_INTERFACE = 4, /* the entry interface, OC_RET_INTERFACE_M */
     OC_RET_EV_TERMINAL = 5,  /* the entry hands over to the terminal glide */
-    OC_RET_EV_TOUCHDOWN = 6
+    OC_RET_EV_TOUCHDOWN = 6,
+    OC_RET_EV_LOWER = 7      /* from an orbit far from round: the burn at its lowest point that rounds it off, before the plan */
 };
 
 /* the limits the return is flown inside, and that the readouts are judged against (OC_RET_OVER) */
@@ -103,6 +104,7 @@ enum {
                              lies inside it, or failing one within 3.5 hours, the first in reach */
     OC_RET_SKIPPED,       /* passes in reach let go for want of that margin before the one taken */
     OC_RET_TD_CRAB_DEG,   /* at the touch, the nose off the track over the ground, + to the right: the crab a crosswind leaves */
+    OC_RET_LOWERED,       /* 1 once the orbit's top has been lowered first (OC_RET_EV_LOWER) */
     OC_RET_COUNT
 };
 

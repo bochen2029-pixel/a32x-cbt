@@ -21,6 +21,7 @@
 // TEST: return_refused_on_the_deck
 // TEST: departs_clear_of_the_mast
 // TEST: blind_to_the_wind
+// TEST: lands_from_a_high_orbit
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
@@ -335,12 +336,19 @@ void landsWhenGivenBack() {
     }
 }
 
-// The same inputs, the same flight: the state's hash at the burn and at the stop.
+// The same inputs, the same flight: the state's hash at the burn and at the stop; in still air with exact
+// instruments, and in a wind with the instruments' noise and the mass and thrust as known wrong, whose
+// seeds and sizes the hash covers.
 void theSameTwice() {
     const Run a = fly(1300), b = fly(1300);
     std::printf("  hashes %08x %08x, then %08x %08x\n", a.hashAtBurn, a.hash, b.hashAtBurn, b.hash);
     CHECK(a.hashAtBurn == b.hashAtBurn && a.hash == b.hash, "the same flight twice");
     CHECK(a.tStop > 0, "and it landed");
+    const Weather wx{17, 1.5, 1.02, 0.97, 99, 1.0};
+    const Run c = fly(1300, IN_ORBIT, 0, RIGHT, wx), d = fly(1300, IN_ORBIT, 0, RIGHT, wx);
+    std::printf("  in a wind, with noise: hashes %08x %08x, then %08x %08x\n", c.hashAtBurn, c.hash, d.hashAtBurn, d.hash);
+    CHECK(c.hashAtBurn == d.hashAtBurn && c.hash == d.hash, "the same windy, noisy flight twice");
+    CHECK(c.hashAtBurn != a.hashAtBurn && c.tStop > 0, "the wind and the noise are in the hash, and it landed");
 }
 
 // The guidance's model of the craft is the craft: the felt load its predictor works out for the present
@@ -501,6 +509,17 @@ void blindToTheWind() {
     CHECK(seen > checks / 4, "the other wind's air data changed the commands at only %d steps", seen);
 }
 
+// From an orbit far from round, whose far side the pilot has raised to 6,600 km: no pass would be in reach
+// for days, if ever, so the crew rounds the orbit off first, tail first at its lowest point, and plans from
+// the round orbit. It lands as from any other, inside the limits, with propellant to spare.
+void landsFromAHighOrbit() {
+    const Run r = fly(3000, PILOT_BURN, 260);
+    std::printf("  lowered first: %.0f; %.0f kg of propellant used in all\n", ret(OC_RET_LOWERED), ret(OC_RET_PROP_USED));
+    landed(r);
+    CHECK(ret(OC_RET_LOWERED) > 0, "the orbit rounded off first");
+    CHECK(get(OC_PROP) > 0, "propellant to spare: %.0f kg", get(OC_PROP));
+}
+
 struct Test { const char* name; void (*fn)(); };
 const Test tests[] = {
     {"readouts_block", readoutsBlock},
@@ -520,6 +539,7 @@ const Test tests[] = {
     {"return_refused_on_the_deck", returnRefusedOnTheDeck},
     {"departs_clear_of_the_mast", departsClearOfTheMast},
     {"blind_to_the_wind", blindToTheWind},
+    {"lands_from_a_high_orbit", landsFromAHighOrbit},
 };
 
 // The Monte Carlo, on demand (not a ctest):

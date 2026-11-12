@@ -79,6 +79,8 @@ struct ReturnState {
     double reach;             // m: the plan's pass, the entry's reach off the plane with lift over drag MARGIN_LD of the model's
     int skipped;              // passes in reach let go for want of margin before the one taken
     double tdCrab;            // rad: at the touch, the nose off the track over the ground, + to the right
+    int lowering;             // lowering the orbit's top first: 1 to be planned, 3 waiting for the lowest point, 2 burning
+    int lowered;              // 1 once it has been
 };
 
 }   // namespace oc
