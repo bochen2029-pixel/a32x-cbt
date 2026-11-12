@@ -32,6 +32,10 @@ struct DeckState {
     // the last touchdown
     int verdict, tdPad;
     double tdT, tdSink, tdDrift, tdOff, tdTilt;
+    // the step before, near the deck, to judge a touchdown at the touch rather than at the end of its step: the
+    // sink, its rate of change, the lowest leg's height over the floor, the drift (lastValid 1 while they are)
+    int lastValid;
+    double sinkLast, sinkRate, legLast, driftLast;
 };
 
 }   // namespace oc

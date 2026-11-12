@@ -274,10 +274,9 @@ Deriv deriv(const State& s, double t, V3 r, V3 v, Q q, V3 w, double prop) {
     return d;
 }
 
-void integrate(State& s) {
-    const double h = OC_DT;
+// One RK4 step of h from time t.
+static void rk4(State& s, double h, double t) {
     auto qadd = [](Q a, Q b, double k) { return Q{a.w + b.w * k, a.x + b.x * k, a.y + b.y * k, a.z + b.z * k}; };
-    const double t = timeOf(s);
     const Deriv k1 = deriv(s, t, s.r, s.v, s.q, s.w, s.prop);
     const Deriv k2 = deriv(s, t + h / 2, s.r + k1.rd * (h / 2), s.v + k1.vd * (h / 2), qadd(s.q, k1.qd, h / 2), s.w + k1.wd * (h / 2), s.prop + k1.propd * h / 2);
     const Deriv k3 = deriv(s, t + h / 2, s.r + k2.rd * (h / 2), s.v + k2.vd * (h / 2), qadd(s.q, k2.qd, h / 2), s.w + k2.wd * (h / 2), s.prop + k2.propd * h / 2);
@@ -289,6 +288,17 @@ void integrate(State& s) {
                   s.q.y + (k1.qd.y + 2 * k2.qd.y + 2 * k3.qd.y + k4.qd.y) * c, s.q.z + (k1.qd.z + 2 * k2.qd.z + 2 * k3.qd.z + k4.qd.z) * c});
     s.w = s.w + (k1.wd + k2.wd * 2 + k3.wd * 2 + k4.wd) * c;
     s.prop = std::fmax(0.0, s.prop + (k1.propd + 2 * k2.propd + 2 * k3.propd + k4.propd) * c);
+}
+
+// The step, OC_DT, in one RK4 step; where the gear can reach the Ring's deck, in ten. There the legs and the tyres
+// stuck to their spots damp the craft at about 26/s, and RK4 over a whole step (lambda h = 0.5) leaves a false
+// velocity of 2e-4 m/s in a craft parked at rest; in tenths, lambda h is 0.05 and it goes. The step itself stays
+// the step: the controls and the commands are held across it, and the deck's spots are fixed through it.
+// (Found by the audit of 599e051. The owner's booster lander sub-steps its contact the same way.)
+void integrate(State& s) {
+    const int pieces = s.gear && s.deck.near ? 10 : 1;
+    const double t = timeOf(s);
+    for (int i = 0; i < pieces; ++i) rk4(s, OC_DT / pieces, t + i * (OC_DT / pieces));
 }
 
 // ---- the stability plane: rates in, torque out --------------------------------------------------

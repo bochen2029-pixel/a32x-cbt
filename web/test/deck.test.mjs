@@ -81,7 +81,9 @@ test('once asked, the page says what the crew does first, or why the core refuse
   assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.depart, pad: 0 }), 'The crew lands on pad 1: out into the Ring, then the glide along the deck');
   assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.hover, pad: 2 }), 'The crew lands on pad 3: over to it and down');
   assert.equal(engagedText(S, { ...D, refused: DECK_NO.landed }), 'Deck landing refused: on the deck already');
-  assert.equal(engagedText(S, { ...D, refused: DECK_NO.prop }), 'Deck landing refused: under 2,000 kg of propellant');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.prop }), 'Deck landing refused: too little propellant for it');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.riding }), 'Deck landing refused: turning with the Ring but not over the deck: fly over it first');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.stop }), 'Deck landing refused: moving along the deck too fast to stop before the bulkhead');
 });
 
 test('the deck hold is for flying over the deck: within the Ring\'s reach', () => {

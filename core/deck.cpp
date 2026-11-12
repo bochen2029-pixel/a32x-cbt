@@ -476,21 +476,38 @@ void deckEngage(State& s) {
     // kilometres as the Ring turns. The orbit is judged further out.
     const double range = ring.valid ? norm(s.r - ringPos(t)) : 1e30;
     const bool within = range < std::hypot(R + 500, W2 + 1500);
+    const Frame f = frameAt(t);
+    const Over o = overOf(s.r, s.v, f);
+    const double off = std::fabs(wrap(o.th - A0));
+    // Riding with the deck, nearer its speed than at rest among the stars, the craft needs about a g of thrust to
+    // stay up: the crew picks the landing up from there, over the deck, or not at all. Over the deck it hovers to
+    // the nearest pad if it can stop along the deck, braking at the hover's A_HOVER_H, short of the bulkhead
+    // ahead (40 m to spare), and has the propellant for the hover's descent from where it is; else it refuses, as
+    // it does over the roof or beside the deck, and the pilot keeps the craft. (Found by the audit of 599e051:
+    // chosen by where the craft was alone, a crew taking over high in the final went to the hold point on the
+    // small thrusters, and the craft fell.)
+    const bool riding = ring.valid && o.rho > OC_RING_RIM_M - 400 && std::fabs(o.us) < 0.5 * W * o.rho;
+    const double descent = (std::fmax(o.h, 0.0) / V_HOVER_MAX + 30) * (M_DRY + s.prop) * W * W * o.rho / (ISP * G0);   // kg
     if (s.dock.held == 1) no = OC_DECK_NO_DOCKED;
     else if (s.crashed) no = OC_DECK_NO_CRASHED;
     else if (k.onDeck) no = OC_DECK_NO_LANDED;
     else if (!ring.valid || (!within && orbitOf(s).peri < 150000)) no = OC_DECK_NO_LOW;
     else if (range > OC_DOCK_ENGAGE_M) no = OC_DECK_NO_FAR;
     else if (!within && norm(s.v - ringVel(t) - cross(ring.normal * ring.rate, s.r - ringPos(t))) > OC_DOCK_ENGAGE_SPEED) no = OC_DECK_NO_FAST;
-    else if (s.prop < OC_DECK_PROP_MIN) no = OC_DECK_NO_PROP;
+    else if (riding && (off >= BETA || std::fabs(o.c) >= W2 - 30 || o.h <= 0)) no = OC_DECK_NO_RIDING;
+    else if (riding && o.us * o.us / (2 * A_HOVER_H) >= R * (BETA - std::copysign(1.0, o.us) * wrap(o.th - A0)) - 40) no = OC_DECK_NO_STOP;
+    else if (s.prop < (riding ? descent : OC_DECK_PROP_MIN)) no = OC_DECK_NO_PROP;
     k.refused = no;
     if (no) { s.autoMode = k.autoBefore; return; }   // refused: whoever was flying still is
     k.prop0 = s.prop;
     k.still = 0;
-    const Frame f = frameAt(t);
-    const Over o = overOf(s.r, s.v, f);
-    const double off = std::fabs(wrap(o.th - A0));
-    if (off < BETA && std::fabs(o.c) < W2 - 30 && o.h > 0 && o.h < CLEAR_M - 10) {   // over the deck already: to the nearest pad
+    if (riding) {
+        setPad(k, nearestPad(o));
+        k.side = o.c < 0 ? -1 : 1;
+        k.phase = OC_DECK_PH_HOVER;
+        return;
+    }
+    if (off < BETA && std::fabs(o.c) < W2 - 30 && o.h > 0 && o.h < CLEAR_M - 10) {   // low over the deck, not riding with it: to the nearest pad
         setPad(k, nearestPad(o));
         k.side = o.c < 0 ? -1 : 1;
         k.phase = OC_DECK_PH_HOVER;
@@ -654,13 +671,14 @@ void deckAfterStep(State& s) {
         if (k.phase != OC_DECK_PH_LANDED) k.phase = OC_DECK_PH_NONE;   // the crew let go
     }
     if (!(s.autoMode == OC_AUTO_OFF && s.sas == OC_SAS_DECK)) k.armed = 0;
-    if (!ring.valid || s.crashed || s.dock.held) { k.near = 0; k.onDeck = 0; k.still = 0; k.stuck[0] = k.stuck[1] = k.stuck[2] = 0; return; }
+    if (!ring.valid || s.crashed || s.dock.held) { k.near = 0; k.onDeck = 0; k.still = 0; k.lastValid = 0; k.stuck[0] = k.stuck[1] = k.stuck[2] = 0; return; }
     const double t = timeOf(s);
     const double far = norm(s.r - ringPos(t)) - std::hypot(R + 40, W2 + 30);
     if (far > 0) {   // nowhere near the floor: the frame is not needed
         k.near = 0;
         k.onDeck = 0;
         k.still = 0;
+        k.lastValid = 0;
         k.stuck[0] = k.stuck[1] = k.stuck[2] = 0;
         if (k.phase == OC_DECK_PH_LANDED) k.phase = OC_DECK_PH_NONE;
         return;
@@ -668,7 +686,21 @@ void deckAfterStep(State& s) {
     const Frame f = frameAt(t);
     const Over o = overOf(s.r, s.v, f);
     k.near = o.h < 80 && o.h > -40 && std::fabs(wrap(o.th - A0)) < BETA + 0.02 && std::fabs(o.c) < W2 + 30;
-    if (!k.near) { k.onDeck = 0; k.still = 0; k.stuck[0] = k.stuck[1] = k.stuck[2] = 0; if (k.phase == OC_DECK_PH_LANDED) k.phase = OC_DECK_PH_NONE; return; }
+    if (!k.near) { k.onDeck = 0; k.still = 0; k.stuck[0] = k.stuck[1] = k.stuck[2] = 0; k.lastValid = 0; if (k.phase == OC_DECK_PH_LANDED) k.phase = OC_DECK_PH_NONE; return; }
+    // what the next step's touchdown, if it comes, is judged from: this step's sink, its rate, the lowest leg's
+    // height over the floor of the sector, the drift
+    double low = 1e30;
+    for (int i = 0; i < 3 && s.gear; ++i) {
+        const V3 p = toRing(f, s.r + rot(s.q, GEAR[i]) - f.c);
+        if (std::fabs(p.y) < W2 && std::fabs(wrap(std::atan2(p.x, p.z) - A0)) < BETA) low = std::fmin(low, R - std::hypot(p.x, p.z));
+    }
+    const double sinkWas = k.sinkLast, rateWas = k.sinkRate, legWas = k.legLast, driftWas = k.driftLast;
+    const int validWas = k.lastValid;
+    k.sinkRate = validWas ? (-o.hd - sinkWas) / OC_DT : 0;
+    k.sinkLast = -o.hd;
+    k.legLast = low;
+    k.driftLast = std::hypot(o.us, o.u.y);
+    k.lastValid = 1;
     const V3 spin = f.y * W;
     // the hard points: each along its path over the step, in pieces of half a metre
     V3 now[NHARD], vel[NHARD];
@@ -702,7 +734,14 @@ void deckAfterStep(State& s) {
         }
     }
     if (legs && !k.onDeck) {   // the touchdown: the centre of mass's motion against the deck as the first leg meets it
-        const double sink = -o.hd, drift = std::hypot(o.us, o.u.y);
+        // Judged at the touch, not at the step's end, when the legs have already taken some of the sink: the
+        // step before's sink carried down the lowest leg's last legWas metres at its rate, sink^2 + 2 rate legWas,
+        // as a fall at a steady pull is; never less than the end shows. The drift no less than the step before's.
+        // (Found by the audit of 599e051: judged at the step's end, a 3.13 m/s touch read 2.90, firm, and a softer
+        // 3.04 a crash, by where in its step the touch fell.)
+        double sink = -o.hd, drift = std::hypot(o.us, o.u.y);
+        if (validWas && legWas > 0 && legWas < 3.0) sink = std::fmax(sink, std::sqrt(std::fmax(0.0, sinkWas * sinkWas + 2 * rateWas * legWas)));
+        if (validWas) drift = std::fmax(drift, driftWas);
         const double tilt = std::acos(clampd(dot(fromRing(f, o.out), rot(s.q, {0, 0, 1})), -1, 1));
         int pad = 0;
         double offPad = 1e30;
@@ -808,7 +847,8 @@ void deckHash(const State& s, unsigned& h) {
                         k.prop0, (double)k.holding, (double)k.holdingC, k.holdPos.x, k.holdPos.y, k.holdPos.z, (double)k.holdingH, k.holdH, k.setS, k.setC, k.cmdS, k.cmdC,
                         k.setH, k.heading, (double)k.armed, (double)k.verdict, (double)k.tdPad, k.tdT, k.tdSink, k.tdDrift, k.tdOff, k.tdTilt,
                         (double)k.stuck[0], (double)k.stuck[1], (double)k.stuck[2], k.anchor[0].x, k.anchor[0].y, k.anchor[0].z,
-                        k.anchor[1].x, k.anchor[1].y, k.anchor[1].z, k.anchor[2].x, k.anchor[2].y, k.anchor[2].z};
+                        k.anchor[1].x, k.anchor[1].y, k.anchor[1].z, k.anchor[2].x, k.anchor[2].y, k.anchor[2].z,
+                        (double)k.lastValid, k.sinkLast, k.sinkRate, k.legLast, k.driftLast};
     hashDoubles(h, v, sizeof v / sizeof v[0]);
 }
 
