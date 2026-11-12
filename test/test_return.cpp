@@ -1,19 +1,269 @@
-// The flight home's tests (orbit_return.h). A stub until the flight home is built: its readouts' block is there.
-// Run one by name or all; ctest runs each line below that reads "// TEST: <name>". GPLv3.
+// The flight home's tests (orbit_return.h). Each flies the whole return through the core, from orbit to
+// a stop on KDFW 17C, and states what a landing must be: on the runway's touchdown zone, near its
+// centreline, a gentle sink, stopped on the runway, inside the heat, load and dynamic-pressure limits.
+// Run one by name (test_return lands_from_insertion) or all; ctest runs each line below that reads
+// "// TEST: <name>". GPLv3.
 //
 // TEST: readouts_block
+// TEST: lands_from_insertion
+// TEST: lands_on_a_pass_just_missed
+// TEST: lands_after_a_long_wait
+// TEST: lands_from_starts_round_the_day
+// TEST: lands_after_leaving_the_hub
+// TEST: lands_from_a_changed_orbit
+// TEST: the_same_twice
+// TEST: model_is_the_plant
+// TEST: plan_says_when
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_return.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 
+namespace {
+
+int failures = 0;
+
+#define CHECK(cond, ...)                                              \
+    do {                                                              \
+        if (!(cond)) {                                                \
+            std::printf("  FAIL %s:%d: %s — ", __FILE__, __LINE__, #cond); \
+            std::printf(__VA_ARGS__);                                 \
+            std::printf("\n");                                        \
+            ++failures;                                               \
+        }                                                             \
+    } while (0)
+
+const double LAT = 32.91569901, LON = -97.02600098, HDG = 180.3;   // KDFW 17C, docs/provenance.md 1f
+
+double get(int i) { return oc_out()[i]; }
+double ret(int i) { return oc_return_out()[i]; }
+
+bool finite() {
+    for (int i = 0; i < oc_out_len(); ++i)
+        if (!std::isfinite(oc_out()[i])) return false;
+    for (int i = 0; i < oc_return_out_len(); ++i)
+        if (!std::isfinite(oc_return_out()[i])) return false;
+    return true;
+}
+
+// Where the return starts from.
+enum Start {
+    IN_ORBIT,   // the crew's insertion orbit, wherever the craft has got to in it
+    AT_HUB,     // held off the Ring's hub by the crew's approach
+    PILOT_BURN  // the pilot has burned along (+) or against (-) the velocity first
+};
+
+struct Run {
+    double engage, tBurn, tInterface, tTerminal, tTouch, tStop;
+    double dv, cross, maxG;
+    int passes;
+    unsigned hashAtBurn, hash;
+    bool finite;
+};
+
+// Fly the crew to orbit, start the return at `engage` s, and fly it to a stop (or a crash, or the limit).
+Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0) {
+    Run r{};
+    r.engage = engage;
+    r.tBurn = r.tInterface = r.tTerminal = r.tTouch = r.tStop = -1;
+    r.finite = true;
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
+    if (start == AT_HUB) oc_auto(OC_AUTO_APPROACH);
+    if (start == PILOT_BURN) {   // retrograde or prograde hold, then a fifth of the drive for |pilotBurn| s
+        oc_step(500);
+        oc_auto(OC_AUTO_OFF);
+        oc_sas(pilotBurn > 0 ? OC_SAS_PROGRADE : OC_SAS_RETROGRADE);
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+        oc_step(3000);
+        oc_controls(0, 0, 0, 0.2, 0, 0, 0, 0, 0);
+        oc_step((int)(std::fabs(pilotBurn) / OC_DT + 0.5));
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+    while (get(OC_T) < engage) oc_step(50);
+    oc_auto(OC_AUTO_RETURN);
+    int phase = (int)ret(OC_RET_PHASE);
+    while (get(OC_T) < engage + 200000) {
+        oc_step(10);
+        const int ph = (int)ret(OC_RET_PHASE);
+        if (ph == OC_RET_PH_WAIT || ph == OC_RET_PH_DEPART) {   // the plan, as it stands before the burn
+            r.dv = ret(OC_RET_DV);
+            r.cross = ret(OC_RET_CROSS);
+            r.passes = (int)ret(OC_RET_PASSES);
+        }
+        if (ph != phase) {
+            if (ph == OC_RET_PH_BURN) { r.tBurn = get(OC_T); r.hashAtBurn = oc_hash(); }
+            if (ph == OC_RET_PH_ENTRY) r.tInterface = get(OC_T);
+            if (ph == OC_RET_PH_TERMINAL) r.tTerminal = get(OC_T);
+            phase = ph;
+        }
+        if (get(OC_ON_GROUND) < 0.5 && get(OC_G) > r.maxG) r.maxG = get(OC_G);
+        if (!finite()) { r.finite = false; break; }
+        if (get(OC_CRASHED) > 0 || ph == OC_RET_PH_STOPPED || get(OC_AUTO) != OC_AUTO_RETURN) break;
+    }
+    r.tTouch = ret(OC_RET_TOUCHED) > 0 ? ret(OC_RET_TD_T) : -1;
+    r.tStop = ret(OC_RET_STOPPED) > 0 ? get(OC_T) : -1;
+    r.hash = oc_hash();
+    return r;
+}
+
+void print(const Run& r) {
+    std::printf("  engaged %.0f s: burn %.0f s (%.1f m/s, %d passes let go, runway %.0f km off the plane), interface %.0f s, terminal %.0f s, "
+                "touchdown %.0f s (%.2f h after engaging)\n",
+                r.engage, r.tBurn, r.dv, r.passes, r.cross / 1000, r.tInterface, r.tTerminal, r.tTouch, (r.tTouch - r.engage) / 3600);
+    std::printf("    heat %.0f kW/m2 peak, %.0f MJ/m2, %.0f K; load %.2f g peak; %.1f kPa peak; %d bank reversals; %.0f kg of propellant\n",
+                ret(OC_RET_HEAT_PEAK) / 1000, ret(OC_RET_HEAT_LOAD) / 1e6, std::pow(ret(OC_RET_HEAT_PEAK) / (0.85 * 5.670374e-8), 0.25),
+                ret(OC_RET_LOAD_PEAK), ret(OC_RET_QBAR_PEAK) / 1000, (int)ret(OC_RET_REVERSALS), ret(OC_RET_PROP_USED));
+    std::printf("    touchdown %.0f m past the threshold, %.2f m off the centreline, sinking %.2f m/s at %.1f m/s, pitch %.1f deg; stopped %.0f m "
+                "past it, %.2f m off\n",
+                ret(OC_RET_TD_ALONG), ret(OC_RET_TD_OFF), ret(OC_RET_TD_SINK), ret(OC_RET_TD_SPEED), ret(OC_RET_TD_PITCH_DEG), ret(OC_RET_STOP_ALONG),
+                ret(OC_RET_STOP_OFF));
+}
+
+// What a landing must be.
+void landed(const Run& r) {
+    print(r);
+    CHECK(r.finite, "every readout finite");
+    CHECK(get(OC_CRASHED) == 0, "not crashed, at %.0f s", get(OC_T));
+    CHECK(ret(OC_RET_TOUCHED) > 0, "touched down");
+    CHECK(ret(OC_RET_TD_ALONG) > 0 && ret(OC_RET_TD_ALONG) < OC_RET_ZONE_M, "in the touchdown zone: %.0f m past the threshold", ret(OC_RET_TD_ALONG));
+    CHECK(std::fabs(ret(OC_RET_TD_OFF)) < 3.0, "near the centreline: %.2f m", ret(OC_RET_TD_OFF));
+    CHECK(ret(OC_RET_TD_SINK) < 2.0, "a gentle touch: %.2f m/s down", ret(OC_RET_TD_SINK));
+    CHECK(ret(OC_RET_STOPPED) > 0, "stopped");
+    CHECK(ret(OC_RET_STOP_ALONG) > 0 && ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M,
+          "stopped on the runway: %.0f m along, %.2f m off", ret(OC_RET_STOP_ALONG), ret(OC_RET_STOP_OFF));
+    CHECK(ret(OC_RET_HEAT_PEAK) < OC_RET_HEAT_LIMIT, "heat %.0f kW/m2", ret(OC_RET_HEAT_PEAK) / 1000);
+    CHECK(ret(OC_RET_LOAD_PEAK) < OC_RET_LOAD_LIMIT && r.maxG < OC_RET_LOAD_LIMIT, "load %.2f g (felt %.2f g)", ret(OC_RET_LOAD_PEAK), r.maxG);
+    CHECK(ret(OC_RET_QBAR_PEAK) < OC_RET_QBAR_LIMIT, "dynamic pressure %.0f Pa", ret(OC_RET_QBAR_PEAK));
+    CHECK(ret(OC_RET_OVER) == 0, "no limit passed in flight: %.0f", ret(OC_RET_OVER));
+}
+
+// ---- the tests ----------------------------------------------------------------------------------
+
+void readoutsBlock() {
+    oc_reset(LAT, LON, HDG);
+    CHECK(oc_return_out_len() == OC_RET_COUNT, "%d readouts", oc_return_out_len());
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_NONE, "not flying home at the start");
+    CHECK(ret(OC_RET_RANGE) < 1.0, "on the threshold: %.2f m", ret(OC_RET_RANGE));
+}
+
+// Straight after the crew's insertion: the craft waits for its pass, burns, and lands.
+void landsFromInsertion() { landed(fly(800)); }
+
+// Started too late for the pass's best burn: the plan burns at once and flies a steeper entry to reach it.
+void landsOnAPassJustMissed() {
+    const Run r = fly(2620);
+    landed(r);
+    CHECK(r.tBurn > 0 && r.tBurn < 3000, "the same pass, burning at %.0f s", r.tBurn);
+}
+
+// Started just after the day's last pass within reach: the craft waits most of a day in orbit.
+void landsAfterALongWait() {
+    const Run r = fly(3700);
+    landed(r);
+    CHECK(r.tBurn - r.engage > 12 * 3600, "a long wait: %.1f h", (r.tBurn - r.engage) / 3600);
+}
+
+// From places round the orbit and times round the day, the next pass in reach.
+void landsFromStartsRoundTheDay() {
+    const double starts[] = {1300, 21000, 47000, 66500, 72100, 77800};
+    for (double e : starts) landed(fly(e));
+}
+
+// Held off the Ring's hub: the craft backs away from the Ring on its small thrusters first.
+void landsAfterLeavingTheHub() {
+    const Run r = fly(1600, AT_HUB);
+    landed(r);
+}
+
+// From orbits the pilot has changed: the far side raised, and the near side lowered.
+void landsFromAChangedOrbit() {
+    landed(fly(3000, PILOT_BURN, 20));
+    landed(fly(3000, PILOT_BURN, -15));
+}
+
+// The same inputs, the same flight: the state's hash at the burn and at the stop.
+void theSameTwice() {
+    const Run a = fly(1300), b = fly(1300);
+    std::printf("  hashes %08x %08x, then %08x %08x\n", a.hashAtBurn, a.hash, b.hashAtBurn, b.hash);
+    CHECK(a.hashAtBurn == b.hashAtBurn && a.hash == b.hash, "the same flight twice");
+    CHECK(a.tStop > 0, "and it landed");
+}
+
+// The guidance's model of the craft is the craft: the felt load its predictor works out for the present
+// state equals the core's, all through the entry and the glide.
+void modelIsThePlant() {
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_T) < 800) oc_step(50);
+    oc_auto(OC_AUTO_RETURN);
+    double worst = 0, at = 0;
+    int samples = 0;
+    while (get(OC_T) < 20000 && ret(OC_RET_PHASE) < OC_RET_PH_APPROACH && get(OC_CRASHED) == 0) {
+        oc_step(25);
+        if (ret(OC_RET_PHASE) < OC_RET_PH_ENTRY || get(OC_THROTTLE) > 0) continue;
+        const double d = std::fabs(oc_return_model_g() - get(OC_G));
+        ++samples;
+        if (d > worst) { worst = d; at = get(OC_T); }
+    }
+    std::printf("  %d samples from the entry to the approach: the model's load and the core's differ by %.2e g at most (%.0f s)\n", samples, worst, at);
+    CHECK(samples > 1000, "%d samples", samples);
+    CHECK(worst < 0.01, "%.4f g", worst);
+}
+
+// While the craft waits, the readouts say for what and when: the burn's time counts down to the burn the
+// craft then makes, of the size planned.
+void planSaysWhen() {
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_T) < 1300) oc_step(50);
+    oc_auto(OC_AUTO_RETURN);
+    oc_step(1);
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_WAIT, "waiting: phase %.0f", ret(OC_RET_PHASE));
+    CHECK(ret(OC_RET_EVENT) == OC_RET_EV_BURN, "for the burn: event %.0f", ret(OC_RET_EVENT));
+    const double when = get(OC_T) + ret(OC_RET_T_EVENT), dv = ret(OC_RET_DV);
+    std::printf("  at %.0f s: the burn in %.0f s, %.1f m/s; the runway %.0f km off the plane on the pass taken\n", get(OC_T), ret(OC_RET_T_EVENT), dv,
+                ret(OC_RET_CROSS) / 1000);
+    CHECK(dv > 80 && dv < 200, "%.1f m/s", dv);
+    CHECK(std::fabs(ret(OC_RET_CROSS)) < 1.2e6, "%.0f km", ret(OC_RET_CROSS) / 1000);
+    double prop = get(OC_PROP);
+    while (ret(OC_RET_PHASE) == OC_RET_PH_WAIT && get(OC_T) < 200000) oc_step(5);
+    std::printf("  the burn began at %.0f s (%.1f s from the first word)\n", get(OC_T), get(OC_T) - when);
+    CHECK(std::fabs(get(OC_T) - when) < 30, "at %.0f s, said %.0f s", get(OC_T), when);
+    while (ret(OC_RET_PHASE) == OC_RET_PH_BURN) oc_step(1);
+    const double used = prop - get(OC_PROP), made = 2000 * 9.80665 * std::log((30000 + prop) / (30000 + get(OC_PROP)));
+    std::printf("  burned %.0f kg: %.1f m/s, planned %.1f; the orbit now %.0f x %.0f km\n", used, made, dv, get(OC_APO) / 1000, get(OC_PERI) / 1000);
+    CHECK(std::fabs(made - dv) < 0.1 * dv, "%.1f m/s made, %.1f planned", made, dv);
+    CHECK(get(OC_PERI) < 70000 && get(OC_PERI) > 50000, "the orbit's low point %.0f km", get(OC_PERI) / 1000);
+}
+
+struct Test { const char* name; void (*fn)(); };
+const Test tests[] = {
+    {"readouts_block", readoutsBlock},
+    {"lands_from_insertion", landsFromInsertion},
+    {"lands_on_a_pass_just_missed", landsOnAPassJustMissed},
+    {"lands_after_a_long_wait", landsAfterALongWait},
+    {"lands_from_starts_round_the_day", landsFromStartsRoundTheDay},
+    {"lands_after_leaving_the_hub", landsAfterLeavingTheHub},
+    {"lands_from_a_changed_orbit", landsFromAChangedOrbit},
+    {"the_same_twice", theSameTwice},
+    {"model_is_the_plant", modelIsThePlant},
+    {"plan_says_when", planSaysWhen},
+};
+
+}   // namespace
+
 int main(int argc, char** argv) {
-    const char* name = argc > 1 ? argv[1] : "readouts_block";
-    if (std::strcmp(name, "readouts_block") != 0) { std::printf("no test named %s\n", name); return 2; }
-    oc_reset(32.91569901, -97.02600098, 180.3);
-    const bool ok = oc_return_out_len() == OC_RET_COUNT && oc_return_out()[OC_RET_PHASE] == OC_RET_PH_NONE;
-    std::printf("%s\n", ok ? "ok" : "FAILED");
-    return ok ? 0 : 1;
+    int ran = 0;
+    for (const Test& t : tests) {
+        if (argc > 1 && std::strcmp(argv[1], t.name) != 0) continue;
+        const int before = failures;
+        std::printf("%s\n", t.name);
+        t.fn();
+        std::printf("  %s\n", failures == before ? "ok" : "FAILED");
+        ++ran;
+    }
+    if (ran == 0) { std::printf("no test named %s\n", argc > 1 ? argv[1] : "?"); return 2; }
+    return failures ? 1 : 0;
 }
