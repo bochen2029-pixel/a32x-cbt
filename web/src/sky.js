@@ -237,6 +237,7 @@ export const sky = {
 
   command(c, ctx) {
     if (c !== 'moon') return false;
+    if (ctx.walk && ctx.walk.v.on) return false;   // walking, F drops a ball: the walk's key, not the telescope's
     this.telescope = !this.telescope;
     if (this.telescope) {
       const k = this.k, clear = inSight(ctx.cam || [0, 0, 0], moonCentre(k), 0);
