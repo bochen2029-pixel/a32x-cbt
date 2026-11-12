@@ -249,6 +249,10 @@ function draw(ctx, o, f) {
   L.uSun.value.set(...sun);
   L.uSunLight.value.set(...(lit ? [1.75, 1.65, 1.5] : [0, 0, 0]));
   L.uHaze.value.set(...(lit ? [0.34, 0.38, 0.44] : [0.2, 0.22, 0.26]));
+  // the Earth: where it is from the ring, and how much of the face it turns to the ring the Sun lights
+  const toEarth = fr.unit(fr.sub([0, 0, -fr.RE], eyeSite)), litPart = 0.5 * (1 - fr.dot(sunSite, toEarth));
+  L.uEarth.value.set(...siteDirToRing(F, toEarth));
+  L.uEarthLight.value.set(...[0.10, 0.13, 0.19].map((x) => x * litPart));
   v.world.update(o, ctx.dt);
 
   const where = Math.round(o.where), enclosed = where === WHERE.hub || (where === WHERE.lift && o.liftR < WALK.lobby + 1);
@@ -275,7 +279,7 @@ function draw(ctx, o, f) {
     Object.assign(ctx, { cam: eyeSite, rel, up: fr.unit(fr.add(eyeSite, [0, 0, fr.RE])), alt, sunSite, P, axes: fr.bodyAxes([s.qw, s.qx, s.qy, s.qz]) });
     for (const feature of FEATURES) if (feature !== walk && feature.update) feature.update(ctx);
     ctx.earth.update(camera, canvas.height, rel([0, 0, -fr.RE]), alt, fr.three(sunSite), v.toEcef);
-    const hidden = [ctx.ring.group, ctx.craft.group].filter((g) => g.visible);
+    const hidden = [ctx.ring && ctx.ring.group, ctx.craft && ctx.craft.group].filter((g) => g && g.visible);   // seen from outside, not from in
     for (const g of hidden) g.visible = false;
     renderer.render(ctx.far, camera);
     for (const g of hidden) g.visible = true;
