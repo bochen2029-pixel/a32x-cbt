@@ -148,7 +148,9 @@ From the audit of `c56d77b`, suspected and not yet settled:
   above about 15 m/s the ball could step over a rim wall's lip of no thickness. To settle: graze a lip
   with the probe alone.
 - **G9.** A crash on the ground is judged by the centre of mass's height and the sink rate alone. A
-  wingtip reaches the ground at about 25° of bank on the gear, and nothing checks a tail strike.
+  wingtip reaches the ground at about 25° of bank on the gear, and nothing checks a tail strike, nor the
+  side load of a touchdown crabbed into a crosswind (the flight home lands crabbed: it does not de-crab;
+  `OC_RET_TD_CRAB_DEG` reports the crab).
 - **G10.** In the far pass, beyond 300 km, the Ring and the craft get no haze: sky fragments write
   depth 1.0 and fail the depth test over them. To settle: draw the Ring from the runway.
 - **G11.** `map-math.js`'s `ringState` is degenerate when the craft is 90° round the orbit from the
