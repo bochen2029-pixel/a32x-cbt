@@ -114,6 +114,19 @@ Re-entry and landing back. Docking, and any contact with the Ring: the craft fli
 Ring's inside, its people, anything furnished. Terrain: the globe is smooth and the field flat. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. Sound, VR, failures.
 
+### Rigour
+
+`INVARIANTS.md` writes down what the core promises, in the owner's manner from Subsim: each rule with
+why it holds and what enforces it. The rules cover conservation in a vacuum, thin air as the only loss
+in orbit, work and energy on the ascent, the propellant's bookkeeping, one frame seen three ways, replay
+bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, and a
+receipt for every number. `test/test_invariants.cpp` holds them as physics, with tolerances derived from
+RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`). Its
+`// DEFECT:` lines are three invariants the core breaks today, each with a fix proposed in
+`INVARIANTS.md`; `test_invariants defects` runs them. `evidence/` keeps the receipts. Every constant and
+every number stated here is certified by Abacus, the owner's tool of certified arithmetic, or cited
+where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists the mismatches found.
+
 ## Build and test
 
 The core and its tests, natively:
