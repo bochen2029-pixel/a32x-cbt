@@ -704,7 +704,7 @@ Other parts play their moments through `ctx.sound`:
 | call | does |
 |---|---|
 | `cue(name, params)` | plays a moment: `strike` {strength, hz}, `thump` {strength, from, to, seconds}, `contact` {speed m/s}, `latch` {n}, `capture`, `release`, `hiss` {seconds, strength}, `boom` {n}, `nwave` {strength, seconds}, `ignition`, `shutdown`, `gear` {down}, `touchdown` {strength, screech}, `pad` {strength, sink}, `liftoff`, `swivel` {strength}, `puff` {strength, side}, `crash`, `step` {surface, side, weight}, `land` {surface, strength}, `ball` {strength, distance, dir, surface}, `door` {open, distance, dir}, `brake` {aboard, distance, dir}, `hatch` {open}, `bubble` {radius, strength}, `chime`; each also takes `delay` (s). What is not a number in its range gets its default. An unknown name is refused and said once |
-| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift's motor, beside the walk's own), `walk` m/s (a walker's speed, in place of the walk's own footsteps; NaN: the walk's), `surface` |
+| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift's motor, beside the walk's own), `walk` m/s and `surface` (footsteps at that speed, on that, in a frame another part draws where no walk runs: the walk's own come from its readouts) |
 | `scene(name)` | where the ear is: `flight`, `ring` (the band), `hub`, `car`, or null to follow the walk's readouts, or the flight |
 | `volume(v)`, `mute(on)`, `on`, `state`, `level()`, `engine` | the master, and what a test reads: whether it sounds, how loud, the instrument |
 
