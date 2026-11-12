@@ -107,7 +107,8 @@ test('the readouts: where the runway is, the heat and the load, the guidance, th
   const landed = view.returnHud(flight(P.stopped, { touched: 1, tdAlong: 432, tdOff: -0.07, tdSink: 0.74, stopped: 1, stopAlong: 2121 }), air);
   assert.match(landed.at(-1), /^DOWN 432 m past the threshold, 0\.1 m left of the line, sinking 0\.74 m\/s\s+stopped at 2\.12 km/);
   assert.deepEqual(view.returnHud(flight(P.none, { heatPeak: 0, loadPeak: 0 }), air), []);
-  for (const line of view.returnHud(flight(P.entry), air, true)) assert.ok(line.length <= 44, `a phone's line: ${line}`);
+  const phone = [flight(P.entry), flight(P.approach), flight(P.stopped, { touched: 1, tdAlong: 432, tdOff: -0.07, tdSink: 0.74, stopped: 1, stopAlong: 2121 })];
+  for (const r of phone) for (const line of view.returnHud(r, air, true)) assert.ok(line.length <= 30, `a phone's line: ${line}`);
 });
 
 test('the air glows brighter and whiter with the heat', { skip: noThree }, () => {
