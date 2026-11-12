@@ -11,6 +11,9 @@
 // TEST: lands_from_starts_round_the_day
 // TEST: lands_after_leaving_the_hub
 // TEST: lands_from_a_changed_orbit
+// TEST: lands_with_its_model_wrong
+// TEST: lands_with_its_model_wrong_round_the_day
+// TEST: lands_when_given_back
 // TEST: the_same_twice
 // TEST: model_is_the_plant
 // TEST: plan_says_when
@@ -19,7 +22,9 @@
 #include "../core/orbit_return.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace {
@@ -64,13 +69,18 @@ struct Run {
     bool finite;
 };
 
+// How wrong the guidance's model of the air and the craft is (oc_return_model_error); 1, 0, 0, 1, 1: right.
+struct ModelError { double rho, wave, phase, lift, drag; };
+const ModelError RIGHT{1, 0, 0, 1, 1};
+
 // Fly the crew to orbit, start the return at `engage` s, and fly it to a stop (or a crash, or the limit).
-Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0) {
+Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError err = RIGHT) {
     Run r{};
     r.engage = engage;
     r.tBurn = r.tInterface = r.tTerminal = r.tTouch = r.tStop = -1;
     r.finite = true;
     oc_reset(LAT, LON, HDG);
+    oc_return_model_error(err.rho, err.wave, err.phase, err.lift, err.drag);
     while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
     if (start == AT_HUB) oc_auto(OC_AUTO_APPROACH);
     if (start == PILOT_BURN) {   // retrograde or prograde hold, then a fifth of the drive for |pilotBurn| s
@@ -185,6 +195,80 @@ void landsFromAChangedOrbit() {
     landed(fly(3000, PILOT_BURN, -15));
 }
 
+// The guidance's model of the air and the craft made wrong, the craft flying the core's own: the density
+// off by a quarter and a wave of 15 % in height, the lift and drag coefficients by a tenth, at the box's
+// corners. The guidance learns the error in flight, from what it feels against what it expects.
+void landsWithItsModelWrong() {
+    const ModelError corners[] = {
+        {0.75, 0.15, 0.0, 1.10, 0.90},   // the air thinner than it thinks, its lift over drag a fifth too high
+        {1.25, 0.15, 3.1, 0.90, 1.10},   // the air denser, its lift over drag a fifth too low
+        {0.75, 0.00, 0.0, 0.90, 1.10},
+        {1.25, 0.15, 1.6, 1.10, 0.90},
+    };
+    for (const ModelError& e : corners) {
+        std::printf("  the model's air x%.2f (wave %.2f), lift x%.2f, drag x%.2f\n", e.rho, e.wave, e.lift, e.drag);
+        landed(fly(800, IN_ORBIT, 0, e));
+    }
+}
+
+// Drawn at random, as the Monte Carlo draws them (monte_carlo, below): when the return starts, anywhere in
+// the day, and the model's error inside the box above.
+uint64_t mix(uint64_t z) {   // SplitMix64
+    z += 0x9e3779b97f4a7c15ULL;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+struct Draw { double engage; ModelError err; };
+Draw draw(uint64_t pool, int i, double rhoSpread = 0.25, double waveMax = 0.15, double coefSpread = 0.10) {
+    uint64_t z = mix(pool * 1000003ULL + (uint64_t)i);
+    auto u = [&](double a, double b) { z = mix(z); return a + (b - a) * ((z >> 11) * (1.0 / 9007199254740992.0)); };
+    Draw d;
+    d.engage = u(800, 87000);
+    d.err.rho = u(1 - rhoSpread, 1 + rhoSpread);
+    d.err.wave = u(0, waveMax);
+    d.err.phase = u(0, 6.283185307179586);
+    d.err.lift = u(1 - coefSpread, 1 + coefSpread);
+    d.err.drag = u(1 - coefSpread, 1 + coefSpread);
+    return d;
+}
+
+void landsWithItsModelWrongRoundTheDay() {
+    for (int i = 0; i < 4; ++i) {
+        const Draw d = draw(11, i);
+        std::printf("  draw %d: the model's air x%.2f (wave %.2f), lift x%.2f, drag x%.2f\n", i, d.err.rho, d.err.wave, d.err.lift, d.err.drag);
+        landed(fly(d.engage, IN_ORBIT, 0, d.err));
+    }
+}
+
+// The pilot takes the controls on the way down and gives them back: in the entry, in the glide, on the
+// final. The crew picks the flight home up from wherever the craft is.
+void landsWhenGivenBack() {
+    const double at[][2] = {{5500, 60}, {6900, 60}, {7700, 30}};
+    for (const auto& a : at) {
+        oc_reset(LAT, LON, HDG);
+        while (get(OC_T) < 800) oc_step(50);
+        oc_auto(OC_AUTO_RETURN);
+        while (get(OC_T) < a[0]) oc_step(1);
+        const int phase = (int)ret(OC_RET_PHASE);
+        oc_auto(OC_AUTO_OFF);
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+        while (get(OC_T) < a[0] + a[1]) oc_step(1);
+        oc_auto(OC_AUTO_RETURN);
+        std::printf("  the pilot's from %.0f s for %.0f s (phase %d), then the crew's again (phase %.0f)\n", a[0], a[1], phase, ret(OC_RET_PHASE));
+        Run r{};
+        r.engage = 800;
+        r.finite = true;
+        while (get(OC_T) < 30000 && get(OC_CRASHED) == 0 && ret(OC_RET_PHASE) != OC_RET_PH_STOPPED) {
+            oc_step(10);
+            if (get(OC_ON_GROUND) < 0.5 && get(OC_G) > r.maxG) r.maxG = get(OC_G);
+            r.finite = r.finite && finite();
+        }
+        r.tTouch = ret(OC_RET_TD_T);
+        landed(r);
+    }
+}
+
 // The same inputs, the same flight: the state's hash at the burn and at the stop.
 void theSameTwice() {
     const Run a = fly(1300), b = fly(1300);
@@ -247,14 +331,51 @@ const Test tests[] = {
     {"lands_from_starts_round_the_day", landsFromStartsRoundTheDay},
     {"lands_after_leaving_the_hub", landsAfterLeavingTheHub},
     {"lands_from_a_changed_orbit", landsFromAChangedOrbit},
+    {"lands_with_its_model_wrong", landsWithItsModelWrong},
+    {"lands_with_its_model_wrong_round_the_day", landsWithItsModelWrongRoundTheDay},
+    {"lands_when_given_back", landsWhenGivenBack},
     {"the_same_twice", theSameTwice},
     {"model_is_the_plant", modelIsThePlant},
     {"plan_says_when", planSaysWhen},
 };
 
+// The Monte Carlo, on demand (not a ctest): test_return monte_carlo <first> <count> <pool> [rho wave coef].
+// Runs first..first+count-1 of the pool, drawn as above (the spreads may be given), and prints a line for
+// each, then how many landed, with a 95 % Wilson interval. Shard a big pool across processes by first.
+int monteCarlo(int argc, char** argv) {
+    const int first = argc > 2 ? std::atoi(argv[2]) : 0, count = argc > 3 ? std::atoi(argv[3]) : 20;
+    const uint64_t pool = argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 1;
+    const double rho = argc > 5 ? std::atof(argv[5]) : 0.25, wave = argc > 6 ? std::atof(argv[6]) : 0.15, coef = argc > 7 ? std::atof(argv[7]) : 0.10;
+    int good = 0;
+    std::printf("run,outcome,engage_s,rho,wave,lift,drag,burn_s,cross_km,sink,along,off,stop_along,stop_off,heat_kW,load_g,qbar_Pa,prop_kg\n");
+    for (int i = first; i < first + count; ++i) {
+        const Draw d = draw(pool, i, rho, wave, coef);
+        const Run r = fly(d.engage, IN_ORBIT, 0, d.err);
+        const char* why = "landed";
+        if (!r.finite) why = "not-finite";
+        else if (get(OC_CRASHED) > 0) why = "crashed";
+        else if (ret(OC_RET_STOPPED) < 1) why = r.tBurn < 0 ? "no-plan" : "not-stopped";
+        else if (!(ret(OC_RET_TD_ALONG) > 0 && ret(OC_RET_TD_ALONG) < OC_RET_ZONE_M)) why = "outside-zone";
+        else if (std::fabs(ret(OC_RET_TD_OFF)) >= 3) why = "off-centreline";
+        else if (ret(OC_RET_TD_SINK) >= 2) why = "hard";
+        else if (!(ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M)) why = "overran";
+        else if (ret(OC_RET_OVER) != 0 || r.maxG >= OC_RET_LOAD_LIMIT || ret(OC_RET_HEAT_PEAK) >= OC_RET_HEAT_LIMIT) why = "limit";
+        good += std::strcmp(why, "landed") == 0;
+        std::printf("%d,%s,%.0f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.0f\n", i, why, d.engage, d.err.rho, d.err.wave, d.err.lift,
+                    d.err.drag, r.tBurn, r.cross / 1000, ret(OC_RET_TD_SINK), ret(OC_RET_TD_ALONG), ret(OC_RET_TD_OFF), ret(OC_RET_STOP_ALONG),
+                    ret(OC_RET_STOP_OFF), ret(OC_RET_HEAT_PEAK) / 1000, ret(OC_RET_LOAD_PEAK), ret(OC_RET_QBAR_PEAK), ret(OC_RET_PROP_USED));
+        std::fflush(stdout);
+    }
+    const double n = count, p = n > 0 ? good / n : 0, z = 1.96, dd = 1 + z * z / n, c = (p + z * z / (2 * n)) / dd;
+    const double h = z * std::sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / dd;
+    std::printf("# %d of %d landed (%.1f %%; 95 %% Wilson %.1f-%.1f %%)\n", good, count, 100 * p, 100 * (c - h), 100 * (c + h));
+    return 0;
+}
+
 }   // namespace
 
 int main(int argc, char** argv) {
+    if (argc > 1 && std::strcmp(argv[1], "monte_carlo") == 0) return monteCarlo(argc, argv);
     int ran = 0;
     for (const Test& t : tests) {
         if (argc > 1 && std::strcmp(argv[1], t.name) != 0) continue;

@@ -64,7 +64,7 @@ enum {
     OC_RET_HEAT,          /* W/m2: the stagnation point's heat flux (Sutton and Graves) */
     OC_RET_HEAT_PEAK,     /* W/m2, since the return was engaged (or since the start) */
     OC_RET_HEAT_LOAD,     /* J/m2: the flux, summed */
-    OC_RET_TEMP,          /* K: the surface in radiative equilibrium with the flux */
+    OC_RET_TEMP,          /* K: the surface in radiative equilibrium with the flux and the air round it */
     OC_RET_GLOW,          /* 0..1: how brightly the air glows round the craft, for the page */
     OC_RET_LOAD,          /* g: the felt acceleration, the wheels' part left out */
     OC_RET_LOAD_PEAK,     /* g, off the ground */
@@ -92,6 +92,11 @@ int oc_return_out_len(void);
    state: the predictor's forces, at the craft's present angle of attack and bank. Equal to OC_G in
    flight if the predictor and the flight are one model. */
 double oc_return_model_g(void);
+
+/* For tests of robustness: make the guidance's model of the air and the craft wrong. Its density becomes
+   the air's times rho (1 + wave sin(2 pi h / 12 km + phase)), its lift and drag coefficients the craft's
+   times lift and drag; the craft still flies the core's. Kept through oc_auto, cleared by oc_reset. */
+void oc_return_model_error(double rho, double wave, double phase, double lift, double drag);
 
 #ifdef __cplusplus
 }
