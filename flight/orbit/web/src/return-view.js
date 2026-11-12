@@ -65,17 +65,17 @@ export function returnStatus(r, s, { touch = false, skipping = false } = {}) {
     case RET_PH.depart:
       return { line: `HOME · LEAVING THE RING · clear in ${fmtWait(r.tEvent)}`, hint: skipping ? 'skipping ahead…' : `${k.skip} · ${k.take}` };
     case RET_PH.wait:
-      if (Math.round(r.event) !== RET_EV.burn) return { line: 'HOME · NO PASS WITHIN REACH YET · the crew looks again every 10 min', hint: k.take };
-      if (skipping) return { line: `HOME · SKIPPING AHEAD · the burn in ${fmtWait(r.tEvent)}`, hint: 'R again: stop skipping' };
-      return { line: `HOME · WAITING FOR THE PASS · the burn in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
+      if (Math.round(r.event) !== RET_EV.burn) return { line: 'HOME · NO PASS WITHIN REACH YET', hint: `the crew looks again every 10 min · ${k.take}` };
+      if (skipping) return { line: `HOME · SKIPPING · the burn in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
+      return { line: `HOME · WAITING · the burn in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
     case RET_PH.burn:
-      return { line: `HOME · DE-ORBIT BURN · ${r.dv.toFixed(0)} m/s, tail first`, hint: k.take };
+      return { line: `HOME · DE-ORBIT BURN · ${r.dv.toFixed(0)} m/s`, hint: k.take };
     case RET_PH.coast:
       return { line: `HOME · FALLING TO THE AIR · entry in ${fmtWait(r.tEvent)}`, hint: k.take };
     case RET_PH.entry:
       return { line: `HOME · ENTRY · Mach ${s.mach.toFixed(0)} · ${togo} to go`, hint: k.take };
     case RET_PH.terminal:
-      return { line: `HOME · TERMINAL AREA · ${togo} to go, ${fmtDistance(s.alt)} up`, hint: k.take };
+      return { line: `HOME · TERMINAL AREA · ${togo} to go`, hint: k.take };
     case RET_PH.approach:
       return { line: `HOME · APPROACH · 17C in ${togo}`, hint: k.take };
     case RET_PH.flare:
@@ -83,7 +83,7 @@ export function returnStatus(r, s, { touch = false, skipping = false } = {}) {
     case RET_PH.rollout:
       return { line: `HOME · ROLLOUT · ${s.tas.toFixed(0)} m/s`, hint: '' };
     case RET_PH.stopped:
-      return { line: `HOME · STOPPED ON 17C · ${fmtDistance(r.stopAlong)} past the threshold`, hint: k.reset };
+      return { line: `HOME · STOPPED ON 17C · ${fmtDistance(r.stopAlong)} down`, hint: k.reset };
     default:
       return null;
   }
@@ -348,6 +348,8 @@ function docked(core) {
 export const ret = {
   name: 'ret',
   skipping: false,
+  announce: false,
+  engagedAt: 0,
 
   init(ctx) {
     this.r = ctx.core.addBlock('ret', '_oc_return_out', '_oc_return_out_len', RET_OUT);
@@ -362,11 +364,12 @@ export const ret = {
     if (c !== 'return') return false;
     if (waiting) {
       if (this.skipping) { this.skipping = false; ctx.say('Stopped skipping'); return true; }
-      if (skipDone(r, auto, ctx.AUTO) === 'no pass in reach') { ctx.say('No pass within reach yet: nothing to skip to'); return true; }
+      if (!this.announce && skipDone(r, auto, ctx.AUTO) === 'no pass in reach') { ctx.say('No pass within reach yet: nothing to skip to'); return true; }
       this.skipping = true;
       ctx.say('Skipping ahead to the de-orbit burn…');
       return true;
     }
+    if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say('Home, stopped on 17C: Backspace starts again'); return true; }
     if (auto === ctx.AUTO.return) { ctx.say('The crew is flying home: Space takes the controls'); return true; }
     const may = canReturn(s, r);
     if (!may.ok) { ctx.say(may.why); return true; }
@@ -377,16 +380,20 @@ export const ret = {
     }
     ctx.core.auto(ctx.AUTO.return);
     ctx.core.read();
-    const ph = Math.round(r.phase);
-    if (ph === RET_PH.wait && Math.round(r.event) === RET_EV.burn) words += `: the burn in ${fmtWait(r.tEvent)}`;
-    if (ph === RET_PH.wait && Math.round(r.event) !== RET_EV.burn) words = 'No pass within reach from this orbit yet: the crew waits and looks again';
     ctx.say(words);
     this.skipping = false;
+    this.announce = Math.round(r.phase) === RET_PH.wait;   // the plan is made on the core's next step: say it then
+    this.engagedAt = ctx.core.s.t;
     return true;
   },
 
   update(ctx) {
     const core = ctx.core, r = this.r;
+    if (this.announce && core.s.t > this.engagedAt && Math.round(r.phase) === RET_PH.wait && Math.round(core.s.auto) === ctx.AUTO.return) {
+      this.announce = false;
+      if (Math.round(r.event) === RET_EV.burn) ctx.say(`The crew flies home to KDFW 17C: the de-orbit burn in ${fmtWait(r.tEvent)}`);
+      else ctx.say('No pass within reach from this orbit yet: the crew waits and looks again');
+    } else if (Math.round(r.phase) !== RET_PH.wait) this.announce = false;
     if (this.skipping) {
       // Step the core fast, within half the frame's time (14 to 60 ms), until the burn is near.
       const until = performance.now() + Math.min(60, Math.max(14, 500 * (ctx.dt || 0)));
