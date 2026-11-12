@@ -19,14 +19,14 @@ export const DOCK_OUT = [
 ];
 export const DPH = { none: 0, transfer: 1, align: 2, close: 3, captured: 4, docked: 5 };
 export const VERDICT = { none: 0, captured: 1, fast: 2, offset: 3, sliding: 4, angle: 5, roll: 6, rollRate: 7, slow: 8 };
-export const HIT = { none: 0, hull: 1, roof: 2, rim: 3, spoke: 4, hub: 5, port: 6 };
-export const PART = { none: 0, probe: 1, nose: 2, body: 3, leftWing: 4, rightWing: 5, tail: 6 };
+export const HIT = { none: 0, hull: 1, roof: 2, rim: 3, spoke: 4, hub: 5, port: 6, deck: 7, bulkhead: 8 };
+export const PART = { none: 0, probe: 1, nose: 2, body: 3, leftWing: 4, rightWing: 5, tail: 6, gear: 7 };
 export const REFUSED = { none: 0, docked: 1, crashed: 2, low: 3, far: 4, fast: 5 };
 
 const PHASE_WORDS = ['', 'to the hold point', 'lining up', 'closing', 'captured', 'docked'];
 const PHASE_LABELS = ['', 'TO HOLD POINT', 'LINING UP', 'CLOSING', 'CAPTURED', 'DOCKED'];
-const HIT_WORDS = ['nothing', 'the hull', 'the roof', 'a rim wall', 'a spoke', 'the hub', 'the port'];
-const PART_WORDS = ['nothing', 'the probe', 'the nose', 'the body', 'the left wing', 'the right wing', 'the tail'];
+const HIT_WORDS = ['nothing', 'the hull', 'the roof', 'a rim wall', 'a spoke', 'the hub', 'the port', 'the deck', 'a bulkhead'];
+const PART_WORDS = ['nothing', 'the probe', 'the nose', 'the body', 'the left wing', 'the right wing', 'the tail', 'the gear'];
 const REFUSED_WORDS = ['', 'docked already', 'crashed', 'not in orbit', 'more than 50 km from the Ring', 'passing the Ring faster than 50 m/s'];
 
 const round = (v) => Math.round(v);
