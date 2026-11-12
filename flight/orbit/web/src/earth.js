@@ -270,23 +270,36 @@ export class Earth {
     this.mesh = new THREE.Mesh(geometry, this.material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 10;
+    // whatever camera draws it (the view's, or the six of the reflected sky's cube) sets its own rays
+    this.viewportHeight = 1;
+    this.mesh.onBeforeRender = (renderer, scene, camera) => {
+      const target = renderer.getRenderTarget();
+      this.setCamera(camera, target && target.isWebGLCubeRenderTarget ? target.height : this.viewportHeight);
+    };
+  }
+
+  // The camera's part of the uniforms: its rays, its depth range, how wide a pixel is.
+  setCamera(camera, viewportHeight) {
+    const u = this.uniforms;
+    u.uInvProj.value.copy(camera.projectionMatrixInverse);
+    u.uCamWorld.value.copy(camera.matrixWorld);
+    camera.getWorldDirection(u.uCamFwd.value);
+    u.uPixelAngle.value = (camera.fov * Math.PI) / 180 / viewportHeight;
+    u.uNear.value = camera.near;
+    u.uFar.value = camera.far;
   }
 
   // camera: placed at the origin and pointed; earthCentre: the Earth's centre from the eye, three.js
   // axes; alt: the eye's height, from doubles; sun: unit, three.js axes; toEcef: {x, y, z} columns.
   update(camera, viewportHeight, earthCentre, alt, sun, toEcef) {
     const u = this.uniforms;
-    u.uInvProj.value.copy(camera.projectionMatrixInverse);
-    u.uCamWorld.value.copy(camera.matrixWorld);
-    camera.getWorldDirection(u.uCamFwd.value);
+    this.viewportHeight = viewportHeight;
+    this.setCamera(camera, viewportHeight);
     u.uEarthC.value.set(earthCentre[0], earthCentre[1], earthCentre[2]);
     u.uAlt.value = alt;
     u.uSun.value.set(sun[0], sun[1], sun[2]);
     const m = toEcef;
     u.uToEcef.value.set(m.x[0], m.y[0], m.z[0], m.x[1], m.y[1], m.z[1], m.x[2], m.y[2], m.z[2]);
-    u.uPixelAngle.value = (camera.fov * Math.PI) / 180 / viewportHeight;
-    u.uNear.value = camera.near;
-    u.uFar.value = camera.far;
     u.uClouds.value = Math.min(1, Math.max(0, (alt - 10000) / 50000));
     u.uGain.value = 1 - 0.45 * Math.min(1, Math.max(0, (alt - 15000) / 60000));
   }
@@ -317,6 +330,11 @@ export class Stars {
     this.points.frustumCulled = false;
     this.points.matrixAutoUpdate = false;
     this.points.renderOrder = 0;
+  }
+
+  dispose() {
+    this.points.geometry.dispose();
+    this.material.dispose();
   }
 
   // inertialToThree: the 3x3 that takes an inertial direction to three.js's axes, as {x, y, z} columns
