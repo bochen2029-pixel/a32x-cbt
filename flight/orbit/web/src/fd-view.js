@@ -6,7 +6,8 @@
 //     bank command among them), the throttle with its cue, and the ILS's localizer and glide slope to KDFW
 //     17C when they are received, from the runway's own geometry;
 //   - in the view, chase or cockpit, a single cue where the director wants the nose, and the nose's own
-//     mark, beside the velocity vector the HUD draws: fly the one onto the other.
+//     mark, beside the velocity vector the HUD draws: fly the one onto the other;
+//   - on an approach to 17C, the path to follow in the world: gates down the glide slope, a kilometre apart.
 // 8 cycles it: shown while you fly (the default), shown while the crew flies too, off. The deck's own
 // display and the docking reticle draw near the Ring, where the core's director says nothing, so two are
 // never drawn at once. The numbers are fd-hud.js's. GPLv3.
@@ -15,7 +16,9 @@ import * as THREE from 'three';
 import { validateAirport } from '../../../web/src/airport-layout.js';
 import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
 import { AUTO } from './core.js';
-import { FD_MODES, FD_MODE_WORDS, FD_PH, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, ilsDeviation, ilsGeometry, ilsShown } from './fd-hud.js';
+import {
+  FD_MODES, FD_MODE_WORDS, FD_PH, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, glidePathGates, ilsDeviation, ilsGeometry, ilsShown,
+} from './fd-hud.js';
 import { add, cross, scale, three } from './frames.js';
 
 const D2R = Math.PI / 180;
@@ -182,6 +185,25 @@ function drawViewCue(g, at, angle, colour, kind) {
   g.restore();
 }
 
+// ---- the path in the world ----------------------------------------------------------------------------
+
+// The glide path's gates (fd-hud.js), as lines in the site frame's three.js axes from the start point: the
+// mesh is placed from the eye each frame. Magenta, as the director's cues are; the distance shrinks them, so
+// the path reads as a tunnel down to the runway.
+function gatesMesh(gates) {
+  const pos = [];
+  for (const gate of gates) {
+    for (let k = 0; k < 4; k++) for (const c of [gate.corners[k], gate.corners[(k + 1) % 4]]) pos.push(...three(c));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  const lines = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xff6ad5, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+  lines.frustumCulled = false;
+  lines.visible = false;
+  lines.name = 'glide path';
+  return lines;
+}
+
 // ---- the feature (features.js) -------------------------------------------------------------------------
 
 export const fd = {
@@ -200,6 +222,8 @@ export const fd = {
     this.g = this.canvas.getContext('2d');
     this.drawn = false;
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    this.gates = gatesMesh(glidePathGates(this.geometry));
+    ctx.near.add(this.gates);
     this.sync(ctx);
   },
 
@@ -226,6 +250,9 @@ export const fd = {
     const flying = Math.round(s.auto) === AUTO.off || (Math.round(s.auto) === AUTO.return && s.alt < 8000) || this.mode === 'always';
     const ils = this.mode !== 'off' && flying && ilsShown(s, dev, this.geometry) ? dev : null;
     this.state = { shown, ils };
+    // the path in the world, placed from the eye like the field (main.js)
+    this.gates.visible = !!ils;
+    if (ils) this.gates.position.set(...ctx.rel([0, 0, 0]));
     const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (!shown && !ils) {
       if (this.drawn) { this.g.setTransform(1, 0, 0, 1, 0, 0); this.g.clearRect(0, 0, this.canvas.width, this.canvas.height); this.drawn = false; }

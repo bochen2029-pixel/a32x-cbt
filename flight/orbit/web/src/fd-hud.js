@@ -126,6 +126,23 @@ export function ilsDeviation(g, P, alt) {
   };
 }
 
+// The path to follow, drawn in the world: square gates down the glide slope and the localizer's course, every
+// km from 1 km to 18 km short of the threshold, w wide and h tall, centred where the craft's centre of mass
+// is on the path (its wheels on it, ILS.wheelsM under). In the site frame, which is the start point's plane:
+// the Earth falls away under it by d squared over 2R, and the gate with it. Each gate its four corners, in
+// order round, and its distance.
+export function glidePathGates(g, { from = 1000, to = 18000, every = 1000, w = 120, h = 60, RE = 6371000 } = {}) {
+  const gates = [];
+  for (let d = from; d <= to + 1e-6; d += every) {
+    const e = g.threshold[0] - g.course[0] * d, n = g.threshold[1] - g.course[1] * d;
+    const r = Math.hypot(e, n);
+    const up = (d + g.gpip) * Math.tan(g.glideDeg * D2R) + ILS.wheelsM - (r * r) / (2 * RE);
+    const corner = (sr, su) => [e + g.right[0] * sr * w / 2, n + g.right[1] * sr * w / 2, up + su * h / 2];
+    gates.push({ d, centre: [e, n, up], corners: [corner(-1, -1), corner(1, -1), corner(1, 1), corner(-1, 1)] });
+  }
+  return gates;
+}
+
 // Whether the ILS is worth showing: on an approach, which is to say off the ground, short of the threshold,
 // within 90 degrees of the course and below 8 km, with the localizer received (not taking off over it).
 export function ilsShown(s, dev, g) {
@@ -155,8 +172,9 @@ export function fdLines(s, shown, ils, id = '17C', narrow = false) {
     }
   }
   if (ils) {   // where the craft is: right of the course or left, above the path or below
-    const loc = ils.loc.valid ? `LOC ${Math.abs(ils.loc.dots).toFixed(1)} dot ${ils.loc.dots >= 0 ? 'right' : 'left'}` : 'LOC —';
-    const gs = ils.gs.valid ? `GS ${Math.abs(ils.gs.dots).toFixed(1)} dot ${ils.gs.dots >= 0 ? 'high' : 'low'}` : 'GS —';
+    const off = (dots, a, b, on) => (Math.abs(dots) < 0.05 ? on : `${Math.abs(dots).toFixed(1)} dot ${dots >= 0 ? a : b}`);
+    const loc = ils.loc.valid ? `LOC ${off(ils.loc.dots, 'right', 'left', 'on the course')}` : 'LOC —';
+    const gs = ils.gs.valid ? `GS ${off(ils.gs.dots, 'high', 'low', 'on the path')}` : 'GS —';
     lines.push(narrow ? `ILS ${loc} ${gs}` : `ILS  ${id}  ${loc}   ${gs}   ${fmtDistance(ils.distance)} to the threshold`);
   }
   return lines;

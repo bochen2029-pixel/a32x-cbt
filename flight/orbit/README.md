@@ -720,6 +720,10 @@ nothing: the docking reticle and the deck's display are drawn there.
   18 NM and 35° of the course; the glide slope is the PAPI's 3° through 50 ft over the threshold, a dot
   0.12 of its angle, received within 10 NM and 8°, judged at the wheels (the centre of mass's height less
   3 m). The crew's own approach puts its wheels 15 m over the threshold on 3°: the same path.
+- **The path to follow**, in the world on the same approach: magenta gates 120 m wide and 60 m tall down
+  the glide slope and the localizer's course, a kilometre apart from 18 km to 1 km out, each where the
+  craft's centre of mass is on the path, the Earth's curve under the start point's plane allowed for (25 m
+  at 18 km). Fly through them.
 - **8** cycles it: shown while you fly (the default, remembered), shown while the crew flies too (its bars
   then sit on the craft, as an autopilot's do), and off, when the core stops computing it. It leaves the
   tour running.
