@@ -3,9 +3,9 @@
 // whose port faces the way the crew arrives. Textures painted by code. GPLv3.
 
 import * as THREE from 'three';
-import { HUB_PORT_M } from './core.js';
+import { HUB_PORT_M, RING } from './core.js';
 
-export const RING = { floor: 5000, width: 1000, roof: 4700, hull: 5040, rimInner: 4620, hub: 160, spokes: 6 };
+export { RING };
 
 function rng(seed) {
   let s = seed >>> 0;
@@ -97,11 +97,11 @@ export class Ring {
     this.spin.add(new THREE.Mesh(new THREE.CylinderGeometry(R.floor, R.floor, R.width - 2, seg, 1, true), floor));
     // the rim walls, from the hull to above the roof
     for (const side of [-1, 1]) {
-      const wall = new THREE.Mesh(new THREE.RingGeometry(R.rimInner, R.hull, seg, 1), plain);
+      const wall = new THREE.Mesh(new THREE.RingGeometry(R.rim, R.hull, seg, 1), plain);
       wall.rotation.x = side > 0 ? -Math.PI / 2 : Math.PI / 2;
       wall.position.y = side * half;
       this.spin.add(wall);
-      const inner = new THREE.Mesh(new THREE.CylinderGeometry(R.rimInner, R.rimInner, 60, seg, 1, true), plain);
+      const inner = new THREE.Mesh(new THREE.CylinderGeometry(R.rim, R.rim, 60, seg, 1, true), plain);
       inner.position.y = side * (half - 30);
       this.spin.add(inner);
     }
@@ -115,7 +115,7 @@ export class Ring {
     });
     this.spin.add(new THREE.Mesh(new THREE.CylinderGeometry(R.roof - 2, R.roof - 2, R.width - 60, seg, 1, true), lattice));
     // spokes, hub to rim, in the middle plane
-    const spokeLength = R.rimInner - R.hub;
+    const spokeLength = R.rim - R.hub;
     for (let k = 0; k < R.spokes; k++) {
       const a = (k / R.spokes) * Math.PI * 2;
       const spoke = new THREE.Mesh(new THREE.BoxGeometry(70, 70, spokeLength), plain);

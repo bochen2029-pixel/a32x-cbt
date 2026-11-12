@@ -16,10 +16,27 @@ extern "C" {
 
 #define OC_DT 0.02 /* seconds per step: fifty steps a second, as the Airbus flies */
 
-/* who is flying: the pilot; the scripted crew (runway to orbit); or the crew's approach, which flies
-   to a point on the ring's axis, OC_STANDOFF_M off the hub's port, and holds there */
-enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2 };
-#define OC_HUB_PORT_M 350.0 /* from the ring's centre to the hub's port, along the axis */
+/* who is flying: the pilot; the scripted crew (runway to orbit); the crew's approach, which flies to
+   a point on the ring's axis, OC_STANDOFF_M off the hub's port, and holds there; the crew flying home
+   (orbit_return.h); the crew docking at the hub (orbit_dock.h) */
+enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN = 3, OC_AUTO_DOCK = 4 };
+
+/* The ring's shape, one for the core and the page. Its frame: the axis, fixed among the stars, and ref,
+   a unit vector in its plane that turns with it at OC_RING_SPIN about the axis. The floor and the roof
+   are cylinders about the axis, OC_RING_WIDTH_M long, centred on the ring's plane; the rim walls close
+   them from OC_RING_RIM_M out to the hull. Spoke k (of OC_RING_SPOKES) runs from the hub to the rim
+   along sin(2 pi k / OC_RING_SPOKES) ref + cos(2 pi k / OC_RING_SPOKES) (ref x axis), in the plane. The
+   hub is a cylinder on the axis, its port at -axis, OC_HUB_PORT_M from the centre. */
+#define OC_RING_SPIN 0.0443     /* rad/s: one g at the floor, a turn in 142 s */
+#define OC_RING_FLOOR_M 5000.0  /* radius of the floor */
+#define OC_RING_WIDTH_M 1000.0  /* the band's length along the axis */
+#define OC_RING_HULL_M 5040.0   /* radius of the hull, outside the floor */
+#define OC_RING_ROOF_M 4700.0   /* radius of the roof: 300 m over the floor */
+#define OC_RING_RIM_M 4620.0    /* inner radius of the rim walls */
+#define OC_RING_SPOKES 6
+#define OC_RING_SPOKE_M 70.0    /* a spoke's square section */
+#define OC_HUB_RADIUS_M 160.0
+#define OC_HUB_PORT_M 350.0     /* from the ring's centre to the hub's port, along the axis */
 #define OC_STANDOFF_M 300.0
 
 /* what the attitude hold points at, hands off, above the air */

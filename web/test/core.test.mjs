@@ -6,7 +6,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { AUTO, Core, DT, HUB_PORT_M, OUT, PH, STANDOFF_M } from '../src/core.js';
+import { AUTO, Core, DT, HUB_PORT_M, OUT, PH, RING, STANDOFF_M } from '../src/core.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const header = readFileSync(join(here, '..', '..', 'core', 'orbit_core.h'), 'utf8');
@@ -46,3 +46,12 @@ for (const [name, path, factory] of [['WebAssembly', built, 'createOrbitCore'], 
     assert.equal(hashes[0], hashes[1], 'the same flight twice');
   });
 }
+
+test('the ring\'s shape is the header\'s', () => {
+  const def = (name) => Number(header.match(new RegExp(`#define ${name}\\s+([0-9.]+)`))[1]);
+  assert.deepEqual(RING, {
+    spin: def('OC_RING_SPIN'), floor: def('OC_RING_FLOOR_M'), width: def('OC_RING_WIDTH_M'), hull: def('OC_RING_HULL_M'),
+    roof: def('OC_RING_ROOF_M'), rim: def('OC_RING_RIM_M'), spokes: def('OC_RING_SPOKES'), spoke: def('OC_RING_SPOKE_M'),
+    hub: def('OC_HUB_RADIUS_M'), port: def('OC_HUB_PORT_M'),
+  });
+});

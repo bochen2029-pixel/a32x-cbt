@@ -50,14 +50,16 @@ export class Hud {
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
   }
 
-  // s: readouts; view: { warp, view }; marks: screen points (null when behind) for velocity and Ring
-  draw(s, view, marks, now) {
+  // s: readouts; view: { warp, view }; marks: screen points (null when behind) for velocity and Ring;
+  // more: { extra: lines a feature adds, status: a feature's { line, hint } in place of the flight's }
+  draw(s, view, marks, now, more = {}) {
     this.place(this.fpm, marks.velocity);
     this.place(this.tgt, marks.ring);
     if (marks.ring) this.tgtLabel.textContent = fmtDistance(s.ringRange);
     if (now < this.next) return;
     this.next = now + 100;
-    const st = status(s, view.warp, this.touch);
+    const st = more.status || status(s, view.warp, this.touch);
+    const extra = more.extra || [];
     this.top.textContent = st.line;
     this.hint.textContent = st.hint;
     const vs = s.vs >= 0 ? `+${s.vs.toFixed(0)}` : s.vs.toFixed(0);
@@ -73,6 +75,7 @@ export class Hud {
         `APO ${apo}  PER ${peri}`,
         `THR ${(s.throttle * 100).toFixed(0)}%  PROP ${((s.prop / 30000) * 100).toFixed(0)}%  ${s.g.toFixed(1)} g`,
         `RING ${fmtDistance(s.ringRange)}  ${s.ringRate <= 0 ? '−' : '+'}${Math.abs(s.ringRate).toFixed(0)} m/s`,
+        ...extra,
       ].join('\n');
       return;
     }
@@ -85,6 +88,7 @@ export class Hud {
       `ORB  ${s.vorb.toFixed(0)} m/s   apo ${apo}   peri ${peri}   inc ${s.inc.toFixed(1)}°`,
       `ENG  thrust ${(s.throttle * 100).toFixed(0)}%   propellant ${(s.prop / 1000).toFixed(2)} t (${((s.prop / 30000) * 100).toFixed(0)}%)   gear ${s.gear > 0.5 ? 'DOWN' : 'up'}`,
       `RING ${fmtDistance(s.ringRange)}   ${rate}   rel ${vrel.toFixed(1)} m/s`,
+      ...extra,
     ].join('\n');
   }
 

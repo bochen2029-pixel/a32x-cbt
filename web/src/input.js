@@ -11,6 +11,9 @@ export const HELP = [
   ['1 2 3 4', 'attitude hold, prograde, retrograde, the Ring'],
   ['G  B', 'gear;  brakes'],
   ['T', 'in orbit: the crew flies the approach'],
+  ['P', 'the crew docks at the hub'],
+  ['R', 'the crew flies home to KDFW'],
+  ['Enter', 'docked: go aboard the Ring and walk'],
   ['O', 'skip ahead to orbit (crew)'],
   [', .', 'time slower / faster'],
   ['V', 'view: chase, cockpit, from the Ring'],
@@ -60,7 +63,7 @@ export class Input {
     if (down && !e.repeat) {
       const map = {
         ' ': 'crew', g: 'gear', b: 'brake', v: 'view', h: 'help', t: 'approach', o: 'orbit', ',': 'slower', '.': 'faster',
-        1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', z: 'full', x: 'cut', Backspace: 'reset',
+        1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
       };
       if (map[k] !== undefined) this.commands.push(map[k]);
     }

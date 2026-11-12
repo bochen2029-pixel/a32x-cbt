@@ -79,6 +79,35 @@ The readouts give the relative velocity to the Ring in the frame that turns with
 keeping station in the same orbit reads zero. The Ring's own frame does not turn that way, so a craft
 holding off its hub reads about 0.7 m/s there.
 
+## The parts, and what is coming
+
+The core is one program in parts, each with its own header, readouts and tests: `core/orbit_core.cpp`
+(the flight, the crew to orbit, the approach), `return.cpp` (the flight home), `dock.cpp` (docking and
+contact with the Ring), `walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
+page is the same: `web/src/main.js` flies and draws, and each further part is a module of its own
+(`web/src/features.js` lists them and says what each may do). The Ring's shape is one set of numbers,
+in `orbit_core.h`, that the core and the drawing both use.
+
+### Docking
+
+To come.
+
+### The walk
+
+To come.
+
+### The flight home
+
+To come.
+
+### The Sun and the Moon
+
+To come.
+
+### Graphics, from a phone to a big card
+
+To come.
+
 ## What is not
 
 Re-entry and landing back. Docking, and any contact with the Ring: the craft flies through it. The
@@ -116,7 +145,9 @@ node --test flight/orbit/web/test/
 `build-web/index.html` is the whole page in one file, about 1 MB; `build-web/page.html` is the same
 without the document's skeleton, for a host that wraps a page in its own.
 
-`flight/orbit/build/orbit_run 10 900` prints the crew's flight every 10 s for 900 s.
+Each part's tests are `test/test_<part>.cpp`, and ctest runs each test by the name it declares in a line
+reading `// TEST: <name>` (`ctest -R dock` runs docking's). `flight/orbit/build/orbit_run 10 900` prints
+the crew's flight every 10 s for 900 s.
 `web/data/land.js` is made by `node flight/orbit/web/tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>`.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
