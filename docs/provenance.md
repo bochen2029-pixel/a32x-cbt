@@ -258,6 +258,26 @@ Each further part of the sketch keeps its own sources here, in the subsection be
 | the signed distance of a point from a box | textbook geometry | the Ring's band, hub and spokes as boxes in the Ring's frame, which a sphere touches where its centre is nearer than its radius; each sphere is swept along its step in pieces shorter than half the smallest radius |
 | this project | — | every number: the probe's place and length, the six tolerances of the catch, the probe's spring, damper and stroke, the draw-in, the separation speed, the craft's spheres, the crew's way round the Ring and its closing profile, and the target painted on the hub's face |
 
+#### The flight deck
+
+`flight/orbit/core/deck.cpp`, `orbit_deck.h`, `deck_state.h`, `web/src/deck-view.js`, `deck-hud.js` and their
+tests are ours, GPLv3. What is taken below is taken as ideas and methods; no code is copied, and no number
+of a real aircraft, ship or station is used.
+
+| source | licence | what is taken |
+|---|---|---|
+| the F-35B's short take-off and vertical landing: a swivelling aft nozzle, a lift fan ahead of the centre of mass and roll posts in the wings, balanced so the lift passes through it; and its "unified" flight controls, in which the stick commands translational velocity in the hover and the throttle the vertical speed | general engineering knowledge of a publicly described aircraft; no document is copied | the ideas only: the drive swivelling from aft to straight down through the centre of mass, attitude bled from the drive while jet-borne, and the deck hold's stick as a velocity and throttle as a climb or sink. The swivel's rate, the posts' and jet's shares and every gain are this project's |
+| the instrument landing system: a localizer, a glide path, deviation needles and a flight director | general aviation knowledge | the idea of a beam to fly and needles that point to it; here a path in the Ring's turning frame, curved with the floor |
+| motion in a rotating frame, and plane polar coordinates (any text on classical mechanics, e.g. D. Kleppner and R. Kolenkow, *An Introduction to Mechanics*) | textbook | the centrifugal and Coriolis accelerations, and that in a cylinder about the Ring's axis, fixed among the stars, the motion is ρ̈ − ρψ̇² radially and ρψ̈ + 2ρ̇ψ̇ along: the laws work their thrust out from these exactly |
+| feedback linearisation (J.-J. E. Slotine and W. Li, *Applied Nonlinear Control*, 1991) | textbook method | asking for the deck coordinates' accelerations and cancelling the known dynamics to get the thrust, with linear loops on the errors |
+| the owner's booster-lander simulator (`bochen2029-pixel/booster-lander-simulator` at `e0e5769`: `core/guidance_hoverslam.c`, `CLAUDE_v1.md` §9.1 and §13.3), Bo Chen, 2026 | MIT | as ideas, read and not copied: a speed scheduled by the distance still to go at a constant deceleration, v = √(v₁² + 2 a d), the deceleration frozen when the burn starts so the profile does not steepen as the propellant goes (here the glide's bleed); a place loop that commands a capped velocity, then tracks it, so the approach decays without overshoot (here the hover); a touchdown judged by sink, drift and tilt against stated limits; and Monte-Carlo runs on fixed seeds with the worst case printed. No code |
+| P. R. Dahl, *A solid friction model*, The Aerospace Corporation, TOR-0158(3107-18)-1 (1968) | the report's idea | a contact that sticks as a stiff spring until friction gives way, the bristle idea, as the tyres' hold on the deck at rest. The spring, its damping and the friction are this project's |
+| K. Perlin, "Improving noise", *ACM Transactions on Graphics* 21 (2002), 681–682 | the paper's result | the quintic step 6x⁵ − 15x⁴ + 10x³, whose second derivative is nought at both ends, for the course onto the centreline |
+| this project | — | the deck's shape and the pads' places (with the Ring's drawing), the craft's hard points, the touchdown's tolerances and crash limits, the glide's height and side, the final's clearance and bend, the swivel's rate, the roll posts' and lift jet's authority, the tyres' spring and friction, the departure and the wait, every gain, the pads' paint and lights, and the approach display |
+
+The landing does not claim the fidelity of any real system: the drive is the sketch's one fiction, and a
+craft that lands like this on a turning deck has never been built.
+
 #### The walk
 
 Nothing taken from outside yet.

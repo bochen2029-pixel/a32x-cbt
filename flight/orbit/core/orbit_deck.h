@@ -23,10 +23,12 @@
 // brakes on and hands the craft to the pilot, held on the deck.
 //
 // The pilot's deck hold (oc_sas(OC_SAS_DECK)) is the F-35B's unified control, in the deck's frame: the
-// stick (fore and aft, left and right, in the nose's axes) accelerates the velocity it holds against the
-// deck, and with the stick centred near rest it holds its place; the throttle sets the climb or the sink,
-// centred holding the height, and near the deck the sink is eased to a touchdown's by itself; the pedals
-// turn the nose. The attitude and the swivel are the law's.
+// stick (fore and aft, left and right, in the nose's axes) is a velocity against the deck, 10 m/s at its
+// stops, and centred the hold keeps the craft's place along the deck and across it; held at a stop it also
+// winds up a speed that runs down when it is let go, so that a long way can be flown on the keys. The
+// throttle sets the climb or the sink, 8 m/s at its stops, its middle holding the height, and near the deck
+// the sink is eased to a touchdown's by itself; the pedals turn the nose. The attitude and the swivel are
+// the law's. On the deck, with no climb asked, the drive idles and the gear has it.
 //
 // The gear meets the floor as it meets the runway: a spring, a damper and the tyres' friction, against
 // the deck's motion. A touchdown inside the tolerances below is a landing; past the crash limits, or with
