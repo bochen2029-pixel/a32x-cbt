@@ -64,9 +64,9 @@ function urlPlace() {
 
 const v = {
   on: false, core: null, world: null, cam: null, warp: 1, debt: 0, look: { heading: 0, pitch: 0 },
-  prev: null, cur: null, drag: null, was: {}, pads: [], usePulse: false, touchJump: false, touchRun: false, touchBall: false,
+  prev: null, cur: null, drag: null, was: {}, usePulse: false, touchJump: false, touchRun: false, touchBall: false,
   pressed: new Set(),   // keys pressed since the last frame: a tap shorter than a frame still counts
-  hudNext: 0, sayUntil: 0, saved: null, lean: null, toEcef: null, sun: null, ballFrom: null, ballMark: null,
+  hudNext: 0, sayUntil: 0, saved: null, lean: null, toEcef: null, sun: null, ballMark: null,
 };
 
 function say(ctx, text) {
@@ -89,7 +89,7 @@ function start(ctx, place) {
   v.look = { heading: o.heading, pitch: o.pitch };
   v.prev = { ...o };
   v.cur = { ...o };
-  Object.assign(v, { on: true, debt: 0, warp: 1, lean: null, ballFrom: null, ballMark: null });
+  Object.assign(v, { on: true, debt: 0, warp: 1, lean: null, ballMark: null });
   v.world.markAt(null);
   if (!v.saved) {
     const help = document.getElementById('help'), button = document.querySelector('#buttons button[data-cmd="walk"]');
