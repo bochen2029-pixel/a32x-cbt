@@ -256,7 +256,17 @@ Nothing taken from outside yet.
 
 #### The walk
 
-Nothing taken from outside yet.
+`flight/orbit/core/walk.cpp` and `orbit_walk.h`, `flight/orbit/web/src/walk-*.js` are ours, GPLv3.
+
+| source | licence | what is taken |
+|---|---|---|
+| Newtonian mechanics in a rotating frame: the centrifugal and Coriolis terms | textbook | as a method: the walker's and a ball's motion in the ring's frame, held by its floors. The tests work each motion out again in the frame that does not turn, where it is a straight line |
+| the classical fourth-order Runge–Kutta method | textbook | as a method: free flight in the ring's frame |
+| C. Schlick, *An Inexpensive BRDF Model for Physically-based Rendering*, Computer Graphics Forum 13(3), 1994 | the paper's method | the Fresnel term of the canal's water and the lifts' glass, as a formula |
+| this project | — | the walker's size, pace, push, friction and jump; the hub's lobby; the lifts and their ride (the sideways push held to 1.5 m/s², the hub's easing at half the riders' weight, the braking); the floor's plan (streets, the canal and its bridges, the plazas, the paths, 1,500 blocks laid out from a seeded hash); the Sun's way into the band; the roof's lattice and lamps; the fill light and the haze; the signs, canvas text in the system's fonts |
+
+The walk's physics is Newton's; its numbers are chosen, and the place is drawn by code. It describes no real
+station.
 
 #### The flight home
 

@@ -99,16 +99,21 @@ const COMMON = /* glsl */ `
     return r > 0.01 ? vec3(-p.x, 0.0, -p.z) / r : vec3(0.0, 1.0, 0.0);
   }
   bool inHub(vec3 p) { return length(p.xz) < HUB + 0.5 && abs(p.y) < PORT; }
-  // Sunlight and the soft fill, on a surface of this colour at p facing n.
-  vec3 lit(vec3 albedo, vec3 p, vec3 n) {
+  // Sunlight and the soft fill, on a surface of this colour at p facing n; shaded by the roof's lattice or not.
+  vec3 litBy(vec3 albedo, vec3 p, vec3 n, bool lattice) {
     vec3 up = upAt(p);
     float ndu = dot(n, up);
     if (inHub(p)) return albedo * (uLobbyLight * (0.55 + 0.45 * ndu) + vec3(0.02));
     vec3 light = mix(uFillGround, uFillSky, 0.5 + 0.5 * ndu);
     float ndl = dot(n, uSun);
-    if (ndl > 0.0 && uSunLight.r + uSunLight.g > 0.0) light += uSunLight * ndl * sunReach(p + n * 0.05, uSun) * roofShade(p, uSun);
+    if (ndl > 0.0 && uSunLight.r + uSunLight.g > 0.0) {
+      float reach = sunReach(p + n * 0.05, uSun);
+      if (reach > 0.0 && lattice) reach *= roofShade(p, uSun);
+      light += uSunLight * ndl * reach;
+    }
     return albedo * light;
   }
+  vec3 lit(vec3 albedo, vec3 p, vec3 n) { return litBy(albedo, p, n, true); }
   vec3 hazed(vec3 colour, vec3 p) {
     float a = 1.0 - exp(-airPath(cameraPosition, p) / uHazeDist);
     return mix(colour, uHaze, a);
@@ -290,7 +295,7 @@ const ROOF_FRAGMENT = /* glsl */ `
     float lamp = bars(sc.y + HALF + 125.0, 250.0, 0.35, blur) * (1.0 - bars(sc.x, 12.5, 2.0, blur));
     vec3 n = upAt(p);
     if (dot(n, cameraPosition - p) < 0.0) n = -n;   // the side the eye sees
-    vec3 beam = lit(vec3(0.16, 0.17, 0.19), p, n);
+    vec3 beam = litBy(vec3(0.16, 0.17, 0.19), p, n, false);
     vec3 colour = beam * cover + vec3(1.0, 0.92, 0.8) * 3.0 * lamp;
     float alpha = clamp(cover + lamp + 0.07, 0.0, 1.0);
     colour = hazed(colour, p);
@@ -547,7 +552,7 @@ function buildCar(mats) {
   for (const x of [-DOOR, DOOR]) straightBox(frame, x - 0.06, x + 0.06, 0, H, CAR - 0.06, CAR + 0.06, metal, KIND.plain);   // the door's jambs
   straightBox(frame, -DOOR, DOOR, WALK.doorTall, WALK.doorTall + 0.1, CAR - 0.06, CAR + 0.06, metal, KIND.plain);
   for (const [x0, x1, z0, z1] of [[-CAR + 0.1, -CAR + 0.15, -CAR, CAR], [CAR - 0.15, CAR - 0.1, -CAR, CAR], [-CAR, CAR, -CAR + 0.1, -CAR + 0.15]]) {
-    straightBox(frame, x0, x1, 0.98, 1.04, z0, z1, [0.6, 0.6, 0.58], KIND.plain);              // the rail
+    straightBox(frame, x0, x1, 0.98, 1.04, z0, z1, [0.3, 0.3, 0.29], KIND.plain);              // the rail
   }
   straightBox(frame, -1.0, 1.0, H - 0.03, H, -1.0, 1.0, [1, 0.95, 0.85], KIND.lamp);            // its lamp
   const pane = (a, b, c, d, n) => glass.quad(a, b, c, d, n);
@@ -656,7 +661,16 @@ function buildLobby(boxes, mats) {
     for (let i = 0; i < seg; i++) {
       const a = (i / seg) * 2 * Math.PI, b = ((i + 1) / seg) * 2 * Math.PI;
       for (const [r0, r1] of [[0, 50], [50, 100], [100, RL]]) {
-        walls.quad(P(a, c, r0), P(b, c, r0), P(b, c, r1), P(a, c, r1), [0, facing, 0], [0.62, 0.62, 0.6], KIND.lobbyWall);
+        walls.quad(P(a, c, r0), P(b, c, r0), P(b, c, r1), P(a, c, r1), [0, facing, 0], [0.34, 0.35, 0.37], KIND.lobbyWall);
+      }
+    }
+  }
+  // lamps in the end walls: rings of them
+  for (const [c, facing] of [[WALK.lobbyC0, 1], [WALK.lobbyC1, -1]]) {
+    for (const [r, n] of [[40, 12], [85, 24], [128, 36]]) {
+      for (let i = 0; i < n; i++) {
+        const a = ((i + 0.5) / n) * 2 * Math.PI, w = 2.2 / r, cc = c + facing * 0.05;
+        walls.quad(P(a - w, cc, r - 1.2), P(a + w, cc, r - 1.2), P(a + w, cc, r + 1.2), P(a - w, cc, r + 1.2), [0, facing, 0], [1, 0.93, 0.8], KIND.lamp);
       }
     }
   }
@@ -676,7 +690,7 @@ function buildLobby(boxes, mats) {
   // the lifts' housings, from the core's plan
   for (const b of boxes) {
     if (b.zone !== WHERE.hub) continue;
-    bentBox(solid, B, b.s - b.half, b.s + b.half, b.c0, b.c1, b.h0, b.h1, [0.55, 0.56, 0.58], KIND.plain);
+    bentBox(solid, B, b.s - b.half, b.s + b.half, b.c0, b.c1, b.h0, b.h1, [0.7, 0.7, 0.68], KIND.plain);
   }
   // a lamp over each lift's door
   for (let k = 0; k < RING.spokes; k++) {
@@ -686,8 +700,34 @@ function buildLobby(boxes, mats) {
   const placed = new THREE.Group();   // the lobby is built about the axis: a bender's frame placed at radius RL, angle 0
   placed.position.set(0, 0, RL);
   placed.add(new THREE.Mesh(solid.geometry(), mats.box));
+  placed.add(sign('THE CRAFT', B, 0, WALK.lobbyC0 + 0.06, 2.85, 2.4));
+  for (let k = 0; k < RING.spokes; k++) placed.add(sign(`LIFT ${k + 1} · DOWN`, B, k * SECTOR * RL, CC + SHAFT + 0.06, 3.2, 2.4));
   group.add(new THREE.Mesh(floor.geometry(), mats.box), new THREE.Mesh(walls.geometry(), mats.box), placed);
   return group;
+}
+
+// A sign on a wall facing +c, in a bender's frame: words lit on a dark plate, s and h its middle, w wide.
+function sign(text, B, s, c, h, w) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 96;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#10161d';
+  g.fillRect(0, 0, 512, 96);
+  g.fillStyle = '#ffd36b';
+  g.font = '600 52px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 256, 50);
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 4;
+  const plate = new THREE.Mesh(new THREE.PlaneGeometry(w, (w * 96) / 512), new THREE.MeshBasicMaterial({ map }));
+  plate.position.set(...B.at(s, c, h));
+  // the plate's x along the floor (spinward at s), its y up there, its face toward +c
+  const sp = B.spin(s), up = B.up(s);
+  plate.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(...sp), new THREE.Vector3(...up), new THREE.Vector3(0, 1, 0)));
+  return plate;
 }
 
 // ---- the whole --------------------------------------------------------------------------------
@@ -726,6 +766,7 @@ export class WalkWorld {
         // in the holder's frame x is spinward and z outward: the leaves' own frame is x spinward, y up, z along the axis
         d.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 1, 0)));
         holder.add(d);
+        if (zone === WHERE.floor) holder.add(sign(`LIFT ${k + 1} · UP TO THE HUB`, B, 0, CC + SHAFT + 0.06, 2.8, 2.4));
         holder.userData = { k, zone, door: d, open: 0 };
         this.doors.push(holder);
         (zone === WHERE.hub ? this.lobby : this.band).add(holder);
