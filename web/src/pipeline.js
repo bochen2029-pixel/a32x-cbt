@@ -55,6 +55,11 @@ export class Pipeline {
     this.bloom = null;
     this.output = new OutputPass();
     this.output.renderToScreen = true;
+    // the picture is opaque whatever alpha the passes left in the target (an additive plume leaves 1, the
+    // Earth's ground 0): a canvas that is composited by its alpha would let the page show through
+    const read = 'gl_FragColor = texture2D( tDiffuse, vUv );';
+    if (!this.output.material.fragmentShader.includes(read)) throw new Error('three.js\'s output pass has changed: its alpha cannot be made opaque');
+    this.output.material.fragmentShader = this.output.material.fragmentShader.replace(read, 'gl_FragColor = vec4( texture2D( tDiffuse, vUv ).rgb, 1.0 );');
     this.width = 1;
     this.height = 1;
     this.divide = 1;
@@ -106,6 +111,7 @@ export class Pipeline {
   render(draw) {
     const r = this.renderer;
     r.info.reset();
+    r.setClearColor(0x000000, 1);
     if (!this.target) {
       r.setRenderTarget(null);
       r.clear();

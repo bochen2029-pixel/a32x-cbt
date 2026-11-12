@@ -43,15 +43,15 @@ function paintTop(T, seed) {
     for (let y = 0; y < h; ) {
       const ph = Math.round(sz * (0.9 + r() * 0.9));
       const v = r() < 0.08 ? 0.66 + r() * 0.06 : 0.77 + r() * 0.06;
-      p.rect(x, y, x + pw, y + ph, { albedo: [v, v, v * 0.985], height: 0.2, rough: 0.36 + r() * 0.12 });
-      p.seam(x, y, x + pw, y + ph, 1, 0.5, 0.86);
-      if (r() < 0.06) p.seam(x + pw * 0.2, y + ph * 0.2, x + pw * 0.8, y + ph * 0.8, 1, 0.3, 0.9);   // an access panel
+      p.rect(x, y, x + pw, y + ph, { albedo: [v, v, v * 0.985], height: 0.3, rough: 0.36 + r() * 0.12 });
+      p.seam(x, y, x + pw, y + ph, 1, 0.35, 0.93);
+      if (r() < 0.06) p.seam(x + pw * 0.2, y + ph * 0.2, x + pw * 0.8, y + ph * 0.8, 1, 0.25, 0.95);   // an access panel
       y += ph;
     }
     x += pw;
   }
   // rows of fasteners along the major seams
-  for (let x = 0; x < w; x += Math.round(sx * 4)) for (let y = 0; y < h; y += 3) p.rect(x, y, x + 1, y + 1, { tint: 0.85 });
+  for (let x = 0; x < w; x += Math.round(sx * 4)) for (let y = 0; y < h; y += 3) p.rect(x, y, x + 1, y + 1, { tint: 0.94 });
   // carbon at the leading edges and the nose, and round the cockpit's windows
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
     const x = TAIL + (i / w) * L, z = (j / h - 0.5) * SPAN;
@@ -103,7 +103,7 @@ function bodyMaterial(top, belly, settings, aniso) {
     belly: dataTexture(belly.albedoBytes(), belly.w, belly.h, { srgb: true, anisotropy: aniso }),
     topMask: dataTexture(top.maskBytes(), top.w, top.h, { anisotropy: aniso }),
     bellyMask: dataTexture(belly.maskBytes(), belly.w, belly.h, { anisotropy: aniso }),
-    topNormal: settings.normalMaps ? dataTexture(top.normalBytes(2), top.w, top.h, { anisotropy: aniso }) : null,
+    topNormal: settings.normalMaps ? dataTexture(top.normalBytes(0.7), top.w, top.h, { anisotropy: aniso }) : null,
     bellyNormal: settings.normalMaps ? dataTexture(belly.normalBytes(2), belly.w, belly.h, { anisotropy: aniso }) : null,
   };
   const m = new THREE.MeshStandardMaterial({
@@ -150,7 +150,7 @@ function plumeMaterial(steps, shared) {
     uniforms: {
       uThrottle: { value: 0 }, uDiamonds: { value: 0 }, uSpacing: { value: 2.5 }, uLength: { value: 10 }, uRadius: { value: 1 },
       uVacuum: { value: 0 }, uTime: shared.uTime, uExit: { value: BELL.exit },
-      uCore: { value: new THREE.Color(2.4, 3.2, 5.2) }, uSheath: { value: new THREE.Color(0.45, 0.75, 2.0) }, uDiamond: { value: new THREE.Color(7.0, 5.6, 6.4) },
+      uCore: { value: new THREE.Color(2.2, 2.7, 4.2) }, uSheath: { value: new THREE.Color(0.22, 0.42, 1.25) }, uDiamond: { value: new THREE.Color(9.0, 6.5, 7.5) },
     },
     defines: { STEPS: steps },
     vertexShader: /* glsl */ `
@@ -183,12 +183,15 @@ function plumeMaterial(steps, shared) {
         for (int i = 0; i < STEPS; i++) {
           vec3 q = o + d * (tIn + (float(i) + jitter) * dt);
           float x = max(-q.x, 0.0), xi = x / uLength, r2 = dot(q.yz, q.yz);
-          float w = uExit * (0.85 + xi * (0.9 + 7.0 * uVacuum));
-          float core = exp(-r2 / (w * w)) * exp(-xi * (3.0 + 1.0 * uVacuum)) * (uExit * uExit) / (w * w);
+          // the core: as wide as the mouth, hot for a few metres in the air, far longer and wider in vacuum
+          float w = uExit * (0.7 + xi * (0.5 + 7.0 * uVacuum));
+          float core = exp(-r2 / (w * w)) * exp(-x / mix(3.5, 24.0, uVacuum)) * (uExit * uExit) / (w * w);
+          // the diamonds: knots where the flow recompresses, past the first, fading downstream
           float n = x / uSpacing;
-          float knot = pow(0.5 + 0.5 * cos(6.2832 * n), 10.0) * exp(-n * 0.32) * smoothstep(0.3, 0.9, n) * uDiamonds;
-          float kr = uExit * (0.5 + 0.08 * n);
-          float sheath = exp(-r2 / (3.5 * w * w)) * exp(-xi * 2.2) * 0.2;
+          float knot = pow(max(0.0, 0.5 + 0.5 * cos(6.2832 * n)), 12.0) * exp(-n * 0.28) * smoothstep(0.4, 0.95, n) * uDiamonds;
+          float kr = uExit * (0.42 + 0.06 * n);
+          // and round it all a faint blue sheath, the length of the plume
+          float sheath = exp(-r2 / (2.5 * w * w)) * exp(-xi * 1.6) * 0.14;
           sum += (uCore * core + uDiamond * knot * exp(-r2 / (kr * kr)) + uSheath * sheath) * dt;
         }
         float flicker = 1.0 + 0.05 * sin(uTime * 61.0) + 0.04 * sin(uTime * 23.0 + 1.3);
@@ -366,6 +369,26 @@ export class Craft {
       door.rotation.x = leg.z >= 0 ? 1.2 : -1.2;
     }
 
+    // a soft shadow under the craft on the ground, where the tier draws no shadow map
+    this.contact = null;
+    if (!quality.shadowMap) {
+      const n = 64, a = new Uint8Array(n * n * 4);
+      for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+        const u = (i + 0.5) / n * 2 - 1, v = (j + 0.5) / n * 2 - 1, k = (j * n + i) * 4;
+        a[k] = a[k + 1] = a[k + 2] = 0;
+        a[k + 3] = Math.round(255 * Math.pow(Math.max(0, 1 - (u * u + v * v)), 1.6));
+      }
+      const tex = dataTexture(a, n, n);
+      // drawn over the field's painted layers, which pull themselves toward the eye by up to six (flight/web, airport.js)
+      const m = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.5, polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -16 });
+      this.textures.push(tex);
+      this.materials.push(m);
+      this.contact = new THREE.Mesh(new THREE.PlaneGeometry(31, 16).rotateX(-Math.PI / 2), m);
+      this.contact.renderOrder = 1;
+      this.group.add(this.contact);
+      this.owned.push(this.contact);
+    }
+
     // the lights
     const lightM = lightsMaterial(this.shared);
     this.materials.push(lightM);
@@ -388,10 +411,25 @@ export class Craft {
 
   // rel: the CG from the eye, three.js axes; fwd, up, right: the body's axes, three.js axes;
   // s: the core's readouts; t: seconds, for the flicker and the blinking.
-  update(rel, fwd, up, right, s, t, pixelRatio = null) {
+  // ground: the local vertical, three.js axes (optional), for the contact shadow.
+  update(rel, fwd, up, right, s, t, pixelRatio = null, ground = null) {
     this.group.position.set(rel[0], rel[1], rel[2]);
     const m = new THREE.Matrix4().makeBasis(new THREE.Vector3(...fwd), new THREE.Vector3(...up), new THREE.Vector3(...right));
     this.group.quaternion.setFromRotationMatrix(m);
+    if (this.contact) {
+      const near = ground && s.alt < 40;
+      this.contact.visible = Boolean(near);
+      if (near) {
+        // laid flat on the ground under the centre of mass, turned with the craft's heading, fainter higher up
+        const g = new THREE.Vector3(...ground).normalize(), f = new THREE.Vector3(...fwd);
+        f.addScaledVector(g, -f.dot(g)).normalize();
+        const flat = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(f, g, new THREE.Vector3().crossVectors(f, g)));
+        const inv = this.group.quaternion.clone().invert();
+        this.contact.quaternion.copy(inv).multiply(flat);
+        this.contact.position.copy(g.multiplyScalar(-(s.alt - 0.3)).applyQuaternion(inv));
+        this.contact.material.opacity = 0.75 * Math.max(0, 1 - s.alt / 40);
+      }
+    }
     this.gear.visible = s.gear > 0.5;
     this.shared.uTime.value = t;
     if (pixelRatio) this.shared.uPixelRatio.value = pixelRatio;

@@ -48,6 +48,18 @@ export class Hud {
     this.tgtLabel = root.querySelector('#target-label');
     this.next = 0;
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+    // on a touch screen the buttons used most sit under the thumbs; MORE opens the rest, and any of
+    // them, pressed, closes it again
+    const buttons = root.querySelector('#buttons'), more = root.querySelector('#btn-more');
+    if (buttons && more) {
+      const open = (on) => {
+        buttons.classList.toggle('open', on);
+        more.setAttribute('aria-expanded', String(on));
+        more.textContent = on ? 'LESS' : 'MORE';
+      };
+      more.addEventListener('click', () => open(!buttons.classList.contains('open')));
+      for (const b of buttons.querySelectorAll('button')) if (b !== more) b.addEventListener('click', () => open(false));
+    }
   }
 
   // s: readouts; view: { warp, view }; marks: screen points (null when behind) for velocity and Ring;

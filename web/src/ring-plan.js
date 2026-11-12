@@ -25,11 +25,38 @@ export const TILES = 4;                            // the floor's town repeats t
 export const TILE = (2 * Math.PI * RING.floor) / TILES;   // m of floor in one repeat
 export const SIDE_COLOURS = { [-1]: [1.0, 0.16, 0.1], 1: [0.15, 1.0, 0.35] };   // the port side's rims red, the far side's green
 
+// The open flight deck: a sector of the band with no roof, where a craft that can land upright sets down
+// on pads under the spin's 1 g. Its numbers are RING.deck where core.js has them (orbit_core.h's
+// OC_DECK_*), else these, the same: centred `angle` degrees round in the spokes' own convention (midway
+// between spokes 0 and 1), `arc` m of floor long, sealed from the town at each end by a bulkhead
+// `bulkhead` m thick standing just outside it. Its pads, `pads` of them `padSpacing` apart on its
+// centreline, each `padRadius` m across, are the deck's own part of the page to draw (deck-view.js).
+export const DECK = RING.deck || { angle: 30, arc: 1500, bulkhead: 20, pads: 3, padSpacing: 400, padRadius: 25 };
+export const DECK_A = (DECK.angle * Math.PI) / 180;         // the sector's middle, rad
+export const DECK_HALF = DECK.arc / 2 / RING.floor;         // its half-angle at the floor, rad
+export const DECK_WALL = DECK.bulkhead / RING.floor;        // a bulkhead's thickness, as an angle at the floor
+export const DECK_DOOR = { half: 280, top: RING.floor - 210 };   // each bulkhead's hangar door: 560 m wide, 210 m tall
+
 const TAU = 2 * Math.PI;
 const at = (r, a, y) => [r * Math.sin(a), y, r * Math.cos(a)];
 const round = (a) => [Math.cos(a), 0, -Math.sin(a)];   // the way round, at angle a
 
 export function spokeAngle(k) { return (k / RING.spokes) * TAU; }
+
+// How far round from the deck's middle angle a is, rad, -pi to pi.
+export function fromDeck(a) { return Math.atan2(Math.sin(a - DECK_A), Math.cos(a - DECK_A)); }
+
+// Whether angle a is over the open deck, its bulkheads included where `walls`.
+export function onDeck(a, walls = true) { return Math.abs(fromDeck(a)) < DECK_HALF + (walls ? DECK_WALL : 0); }
+
+// The bulkheads: one at each end of the deck, from the floor up past the roof's edge and from end wall
+// to end wall. a: the middle of its thickness; face: the angle of its face toward the deck.
+export function bulkheads() {
+  return [-1, 1].map((side) => ({
+    side, a: DECK_A + side * (DECK_HALF + DECK_WALL / 2), face: DECK_A + side * DECK_HALF,
+    r0: RING.roof - 12, r1: RING.floor, y: HALF - 2,
+  }));
+}
 
 // A member: a box from a to b, w across along `up` (made square to the length), t through the third way.
 function member(a, b, w, t, up, shade = 1) { return { a, b, w, t, up, shade }; }
@@ -139,10 +166,36 @@ export function lights(settings) {
   for (let j = 0; j < 12; j++) add(spin, at(60, (j / 12) * TAU, -HUB_PORT_M - 2), [9, 9, 9], 2.4, [1.2, j / 12, 0.18]);
   for (let j = 0; j < 4; j++) add(spin, at(RING.hub - 6, (j / 4) * TAU + Math.PI / 4, -HUB_PORT_M - 2), [10, 10, 10], 2.6, [2.0, 0.5, 0.06]);
   for (const r of radiators()) add(spin, at(r.r1 + 4, r.a, (r.y0 + r.y1) / 2), [10, 10, 10], 2.4, [3.0, r.a / TAU, 0.05]);
+  // the deck: a row along each edge, clear of the centreline and its pads; the hangar doors' outlines
+  // and the windows over them; a red beacon at each bulkhead's top corners
+  for (let s = -DECK.arc / 2 + 25; s <= DECK.arc / 2 - 25; s += 50) {
+    for (const side of [-1, 1]) add(spin, at(RING.floor - 1.5, DECK_A + s / RING.floor, side * (INNER - 40)), [4, 6, 9], 1.8);
+  }
+  for (const b of bulkheads()) {
+    const pull = -b.side * (2 / RING.floor);   // a couple of metres out from the face, over the deck
+    for (let y = -DECK_DOOR.half; y <= DECK_DOOR.half; y += 20) add(spin, at(DECK_DOOR.top - 3, b.face + pull, y), [9, 7, 3.5], 1.8);
+    for (let r = DECK_DOOR.top; r < RING.floor - 4; r += 20) for (const y of [-DECK_DOOR.half, DECK_DOOR.half]) add(spin, at(r, b.face + pull, y), [9, 7, 3.5], 1.8);
+    for (let y = -170; y <= 170; y += 7) for (const r of [RING.roof + 26, RING.roof + 38]) add(spin, at(r, b.face + pull, y), [5, 4.2, 3.2], 1.4, null, true);
+    for (const y of [-(INNER - 12), INNER - 12]) add(spin, at(b.r0 + 4, b.face + pull, y), [10, 0.7, 0.35], 2.6, [1.5, b.side > 0 ? 0 : 0.5, 0.3]);
+  }
   // the mast's tip and the arrays' wingtips
   add(still, [0, MAST.y1 + 6, 0], [10, 0.8, 0.4], 2.8, [1.0, 0, 0.5]);
   for (const y of ARRAYS.at) for (const s of [-1, 1]) add(still, [s * (ARRAYS.root + ARRAYS.span + 3), y, 0], s < 0 ? [8, 0.6, 0.3] : [0.4, 7, 1.6], 2.2);
   return { spin, still };
+}
+
+// Every building of every repeat of the town, as it stands round the Ring: u is now m round from angle 0,
+// and none stands on the deck or its bulkheads. Heights differ a little from one repeat to the next.
+export function standing(plan = town()) {
+  const r = rng(77), out = [];
+  for (let t = 0; t < TILES; t++) {
+    for (const b of plan.buildings) {
+      const h = b.h * (0.75 + r() * 0.5), u0 = b.u0 + t * TILE, u1 = b.u1 + t * TILE;
+      if (onDeck(u0 / RING.floor) || onDeck(u1 / RING.floor) || onDeck((u0 + u1) / 2 / RING.floor)) continue;
+      out.push({ ...b, u0, u1, h });
+    }
+  }
+  return out;
 }
 
 // The town on the floor, one repeat of it: u along the floor round the Ring (0 to TILE), v across it
