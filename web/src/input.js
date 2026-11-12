@@ -17,6 +17,7 @@ export const HELP = [
   ['O', 'skip ahead to orbit (crew)'],
   [', .', 'time slower / faster'],
   ['V', 'view: chase, cockpit, from the Ring'],
+  ['N', 'the Moon through a telescope, and back'],
   ['drag, wheel', 'look around the craft, zoom'],
   ['H', 'this help'],
   ['Backspace', 'start again'],
@@ -64,6 +65,7 @@ export class Input {
       const map = {
         ' ': 'crew', g: 'gear', b: 'brake', v: 'view', h: 'help', t: 'approach', o: 'orbit', ',': 'slower', '.': 'faster',
         1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
+        n: 'moon',
       };
       if (map[k] !== undefined) this.commands.push(map[k]);
     }
