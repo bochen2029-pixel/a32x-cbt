@@ -194,10 +194,14 @@ const FRAGMENT = /* glsl */ `
         float L = t1 - t0;
         vec3 od = vec3(0.0);
         vec3 sumR = vec3(0.0), sumM = vec3(0.0);
+        // the samples packed toward where the air is: near the eye from low down, near the ground when
+        // looking down from above most of it (air.js holds the same two lines to a fine reference)
+        bool deep = tEarth > 0.0 && uAlt > HR;
         for (int i = 0; i < VIEW_STEPS; i++) {
           float s0 = float(i) / float(VIEW_STEPS), s1 = float(i + 1) / float(VIEW_STEPS);
-          float t = t0 + L * (0.5 * (s0 * s0 + s1 * s1));
-          float ds = L * (s1 * s1 - s0 * s0);
+          float a0 = deep ? 1.0 - (1.0 - s0) * (1.0 - s0) : s0 * s0, a1 = deep ? 1.0 - (1.0 - s1) * (1.0 - s1) : s1 * s1;
+          float t = t0 + L * 0.5 * (a0 + a1);
+          float ds = L * (a1 - a0);
           vec3 p = o + d * t;
           vec3 dens = density(max(length(p) - RE, 0.0));
           od += dens * ds * 0.5;

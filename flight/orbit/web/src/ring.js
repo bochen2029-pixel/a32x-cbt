@@ -685,7 +685,7 @@ export class Ring {
     }
     const tubes = [], towers = [];
     for (let k = 0; k < RING.spokes; k++) {
-      const a = spokeAngle(k), len = RING.rim - COLLAR.r;
+      const a = spokeAngle(k), len = RING.roof - COLLAR.r;
       const dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
       const tube = new THREE.CylinderGeometry(9, 9, len, 16, 1, true).rotateX(Math.PI / 2).rotateY(a);
       tube.translate(...dir.clone().multiplyScalar(COLLAR.r + len / 2).toArray());
@@ -801,7 +801,7 @@ export class Ring {
     // the lift cars, up and down their tubes, a few minutes a trip
     for (const c of this.cars) {
       const f = 0.5 + 0.5 * Math.sin(t * 0.012 * c.dir + c.phase * TAU);
-      const r = COLLAR.r + 40 + f * (RING.rim - COLLAR.r - 80);
+      const r = COLLAR.r + 40 + f * (RING.roof - COLLAR.r - 80);
       c.car.position.set(Math.sin(c.a) * r, 0, Math.cos(c.a) * r);
     }
   }

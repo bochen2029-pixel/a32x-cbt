@@ -15,7 +15,7 @@ export function ringDepth(y, r, centre) {
   const band = Math.hypot(Math.max(0, Math.abs(y) - (HALF + 12)), Math.max(0, RING.rim - 60 - r, r - RING.hull - 12));
   const hubY = y < -HUB_PORT_M - 4 ? -HUB_PORT_M - 4 - y : y > MAST.y1 + 12 ? y - MAST.y1 - 12 : 0;
   const hub = Math.hypot(hubY, Math.max(0, r - RADIATORS.r1 - 6));
-  const spokes = Math.hypot(Math.max(0, Math.abs(y) - RING.spoke), Math.max(0, r - RING.rim));
+  const spokes = Math.hypot(Math.max(0, Math.abs(y) - RING.spoke), Math.max(0, r - RING.roof));
   return { min: Math.min(band, hub, spokes), max: centre + RING.hull + 60 };
 }
 

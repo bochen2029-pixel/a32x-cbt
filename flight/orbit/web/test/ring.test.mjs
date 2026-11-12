@@ -19,7 +19,7 @@ test('every member stands within the Ring\'s own shape', () => {
       for (const p of [m.a, m.b]) {
         const r = radius(p), y = p[1];
         const inBand = r >= RING.rim - 60 && r <= RING.hull + 10 && Math.abs(y) <= HALF + 12;
-        const inSpokes = r >= RING.hub - 1 && r <= RING.rim + 1 && Math.abs(y) <= RING.spoke;
+        const inSpokes = r >= RING.hub - 1 && r <= RING.roof + 1 && Math.abs(y) <= RING.spoke;
         const inHub = r <= COLLAR.r + 45 && y >= -HUB_PORT_M && y <= HUB_PORT_M;
         assert.ok(inBand || inSpokes || inHub, `${t}: a member's end at r ${r.toFixed(0)} m, y ${y.toFixed(0)} m`);
       }
@@ -38,7 +38,7 @@ test('the port\'s face is left clear for docking\'s markings', () => {
   assert.ok(MAST.y0 >= HUB_PORT_M, 'and the arrays\' mast on the far face');
 });
 
-test('each spoke runs from the collar to the rim, where core.js puts it', () => {
+test('each spoke runs from the collar to the roof, where core.js puts it and the band\'s solid starts', () => {
   for (const t of TIERS) {
     const st = structure(SETTINGS[t].ring);
     for (let k = 0; k < RING.spokes; k++) {
@@ -48,7 +48,8 @@ test('each spoke runs from the collar to the rim, where core.js puts it', () => 
       const mine = st.spokes.filter((m) => across(m.a) <= RING.spoke && across(m.b) <= RING.spoke && along(m.a) > 0 && along(m.b) > 0);
       const reach = mine.flatMap((m) => [along(m.a), along(m.b)]);
       assert.ok(mine.length > 0, `${t}: spoke ${k} is drawn`);
-      assert.ok(Math.abs(Math.min(...reach) - COLLAR.r) < 1 && Math.abs(Math.max(...reach) - RING.rim) < 1, `${t}: spoke ${k} reaches ${Math.min(...reach).toFixed(0)} to ${Math.max(...reach).toFixed(0)} m`);
+      assert.ok(Math.abs(Math.min(...reach) - COLLAR.r) < 1 && Math.abs(Math.max(...reach) - RING.roof) < 1, `${t}: spoke ${k} reaches ${Math.min(...reach).toFixed(0)} to ${Math.max(...reach).toFixed(0)} m`);
+      assert.ok(mine.every((m) => Math.max(m.w, m.t) <= RING.spoke), 'within the spoke\'s section');
     }
   }
 });

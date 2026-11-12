@@ -23,6 +23,7 @@ import { Pipeline } from './pipeline.js';
 import { PROBE, SETTINGS, nextChoice, pixelRatioFor, probeVerdict, resolveTier } from './quality.js';
 import { Ring } from './ring.js';
 import { depthSlices, ringDepth } from './slices.js';
+import { AIR_LAW_PA, inertialVelocity, keepAbove } from './view-math.js';
 
 const NEAR = 3e5;                                   // m: nearer than this is drawn in the near pass
 const EXPOSURE = 1.4;                               // for AgX: a sunlit grey card at middle grey
@@ -320,7 +321,7 @@ async function main() {
     const side = cross(h, up);
     const dir = add(scale(h, Math.cos(look.az)), scale(side, Math.sin(look.az)));
     const back = add(scale(dir, -Math.cos(look.el)), scale(up, Math.sin(look.el)));
-    const eye = add(P, scale(back, look.dist));
+    const eye = keepAbove(add(P, scale(back, look.dist)), up);   // never under the ground, however the drag swings it
     return { eye, target: add(P, scale(up, 2.5)), up };
   }
 
@@ -472,6 +473,8 @@ async function main() {
     else {
       const a = (s.alpha * Math.PI) / 180, b = (s.beta * Math.PI) / 180;
       vel = add(add(scale(axes.fwd, Math.cos(a) * Math.cos(b)), scale(axes.right, Math.sin(b))), scale(axes.down, Math.sin(a) * Math.cos(b)));
+      // above the air the marker shows the velocity in space, prograde as the PROGRADE hold flies it
+      if (s.qbar < AIR_LAW_PA) vel = inertialVelocity(scale(vel, s.tas), P, START.lat);
     }
     const moving = length(vel) > 0.5 && (s.tas > 5 || s.ringRange < 2e5);
     hud.draw(s, { warp: state.skipping ? 'MAX' : state.warp, view: VIEWS[state.view] }, {
