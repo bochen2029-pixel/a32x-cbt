@@ -78,6 +78,7 @@ export const tour = {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.button?.setAttribute('aria-pressed', 'false');
     this.box.classList.remove('shown');
+    delete this.box.dataset.title;
     if (why) ctx.say(why);
   },
 
@@ -117,6 +118,9 @@ export const tour = {
       if (i >= 0) ctx.state.view = i;
     }
     if (out.caption) {
+      // a soft tone as each part's caption first shows; no words spoken
+      if (out.caption.title !== this.box.dataset.title && ctx.sound && ctx.sound.cue) ctx.sound.cue('chime');
+      this.box.dataset.title = out.caption.title;
       this.box.innerHTML = '';
       const b = document.createElement('b');
       b.textContent = out.caption.title;
