@@ -65,7 +65,7 @@ function member(a, b, w, t, up, shade = 1) { return { a, b, w, t, up, shade }; }
 export function structure(settings) {
   const out = { spokes: [], yokes: [], rims: [], ribs: [], stringers: [], hub: [] };
   const S = RING.spoke, h = S / 2;
-  const r0 = COLLAR.r, r1 = RING.rim;
+  const r0 = COLLAR.r, r1 = RING.roof;   // to the roof, where the band's solid starts: the lift runs on down to the floor
   // the spokes: square trusses, four chords, a batten round each station and a diagonal on each face
   for (let k = 0; k < RING.spokes; k++) {
     const a = spokeAngle(k), e = round(a), d = [Math.sin(a), 0, Math.cos(a)];
@@ -150,13 +150,13 @@ export function lights(settings) {
   const every = settings.struts ? 220 : 440;
   for (let k = 0; k < RING.spokes; k++) {
     const a = spokeAngle(k), e = round(a), h = RING.spoke / 2 + 2;
-    for (let r = COLLAR.r + every; r < RING.rim - 50; r += every) {
+    for (let r = COLLAR.r + every; r < RING.roof - 50; r += every) {
       for (const [i, j] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
         const c = at(r, a, j * h);
         add(spin, [c[0] + e[0] * i * h, c[1], c[2] + e[2] * i * h], [6, 6, 6.5], 1.4);
       }
     }
-    for (const r of [COLLAR.r + 30, RING.rim - 70]) add(spin, at(r, a, -h - 4), [8, 0.6, 0.3], 2.6, [1.6, k / RING.spokes, 0.25]);
+    for (const r of [COLLAR.r + 30, RING.rim - 70]) add(spin, at(r, a, -h - 4), [8, 0.6, 0.3], 2.6, [1.6, k / RING.spokes, 0.25]);   // the lower one clear of the rims' girders
   }
   // the hub: rings round the barrel, the port's approach lights, strobes at the radiators' tips
   for (const y of [-300, -200, -100, 100, 200, 300]) {
