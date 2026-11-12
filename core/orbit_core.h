@@ -39,8 +39,9 @@ enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN =
 #define OC_HUB_PORT_M 350.0     /* from the ring's centre to the hub's port, along the axis */
 #define OC_STANDOFF_M 300.0
 
-/* what the attitude hold points at, hands off, above the air */
-enum { OC_SAS_HOLD = 0, OC_SAS_PROGRADE = 1, OC_SAS_RETROGRADE = 2, OC_SAS_TARGET = 3 };
+/* what the attitude hold points at, hands off, above the air. OC_SAS_PORT holds the craft lined up on
+   the hub's port and turning with it (orbit_dock.h), so a pilot docking by hand flies translation only */
+enum { OC_SAS_HOLD = 0, OC_SAS_PROGRADE = 1, OC_SAS_RETROGRADE = 2, OC_SAS_TARGET = 3, OC_SAS_PORT = 4 };
 
 /* the scripted crew's phases, in order */
 enum {

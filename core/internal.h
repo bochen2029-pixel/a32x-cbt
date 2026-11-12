@@ -191,11 +191,15 @@ void returnHash(const State& s, unsigned& h);
 
 void dockReset(State& s);
 void dockEngage(State& s);                                     // oc_auto(OC_AUTO_DOCK)
-bool dockRide(State& s);                                       // true while docked: the step is the ring's
+bool dockRide(State& s);                                       // true while held by the ring: the step is the ring's
 void dockCrew(State& s, const Local& L, double* throttle);
 void dockAfterStep(State& s);                                  // contact with the ring, capture
 void dockWriteOut(const State& s);
 void dockHash(const State& s, unsigned& h);
+V3 dockHoldRates(const State& s);                              // OC_SAS_PORT: lined up on the port, turning with it
+V3 dockSafeAim(const State& s, V3 goal);                       // goal, or the next corner of a way to it round the ring
+
+void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 
 // sky.cpp: where the Sun and the Moon are, for the flight's date and time; sets sunEci at oc_reset.
 void skyReset(const Site& site);

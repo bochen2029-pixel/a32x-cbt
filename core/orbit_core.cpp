@@ -472,7 +472,7 @@ void approach(State& s, const Local& L, double* throttle) {
     *throttle = 0;
     s.brake = 0;
     s.steer = 0;
-    const V3 dr = s.r - holdPoint(t), dv = s.v - ringVel(t);
+    const V3 dr = s.r - dockSafeAim(s, holdPoint(t)), dv = s.v - ringVel(t);   // round the ring, not through it (dock.cpp)
     const double d = norm(dr);
     const double speed = std::fmin(40.0, std::fmin(std::sqrt(2 * 0.25 * d), 0.1 * d));
     const V3 want = d > 1e-3 ? dr * (-speed / d) : V3{0, 0, 0};
@@ -512,6 +512,7 @@ void pilot(State& s, const Local& L, double* throttle) {
             else if (s.sas == OC_SAS_RETROGRADE) target = attitudeToward(s.v * -1.0, L.up, 0, s.q);
             else if (s.sas == OC_SAS_TARGET && ring.valid) target = attitudeToward(ringPos(t) - s.r, L.up, 0, s.q);
             wc = ratesToward(s, target, 1.0, 0.25);
+            if (s.sas == OC_SAS_PORT && ring.valid) wc = dockHoldRates(s);   // lined up on the port, turning with it (dock.cpp)
         }
     }
     s.rcs = V3{clampd(hands.tx, -1, 1), clampd(hands.ty, -1, 1), clampd(hands.tz, -1, 1)} * RCS_ACC;
@@ -521,8 +522,8 @@ void pilot(State& s, const Local& L, double* throttle) {
 // ---- one step -----------------------------------------------------------------------------------
 
 void stepOnce(State& s) {
+    if (dockRide(s)) { ++s.n; return; }   // docked, or wrecked on the ring: the ring carries the craft (dock.cpp)
     if (s.crashed) { ++s.n; return; }
-    if (dockRide(s)) { ++s.n; return; }   // docked: the hub carries the craft (dock.cpp)
     const Local L = localOf(s);
     s.rcs = {0, 0, 0};
     double throttle = 0;
@@ -696,7 +697,7 @@ void oc_auto(int mode) {
 }
 
 void oc_sas(int mode) {
-    g.sas = mode >= OC_SAS_HOLD && mode <= OC_SAS_TARGET ? mode : OC_SAS_HOLD;
+    g.sas = mode >= OC_SAS_HOLD && mode <= OC_SAS_PORT ? mode : OC_SAS_HOLD;
     g.holdValid = 0;
     writeOut();
 }
