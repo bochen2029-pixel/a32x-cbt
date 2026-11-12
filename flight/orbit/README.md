@@ -36,6 +36,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | V | B | view: chase, cockpit, from the Ring |
 | drag, wheel | | look round the craft, zoom |
 | H, Backspace | | help, start again |
+| Y | | sound off, on (it starts on the first key or tap) |
 
 On a touch screen: a stick under the left thumb, a throttle under the right, and the buttons.
 
@@ -108,11 +109,64 @@ To come.
 
 To come.
 
+### The map and the sound
+
+**The sound** (`web/src/sound.js`, the instrument; `web/src/sound-mix.js`, what it plays as numbers) is
+made as it plays by the browser's own Web Audio nodes: no sound file, sample or recording anywhere. A
+browser lets a page sound only after the user acts, so it starts on the first key, click or tap; **Y** or
+SOUND mutes and unmutes it, the wheel over SOUND sets the volume, and the page remembers both. It only
+listens: it reads the readouts and writes nothing back.
+
+The ear is aboard in the cockpit view and with the camera in the others, and what reaches it comes three
+ways. Through the air: the drive's roar, its bright edge and its crackle (shocklets at random, up to 900 a
+second, more and harder with the throttle), the wind over the skin, an entry's plasma; each as strong as
+the air is dense, so the drive fades with height to nothing. Through the structure: the drive's rumble,
+a drone and a metallic shear that never resolves, the small thrusters' hiss, the tyres and the runway's
+joints (the nose wheel over each, the main wheels 13 m later), knocks; eight hull modes ring under the
+load and ring down when the drive stops. This is all there is in a vacuum, felt more than heard. In the
+cabin: fans and a 400 Hz hum.
+
+| | what is heard |
+|---|---|
+| the air | wind rising with dynamic pressure; a rumble through Mach 1, and a thump crossing it; buffet past 14° of α |
+| an entry | the plasma's roar and crackle as loud as the stagnation heating (Sutton and Graves: as √ρ v³); a boom going subsonic |
+| the gear | tyres and joints, the brakes, a thud and a chirp at touchdown as hard as the sink rate, the legs' motor and lock |
+| docking | read from `core.dock.docked` when the docking part gives it: a clunk, the latches, a hiss as the pressures meet; a bang on a hard contact, found from a jolt with nothing pushing |
+| a crash | one heavy impact, then silence |
+| inside the Ring | a large airy room, six seconds long, its roof 300 m up; the hub quieter |
+
+A camera outside hears only what the air carries to it, late by the time the sound takes (a chase camera
+70 m behind hears the drive 0.2 s late), thinned as 1 / r, its high notes taken by the distance first,
+and from where the drive is, through a head (HRTF). Past the speed of sound the chase camera rides outside
+the drive's Mach cone and hears none of it; above the air, nothing comes through the air at all. Time run
+faster is played 3 dB quieter at each doubling and not at all from 50×, and the moments only near real
+time.
+
+The mix is set so the drive at full power at sea level is the loudest thing: about −20 dBFS root mean
+square at the default volume (70 %), its peaks under −8 dBFS; max q −22 to −25, an entry's hottest −26,
+full power above the air −30 in the cockpit, the cabin alone −41, a crash's peak −8. Each voice's gain was
+measured by rendering it alone on an `OfflineAudioContext` in Chromium, so that one asked for 1 comes out
+at 0.1 RMS, and the same renders check that no throttle step or mute clicks, that a note swept across the
+hull's modes swells by 6 dB at most, and that the crackle's pressure leans positive outside (the measured
+signature of a rocket's), softened through the cabin's wall.
+
+Other parts play their moments through `ctx.sound`:
+
+| call | does |
+|---|---|
+| `cue(name, params)` | plays a moment: `strike` {strength, hz}, `thump` {strength, from, to, seconds}, `contact` {speed m/s}, `latch` {n}, `capture`, `release`, `hiss` {seconds, strength}, `boom` {n}, `ignition`, `shutdown`, `gear` {down}, `touchdown` {strength, screech}, `crash`, `step` {surface: grass or paving, side, weight}, `door` {open}; each also takes `delay` (s). An unknown name is refused and said once |
+| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift moving), `walk` m/s (the walker's speed; footsteps follow it), `surface` |
+| `scene(name)` | where the ear is: `flight`, `ring`, `hub`, or null to follow whoever draws the frame (the walk's frames are the Ring's) |
+| `volume(v)`, `mute(on)`, `on`, `state`, `level()` | the master, and what a test reads: whether it sounds and how loud |
+
+The flight's own moments (the drive lighting and stopping, the gear, a touchdown, the speed of sound,
+docking and undocking, a crash) are found from the readouts and need no call.
+
 ## What is not
 
 Re-entry and landing back. Docking, and any contact with the Ring: the craft flies through it. The
 Ring's inside, its people, anything furnished. Terrain: the globe is smooth and the field flat. The
-Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. Sound, VR, failures.
+Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
 
 ## Build and test
 

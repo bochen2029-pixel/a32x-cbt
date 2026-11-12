@@ -270,6 +270,19 @@ Nothing taken from outside yet.
 
 Nothing taken from outside yet.
 
+#### The map and the sound
+
+The sound is made as it plays from the browser's Web Audio nodes; no sound file, sample or recording
+ships. The ideas below are taken as ideas and numbers, and the code is this project's.
+
+| source | licence | what is taken |
+|---|---|---|
+| The operator's ASTRA-7 warp-hull audio study, `astra-7/ASTRA_AUDIO` (`DESIGN_SPEC.md`, `Source/AstraAudio/WarpHullSynthNode.cpp`, at `2077332`), Bo Chen, 2026 | MIT | the voice: a drive heard through its hull, every layer driven by the state and none a recording. Its drone's partial ratios 1, 2, 2.98, 4.21 with gains 1, 0.5, 0.3, 0.18 (the drive's hum); a bank of eight hull modes on a stretched inharmonic series, which ours moves down a step for a smaller hull, damped less as the drive rises so that the hull rings under power and rings down after; two-operator FM with the modulator at π times the carrier, a shear that never resolves, with its DC blocker as a highpass; the soft ceiling tanh(1.15 x) × 0.85 on the master |
+| The operator's booster-lander simulator, `DECISIONS.md` D-011 and `ui/src/audio/propagation.ts` and `crackle.ts` (at `e0e5769`), Bo Chen, 2026 | MIT | sound as an observer that writes nothing back; the delay by the time sound takes to arrive, 1 / r spreading, and the air's absorption as a lowpass whose corner falls log-linearly from 18 kHz at 150 m to 30 Hz at 20 km (its two anchors); crackle as shocklets at random, up to 900 a second at full thrust, leaning positive; a reverb whose impulse response is made in code; a panner through a head (HRTF) |
+| The operator's subsim, `spec/SPEC-dsp.md` REQ-AUDIO-005 (at `ceb0059`), Bo Chen, unpublished | none stated; an idea only | that compressed time is not played as if it were real: here quieter at each doubling and silent from 50×, not muted above 1× |
+| K. Sutton and R. A. Graves, *A general stagnation-point convective-heating equation for arbitrary gas mixtures*, NASA TR R-376 (1971) | public domain, a work of the US government | the stagnation heating k √(ρ / r) v³ with k = 1.7415 × 10⁻⁴ for air, which an entry's plasma is as loud as |
+| this project | — | the instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the Ring's room |
+
 The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
 and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
 here is fit for navigation, and none of it describes a real vehicle.
