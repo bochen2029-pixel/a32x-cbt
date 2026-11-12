@@ -386,6 +386,15 @@ method, and Abacus is run, not shipped.
 | W. Kahan, "Further remarks on reducing truncation errors", *Communications of the ACM* 8 (1965), 40 | method | compensated summation, so the ledgers add no rounding of their own |
 | E. Hairer, S. P. Nørsett and G. Wanner, *Solving Ordinary Differential Equations I* (2nd ed., 1993) | method | RK4's order, and the difference of a second- and a fourth-order rule as an estimate of error, for the ledgers' bounds |
 
+#### The guide
+
+`flight/orbit/guide/` (`guide.html`, `build-guide.mjs`) is ours, GPLv3: a guide to the sketch, printed to a
+PDF from screenshots of the built page. Neither the screenshots nor the PDF is committed (`guide/out/`). It
+drives Chrome, Chromium or Edge with this repository's own DevTools driver (`app/tools/chrome.mjs`) and
+fetches nothing. Its type is named, not shipped: Charter or Cambria (Caladea where neither is installed),
+Inter and JetBrains Mono, as the printing machine has them; the PDF embeds subsets of those it finds, each
+under its own licence (Caladea Apache-2.0; Inter and JetBrains Mono the SIL Open Font License).
+
 The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
 and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
 here is fit for navigation, and none of it describes a real vehicle.
