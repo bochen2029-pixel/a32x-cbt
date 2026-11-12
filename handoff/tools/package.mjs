@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // package.mjs: the handoff kit's zip, the one a person carries to the other machine. In it: the kit's
-// documents; the canon; the orbit core's sources, headers, tests, tools and CMake; the built page if
-// there is one; the GPLv3's text; this repository's provenance; a notice; and a manifest naming the
-// commit, with a SHA-256 for every file (also as SHA256SUMS, for `sha256sum -c` or Get-FileHash).
+// documents; the canon; the orbit core's sources, headers, tests, tools and CMake, with its README, its
+// invariants and their receipts (evidence/); the page's sources (web/), and the built page if there is
+// one; the GPLv3's text; this repository's provenance; a notice; and a manifest naming the commit, with a
+// SHA-256 for every file (also as SHA256SUMS, for `sha256sum -c` or Get-FileHash).
 // Node built-ins and this repository's own zip writer (app/tools/zip.mjs). GPLv3.
 //
 //   node flight/orbit/handoff/tools/package.mjs --canon <ARCHITECTURE.md> [--page <index.html>]
@@ -38,7 +39,7 @@ export const KIT_DOCS = [
 const KIT = 'flight/orbit/handoff';
 /** The orbit sketch's parts that travel: everything git tracks under these. */
 const ORBIT = 'flight/orbit';
-const ORBIT_PARTS = ['README.md', 'CMakeLists.txt', 'core', 'test', 'tools'];
+const ORBIT_PARTS = ['README.md', 'INVARIANTS.md', 'CMakeLists.txt', 'core', 'test', 'tools', 'evidence', 'web'];
 /** Files from elsewhere in the repository, and where they go in the archive. */
 const EXTRA = [
   ['docs/provenance.md', 'reference/provenance.md'],
@@ -97,7 +98,7 @@ function notice(short, commit, page) {
     '',
     "canon/ARCHITECTURE.md: the canon, the owner's own document.",
     '',
-    `orbit/: the orbit sketch's core, tests, tools and CMake, from ${REPOSITORY}'s flight/orbit at`,
+    `orbit/: the orbit sketch's core, tests, tools, CMake, README, invariants, receipts and the page's sources, from ${REPOSITORY}'s flight/orbit at`,
     `${commit}. GPLv3: licences/GPL-3.0.txt.`,
     '',
     page

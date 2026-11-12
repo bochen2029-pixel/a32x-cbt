@@ -198,7 +198,7 @@ async function main() {
   window.addEventListener('resize', resize);
   resize();
 
-  // The tier, set: by the address or the saved choice at the start, by the control (F, or GFX), or by
+  // The tier, set: by the address or the saved choice at the start, by the control (9, or GFX), or by
   // the probe below. Everything that depends on it is rebuilt in place, the flight untouched.
   const gfx = document.getElementById('btn-quality');
   const showQuality = () => { if (gfx) gfx.innerHTML = `GFX ${quality.settings.label}${quality.choice === 'auto' ? '<small> · AUTO</small>' : ''}`; };
