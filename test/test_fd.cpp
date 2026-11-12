@@ -10,6 +10,7 @@
 // TEST: leaves_the_flight_alone
 // TEST: quiet_where_others_show
 // TEST: flown_to_orbit
+// TEST: flown_home
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_dock.h"
@@ -338,16 +339,18 @@ void quietWhereOthersShow() {
 // pitch error of 10 degrees (or a bank error of 60) is full stick; above the air it moves the rates, and 10
 // degrees off in pitch or heading (20 in bank) is full stick. The throttle they move toward its cue at the
 // keys' rate, 0.6 a second, or slam it full (Z) and shut (X) when the cue is full or nothing; the gear when
-// its cue changes; the brakes off once the crew's hold is over. Nothing else: no runway, no horizon, no
-// orbit's numbers.
+// its cue changes; the brakes off once the crew's hold is over, and on once down on the runway again.
+// Nothing else: no runway, no horizon, no orbit's numbers. A person may also lead the cue, moving the stick
+// for where its error is going as well as where it is (McRuer's pilot does where the craft lags): lead s.
 struct Pilot {
     static const int DELAY = 15;   // steps: 0.3 s
     double fullBank = 60;          // degrees of bank error that is full stick in the air
     bool taper = true;             // false: the throttle full until the cue says shut, its taper ignored
+    double lead = 0;               // s: the error's rate counted in, times this
     struct Seen { double valid, phase, pitch, hdg, bank, thr, gear, aPitch, aHdg, aRoll, airLaw, t; };
     Seen seen[DELAY + 1], last{};
     long n = 0, steady = 0, after = 0;
-    double throttle = 0, brake = 1;
+    double throttle = 0, brake = 1, was[3] = {0, 0, 0};
     double worstPitch = 0, worstBank = 0, sumPitch = 0, sumBank = 0, worstAt = 0, worstPitchAt = 0;
     int gear = 1;
 
@@ -365,11 +368,14 @@ struct Pilot {
         double pitch = 0, roll = 0, yaw = 0;
         if (s.valid > 0.5) {
             const double ePitch = s.pitch - s.aPitch, eBank = wrap180(s.bank - s.aRoll), eHdg = wrap180(s.hdg - s.aHdg);
-            pitch = std::fmax(-1.0, std::fmin(1.0, ePitch / 10));
-            if (s.airLaw > 0.5) roll = std::fmax(-1.0, std::fmin(1.0, eBank / fullBank));
+            const double k = n > 1 ? lead / OC_DT : 0;   // the lead: the error's change over the step, as a rate
+            const double lPitch = ePitch + k * (ePitch - was[0]), lBank = eBank + k * wrap180(eBank - was[1]), lHdg = eHdg + k * wrap180(eHdg - was[2]);
+            was[0] = ePitch; was[1] = eBank; was[2] = eHdg;
+            pitch = std::fmax(-1.0, std::fmin(1.0, lPitch / 10));
+            if (s.airLaw > 0.5) roll = std::fmax(-1.0, std::fmin(1.0, lBank / fullBank));
             else {
-                roll = std::fmax(-1.0, std::fmin(1.0, eBank / 20));
-                yaw = std::fmax(-1.0, std::fmin(1.0, eHdg / 10));
+                roll = std::fmax(-1.0, std::fmin(1.0, lBank / 20));
+                yaw = std::fmax(-1.0, std::fmin(1.0, lHdg / 10));
             }
             // How closely the cues are flown, from the climb to the cut, where they move smoothly: not in the 5 s
             // after a step in a cue (a new phase, the turn's bank, the insertion's first pitch).
@@ -387,7 +393,8 @@ struct Pilot {
             else if (taper) throttle += std::fmax(-0.6, std::fmin(0.6, 3 * (s.thr - throttle))) * OC_DT;   // Shift, Ctrl
             throttle = std::fmax(0.0, std::fmin(1.0, throttle));
             gear = s.gear > 0.5;
-            brake = s.phase == OC_FD_PH_HOLD ? 1 : 0;
+            const bool down = s.phase == OC_FD_PH_ROLLOUT || s.phase == OC_FD_PH_STOPPED;
+            brake = s.phase == OC_FD_PH_HOLD || s.phase == OC_FD_PH_STOPPED ? 1 : down && s.aPitch < 1 ? 0.8 : 0;   // the nose wheel down first
         }
         oc_controls(pitch, roll, yaw, throttle, 0, 0, 0, gear, brake);
     }
@@ -469,6 +476,65 @@ void flownToOrbit() {
                 h.made ? "on to" : "no orbit,", h.end.apo / 1000, h.end.peri / 1000);
 }
 
+// The flight home, flown by a person by the cues alone: the crew flies it from the insertion orbit (engaged
+// at 800 s, as test_return's lands_from_insertion) until they take the controls; then the person, as above
+// and leading the cue by 0.4 s, flies it to a stop. From the wait for the pass (the burn theirs as well),
+// from the fall to the air, and on final. Each lands as the flight home's own landings are judged
+// (orbit_return.h, and the Monte Carlo's): down in the touchdown zone, its first 900 m, within 3 m of the
+// centreline, stopped on the runway, the heat, the load and the dynamic pressure inside their limits; and the
+// sink at the touch under 5 m/s, firm where the crew's is 0.74: the flare is 2 s long, quick for a hand 0.3 s
+// late. Beside it, from the fall to the air, the person without the lead, who lags the pitch cue in the
+// entry's bank reversals (at 70 degrees of bank the air law's pitch target turns the nose mostly in yaw) and
+// passes 2.5 g.
+void flownHome() {
+    struct Home { int phase; double tdAlong, tdOff, tdSink, tdSpeed, stopAlong, stopOff, heat, load, qbar; bool crashed, touched, stopped; };
+    auto fly = [](double from, double lead) {
+        oc_reset(LAT, LON, HDG);
+        while (get(OC_T) < 800) oc_step(50);
+        oc_auto(OC_AUTO_RETURN);
+        while (get(OC_T) < from) oc_step(10);
+        Home h{};
+        h.phase = (int)ret(OC_RET_PHASE);
+        oc_auto(OC_AUTO_OFF);
+        Pilot p;
+        p.lead = lead;
+        p.gear = get(OC_GEAR) > 0.5;
+        p.throttle = 0;
+        p.brake = 0;
+        const double t0 = get(OC_T);
+        while (get(OC_T) < t0 + 8000 && get(OC_CRASHED) == 0 && ret(OC_RET_STOPPED) == 0) {
+            p.fly();
+            oc_step(1);
+        }
+        h.crashed = get(OC_CRASHED) > 0;
+        h.touched = ret(OC_RET_TOUCHED) > 0;
+        h.stopped = ret(OC_RET_STOPPED) > 0;
+        h.tdAlong = ret(OC_RET_TD_ALONG); h.tdOff = ret(OC_RET_TD_OFF); h.tdSink = ret(OC_RET_TD_SINK); h.tdSpeed = ret(OC_RET_TD_SPEED);
+        h.stopAlong = ret(OC_RET_STOP_ALONG); h.stopOff = ret(OC_RET_STOP_OFF);
+        h.heat = ret(OC_RET_HEAT_PEAK); h.load = ret(OC_RET_LOAD_PEAK); h.qbar = ret(OC_RET_QBAR_PEAK);
+        return h;
+    };
+    auto print = [](const char* who, const Home& h) {
+        std::printf("  %s: %s; down %.0f m past the threshold, %.2f m off the centreline, sinking %.2f m/s at %.1f m/s; stopped %.0f m down, %.2f m off; "
+                    "heat %.0f kW/m2, load %.2f g, q %.1f kPa at most\n", who, h.crashed ? "CRASHED" : h.stopped ? "stopped" : "not stopped", h.tdAlong, h.tdOff,
+                    h.tdSink, h.tdSpeed, h.stopAlong, h.stopOff, h.heat / 1000, h.load, h.qbar / 1000);
+    };
+    struct Leg { double from; const char* where; };
+    const Leg legs[] = {{2600, "taken waiting for the pass"}, {4000, "taken falling to the air"}, {7700, "taken on final"}};
+    for (const Leg& l : legs) {
+        const Home h = fly(l.from, 0.4);
+        char who[96];
+        std::snprintf(who, sizeof who, "%s (%.0f s, phase %d)", l.where, l.from, h.phase);
+        print(who, h);
+        CHECK(!h.crashed && h.touched && h.stopped, "%s: crashed %d, touched %d, stopped %d", l.where, h.crashed, h.touched, h.stopped);
+        CHECK(h.tdAlong > 0 && h.tdAlong < OC_RET_ZONE_M && std::fabs(h.tdOff) < 3, "%s: down %.0f m in, %.2f m off", l.where, h.tdAlong, h.tdOff);
+        CHECK(h.stopAlong < OC_RET_RUNWAY_M && std::fabs(h.stopOff) < OC_RET_RUNWAY_HALF_M, "%s: stopped %.0f m down, %.2f m off", l.where, h.stopAlong, h.stopOff);
+        CHECK(h.heat < OC_RET_HEAT_LIMIT && h.load < OC_RET_LOAD_LIMIT && h.qbar < OC_RET_QBAR_LIMIT, "%s: %.0f W/m2, %.2f g, %.0f Pa", l.where, h.heat, h.load, h.qbar);
+        CHECK(h.tdSink < 5, "%s: down at %.2f m/s", l.where, h.tdSink);
+    }
+    print("taken falling to the air, the person without the lead", fly(4000, 0));
+}
+
 struct Test { const char* name; void (*fn)(); };
 const Test tests[] = {
     {"readouts_block", readoutsBlock},
@@ -478,6 +544,7 @@ const Test tests[] = {
     {"leaves_the_flight_alone", leavesTheFlightAlone},
     {"quiet_where_others_show", quietWhereOthersShow},
     {"flown_to_orbit", flownToOrbit},
+    {"flown_home", flownHome},
 };
 
 }   // namespace
