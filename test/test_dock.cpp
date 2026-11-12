@@ -280,13 +280,32 @@ bool waitForGap(double fromNow) {
     return false;
 }
 
+// Wait, hands off, until a flight outward along the right wing that takes `flight` seconds will meet the roof
+// clear of the flight deck's open sector, which has none (orbit_core.h, OC_DECK_*). A direction fixed among
+// the stars goes round backwards in the Ring's frame, at its spin.
+double wingAngle() {
+    const V ax = site(OC_RING_AX_E), ref = site(OC_RING_REF_E), y = body({0, 1, 0});
+    return std::atan2(dot(y, ref), dot(y, cross(ref, ax)));
+}
+double offDeck(double angle) {
+    double off = angle - OC_DECK_ANGLE_DEG * D2R;
+    return std::fabs(off - std::round(off / (2 * PI)) * 2 * PI);
+}
+bool waitForRoof(double flight) {
+    for (int i = 0; i < 8000; ++i) {
+        if (offDeck(wingAngle() - SPIN * flight) > 25 * D2R) return true;
+        oc_step(1);
+    }
+    return false;
+}
+
 const char* hitName(int h) {
-    static const char* names[] = {"nothing", "the hull", "the roof", "a rim wall", "a spoke", "the hub", "the port"};
-    return h >= 0 && h <= OC_DOCK_HIT_PORT ? names[h] : "?";
+    static const char* names[] = {"nothing", "the hull", "the roof", "a rim wall", "a spoke", "the hub", "the port", "the deck", "a bulkhead"};
+    return h >= 0 && h <= OC_DOCK_HIT_BULKHEAD ? names[h] : "?";
 }
 const char* partName(int p) {
-    static const char* names[] = {"nothing", "the probe", "the nose", "the body", "the left wing", "the right wing", "the tail"};
-    return p >= 0 && p <= OC_DOCK_PART_TAIL ? names[p] : "?";
+    static const char* names[] = {"nothing", "the probe", "the nose", "the body", "the left wing", "the right wing", "the tail", "the gear"};
+    return p >= 0 && p <= OC_DOCK_PART_GEAR ? names[p] : "?";
 }
 
 // ---- the tests ----------------------------------------------------------------------------------
@@ -663,12 +682,16 @@ void spinMustMatch() {
 }
 
 // Flown outward from the hold point, inside the rim, the craft meets the band's roof and that is a
-// crash; the readouts say what was hit and with what.
+// crash; the readouts say what was hit and with what. It waits first until the way out meets the roof clear
+// of the flight deck's open sector: about 137 s out at the small thrusters' half a metre a second squared.
 void roofIsSolid() {
     if (!handsAtHold()) return;
+    CHECK(waitForRoof(137), "the deck's sector never came clear");
     const double t0 = get(OC_T);
     const Where w = fliesOut(0.10, 300);   // 470 m toward the ring's plane on the way out: inside the rim, short of the spokes
-    std::printf("  after %.0f s: %.0f m from the axis, %.0f m along it: hit %s with %s\n", get(OC_T) - t0, w.radial, w.axial, hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+    std::printf("  after %.0f s: %.0f m from the axis, %.0f m along it, %.0f deg round from the deck's centre: hit %s with %s\n", get(OC_T) - t0, w.radial, w.axial,
+                offDeck(wingAngle()) * R2D, hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+    CHECK(offDeck(wingAngle()) > 15 * D2R, "met the roof %.1f deg from the deck's centre", offDeck(wingAngle()) * R2D);
     CHECK(get(OC_CRASHED) == 1, "flew %.0f m from the axis without a crash", w.radial);
     CHECK(dk(OC_DOCK_HIT) == OC_DOCK_HIT_ROOF, "hit %s", hitName(idk(OC_DOCK_HIT)));
     CHECK(dk(OC_DOCK_HIT_PART) != OC_DOCK_PART_NONE, "with nothing");

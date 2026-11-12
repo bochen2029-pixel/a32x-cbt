@@ -139,15 +139,19 @@ double outsideBox(double dx, double dy) {
 }
 
 // What a sphere of radius r at p, in the ring's frame, touches: OC_DOCK_HIT_*, or none. The ring is a
-// figure of revolution but for its spokes: the band a closed box in (distance from the axis, distance
-// along it), from the roof out to the hull between the rim walls; the rim walls' lips, thin, inside the
-// roof; the hub a cylinder; each spoke a square beam in the middle plane.
+// figure of revolution but for its spokes and its flight deck: the band a closed box in (distance from the
+// axis, distance along it), from the roof out to the hull between the rim walls; the rim walls' lips, thin,
+// inside the roof; the hub a cylinder; each spoke a square beam in the middle plane. Over the deck's open
+// sector the band is deck.cpp's to say (deckBand): no roof, the bulkheads at its ends, and the deck itself,
+// which the gear lands on and the rest of the craft crashes on, deck.cpp's own contact.
 int touch(V3 p, double r) {
     const double rho = std::hypot(p.x, p.z), ay = std::fabs(p.y);
     const double mid = (OC_RING_ROOF_M + OC_RING_HULL_M) / 2, half = (OC_RING_HULL_M - OC_RING_ROOF_M) / 2;
     const double bx = std::fabs(rho - mid) - half, by = ay - OC_RING_WIDTH_M / 2;
-    if (outsideBox(bx, by) < r) return by > bx ? OC_DOCK_HIT_RIM : (rho > mid ? OC_DOCK_HIT_HULL : OC_DOCK_HIT_ROOF);
-    if (rho < OC_RING_ROOF_M && std::hypot(std::fmax(OC_RING_RIM_M - rho, 0.0), by) < r) return OC_DOCK_HIT_RIM;
+    const int deck = deckBand(p, r);
+    if (deck > 0) return deck;
+    if (deck < 0 && outsideBox(bx, by) < r) return by > bx ? OC_DOCK_HIT_RIM : (rho > mid ? OC_DOCK_HIT_HULL : OC_DOCK_HIT_ROOF);
+    if (deck < 0 && rho < OC_RING_ROOF_M && std::hypot(std::fmax(OC_RING_RIM_M - rho, 0.0), by) < r) return OC_DOCK_HIT_RIM;
     if (outsideBox(rho - OC_HUB_RADIUS_M, ay - OC_HUB_PORT_M) < r) return OC_DOCK_HIT_HUB;
     const double sh = OC_RING_SPOKE_M / 2;
     if (ay < sh + r && rho < OC_RING_RIM_M + r) {
@@ -429,6 +433,12 @@ void dockAfterStep(State& s) {
     s.v = s.v + push * (OC_DT / (M_DRY + s.prop));
     const V3 tq = irot(s.q, cross(g.head - s.r, push));
     s.w = s.w + V3{tq.x / IXX, tq.y / IYY, tq.z / IZZ} * OC_DT;
+}
+
+// A crash elsewhere on the ring (deck.cpp's: the deck itself), recorded and left as docking's own are.
+void dockWreck(State& s, int what, int part, double back) {
+    if (!ring.valid || s.crashed) return;
+    wreck(s, frameAt(timeOf(s)), what, part, back);
 }
 
 void dockWriteOut(const State& s) {
