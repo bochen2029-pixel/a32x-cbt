@@ -45,7 +45,9 @@ export const tour = {
       b.textContent = 'TOUR';
       b.setAttribute('aria-pressed', 'false');
       b.addEventListener('click', (e) => { ctx.input.commands.push('tour'); e.stopPropagation(); });
-      grid.insertBefore(b, grid.firstChild);
+      b.className = 'quick';   // on a phone, among the few buttons shown without MORE
+      const first = grid.querySelector('.group') || grid;   // first in the flight's group
+      first.insertBefore(b, first.firstChild);
       this.button = b;
     }
     window.addEventListener('keydown', (e) => {
