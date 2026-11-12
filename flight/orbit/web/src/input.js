@@ -2,6 +2,7 @@
 // one set of controls for the core and a few commands for the page. GPLv3.
 
 export const HELP = [
+  ['0, TOUR', 'the tour: the whole loop flown by the crew, with words; any key takes over'],
   ['Space', 'crew on / take the controls'],
   ['W S / ↑ ↓', 'pitch down / up'],
   ['A D / ← →', 'bank left / right'],
@@ -22,7 +23,7 @@ export const HELP = [
   ['N', 'the map: orbit, the Ring close up, the ground track (Shift-N to switch)'],
   ['F', 'the Moon through a telescope, and back'],
   ['Y', 'sound off / on (it starts with your first key or tap)'],
-  ['0', 'the tour: the whole loop flown by the crew, with words; any key takes over'],
+  ['9', 'graphics: auto, low, medium, high (also GFX)'],
   ['drag, wheel', 'look around the craft, zoom'],
   ['H', 'this help'],
   ['Backspace', 'start again'],
@@ -70,7 +71,7 @@ export class Input {
       const map = {
         ' ': 'crew', g: 'gear', b: 'brake', v: 'view', h: 'help', t: 'approach', o: 'orbit', ',': 'slower', '.': 'faster',
         1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', 5: 'sas4', 6: 'sas5', c: 'deck', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
-        f: 'moon',
+        f: 'moon', 9: 'quality',
       };
       if (map[k] !== undefined) this.commands.push(map[k]);
     }

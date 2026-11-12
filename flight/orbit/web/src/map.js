@@ -513,7 +513,8 @@ export const map = {
       b.textContent = 'MAP';
       b.setAttribute('aria-pressed', 'false');
       b.addEventListener('click', (e) => { show(!st.shown); e.stopPropagation(); });
-      grid.appendChild(b);
+      const help = document.getElementById('btn-help');   // with the page's own buttons, before HELP
+      (help ? help.parentNode : grid).insertBefore(b, help);
       st.button = b;
     }
     window.addEventListener('keydown', (e) => {

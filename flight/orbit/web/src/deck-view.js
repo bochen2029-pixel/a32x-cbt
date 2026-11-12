@@ -249,7 +249,7 @@ export const deck = {
       b.textContent = 'LAND DECK';
       b.addEventListener('click', (e) => { ctx.input.commands.push('deck'); e.stopPropagation(); });
       const dockButton = document.getElementById('btn-dock');
-      if (dockButton && dockButton.nextSibling) grid.insertBefore(b, dockButton.nextSibling);
+      if (dockButton) dockButton.parentNode.insertBefore(b, dockButton.nextSibling);   // beside DOCK, in its group
       else grid.appendChild(b);
     }
   },

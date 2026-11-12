@@ -334,7 +334,21 @@ KDFW, to Horizons.
 
 #### Graphics
 
-Nothing taken from outside yet.
+The tiers, the Ring's detail and its flight deck, the craft, the Earth's lighting and its night lights,
+the page's layout (`flight/orbit/README.md`, Graphics). Every texture is still painted by code, into
+typed arrays (`web/src/paint.js`); no image, model or font file ships.
+
+| source | licence | what is taken |
+|---|---|---|
+| Natural Earth 1:10m populated places, `geojson/ne_10m_populated_places_simple.geojson` (4,932,147 bytes, SHA-256 `fd3fa867a320cbd5c5b6bb5bc550afeec2939fb2cef688e508007282a55ac42f`), from `nvkelso/natural-earth-vector` at `ca96624` (version 5.2.0-pre), downloaded 2026-11-12 | public domain: "All versions of Natural Earth raster + vector map data … are in the public domain" (its `LICENSE.md`) | each place's point and its urban population (`pop_max`), coded by `flight/orbit/web/tools/places.mjs` into `web/data/places.js`, 7,332 places of 7,342 (those with no population dropped); the night side's lights are painted from them, a spot for each town whose spread and brightness by population are this project's. The GeoJSON file is not in the repository |
+| three.js's post-processing examples, `examples/jsm/postprocessing/UnrealBloomPass.js` and `OutputPass.js`, from the installed `three` 0.186.1 (§2) | MIT | the glow pass and the pass that tone-maps the picture onto the canvas, used as they are and bundled with three.js; `web/src/pipeline.js` replaces the glow's bright-pass shader (a clamp, and NaN dropped) and makes the output opaque |
+| three.js's AgX tone mapping (Filament's, after Blender's) | MIT | the tone curve, as three.js has it. The look applied in its slot (a power of 1.18, saturation 1.22) is this project's, after Blender's "Punchy" look as a method |
+| C. Cox and W. Munk, *Measurement of the roughness of the sea surface from photographs of the Sun's glitter*, J. Opt. Soc. Am. 44 (1954) | the paper's method | the sea's glint as a distribution of its waves' slopes, Gaussian in their tangent; the variance, a light breeze's, is this project's choice |
+| E. Bruneton, *Precomputed Atmospheric Scattering: a New Implementation* (2017) | its constants as physical data; the implementation's code (BSD-3-Clause) is not used | ozone's absorption coefficients at the three colours and its layer from 10 to 40 km, as 1g's atmosphere has them |
+| NACA Report 460, *The characteristics of 78 related airfoil sections* (1933) | public domain, a work of the US government | the four-digit sections' thickness distribution, for the craft's wing along its chord |
+| the airglow's green line (atomic oxygen at 557.7 nm, near 95 km) | textbook | its height and colour; how bright it is drawn is this project's |
+| the owner's booster-lander-simulator (`ui/src/fx/plume.ts`, `ui/src/scene/postfx.ts`, its `DECISIONS.md`, D-010), Bo Chen, read from a clone | MIT | ideas, no code: the picture kept in HDR with AgX's roll-off and a glow over only what is brighter than white; the plume as a marched volume whose shock diamonds open out and fade as the air thins; the plume made the brightest thing in the frame. The shaders here are written for three.js's WebGL renderer, where its are TSL for WebGPU. Its volumetric cloud deck is not adopted: the sketch's launch keeps its clear day over Texas |
+| this project | — | the tiers and how a device's report places it in one; the Ring's plan (its walls, ribs, girders, trusses, lift tubes, glazing, town, radiators, solar mast and lights) and its flight deck, drawn to the deck's numbers (`RING.deck`, from orbit_core.h's `OC_DECK_*`); the craft's shape, tiles, panels and plume; the Earth's land colours, fields, relief, clouds and their shadows, and its lighting brought to the craft's scale; the depth slices; the page's layout |
 
 #### The map and the sound
 

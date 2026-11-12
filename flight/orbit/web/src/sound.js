@@ -825,7 +825,8 @@ export const sound = {
         say(`Sound ${Math.round(setVolume(st.volume - Math.sign(e.deltaY) * 0.1) * 100)}%`);
         e.preventDefault();
       }, { passive: false });
-      grid.appendChild(b);
+      const help = document.getElementById('btn-help');   // with the page's own buttons, before HELP
+      (help ? help.parentNode : grid).insertBefore(b, help);
       st.button = b;
     }
     for (const type of GESTURES) window.addEventListener(type, gesture, { capture: true, passive: true });
