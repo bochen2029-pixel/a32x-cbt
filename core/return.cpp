@@ -28,13 +28,16 @@
 //   flare     The sink rate taken off in the last metres, the wheels on, the nose lowered, the brakes.
 //
 // All the way down it learns how wrong its model of the air and the craft is, from the acceleration it
-// feels against what the model says (learn, below); tests make the model wrong to show it does.
+// feels against what the model says (learn, below); tests make the model wrong to show it does. It flies by
+// its instruments alone (sense, below): navigation, the accelerometers, air data below Mach 4, the mass as
+// known. It cannot see the wind; where it has air data it works the wind out from them and navigation.
 //
 // Every number marked chosen is this sketch's; docs/provenance.md, 1h, names the methods. GPLv3.
 
 #include "internal.h"
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 
 namespace oc {
@@ -62,6 +65,14 @@ const double CROSS_MAX = 1200000.0;       // m: the furthest off the orbit's pla
 const double BANK_PLAN = 55 * D2R;        // the bank the plan is made for: the middle of the range it buys
 const double BANK_LATE = 72 * D2R;        // and the most it may plan for, to take a pass just missed
 const double LATE_MAX = 500.0;            // s: how far past its best burn time a pass may still be taken
+// The pass's margin: the plan takes the first pass the entry would still reach, down the track and across it,
+// with the craft's lift over drag MARGIN_LD of its model's (lift and drag each a root of it off), before
+// anything has been learned in flight; failing one within MARGIN_WAIT of the first pass in reach, that first
+// pass. 0.8 spans the narrow pools' models, wrong by up to a factor of 1.22 in lift over drag; the wide
+// pools' go to 1.5, past what the plan's bank of 55 degrees leaves room for on any pass.
+const double MARGIN_LD = 0.8;
+const double BANK_MARGIN_LO = 15 * D2R;   // the least bank the check moves the profile to: below it the entry's law skips
+const double MARGIN_WAIT = 3.5 * 3600.0;  // s: up to two more passes, one to three hours more of waiting
 const double V_TOP = 7400.0;              // m/s: the bank profile's top; faster than this it is bank0
 
 const double ALPHA_ENTRY = 40 * D2R;
@@ -93,6 +104,20 @@ const double FAR_CLEAR = 600.0;           // m from the axis
 const double FAR_MAST = 1000.0;           // m along it
 const double LEARN_TAU = 10.0;            // s: the memory of the filters that learn the model's error
 const double LEARN_FROM = 0.3;            // m/s2 of the model's drag: thinner air than this teaches nothing
+
+// The instruments' errors at oc_return_disturb's noise of 1 (chosen, of the order of a GPS-aided inertial
+// system's, a landing system's augmentation near the field, and air data's):
+const double NAV_FAR = 3.0;               // m: navigation's error in place, far from the field
+const double NAV_NEAR = 0.3;              // m: on the final, within 5 km of the threshold, and between straight in range to 50 km
+const double NAV_VEL = 0.03;              // m/s: its error in velocity
+const double ACC_NOISE = 0.02;            // m/s2: the accelerometers' noise on each step's reading, each axis
+const double ACC_BIAS = 0.005;            // m/s2: their bias, each axis
+const double AIR_MACH = 4.0;              // air data below this Mach number, the probes out
+const double ADS_TAS = 0.005;             // of the airspeed: its error, wandering
+const double ADS_ANGLE = 0.2 * D2R;       // the angles of attack and sideslip: their error, wandering
+const double ADS_ANGLE_NOISE = 0.05 * D2R;   // and their noise, each step
+const double ADS_QBAR = 0.01;             // of the dynamic pressure: its error, wandering
+const double WIND_TAU = 5.0;              // s: the memory of the wind the guidance works out
 
 // ---- the field: the runway's own frame, and what is worked out once ------------------------------
 
@@ -156,6 +181,45 @@ Path circlePath(XY p, int side) {
     if (arc < 0) arc += 2 * PI;
     return {straight + HAC_R * arc + FINAL_M, {-FINAL_M + HAC_R * std::cos(theta), (HAC_R + HAC_R * std::sin(theta)) * side}, arc, d, theta};
 }
+
+// ---- what the crew's instruments say ------------------------------------------------------------------
+// The guidance never reads the craft's state itself: returnCrew and returnEngage hand it a copy that is what
+// the instruments say, and take back only its commands. Navigation's place and velocity, with an error that
+// wanders as a GPS-aided inertial system's does and tightens near the field as a landing system's
+// augmentation does; the mass as it is known; air data where the probes are out, below Mach 4, through the
+// moving air and with errors of their own, and faster than that the same reckoned from navigation in still
+// standard air; the accelerometers (learn); the wind it works out from air data and navigation (senseWind).
+// The attitude, the rates, the engine's setting, the gear, the brakes and the weight on the wheels are taken
+// as exact. With a noise of nought (oc_return_disturb), the instruments read the state as it is.
+
+uint64_t mix64(uint64_t z) {   // SplitMix64 (Steele, Lea and Flood 2014)
+    z += 0x9e3779b97f4a7c15ULL;
+    z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+    z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+    return z ^ (z >> 31);
+}
+uint64_t keyOf(double seed, int channel, long long n) { return mix64(mix64((uint64_t)seed * 0x100000001b3ULL + (uint64_t)channel) ^ (uint64_t)n); }
+double unit01(uint64_t k) { return (mix64(k) >> 11) * (1.0 / 9007199254740992.0); }
+double gauss(uint64_t k) {   // Box and Muller
+    const double u1 = 1 - unit01(k), u2 = unit01(k ^ 0x5bd1e995ULL);
+    return std::sqrt(-2 * std::log(u1)) * std::cos(2 * PI * u2);
+}
+// A wandering error of unit RMS on a channel: three sines of periods drawn from 150 to 900 s.
+double wander(double seed, int channel, double t) {
+    double sum = 0;
+    for (int j = 0; j < 3; ++j) {
+        const uint64_t k = keyOf(seed, channel, j);
+        sum += std::sin(2 * PI * t / (150.0 + 750.0 * unit01(k)) + 2 * PI * unit01(k + 1));
+    }
+    return sum * std::sqrt(2.0 / 3.0);
+}
+
+double massOf(const State& s) { return (M_DRY + s.prop) * (1 + s.ret.errMass); }   // the mass as the guidance knows it
+double thrustOf(const State& s) { return T_MAX * (1 + s.ret.errThrust); }          // full thrust, as it knows it
+// The wind as the guidance has worked it out (senseWind), ECI.
+V3 windSeen(const State& s) { return fromEarth(V3{s.ret.windEst[0], s.ret.windEst[1], s.ret.windEst[2]}, timeOf(s)); }
+
+// The guidance's model of the air and the craft follows; the instruments are below it (sense).
 
 // ---- the guidance's model of the air and the craft -------------------------------------------------
 // The core's own (atmosphere, liftDrag), unless a test makes it wrong: its density off by a factor and a
@@ -449,7 +513,7 @@ bool reverse(int bankSide, double off, double tas) {
 
 // Fly the rest of the entry from p: gravity alone above the air, then the entry's law, to the gate.
 // side is which way the bank lies (0: not chosen yet), bank what it is now.
-Shot shoot(Pt p, double mass, double bank0, double vRef, int bankSide, double bank, int side) {
+Shot shoot(Pt p, double mass, double bank0, double vRef, int bankSide, double bank, int side, bool hold = false) {
     Shot o{};
     o.tInterface = -1;
     const double t0 = p.t;
@@ -468,7 +532,7 @@ Shot shoot(Pt p, double mass, double bank0, double vRef, int bankSide, double ba
         g = entryLaw(p.r, p.v, p.t, mass, bank0, vRef, side);
         if (!below && alt < OC_RET_INTERFACE_M) { below = true; o.tInterface = p.t; }
         if (bankSide == 0) bankSide = g.off >= 0 ? 1 : -1;
-        else if (below && reverse(bankSide, g.off, g.tas)) { bankSide = -bankSide; ++o.reversals; }
+        else if (below && !hold && reverse(bankSide, g.off, g.tas)) { bankSide = -bankSide; ++o.reversals; }
         bank += clampd(bankSide * g.bank - bank, -BANK_RATE * h, BANK_RATE * h);
         if (g.heat > o.heatPeak) o.heatPeak = g.heat;
         if (g.load > o.loadPeak) o.loadPeak = g.load;
@@ -537,6 +601,24 @@ Trial tryBurn(const Pt& p0, double tb, double mass, int side, double bank0) {
     return o;
 }
 
+// How far off its plane the entry reaches from a burn at tb, with the craft's lift over drag MARGIN_LD of the
+// model's: shot with the bank held all the way on the side toward (side) the runway, the gate's distance
+// off the plane the burn leaves, as crossRange measures the runway's.
+double reachFrom(const Pt& p0, double tb, double mass, int bankSide) {
+    Pt p = p0;
+    coastTo(p, tb);
+    const double dv = burnFor(p.r, p.v);
+    if (dv < 0) return 0;
+    p.v = p.v - unit(p.v) * dv;
+    const V3 n = unit(cross(p.r, p.v));
+    const Model keep = model;
+    model.kLift *= std::sqrt(MARGIN_LD);
+    model.kDrag /= std::sqrt(MARGIN_LD);
+    const Shot o = shoot(p, mass * std::exp(-dv / (ISP * G0)), BANK_PLAN, V_TOP, bankSide, 0, 1, true);
+    model = keep;
+    return RE * std::asin(clampd(std::fabs(dot(unit(o.rGate), n)), 0, 1));
+}
+
 // How far round the orbit's plane, ahead of the craft where it is at tb, the runway's foot on that plane
 // lies a flight later: an angle about the plane's normal n, 0 to 2 pi. off: the runway's distance off the
 // plane then, + to the left.
@@ -561,7 +643,7 @@ double footAhead(const Pt& p0, double tb, double flight, V3 n, double* off) {
 // bank, a shorter entry, reaches it.
 void plan(State& s) {
     ReturnState& R = s.ret;
-    const double t = timeOf(s), mass = M_DRY + s.prop;
+    const double t = timeOf(s), mass = massOf(s);
     const Pt p0{s.r, s.v, t};
     const Orbit orb = orbitOf(s);
     R.tPlan = t + 600.0;
@@ -570,7 +652,7 @@ void plan(State& s) {
     const double rate = std::sqrt(MU / (orb.a * orb.a * orb.a)) - WE * n.z;   // rad/s: how fast the craft gains on the runway's foot
     const double pass = 2 * PI / rate;
     const int side = R.side ? R.side : 1;
-    const double halfBurn = mass / (2 * BURN_THROTTLE * T_MAX);   // s per m/s: half the burn's length
+    const double halfBurn = mass / (2 * BURN_THROTTLE * thrustOf(s));   // s per m/s: half the burn's length
     const double first = t + BURN_LEAD + 30.0;                    // the earliest the burn's middle can be
 
     auto usable = [](const Trial& a) { return a.dv >= 0 && a.shot.ok; };
@@ -614,6 +696,34 @@ void plan(State& s) {
         }
         return std::fabs(lo.shot.along) < std::fabs(hi.shot.along) ? lo : hi;
     };
+    // Whether the entry would still reach the gate from the burn a plans, with the craft's lift over drag ld
+    // of the model's: the bank's profile moved from the plan's as the corrector would move it, by secant steps
+    // between BANK_MARGIN_LO and BANK_HI, until the shot ends at the gate, and there the runway ahead and the
+    // limits kept. Down the track and across it at once: a runway far off the plane takes bank to one side
+    // that a short entry would want for range.
+    auto reachable = [&](const Trial& a, double ld) {
+        const Model keep = model;
+        model.kLift *= std::sqrt(ld);
+        model.kDrag /= std::sqrt(ld);
+        Trial b = tryBurn(p0, a.tb, mass, side, a.bank0);
+        double bPrev = a.bank0, mPrev = b.shot.along, slope = 0;
+        bool ok = usable(b);
+        for (int i = 0; ok && i < 8 && std::fabs(b.shot.along) > 5000.0; ++i) {
+            const double step = slope != 0 ? -b.shot.along / slope : (b.shot.along > 0 ? -10 : 10) * D2R;   // short: less bank
+            const double next = clampd(b.bank0 + clampd(step, -15 * D2R, 15 * D2R), BANK_MARGIN_LO, BANK_HI);
+            if (std::fabs(next - b.bank0) < 1e-3) break;   // held at a limit
+            b = tryBurn(p0, a.tb, mass, side, next);
+            if (!usable(b)) { ok = false; break; }
+            const double sl = (b.shot.along - mPrev) / (b.bank0 - bPrev);
+            if (sl > 0) slope = sl;   // the miss rises with the bank
+            bPrev = b.bank0;
+            mPrev = b.shot.along;
+        }
+        ok = ok && std::fabs(b.shot.along) <= 5000.0 && std::fabs(b.shot.off) < 25 * D2R && b.shot.heatPeak < OC_RET_HEAT_LIMIT &&
+             b.shot.loadPeak < OC_RET_LOAD_LIMIT;
+        model = keep;
+        return ok;
+    };
     // At the earliest burn, the bank between the plan's and BANK_LATE that ends the shot at the gate: the
     // miss rises with the bank (more of the lift turned aside, a shorter entry). Bisection.
     auto settleBank = [&](double tb) {
@@ -630,12 +740,18 @@ void plan(State& s) {
 
     Trial a{};
     bool found = false;
+    double offReach = R.reach;   // the entry's reach off the plane, with the margin's lift over drag
     if (R.planned) {   // a plan in hand: the pass is taken, only its burn time moves
         a = R.bank0 > BANK_PLAN + 0.01 ? settleBank(std::fmax(first, R.tBurn + R.dv * halfBurn)) : settleTime(std::fmax(first, R.tBurn + R.dv * halfBurn));
         found = good(a);
     }
     if (!found) {
         R.passes = 0;
+        R.skipped = 0;
+        Trial fallback{};
+        double fallbackReach = 0;
+        int fallbackPasses = 0;
+        bool haveFallback = false;
         const Trial ref = tryBurn(p0, first, mass, side, BANK_PLAN);
         if (!usable(ref)) { R.planned = 0; R.tEvent = -1; return; }
         const double flight = ref.shot.tGate - first;
@@ -658,15 +774,31 @@ void plan(State& s) {
             footAhead(p0, tb, flight, n, &off);
             const bool late = tb < first;
             if (late && first - tb > LATE_MAX) continue;
+            if (haveFallback && tb > fallback.tb + MARGIN_WAIT) break;   // no pass with margin soon enough
             if (std::fabs(off) <= 1.1 * CROSS_MAX) {
                 a = late ? settleBank(first) : settleTime(tb);
                 if (usable(a) && a.shot.along < -1000.0 && a.tb <= first + 0.01) a = settleBank(first);   // held at the earliest, still long
-                found = good(a);
+                if (good(a)) {
+                    // Its margin: the bank the plan's, not one raised to take a pass just missed, and the pass in
+                    // reach of the entry with the craft's lift over drag MARGIN_LD of the model's.
+                    offReach = reachFrom(p0, a.tb, mass, a.cross > 0 ? -1 : 1);
+                    found = a.bank0 <= BANK_PLAN + 0.01 && reachable(a, MARGIN_LD);
+                    if (!found && !haveFallback) { fallback = a; fallbackReach = offReach; fallbackPasses = R.passes; haveFallback = true; }
+                    if (!found) ++R.skipped;
+                }
             }
             if (!found && !late) ++R.passes;
         }
+        if (!found && haveFallback) {   // the first pass in reach after all
+            a = fallback;
+            offReach = fallbackReach;
+            R.passes = fallbackPasses;
+            R.skipped = 0;
+            found = true;
+        }
     }
     if (!found) { R.planned = 0; R.tEvent = -1; return; }
+    R.reach = offReach;
     R.planned = 1;
     R.dv = a.dv;
     R.bank0 = a.bank0;
@@ -688,14 +820,25 @@ void plan(State& s) {
 // air data can be had (c): the coefficients' own error, for the laws that fly by the air data. In flight
 // only, the wheels up.
 
-void learn(State& s, const Local& L) {
+// felt: set to what the accelerometers read over the step just flown (ECI, m/s2), and *have to whether there
+// was a step to read over, aloft.
+void learn(State& s, const Local& L, V3* feltOut, bool* have) {
     ReturnState& R = s.ret;
-    const bool flying = !s.onGround && !s.gear && R.phase >= OC_RET_PH_COAST && R.phase <= OC_RET_PH_FLARE;
-    if (flying && R.sensed) {
-        const double mass = M_DRY + s.prop;
+    const bool aloft = !s.onGround && R.phase >= OC_RET_PH_COAST && R.phase <= OC_RET_PH_FLARE;
+    const bool flying = aloft && !s.gear;   // what is learned is learned with the gear up
+    *have = false;
+    if (aloft && R.sensed) {
+        const double mass = massOf(s);
         const V3 rp{R.rPrev[0], R.rPrev[1], R.rPrev[2]}, vp{R.vPrev[0], R.vPrev[1], R.vPrev[2]};
-        const V3 drive = rot(s.q, V3{s.prop > 0 ? s.thr * T_MAX / mass : 0, 0, 0});
-        const V3 felt = (s.v - vp) * (1.0 / OC_DT) - (gravity(s.r) + gravity(rp)) * 0.5 - drive;
+        const V3 drive = rot(s.q, V3{s.prop > 0 ? s.thr * thrustOf(s) / mass : 0, 0, 0});
+        V3 felt = (s.v - vp) * (1.0 / OC_DT) - (gravity(s.r) + gravity(rp)) * 0.5 - drive;
+        if (R.noise > 0)   // the accelerometers' bias and noise
+            felt = felt + V3{ACC_BIAS * gauss(keyOf(R.noiseSeed, 40, 0)) + ACC_NOISE * gauss(keyOf(R.noiseSeed, 41, s.n)),
+                             ACC_BIAS * gauss(keyOf(R.noiseSeed, 42, 0)) + ACC_NOISE * gauss(keyOf(R.noiseSeed, 43, s.n)),
+                             ACC_BIAS * gauss(keyOf(R.noiseSeed, 44, 0)) + ACC_NOISE * gauss(keyOf(R.noiseSeed, 45, s.n))} * R.noise;
+        *feltOut = felt;
+        *have = true;
+        if (flying) {
         const V3 rm = (s.r + rp) * 0.5, vm = (s.v + vp) * 0.5;
         const V3 vAir = vm - cross(V3{0, 0, WE}, rm);
         const double tas = norm(vAir);
@@ -710,13 +853,20 @@ void learn(State& s, const Local& L) {
             R.kDrag += (clampd(dFelt / (kModel * cd), 0.5, 2.0) - R.kDrag) * b;
             R.kLift += (clampd(lFelt / (kModel * cl), 0.5, 2.0) - R.kLift) * b;
         }
-        const double kData = L.qbar * S_REF / mass;   // the air data's
-        if (L.mach < 4 && L.qbar > 2000 && kData * cl > 0.3 * LEARN_FROM) {
-            R.cDrag += (clampd(dFelt / (kData * cd), 0.5, 2.0) - R.cDrag) * b;
-            R.cLift += (clampd(lFelt / (kData * cl), 0.5, 2.0) - R.cLift) * b;
+        // Against the air data: the drag along the air's velocity as they measure it (through the moving air),
+        // the lift across it, and the coefficients at the angle of attack and Mach number they measure.
+        const double kData = L.qbar * S_REF / mass;
+        if (L.mach < AIR_MACH && L.qbar > 2000 && kData * cl > 0.3 * LEARN_FROM) {
+            double clD, cdD;
+            givenCoef(L.alpha, L.mach, &clD, &cdD);
+            const V3 uhat = unit(rot(s.q, L.vAirBody));
+            const double dData = -dot(felt, uhat), lData = norm(felt + uhat * dData);
+            R.cDrag += (clampd(dData / (kData * cdD), 0.5, 2.0) - R.cDrag) * b;
+            R.cLift += (clampd(lData / (kData * clD), 0.5, 2.0) - R.cLift) * b;
+        }
         }
     }
-    R.sensed = flying;
+    R.sensed = aloft;
     R.rPrev[0] = s.r.x; R.rPrev[1] = s.r.y; R.rPrev[2] = s.r.z;
     R.vPrev[0] = s.v.x; R.vPrev[1] = s.v.y; R.vPrev[2] = s.v.z;
     useModelOf(s);
@@ -727,7 +877,7 @@ void learn(State& s, const Local& L) {
 // Fly an angle of attack and a bank about the air's velocity, with no sideslip: the attitude that does
 // it, and the rates that turn the craft to it. ff: rates the attitude is known to need.
 void flyWind(State& s, const Local& L, double alpha, double bank, double gain, double limit, V3 ff) {
-    const V3 vAir = s.v - cross(V3{0, 0, WE}, s.r);
+    const V3 vAir = s.v - cross(V3{0, 0, WE}, s.r) - windSeen(s);
     const V3 vhat = unit(vAir);
     V3 l0, right;
     windAxes(L.up, vhat, rot(s.q, V3{0, 0, -1}), &l0, &right);
@@ -739,7 +889,7 @@ void flyWind(State& s, const Local& L, double alpha, double bank, double gain, d
 
 // The bank the craft has, about the air's velocity: where its lift points.
 double bankOf(const State& s) {
-    const V3 vAir = s.v - cross(V3{0, 0, WE}, s.r);
+    const V3 vAir = s.v - cross(V3{0, 0, WE}, s.r) - windSeen(s);
     const V3 vhat = unit(vAir);
     V3 l0, right;
     windAxes(unit(s.r), vhat, rot(s.q, V3{0, 0, -1}), &l0, &right);
@@ -802,7 +952,7 @@ void depart(State& s, const Local& L) {
 // The corrector: shoot the rest of the entry, and move the bank so the shot ends at the gate.
 void correct(State& s, const Local& L) {
     ReturnState& R = s.ret;
-    const double t = timeOf(s), mass = M_DRY + s.prop;
+    const double t = timeOf(s), mass = massOf(s);
     const Pt p{s.r, s.v, t};
     const double bank = L.qbar > 1.0 ? bankOf(s) : R.bankCmd;
     R.bank0 = clampd(bankProfile(R.bank0, R.vRef, L.tas), BANK_LO, BANK_HI);   // the profile, where the craft now is on it
@@ -858,11 +1008,14 @@ double followPath(State& s, const Ground& g, double limit, bool mayExit) {
         if (arc < 0) arc += 2 * PI;
         R.togo = HAC_R * arc + FINAL_M + R.laps * 2 * PI * HAC_R;
     } else {
-        // Down the centreline, and against the Earth's turn: flying along it at vx, the craft is pushed to
-        // the right of its path by 2 vx WE sin(latitude), 8 mm/s2 at 100 m/s here, which would hold it
-        // 0.7 m off the line.
+        // Down the centreline: a sideways acceleration of -k1 y - k2 vy, critically damped, stiffening from 8 km
+        // out to 2 km, k1 from 0.012 to 0.06 per second squared: near the ground the wind changes with height
+        // and gusts, and the crab the guidance holds against it lags, so the craft is held harder to the line
+        // there. And against the Earth's turn: flying along it at vx, the craft is pushed to the right of its
+        // path by 2 vx WE sin(latitude), 8 mm/s2 at 100 m/s here, which the law would leave it held off the line by.
         const double coriolis = 2 * WE * std::sin(site.lat) * g.vx * side;
-        turn = (-0.012 * y - 0.22 * vy - coriolis) / speed;
+        const double k1 = 0.012 + 0.048 * clampd((8000.0 + g.p.x) / 6000.0, 0, 1), k2 = 2 * std::sqrt(k1);
+        turn = (-k1 * y - k2 * vy - coriolis) / speed;
         R.togo = -g.p.x;
     }
     return side * clampd(std::atan(turn * speed / G0), -limit, limit);
@@ -879,24 +1032,34 @@ V3 turnRates(const Local& L, double bank, double pathRate) {
 void terminal(State& s, const Local& L) {
     ReturnState& R = s.ret;
     const Ground g = groundOf(s);
-    const double mass = M_DRY + s.prop;
-    const bool high = L.alt > H_PATTERN + 500.0;
-    const double bank = followPath(s, g, (L.mach > 1.2 ? 50 : 40) * D2R, !high);
-    if (R.leg == 1 && R.laps == 0 && high && circlePath(g.p, R.side).arc < 0.03) R.laps = 1;   // too high to leave the turn: once more round
+    const double mass = massOf(s);
 
     // Energy, as height: what the craft has above what it should arrive with, over the path in which
     // to spend it. Drag over lift is the height a glide spends for each metre flown.
     const double energy = L.alt + L.tas * L.tas / (2 * G0);
     const double want = H_PATTERN + V_PATTERN * V_PATTERN / (2 * G0);
-    const double room = std::fmax(1000.0, R.togo - FINAL_M - 3000.0);
     const double best = alphaBest(L.mach);
     const double steep = std::fmax(best, (12 + 18 * clampd((L.alt - 3000.0) / 5000.0, 0, 1)) * D2R * (ALPHA_GLIDE_MAX / (30 * D2R)));
-    if (R.leg == 0) {   // more path, if the steepest glide cannot spend it all: whole turns round the circle
-        const double most = dragOverLift(steep, L.mach);
-        if ((energy - want) / room > 1.25 * most && R.laps < 3) ++R.laps;
-        else if (R.laps > 0 && (energy - want) / std::fmax(1000.0, room - 2 * PI * HAC_R) < 0.9 * most) --R.laps;
+    const double flattest = dragOverLift(best, L.mach), most = dragOverLift(steep, L.mach);
+    // A whole turn more round the circle is 2 pi HAC_R more path, and the flattest glide spends at least
+    // flattest times that over it. One is taken only when the craft has that much to spend: a turn it
+    // cannot glide round it flies level under power, the long level stretches of the first build (0.5 to
+    // 2.9 t of propellant). Too high for a turn more, it leaves the turn high and spends the rest on the final.
+    const double lap = 2 * PI * HAC_R;
+    const bool high = L.alt > H_PATTERN + 500.0;
+    const bool lapFits = energy - want > 1.1 * flattest * (lap + FINAL_M + 3000.0);
+    const double bank = followPath(s, g, (L.mach > 1.2 ? 50 : 40) * D2R, !high || !lapFits);
+    if (R.leg == 1 && R.laps == 0 && high && lapFits && circlePath(g.p, R.side).arc < 0.03) R.laps = 1;   // too high to leave the turn: once more round
+    const double room = std::fmax(1000.0, R.togo - FINAL_M - 3000.0);
+    if (R.leg == 0) {   // more path, if the steepest glide cannot spend it all and the flattest can span it: whole turns round the circle
+        if ((energy - want) / room > 1.25 * most && R.laps < 3 && energy - want > 1.1 * flattest * (room + lap)) ++R.laps;
+        else if (R.laps > 0 && (energy - want) / std::fmax(1000.0, room - lap) < 0.9 * most) --R.laps;
     }
-    double alpha = alphaForDrag((energy - want) / room * std::cos(bank), L.mach, best, steep);
+    // Over the ground, not through the air: a glide spends drag over lift in height for each metre it flies
+    // through the air, and flies tas over its speed over the ground (navigation's) of those for each metre of
+    // the path; downwind it must glide steeper, into the wind flatter.
+    const double overGround = std::fmax(g.speed, 20.0) / std::fmax(L.tas, 20.0);
+    double alpha = alphaForDrag((energy - want) / room * std::cos(bank) * overGround, L.mach, best, steep);
     // Steadied, as holding the nose's attitude steadies a glide: the path steeper than this angle of
     // attack settles at wants more of it, a shallower one less. Fast and high, most of the energy spent
     // comes out of the speed, not the height, and the settled path is that much flatter.
@@ -921,7 +1084,7 @@ void terminal(State& s, const Local& L) {
 void approach(State& s, const Local& L, double* throttle) {
     ReturnState& R = s.ret;
     const Ground g = groundOf(s);
-    const double mass = M_DRY + s.prop, wheels = wheelHeight(s, L);
+    const double mass = massOf(s), wheels = wheelHeight(s, L);
     const bool flare = R.phase == OC_RET_PH_FLARE;
     const double bank = followPath(s, g, (flare ? 4 : wheels < 60.0 ? 10 : 30) * D2R, true);
     const double gamma = std::asin(clampd(L.vs / std::fmax(L.tas, 1.0), -1, 1));
@@ -937,9 +1100,13 @@ void approach(State& s, const Local& L, double* throttle) {
     } else {
         const double sinkRef = descending ? -g.speed * std::tan(GLIDE_SLOPE) : 0.0;
         lift = clampd(0.16 * (level - L.alt) + 0.7 * (sinkRef - L.vs), -3.0, 3.0);
+        // Never sinking faster than 2 m/s2 of pull, from here to the flare's height, could take back to the glide
+        // path's own sink: high above the path, the law would otherwise dive at it.
+        const double sinkMost = std::sqrt(sinkRef * sinkRef + 2 * 2.0 * std::fmax(0.0, wheels - FLARE_M));
+        lift = std::fmax(lift, std::fmin(3.0, 0.7 * (-sinkMost - L.vs)));
         if (R.leg == 2 && wheels < FLARE_M && g.p.x > -1500.0) R.phase = OC_RET_PH_FLARE;
     }
-    const double thrust = s.thr * T_MAX;
+    const double thrust = s.thr * thrustOf(s);
     const double need = (G0 * std::cos(gamma) + lift) / std::cos(bank) - thrust * std::sin(L.alpha) / mass;
     const double alpha = alphaForLift(need * mass / std::fmax(L.qbar * S_REF, 1.0), L.mach, -4 * D2R, (flare ? 9.5 : 18) * D2R);
     R.alphaCmd += clampd(alpha - R.alphaCmd, -4 * D2R * OC_DT, 4 * D2R * OC_DT);
@@ -954,7 +1121,7 @@ void approach(State& s, const Local& L, double* throttle) {
     const double drag = L.qbar * S_REF * cd;
     const double push = clampd(0.25 * (vRef - L.tas), -2.0, 2.5);
     R.thrust = clampd(R.thrust + 0.02 * (vRef - L.tas) * OC_DT, -0.05, 0.1);
-    *throttle = flare && wheels < 7.0 ? 0 : clampd((drag + mass * (G0 * std::sin(gamma) + push)) / (T_MAX * std::cos(L.alpha)) + R.thrust, 0, 0.6);
+    *throttle = flare && wheels < 7.0 ? 0 : clampd((drag + mass * (G0 * std::sin(gamma) + push)) / (thrustOf(s) * std::cos(L.alpha)) + R.thrust, 0, 0.6);
     if (R.togo < 9000.0 || wheels < 300.0) s.gear = 1;
     R.tEvent = timeOf(s) + std::fmax(0.0, R.togo + 400.0) / std::fmax(g.speed, 40.0);
     if (s.onGround) { R.phase = OC_RET_PH_ROLLOUT; s.thetaT = L.pitch; s.phiT = 0; }
@@ -976,6 +1143,78 @@ void rollout(State& s, const Local& L) {
     R.togo = -g.p.x;
     R.tEvent = -1;
     if (g.speed < 0.3 && s.onGround) R.phase = OC_RET_PH_STOPPED;
+}
+
+// What the instruments say of the craft in state s, whose air data (through the moving air) are Lt: the state
+// as navigation has it, with no wind in it (the instruments cannot see the air move, only measure it), the
+// mass as known; and in *L its air data, or below Mach 4 navigation's reckoning of them.
+State sense(const State& s, const Local& Lt, Local* L) {
+    State o = s;
+    o.wind = WindState{};
+    const ReturnState& R = s.ret;
+    const double t = timeOf(s), n = R.noise;
+    if (n > 0) {
+        const double d = RE * std::acos(clampd(dot(unit(s.r), unit(fromEarth(site.p0, t))), -1, 1));
+        const double sr = n * (NAV_NEAR + (NAV_FAR - NAV_NEAR) * clampd((d - 5000.0) / 45000.0, 0, 1)), sv = n * NAV_VEL;
+        const double seed = R.noiseSeed;
+        o.r = s.r + V3{wander(seed, 0, t), wander(seed, 1, t), wander(seed, 2, t)} * sr;
+        o.v = s.v + V3{wander(seed, 3, t), wander(seed, 4, t), wander(seed, 5, t)} * sv;
+    }
+    *L = localOf(o);   // navigation's, in still standard air
+    if (L->mach < AIR_MACH) {   // the probes are out: what they measure
+        double tas = Lt.tas, alpha = Lt.alpha, beta = Lt.beta, qbar = Lt.qbar;
+        if (n > 0) {
+            const double seed = R.noiseSeed;
+            tas *= 1 + n * ADS_TAS * wander(seed, 10, t);
+            alpha += n * (ADS_ANGLE * wander(seed, 11, t) + ADS_ANGLE_NOISE * gauss(keyOf(seed, 12, s.n)));
+            beta += n * (ADS_ANGLE * wander(seed, 13, t) + ADS_ANGLE_NOISE * gauss(keyOf(seed, 14, s.n)));
+            qbar *= 1 + n * ADS_QBAR * wander(seed, 15, t);
+        }
+        L->tas = tas;
+        L->alpha = alpha;
+        L->beta = beta;
+        L->qbar = qbar;
+        L->air = Lt.air;
+        L->mach = tas / Lt.air.sound;
+        L->vAirBody = V3{std::cos(alpha) * std::cos(beta), std::sin(beta), std::sin(alpha) * std::cos(beta)} * tas;
+    }
+    return o;
+}
+
+// The wind the guidance works out: where it has air data, aloft, its velocity over the ground (navigation's)
+// less its velocity through the air (the air data's, turned by the attitude), each step into a fading memory
+// of WIND_TAU, kept in the Earth's axes; without, what it last worked out (nothing, on the way down from
+// orbit). Across the craft it takes the sideslip from the side force the accelerometers feel, CY_BETA beta
+// qbar S, not from the vane: a vane's error of 0.2 degrees would leave the craft flying sideslipped and
+// pushed off the centreline by metres, where the accelerometers' bias is worth a hundredth of a degree. So
+// the craft flies in balance, as a turn coordinator holds an aeroplane.
+void senseWind(State& s, const Local& L, const V3& felt, bool have) {
+    ReturnState& R = s.ret;
+    if (!(L.mach < AIR_MACH) || L.tas < 1.0 || s.onGround) return;
+    V3 raw = s.v - cross(V3{0, 0, WE}, s.r) - rot(s.q, L.vAirBody);
+    if (have && L.qbar > 500.0) {
+        const V3 yb = rot(s.q, V3{0, 1, 0});
+        const double beta = clampd(dot(felt, yb) * massOf(s) / (L.qbar * S_REF * CY_BETA), -0.3, 0.3);
+        raw = raw + yb * (L.tas * (std::sin(L.beta) - std::sin(beta)));
+    }
+    const V3 e = toEarth(raw, timeOf(s));
+    const double b = 1 - std::exp(-OC_DT / WIND_TAU);
+    R.windEst[0] += (e.x - R.windEst[0]) * b;
+    R.windEst[1] += (e.y - R.windEst[1]) * b;
+    R.windEst[2] += (e.z - R.windEst[2]) * b;
+}
+
+// What the guidance's commands are: the only fields of the copy it flies that go back to the craft.
+void commands(State& s, const State& seen) {
+    s.ret = seen.ret;
+    s.torque = seen.torque;
+    s.rcs = seen.rcs;
+    s.gear = seen.gear;
+    s.brake = seen.brake;
+    s.steer = seen.steer;
+    s.thetaT = seen.thetaT;
+    s.phiT = seen.phiT;
+    s.autoMode = seen.autoMode;
 }
 
 }   // namespace
@@ -1008,8 +1247,22 @@ int returnRefusal(const State& s) {
     return OC_RET_NO_NONE;
 }
 
-// The crew picks the flight home up from wherever the craft is.
+namespace {
+void engageSeen(State& s, const Local& L);
+void flyHome(State& s, const Local& L, double* throttle);
+}   // namespace
+
+// The crew picks the flight home up from wherever the craft is, as its instruments say it is.
 void returnEngage(State& s) {
+    Local L;
+    State seen = sense(s, localOf(s), &L);
+    engageSeen(seen, L);
+    commands(s, seen);
+}
+
+namespace {
+
+void engageSeen(State& s, const Local& L) {
     ReturnState& R = s.ret;
     const ReturnState was = R;
     R = ReturnState{};
@@ -1018,18 +1271,19 @@ void returnEngage(State& s) {
     R.sinkLast = was.sinkLast;
     R.propAtEngage = s.prop;
     R.errRho = was.errRho; R.errWave = was.errWave; R.errPhase = was.errPhase; R.errLift = was.errLift; R.errDrag = was.errDrag;
+    R.errMass = was.errMass; R.errThrust = was.errThrust; R.noise = was.noise; R.noiseSeed = was.noiseSeed;
     R.kLift = R.kDrag = R.cLift = R.cDrag = 1;
     if (was.phase >= OC_RET_PH_BURN && was.phase <= OC_RET_PH_FLARE && !s.onGround) {
         // Taken back on the way down, after the pilot had it: the same flight home goes on, with what it
         // has met and learned so far.
         R.heatPeak = was.heatPeak; R.heatLoad = was.heatLoad; R.loadPeak = was.loadPeak; R.qbarPeak = was.qbarPeak; R.over = was.over;
         R.propAtEngage = was.propAtEngage;
-        R.dv = was.dv; R.passes = was.passes; R.crossPlan = was.crossPlan; R.reversals = was.reversals;
+        R.dv = was.dv; R.passes = was.passes; R.crossPlan = was.crossPlan; R.reversals = was.reversals; R.reach = was.reach; R.skipped = was.skipped;
         R.kLift = was.kLift; R.kDrag = was.kDrag; R.cLift = was.cLift; R.cDrag = was.cDrag;
+        R.windEst[0] = was.windEst[0]; R.windEst[1] = was.windEst[1]; R.windEst[2] = was.windEst[2];
         R.side = was.side;
     }
     R.tEvent = -1;
-    const Local L = localOf(s);
     const Orbit o = orbitOf(s);
     R.alphaCmd = L.alpha;
     R.bankCmd = 0;
@@ -1047,10 +1301,25 @@ void returnEngage(State& s) {
     else startTerminal(s);
 }
 
-void returnCrew(State& s, const Local& L, double* throttle) {
+}   // namespace
+
+// A step's commands, flying home: worked out from what the instruments say, Lt the craft's own air data.
+void returnCrew(State& s, const Local& Lt, double* throttle) {
+    Local L;
+    State seen = sense(s, Lt, &L);
+    flyHome(seen, L, throttle);
+    commands(s, seen);
+}
+
+namespace {
+
+void flyHome(State& s, const Local& L, double* throttle) {
     ReturnState& R = s.ret;
     useModelOf(s);
-    learn(s, L);
+    V3 felt{0, 0, 0};
+    bool have = false;
+    learn(s, L, &felt, &have);
+    senseWind(s, L, felt, have);
     const double t = timeOf(s);
     *throttle = 0;
     s.brake = 0;
@@ -1073,7 +1342,7 @@ void returnCrew(State& s, const Local& L, double* throttle) {
         const bool aimed = dot(rot(s.q, V3{1, 0, 0}), back) > 0.9986;   // within 3 degrees
         *throttle = aimed ? clampd(BURN_THROTTLE * (peri - PERI_TARGET) / 40000.0, 0.02, BURN_THROTTLE) : 0;
         rateLoop(s, L, point(s, L, back, 1.5, 0.15));
-        R.tEvent = t + std::fmax(0.0, peri - PERI_TARGET) / (3600.0 * BURN_THROTTLE * T_MAX / (M_DRY + s.prop));
+        R.tEvent = t + std::fmax(0.0, peri - PERI_TARGET) / (3600.0 * BURN_THROTTLE * thrustOf(s) / massOf(s));
         if (peri <= PERI_TARGET || s.prop <= 0) {
             *throttle = 0;
             R.phase = OC_RET_PH_COAST;
@@ -1093,7 +1362,7 @@ void returnCrew(State& s, const Local& L, double* throttle) {
     }
     case OC_RET_PH_ENTRY: {
         if (t >= R.tGuide) { correct(s, L); R.tGuide = t + 2.0; }
-        const Law g = entryLaw(s.r, s.v, t, M_DRY + s.prop, R.bank0, R.vRef, R.side);
+        const Law g = entryLaw(s.r, s.v, t, massOf(s), R.bank0, R.vRef, R.side);
         if (R.bankSide == 0) R.bankSide = g.off >= 0 ? 1 : -1;
         else if (reverse(R.bankSide, g.off, g.tas)) { R.bankSide = -R.bankSide; ++R.reversals; }
         R.bankCmd = R.bankSide * g.bank;
@@ -1120,6 +1389,8 @@ void returnCrew(State& s, const Local& L, double* throttle) {
         break;
     }
 }
+
+}   // namespace
 
 // After every step, whoever flies: what the air does to the craft, and the landing's numbers.
 void returnAfterStep(State& s) {
@@ -1171,6 +1442,10 @@ void returnAfterStep(State& s) {
         R.tdSpeed = g.speed;
         R.tdPitch = std::asin(clampd(dot(rot(s.q, V3{1, 0, 0}), up), -1, 1));
         R.tdTime = timeOf(s);
+        // the crab: the nose off the track over the ground, + to the right of it
+        const V3 nose = rot(s.q, V3{1, 0, 0}), vg = s.v - cross(V3{0, 0, WE}, s.r);
+        const V3 nh = nose - up * dot(nose, up), th = vg - up * dot(vg, up);
+        R.tdCrab = norm(th) > 1.0 ? std::atan2(dot(cross(th, nh), up) * -1.0, dot(th, nh)) : 0;
     }
     if (R.touched && !R.stopped && s.onGround && tas < 0.3) {
         const Ground g = groundOf(s);
@@ -1234,6 +1509,13 @@ void returnWriteOut(const State& s) {
     out[OC_RET_STOP_OFF] = R.stopOff;
     out[OC_RET_PROP_USED] = R.propAtEngage - s.prop;
     out[OC_RET_REFUSED] = R.refused;
+    const V3 w = fromEarth(V3{R.windEst[0], R.windEst[1], R.windEst[2]}, t);   // the guidance's wind, in the craft's local axes
+    const V3 up = unit(s.r), east = unit(cross(V3{0, 0, 1}, up)), north = cross(up, east);
+    out[OC_RET_WIND_E] = flying ? dot(w, east) : 0;
+    out[OC_RET_WIND_N] = flying ? dot(w, north) : 0;
+    out[OC_RET_REACH] = R.reach;
+    out[OC_RET_SKIPPED] = R.skipped;
+    out[OC_RET_TD_CRAB_DEG] = R.tdCrab * R2D;
 }
 
 void returnHash(const State& s, unsigned& h) {
@@ -1249,7 +1531,7 @@ void returnHash(const State& s, unsigned& h) {
     };
     hashDoubles(h, v, sizeof v / sizeof v[0]);
     // what was added after the first build, each nought as reset: folded in only when one is not
-    const double more[] = {(double)R.refused};
+    const double more[] = {(double)R.refused, R.errMass, R.errThrust, R.noise, R.noiseSeed, R.windEst[0], R.windEst[1], R.windEst[2], R.reach, (double)R.skipped, R.tdCrab};
     bool used = false;
     for (double x : more) used = used || x != 0;
     if (used) hashDoubles(h, more, sizeof more / sizeof more[0]);
@@ -1271,6 +1553,15 @@ double oc_return_model_g(void) {
     const V3 air = airAccel(s.r, s.v, mass, L.alpha, bankOf(s));
     const V3 drive = rot(s.q, V3{s.prop > 0 ? s.thr * T_MAX / mass : 0, 0, 0});
     return norm(air + drive) / G0;
+}
+
+void oc_return_disturb(double mass, double thrust, unsigned seed, double noise) {
+    if (!(mass > 0.5 && mass < 2) || !(thrust > 0.5 && thrust < 2) || !(noise >= 0 && noise <= 10)) return;   // refused
+    oc::ReturnState& R = oc::g.ret;
+    R.errMass = mass - 1;
+    R.errThrust = thrust - 1;
+    R.noise = noise;
+    R.noiseSeed = seed;
 }
 
 void oc_return_model_error(double rho, double wave, double phase, double lift, double drag) {

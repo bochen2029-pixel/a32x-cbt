@@ -96,6 +96,13 @@ enum {
     OC_RET_STOP_OFF,      /* m off the centreline */
     OC_RET_PROP_USED,     /* kg of propellant since the return was engaged */
     OC_RET_REFUSED,       /* OC_RET_NO_*: why RETURN was last refused */
+    OC_RET_WIND_E,        /* m/s: the wind the crew has worked out from its air data and navigation, east */
+    OC_RET_WIND_N,        /* north */
+    OC_RET_REACH,         /* m: on the pass planned, how far off the plane the entry reaches with the craft's lift over
+                             drag a quarter short of its model's; the plan takes the first pass whose runway, OC_RET_CROSS,
+                             lies inside it, or failing one within 3.5 hours, the first in reach */
+    OC_RET_SKIPPED,       /* passes in reach let go for want of that margin before the one taken */
+    OC_RET_TD_CRAB_DEG,   /* at the touch, the nose off the track over the ground, + to the right: the crab a crosswind leaves */
     OC_RET_COUNT
 };
 
@@ -111,6 +118,15 @@ double oc_return_model_g(void);
    the air's times rho (1 + wave sin(2 pi h / 12 km + phase)), its lift and drag coefficients the craft's
    times lift and drag; the craft still flies the core's. Kept through oc_auto, cleared by oc_reset. */
 void oc_return_model_error(double rho, double wave, double phase, double lift, double drag);
+
+/* For tests of robustness: what the crew's instruments and its knowledge of the craft get wrong, the craft
+   flying the core's. mass and thrust: the craft's mass and the drive's full thrust as the guidance knows
+   them, over the true (1, 1: right; each taken between 0.5 and 2). noise: how strong the instruments'
+   errors are, 0 none, 1 the nominal (return.cpp: navigation 3 m and 0.03 m/s, 0.3 m near the field; the
+   accelerometers 0.02 m/s2 and a bias of 0.005; air data 0.5 % in speed, 1 % in pressure, 0.2 degrees in
+   angle), drawn from seed. A value out of range refuses the call. Kept through oc_auto, cleared by
+   oc_reset. */
+void oc_return_disturb(double mass, double thrust, unsigned seed, double noise);
 
 #ifdef __cplusplus
 }

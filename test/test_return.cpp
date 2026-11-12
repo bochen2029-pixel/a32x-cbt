@@ -20,11 +20,13 @@
 // TEST: plan_says_when
 // TEST: return_refused_on_the_deck
 // TEST: departs_clear_of_the_mast
+// TEST: blind_to_the_wind
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"
 #include "../core/orbit_return.h"
+#include "../core/orbit_wind.h"
 #include "../core/internal.h"   // to place the craft where no crew mode takes it (departs_clear_of_the_mast)
 
 #include <cmath>
@@ -70,26 +72,33 @@ enum Start {
 
 struct Run {
     double engage, tBurn, tInterface, tTerminal, tTouch, tStop;
-    double dv, cross, maxG;
+    double dv, cross, maxG, reach;
     bool docked;
     double dockedAt;
-    int passes;
+    int passes, skipped;
     unsigned hashAtBurn, hash;
     bool finite;
+    double tdHead, tdCross, tdGust, airProp;   // the wind at the touch (m/s, + a headwind, + from the right; its gust up), kg used in the air
 };
 
 // How wrong the guidance's model of the air and the craft is (oc_return_model_error); 1, 0, 0, 1, 1: right.
 struct ModelError { double rho, wave, phase, lift, drag; };
 const ModelError RIGHT{1, 0, 0, 1, 1};
 
+// The day and the craft's other unknowns: the wind (oc_wind, set when the return is engaged), the mass and
+// the thrust as the guidance knows them over the true, and the instruments' noise (oc_return_disturb).
+struct Weather { unsigned windSeed; double wind, mass, thrust; unsigned noiseSeed; double noise; };
+const Weather STILL{0, 0, 1, 1, 0, 0};
+
 // Fly the crew to orbit, start the return at `engage` s, and fly it to a stop (or a crash, or the limit).
-Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError err = RIGHT) {
+Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError err = RIGHT, Weather wx = STILL) {
     Run r{};
     r.engage = engage;
     r.tBurn = r.tInterface = r.tTerminal = r.tTouch = r.tStop = -1;
     r.finite = true;
     oc_reset(LAT, LON, HDG);
     oc_return_model_error(err.rho, err.wave, err.phase, err.lift, err.drag);
+    oc_return_disturb(wx.mass, wx.thrust, wx.noiseSeed, wx.noise);
     while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
     if (start == AT_HUB) oc_auto(OC_AUTO_APPROACH);
     if (start == DOCKED) {   // the crew docks, then lets go: the return starts on the port, turning with it
@@ -112,8 +121,10 @@ Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError 
     }
     while (get(OC_T) < engage) oc_step(50);
     r.engage = get(OC_T);
+    if (wx.wind > 0) oc_wind(wx.windSeed, wx.wind);
     oc_auto(OC_AUTO_RETURN);
     int phase = (int)ret(OC_RET_PHASE);
+    double propAir = -1;
     while (get(OC_T) < engage + 200000) {
         oc_step(10);
         const int ph = (int)ret(OC_RET_PHASE);
@@ -121,6 +132,14 @@ Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError 
             r.dv = ret(OC_RET_DV);
             r.cross = ret(OC_RET_CROSS);
             r.passes = (int)ret(OC_RET_PASSES);
+            r.skipped = (int)ret(OC_RET_SKIPPED);
+            r.reach = ret(OC_RET_REACH);
+        }
+        if (propAir < 0 && ph >= OC_RET_PH_TERMINAL) propAir = get(OC_PROP);
+        if (r.tdHead == 0 && ret(OC_RET_TOUCHED) > 0) {
+            r.tdHead = oc_wind_out()[OC_WIND_HEAD];
+            r.tdCross = oc_wind_out()[OC_WIND_CROSS];
+            r.tdGust = oc_wind_out()[OC_WIND_GUST_U];
         }
         if (ph != phase) {
             if (ph == OC_RET_PH_BURN) { r.tBurn = get(OC_T); r.hashAtBurn = oc_hash(); }
@@ -134,6 +153,7 @@ Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError 
     }
     r.tTouch = ret(OC_RET_TOUCHED) > 0 ? ret(OC_RET_TD_T) : -1;
     r.tStop = ret(OC_RET_STOPPED) > 0 ? get(OC_T) : -1;
+    r.airProp = propAir >= 0 ? propAir - get(OC_PROP) : 0;
     r.hash = oc_hash();
     return r;
 }
@@ -157,16 +177,16 @@ void print(const Run& r) {
 //   - the wheels touch in the touchdown zone's middle, 300 to 600 m past the threshold, where the 3 degree
 //     path (the wheels 15 m over the threshold) and the flare put them;
 //   - sinking 0.5 to 1.0 m/s: the flare's aim, 0.5, and no more than twice it;
-//   - within 0.3 m of the centreline: the final's lateral law holds the line with a stiffness of 0.012 per
-//     second squared, so 0.3 m off is a side push of 3.6 mm/s2 left unbalanced, under half the 8 mm/s2 of
-//     the Earth's turn that it feeds forward.
+//   - within 0.1 m of the centreline: the final's lateral law holds the line with a stiffness of 0.06 per
+//     second squared over its last 2 km, so 0.1 m off is a side push of 6 mm/s2 left unbalanced, under the
+//     8 mm/s2 of the Earth's turn that it feeds forward.
 void landed(const Run& r) {
     print(r);
     CHECK(r.finite, "every readout finite");
     CHECK(get(OC_CRASHED) == 0, "not crashed, at %.0f s", get(OC_T));
     CHECK(ret(OC_RET_TOUCHED) > 0, "touched down");
     CHECK(ret(OC_RET_TD_ALONG) > 300 && ret(OC_RET_TD_ALONG) < 600, "in the touchdown zone's middle: %.0f m past the threshold", ret(OC_RET_TD_ALONG));
-    CHECK(std::fabs(ret(OC_RET_TD_OFF)) < 0.3, "on the centreline: %.2f m", ret(OC_RET_TD_OFF));
+    CHECK(std::fabs(ret(OC_RET_TD_OFF)) < 0.1, "on the centreline: %.2f m", ret(OC_RET_TD_OFF));
     CHECK(ret(OC_RET_TD_SINK) > 0.5 && ret(OC_RET_TD_SINK) < 1.0, "the flare's touch: %.2f m/s down", ret(OC_RET_TD_SINK));
     CHECK(ret(OC_RET_STOPPED) > 0, "stopped");
     CHECK(ret(OC_RET_STOP_ALONG) > 0 && ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M,
@@ -256,23 +276,32 @@ uint64_t mix(uint64_t z) {   // SplitMix64
     z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
     return z ^ (z >> 31);
 }
-struct Draw { double engage; ModelError err; };
-Draw draw(uint64_t pool, int i, double rhoSpread = 0.25, double waveMax = 0.15, double coefSpread = 0.10) {
+struct Draw { double engage; ModelError err; Weather wx; };
+struct Spread { double rho, wave, coef, wind, mass, thrust, noise; };
+const Spread NARROW{0.25, 0.15, 0.10, 0, 0, 0, 0};
+Draw draw(uint64_t pool, int i, Spread sp = NARROW) {
     uint64_t z = mix(pool * 1000003ULL + (uint64_t)i);
     auto u = [&](double a, double b) { z = mix(z); return a + (b - a) * ((z >> 11) * (1.0 / 9007199254740992.0)); };
     Draw d;
     d.engage = u(800, 87000);
-    d.err.rho = u(1 - rhoSpread, 1 + rhoSpread);
-    d.err.wave = u(0, waveMax);
+    d.err.rho = u(1 - sp.rho, 1 + sp.rho);
+    d.err.wave = u(0, sp.wave);
     d.err.phase = u(0, 6.283185307179586);
-    d.err.lift = u(1 - coefSpread, 1 + coefSpread);
-    d.err.drag = u(1 - coefSpread, 1 + coefSpread);
+    d.err.lift = u(1 - sp.coef, 1 + sp.coef);
+    d.err.drag = u(1 - sp.coef, 1 + sp.coef);
+    // drawn after the rest, so that a pool drawn before these were is drawn as it was
+    d.wx.windSeed = (unsigned)(u(0, 4294967295.0));
+    d.wx.wind = u(0, sp.wind);
+    d.wx.mass = u(1 - sp.mass, 1 + sp.mass);
+    d.wx.thrust = u(1 - sp.thrust, 1 + sp.thrust);
+    d.wx.noiseSeed = (unsigned)(u(0, 4294967295.0));
+    d.wx.noise = sp.noise;
     return d;
 }
 
 void landsWithItsModelWrongRoundTheDay() {
     for (int i = 0; i < 4; ++i) {
-        const Draw d = draw(11, i);
+        const Draw d = draw(11, i, NARROW);
         std::printf("  draw %d: the model's air x%.2f (wave %.2f), lift x%.2f, drag x%.2f\n", i, d.err.rho, d.err.wave, d.err.lift, d.err.drag);
         landed(fly(d.engage, IN_ORBIT, 0, d.err));
     }
@@ -281,7 +310,7 @@ void landsWithItsModelWrongRoundTheDay() {
 // The pilot takes the controls on the way down and gives them back: in the entry, in the glide, on the
 // final. The crew picks the flight home up from wherever the craft is.
 void landsWhenGivenBack() {
-    const double at[][2] = {{5500, 60}, {6900, 60}, {7700, 30}};
+    const double at[][2] = {{5500, 60}, {6900, 60}, {7575, 30}};   // the entry, the glide, the final (12 km out)
     for (const auto& a : at) {
         oc_reset(LAT, LON, HDG);
         while (get(OC_T) < 800) oc_step(50);
@@ -429,6 +458,49 @@ void departsClearOfTheMast() {
     CHECK(closest > 293, "%.0f m from the axis beside the mast and its arrays", closest);
 }
 
+// The crew cannot see the wind, only what its instruments measure: its commands, for a state and the air data
+// its probes give there, are the same to the bit whatever the wind that made those air data. Through a flight
+// home in a moderate wind, at every 2 s from the entry to the stop, the crew's step is worked out twice from
+// the same state and the same air data, once with the day's wind in the state and once with another day's;
+// the torque, the small thrusters, the throttle, the gear, the brakes, the nose wheel, the hand law's targets
+// and every field of the return's state must agree. Shown able to fail: given the other day's own air data,
+// the second differs.
+void blindToTheWind() {
+    using namespace oc;
+    oc_reset(LAT, LON, HDG);
+    oc_return_disturb(1.02, 0.97, 77, 1.0);
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
+    oc_wind(5, 2.0);
+    oc_auto(OC_AUTO_RETURN);
+    int checks = 0, apart = 0, seen = 0;
+    while (get(OC_T) < 30000 && get(OC_CRASHED) == 0 && ret(OC_RET_PHASE) != OC_RET_PH_STOPPED) {
+        oc_step(100);
+        if (ret(OC_RET_PHASE) < OC_RET_PH_ENTRY) continue;
+        const Local L = localOf(g);
+        State a = g, b = g, c = g;
+        b.wind.seed = 6;   // another day: the air moves otherwise here, but the probes said what they said
+        c.wind.seed = 6;
+        double ta = 0, tb = 0, tc = 0;
+        returnCrew(a, L, &ta);
+        returnCrew(b, L, &tb);
+        returnCrew(c, localOf(c), &tc);   // and the other day's own air data
+        auto hashOf = [](const State& x) { unsigned h = 2166136261u; returnHash(x, h); return h; };   // every field of the return's state
+        auto same = [&](const State& x, const State& y, double tx, double ty) {
+            return tx == ty && std::memcmp(&x.torque, &y.torque, sizeof x.torque) == 0 && std::memcmp(&x.rcs, &y.rcs, sizeof x.rcs) == 0 && x.gear == y.gear &&
+                   x.brake == y.brake && x.steer == y.steer && x.thetaT == y.thetaT && x.phiT == y.phiT && x.autoMode == y.autoMode &&
+                   hashOf(x) == hashOf(y);
+        };
+        ++checks;
+        if (!same(a, b, ta, tb)) ++apart;
+        if (!same(a, c, ta, tc)) ++seen;
+    }
+    std::printf("  %d steps from the entry to the stop in a moderate wind: the crew's commands the same whatever the wind behind the same air data at %d, "
+                "different at %d; given the other wind's own air data, different at %d\n", checks, checks - apart, apart, seen);
+    CHECK(checks > 200 && ret(OC_RET_PHASE) == OC_RET_PH_STOPPED, "%d checks, phase %.0f", checks, ret(OC_RET_PHASE));
+    CHECK(apart == 0, "the crew's commands followed the wind itself at %d steps", apart);
+    CHECK(seen > checks / 4, "the other wind's air data changed the commands at only %d steps", seen);
+}
+
 struct Test { const char* name; void (*fn)(); };
 const Test tests[] = {
     {"readouts_block", readoutsBlock},
@@ -447,20 +519,27 @@ const Test tests[] = {
     {"plan_says_when", planSaysWhen},
     {"return_refused_on_the_deck", returnRefusedOnTheDeck},
     {"departs_clear_of_the_mast", departsClearOfTheMast},
+    {"blind_to_the_wind", blindToTheWind},
 };
 
-// The Monte Carlo, on demand (not a ctest): test_return monte_carlo <first> <count> <pool> [rho wave coef].
-// Runs first..first+count-1 of the pool, drawn as above (the spreads may be given), and prints a line for
-// each, then how many landed, with a 95 % Wilson interval. Shard a big pool across processes by first.
+// The Monte Carlo, on demand (not a ctest):
+//   test_return monte_carlo <first> <count> <pool> [rho wave coef [wind mass thrust noise]]
+// Runs first..first+count-1 of the pool, drawn as above (the spreads may be given: the model's density, its
+// wave and its coefficients; the wind's strength up to wind, the mass and thrust as known each within that
+// fraction of the true, the instruments' noise), and prints a line for each, then how many landed, with a
+// 95 % Wilson interval. A landing here is the first 900 m, 3 m of the line, under 2 m/s down, stopped on the
+// runway, inside the limits. Shard a big pool across processes by first.
 int monteCarlo(int argc, char** argv) {
     const int first = argc > 2 ? std::atoi(argv[2]) : 0, count = argc > 3 ? std::atoi(argv[3]) : 20;
     const uint64_t pool = argc > 4 ? std::strtoull(argv[4], nullptr, 10) : 1;
-    const double rho = argc > 5 ? std::atof(argv[5]) : 0.25, wave = argc > 6 ? std::atof(argv[6]) : 0.15, coef = argc > 7 ? std::atof(argv[7]) : 0.10;
+    auto arg = [&](int k, double dflt) { return argc > k ? std::atof(argv[k]) : dflt; };
+    const Spread sp{arg(5, 0.25), arg(6, 0.15), arg(7, 0.10), arg(8, 0), arg(9, 0), arg(10, 0), arg(11, 0)};
     int good = 0;
-    std::printf("run,outcome,engage_s,rho,wave,lift,drag,burn_s,cross_km,sink,along,off,stop_along,stop_off,heat_kW,load_g,qbar_Pa,prop_kg\n");
+    std::printf("run,outcome,engage_s,rho,wave,lift,drag,burn_s,cross_km,sink,along,off,stop_along,stop_off,heat_kW,load_g,qbar_Pa,prop_kg,"
+                "wind,mass,thrust,noise,td_speed,td_head,td_cross,td_gust_up,wait_h,passes,skipped,reach_km,air_prop_kg\n");
     for (int i = first; i < first + count; ++i) {
-        const Draw d = draw(pool, i, rho, wave, coef);
-        const Run r = fly(d.engage, IN_ORBIT, 0, d.err);
+        const Draw d = draw(pool, i, sp);
+        const Run r = fly(d.engage, IN_ORBIT, 0, d.err, d.wx);
         const char* why = "landed";
         if (!r.finite) why = "not-finite";
         else if (get(OC_CRASHED) > 0) why = "crashed";
@@ -471,9 +550,11 @@ int monteCarlo(int argc, char** argv) {
         else if (!(ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M)) why = "overran";
         else if (ret(OC_RET_OVER) != 0 || r.maxG >= OC_RET_LOAD_LIMIT || ret(OC_RET_HEAT_PEAK) >= OC_RET_HEAT_LIMIT) why = "limit";
         good += std::strcmp(why, "landed") == 0;
-        std::printf("%d,%s,%.0f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.0f\n", i, why, d.engage, d.err.rho, d.err.wave, d.err.lift,
-                    d.err.drag, r.tBurn, r.cross / 1000, ret(OC_RET_TD_SINK), ret(OC_RET_TD_ALONG), ret(OC_RET_TD_OFF), ret(OC_RET_STOP_ALONG),
-                    ret(OC_RET_STOP_OFF), ret(OC_RET_HEAT_PEAK) / 1000, ret(OC_RET_LOAD_PEAK), ret(OC_RET_QBAR_PEAK), ret(OC_RET_PROP_USED));
+        std::printf("%d,%s,%.0f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.0f,%.3f,%.4f,%.4f,%.2f,%.1f,%.2f,%.2f,%.2f,%.2f,%d,%d,%.0f,%.0f\n", i,
+                    why, d.engage, d.err.rho, d.err.wave, d.err.lift, d.err.drag, r.tBurn, r.cross / 1000, ret(OC_RET_TD_SINK), ret(OC_RET_TD_ALONG),
+                    ret(OC_RET_TD_OFF), ret(OC_RET_STOP_ALONG), ret(OC_RET_STOP_OFF), ret(OC_RET_HEAT_PEAK) / 1000, ret(OC_RET_LOAD_PEAK), ret(OC_RET_QBAR_PEAK),
+                    ret(OC_RET_PROP_USED), d.wx.wind, d.wx.mass, d.wx.thrust, d.wx.noise, ret(OC_RET_TD_SPEED), r.tdHead, r.tdCross, r.tdGust,
+                    r.tBurn > 0 ? (r.tBurn - r.engage) / 3600 : -1.0, r.passes, r.skipped, r.reach / 1000, r.airProp);
         std::fflush(stdout);
     }
     const double n = count, p = n > 0 ? good / n : 0, z = 1.96, dd = 1 + z * z / n, c = (p + z * z / (2 * n)) / dd;

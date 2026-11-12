@@ -14,6 +14,7 @@ export const RET_OUT = [
   'phase', 'event', 'tEvent', 'range', 'cross', 'togo', 'bankCmd', 'alphaCmd', 'miss', 'reversals', 'dv', 'passes',
   'heat', 'heatPeak', 'heatLoad', 'temp', 'glow', 'load', 'loadPeak', 'qbarPeak', 'over', 'glideDev',
   'touched', 'tdSink', 'tdAlong', 'tdOff', 'tdSpeed', 'tdPitch', 'tdT', 'stopped', 'stopAlong', 'stopOff', 'propUsed', 'refused',
+  'windE', 'windN', 'reach', 'skipped', 'tdCrab',
 ];
 export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5, terminal: 6, approach: 7, flare: 8, rollout: 9, stopped: 10 };
 export const RET_EV = { none: 0, clear: 1, burn: 2, burnEnd: 3, interface: 4, terminal: 5, touchdown: 6 };
@@ -122,7 +123,8 @@ export function returnHud(r, s, narrow = false) {
     lines.push(`GUIDE bank ${r.bankCmd >= 0 ? 'R' : 'L'} ${Math.abs(r.bankCmd).toFixed(0)}°   α ${r.alphaCmd.toFixed(0)}°   ${Math.round(r.reversals)} reversals   gate ${miss}`);
   }
   if (!narrow && (ph === RET_PH.wait || ph === RET_PH.depart) && Math.round(r.event) === RET_EV.burn) {
-    lines.push(`PLAN de-orbit ${r.dv.toFixed(0)} m/s in ${fmtWait(r.tEvent)}   ${Math.round(r.passes)} passes let go`);
+    const margin = r.skipped > 0 ? ` (${Math.round(r.skipped)} short of margin)` : '';
+    lines.push(`PLAN de-orbit ${r.dv.toFixed(0)} m/s in ${fmtWait(r.tEvent)}   ${Math.round(r.passes)} passes let go${margin}   reach ${fmtDistance(r.reach)}`);
   }
   if (ph === RET_PH.approach || ph === RET_PH.flare) {
     const dev = r.glideDev;
