@@ -1,7 +1,7 @@
 // internal.h — what the core's parts share: the maths, the craft's numbers, the state, and the laws a
-// crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h and
-// orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at the end, which return.cpp,
-// dock.cpp and deck.cpp define. GPLv3.
+// crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h,
+// orbit_wind.h and orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at the end,
+// which return.cpp, dock.cpp, deck.cpp and wind.cpp define. GPLv3.
 
 #pragma once
 
@@ -107,6 +107,7 @@ struct Controls { double pitch, roll, yaw, throttle, tx, ty, tz; int gearDown; d
 #include "deck_state.h"     // oc::DeckState: deck.cpp's own, in the state so a run replays
 #include "dock_state.h"     // oc::DockState: dock.cpp's own
 #include "return_state.h"   // oc::ReturnState: return.cpp's own
+#include "wind_state.h"     // oc::WindState: wind.cpp's own
 
 namespace oc {
 
@@ -138,6 +139,7 @@ struct State {
     ReturnState ret;
     DockState dock;
     DeckState deck;
+    WindState wind;
 };
 
 struct Site { double lat, lon, hdg; V3 e, n, u, p0; };   // the start point, Earth-fixed
@@ -227,6 +229,16 @@ void deckWriteOut(const State& s);
 void deckHash(const State& s, unsigned& h);
 GearLoad deckGearLoad(const State& s, double t, V3 r, V3 v, Q q, V3 w);   // the gear on the deck, at time t
 int deckBand(V3 p, double r);   // the band round the open sector, for a sphere at p in the ring's frame: OC_DOCK_HIT_*, or -1 away from it
+
+// wind.cpp: the wind (orbit_wind.h). windAt is the air's velocity over the turning Earth at r (ECI) and t,
+// in ECI axes, nil with the wind off; orbit_core.cpp takes it off the craft's velocity where the air pushes
+// (localOf, deriv) and nothing else reads it: the crew learns the wind from its instruments. windCalls
+// counts its evaluations, for tests; nothing in flight reads it.
+V3 windAt(const WindState& w, V3 r, double t);
+void windReset(State& s);
+void windWriteOut(const State& s);
+void windHash(const State& s, unsigned& h);   // folds nothing in with the wind off, so the hash is what it was
+extern long long windCalls;
 
 void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 
