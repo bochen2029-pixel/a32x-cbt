@@ -754,8 +754,8 @@ export class Engine {
   // A lift's doors: a second of sliding on their rollers, and the stop; opening, or shutting with the two
   // leaves meeting. d, dir: where they are from the ear.
   door(t, open = true, d = 3, dir = [0, 0, -1]) {
+    this.ring();
     const into = d > 0 ? this.placed(d, dir) : this.near, ac = this.ac, g = gainOf(ac), bp = filter(ac, 'bandpass', open ? 380 : 620, 2);
-    if (!this.ringBuilt) this.ring();
     bp.frequency.setValueAtTime(open ? 380 : 620, t);
     bp.frequency.linearRampToValueAtTime(open ? 620 : 380, t + 0.9);
     g.gain.setValueAtTime(0, t);
@@ -1090,7 +1090,7 @@ function playWalk(ctx, walk) {
   const ev = detectWalk(st.walkMemory, o, st.walkEvents);
   if (!(v.warp > 0 && v.warp <= 2)) return;   // moments are for a clock near real time
   const t = now + 0.005, span = Math.min(0.1, Math.max(0.005, ctx.dt || 1 / 60));
-  if (!Number.isFinite(st.set.walk)) for (let k = 0; k < ev.steps; k++) e.step(t + ev.stepAt[k] * span, ev.surface, ev.stepSide[k], ev.stepWeight);
+  for (let k = 0; k < ev.steps; k++) e.step(t + ev.stepAt[k] * span, ev.surface, ev.stepSide[k], ev.stepWeight);
   if (ev.land) e.land(t, ev.surface, ev.land);
   const axes = viewAxes(o.upTheta, v.look.heading, v.look.pitch);
   if (ev.bounce) {
@@ -1179,8 +1179,8 @@ const api = {
     return true;
   },
   // A standing condition: heat 0..1 (the entry's heating, in place of the derived one; NaN to derive again),
-  // lift 0..1 (a lift's motor, beside the walk's own), walk m/s (the walker's speed, in place of the walk's own
-  // footsteps; NaN: the walk's), surface 'grass' or 'paving' (for those).
+  // lift 0..1 (a lift's motor, beside the walk's own), walk m/s (footsteps at that speed in a frame another part
+  // draws where no walk runs; the walk's own come from its readouts; NaN: from the keys), surface (for those).
   set(name, value) {
     if (!SETTABLE.includes(name)) { console.error(`sound: nothing to set named "${name}"; there are ${SETTABLE.join(', ')}`); return false; }
     st.set[name] = value;
