@@ -260,13 +260,25 @@ void attitudeHold() {
     oc_step(1000);
     // the attitude in the site frame turns with the Earth and the orbit, so compare it through the
     // body rates: a held attitude in inertial space; check the quaternion moved only by the frame's turn
+    // held still among the stars, the attitude seen from the Earth-fixed site frame turns by exactly the
+    // Earth's turn, WE dt about the pole: the quaternions' dot is cos(WE dt / 2)
     const double dot = std::fabs(qw * get(OC_QW) + qx * get(OC_QX) + qy * get(OC_QY) + qz * get(OC_QZ));
-    CHECK(dot > 0.98, "attitude drifted: dot %.4f", dot);
+    const double turned = 2 * std::acos(std::fmin(1.0, dot)) * 180 / M_PI, earth = 7.2921159e-5 * 20 * 180 / M_PI;
+    std::printf("  held 20 s: turned %.5f deg in the site frame, the Earth %.5f deg\n", turned, earth);
+    CHECK(std::fabs(turned - earth) < 0.01, "attitude drifted: %.5f deg against the Earth's %.5f", turned, earth);
     oc_sas(OC_SAS_PROGRADE);
     oc_step(2500);
-    // prograde: the velocity relative to the ring is nearly the orbit's; compare the nose with the
-    // inertial velocity through pitch: in a round orbit prograde is the local horizon, along the track
+    // prograde: in a round orbit the nose on the local horizon, along the track, and thrust there adds to
+    // the orbit at both ends (retrograde would take from both, and has the same pitch)
     CHECK(std::fabs(get(OC_PITCH_DEG)) < 1.0, "prograde pitch %.2f deg", get(OC_PITCH_DEG));
+    const double apo0 = get(OC_APO), peri0 = get(OC_PERI);
+    oc_controls(0, 0, 0, 0.05, 0, 0, 0, 0, 0);   // a twentieth of the drive for 2 s: about 2 m/s
+    oc_step(100);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(250);
+    std::printf("  2 s of thrust held prograde: apoapsis %+.0f m, periapsis %+.0f m\n", get(OC_APO) - apo0, get(OC_PERI) - peri0);
+    CHECK(get(OC_APO) > apo0 + 500 || get(OC_PERI) > peri0 + 500, "the burn along the nose raised the orbit");
+    CHECK(get(OC_APO) > apo0 - 50 && get(OC_PERI) > peri0 - 50, "and lowered neither end");
     CHECK(finite(), "finite");
 }
 

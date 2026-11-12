@@ -18,6 +18,8 @@
 // TEST: gross_contact_crashes
 // TEST: off_centre_contact_bounces
 // TEST: slow_contact_does_not_latch
+// TEST: sliding_contact_bounces
+// TEST: angled_contact_bounces
 // TEST: spin_must_match
 // TEST: roof_is_solid
 // TEST: rim_wall_is_solid
@@ -631,6 +633,57 @@ void offCentreContactBounces() {
     CHECK(dk(OC_DOCK_CONTACT) == 0 && dk(OC_DOCK_CLOSING) < -0.01 && dk(OC_DOCK_CLOSING) > -0.1, "the head came off the face: closing %.3f m/s", dk(OC_DOCK_CLOSING));
 }
 
+// Centred, slow and lined up, but sliding across the face at three times the tolerance: the latches do
+// not hold, and the head comes off the face. (The audit of c56d77b found no test reached this verdict.)
+void slidingContactBounces() {
+    if (!toHold()) return;
+    oc_auto(OC_AUTO_OFF);
+    oc_sas(OC_SAS_PORT);
+    Hands h{1.0, 0.10, false};
+    const double t0 = get(OC_T), before = dk(OC_DOCK_C_T);
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && dk(OC_DOCK_GAP) > 0.06 && dk(OC_DOCK_C_T) == before)
+        handStep(h, lined() ? clampd(0.05 * dk(OC_DOCK_GAP), h.contact, h.closeMax) : 0);
+    // 6 cm off the face: the small thrusters full across, still closing at 0.1 m/s, to the touch
+    while (get(OC_T) - t0 < 960 && get(OC_CRASHED) == 0 && dk(OC_DOCK_C_T) == before) {
+        oc_controls(0, 0, 0, 0, thruster(0.1 - dk(OC_DOCK_CLOSING), false), 1, 0, 0, 0);
+        oc_step(1);
+    }
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(500);
+    std::printf("  contact at %.3f m/s, %.3f m off the centre, sliding at %.3f m/s: verdict %d\n", dk(OC_DOCK_C_SPEED), dk(OC_DOCK_C_OFFSET), dk(OC_DOCK_C_SLIDE),
+                idk(OC_DOCK_VERDICT));
+    CHECK(dk(OC_DOCK_C_T) != before, "no contact");
+    CHECK(dk(OC_DOCK_C_SLIDE) > 2 * OC_DOCK_TOL_SLIDE && dk(OC_DOCK_C_OFFSET) < OC_DOCK_TOL_OFFSET_M && dk(OC_DOCK_C_SPEED) <= OC_DOCK_V_MAX,
+          "sliding %.3f m/s, %.3f m off, %.3f m/s in", dk(OC_DOCK_C_SLIDE), dk(OC_DOCK_C_OFFSET), dk(OC_DOCK_C_SPEED));
+    CHECK(dk(OC_DOCK_VERDICT) == OC_DOCK_V_SLIDING, "verdict %.0f", dk(OC_DOCK_VERDICT));
+    CHECK(dk(OC_DOCK_DOCKED) == 0 && get(OC_CRASHED) == 0, "docked %.0f, crashed %.0f", dk(OC_DOCK_DOCKED), get(OC_CRASHED));
+}
+
+// Centred and slow, but the craft's axis 5 degrees off the port's, held there among the stars: the probe
+// meets the drogue askew, and the latches do not hold. (Nor did any test reach this verdict.)
+void angledContactBounces() {
+    if (!toHold()) return;
+    oc_auto(OC_AUTO_OFF);
+    oc_sas(OC_SAS_PORT);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(500);                                 // lined up, turning with the port
+    oc_sas(OC_SAS_HOLD);
+    oc_controls(0.2, 0, 0, 0, 0, 0, 0, 0, 0);     // pitch at 0.05 rad/s for 1.76 s: 5 degrees off the axis
+    oc_step(88);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(250);                                 // held there; the port turns on, its roll unmatched
+    Hands h{1.0, 0.10, false};
+    h.waitLined = false;
+    const double took = handFliesIn(h, 1500);
+    std::printf("  contact after %.0f s at %.3f m/s, %.3f m off the centre, %.2f deg off the axis: verdict %d\n", took, dk(OC_DOCK_C_SPEED), dk(OC_DOCK_C_OFFSET),
+                dk(OC_DOCK_C_ANGLE_DEG), idk(OC_DOCK_VERDICT));
+    CHECK(took > 0, "no contact");
+    CHECK(dk(OC_DOCK_C_ANGLE_DEG) > OC_DOCK_TOL_ANGLE_DEG && dk(OC_DOCK_C_OFFSET) < OC_DOCK_TOL_OFFSET_M && dk(OC_DOCK_C_SLIDE) < OC_DOCK_TOL_SLIDE,
+          "%.2f deg off, %.3f m off, sliding %.3f m/s", dk(OC_DOCK_C_ANGLE_DEG), dk(OC_DOCK_C_OFFSET), dk(OC_DOCK_C_SLIDE));
+    CHECK(dk(OC_DOCK_VERDICT) == OC_DOCK_V_ANGLE, "verdict %.0f", dk(OC_DOCK_VERDICT));
+    CHECK(dk(OC_DOCK_DOCKED) == 0 && get(OC_CRASHED) == 0, "docked %.0f, crashed %.0f", dk(OC_DOCK_DOCKED), get(OC_CRASHED));
+}
+
 // A contact slower than the window does not trip the latches; backed off and brought in again at
 // 0.1 m/s, the same craft is captured.
 void slowContactDoesNotLatch() {
@@ -962,6 +1015,8 @@ const Test tests[] = {
     {"gross_contact_crashes", grossContactCrashes},
     {"off_centre_contact_bounces", offCentreContactBounces},
     {"slow_contact_does_not_latch", slowContactDoesNotLatch},
+    {"sliding_contact_bounces", slidingContactBounces},
+    {"angled_contact_bounces", angledContactBounces},
     {"spin_must_match", spinMustMatch},
     {"roof_is_solid", roofIsSolid},
     {"rim_wall_is_solid", rimWallIsSolid},
