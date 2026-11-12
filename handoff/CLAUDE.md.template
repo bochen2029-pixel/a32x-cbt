@@ -1,0 +1,158 @@
+<!--
+  Template for the new Unreal repository's CLAUDE.md, from the orbit sketch's handoff kit.
+  Fill every <...>, delete what does not apply, and delete this comment. Each rule names what enforces
+  it; a rule nothing enforces is a wish, so give it a gate or drop it.
+-->
+
+# House rules: <Game>
+
+Read these before touching anything. They are what this repository holds itself to.
+
+## 0 · Read first, then build
+
+1. `docs/ARCHITECTURE.md`: the canon. Its glossary is binding: Shuttle, not craft; Tick, not step;
+   render frame, never "frame" alone. Its laws L1 to L12 outrank anything here.
+2. `DECISIONS.md`, then `FICTION.md`, then `PROVENANCE.md`.
+3. If you are a worker: your packet in `work/packets/`, and nothing else unless it says so.
+
+Build and test, from the repository's root (PowerShell 7 or Git Bash; absolute paths where UBT wants
+them; `<UE>` is the engine's folder):
+
+```
+cmake -S core -B build/core -G "Visual Studio 17 2022" -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL
+cmake --build build/core --config Release
+ctest --test-dir build/core -C Release --output-on-failure
+"<UE>/Engine/Build/BatchFiles/Build.bat" <Game>Editor Win64 Development -Project="<abs>/<Game>.uproject" -WaitMutex
+"<UE>/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" "<abs>/<Game>.uproject" -ExecCmds="Automation RunTests <Game>; Quit" -unattended -nullrhi -nosplash -NoSound -log
+tools/gates <packet>      # every gate, before any merge
+```
+
+All green before a commit. Zero tests run is a failure, not a pass.
+
+## 1 · The Core is the only truth
+
+All world state lives in `core/`: C++20, no engine headers, its own tests, its own CMake. The View
+draws a Snapshot and turns the player's hands into Commands. Nothing in Unreal keeps world state: not
+an actor, not a component, not a Blueprint, not a static. Nothing in Unreal is read back into the
+Core. No actor the Core owns has *Simulate Physics* on, and no engine movement component decides where
+a person is. Offline tools may feed data in; nothing in the View feeds state back: precompute in,
+telemetry out.
+
+*Enforced by:* the include gate (§3); review (G9); the replay test, which fails if anything outside
+the Core changes the outcome.
+
+## 2 · Time is fixed
+
+The Core advances in whole Ticks (<1/120 s for flight; the canon's master Tick is 1/240 s>). The
+subsystem adds each render frame's time to a debt, runs whole Ticks, and drops debt past a cap rather
+than stretching a Tick. The frame's `DeltaSeconds` never reaches the Core. Nothing that feeds the Core
+reads `FPlatformTime`, `FDateTime::Now` or `FMath::Rand`. Global time dilation is not used: the
+subsystem's warp is the only control of time. Commands are applied at a Tick index and taped with it.
+
+*Enforced by:* the wall-clock gate over `core/` and the plugin; the frame-rate test (one hash at three
+frame rates).
+
+## 3 · No engine in the Core; the C API is the seam
+
+`core/` includes only the C++ standard library. The plugin reaches the Core only through
+`core/include/`, a C API, versioned, and frozen for the length of a wave; a change goes in an issue to
+the lead, never in a worker's diff. The Core is built by CMake as a static library with precise
+floating point (`/fp:precise`, no `/fp:fast`, no `/fp:contract`; `-ffp-contract=off` elsewhere) and the
+engine's C runtime (`/MD`), never by UBT with a module's flags.
+
+*Enforced by:* the include gate; the contract hash (G3); a negative control that plants `/fp:fast` and
+must fail the determinism gate.
+
+## 4 · Tests with the feature
+
+Write the test with the feature, not after. The Core's tests state physics or a promise, not how the
+code is written; they count seconds, never steps. The View's tests are Unreal automation tests, run
+headless. A replay is a test: a taped run replays to the same hash on the same build. A visual change
+is checked at the named waypoints by screenshots, looked at by someone other than its author; the
+screenshots are evidence, kept in `evidence/`, not source.
+
+*Enforced by:* G4, G5, G8.
+
+## 5 · Text is source; binary assets are build outputs
+
+No `.uasset` or `.umap` is made by hand. Meshes come from generators: Blender scripts in
+`tools/blender/`, run headless; Geometry Script in C++ in the editor module, baked to Static Meshes
+(never run in a packaged game). Materials come from a generator commandlet. MetaSounds are built at
+runtime by the Builder API. Input actions and mapping contexts are made in C++. The game mode spawns
+the world into an engine map, so there is no level to commit. `Content/Generated/` is not in git and
+is rebuilt by `tools/generate` before the editor opens or a cook runs. Every generated asset has a row
+in the asset manifest: generator, version, inputs, hash. An exception (a third-party plugin's content,
+say) is listed by path in `PROVENANCE.md` with its reason.
+
+**No Blueprint logic.** A Blueprint subclass exists only where the engine insists on an asset, and it
+carries no graph.
+
+*Enforced by:* G6 (no binary in git outside the allow-list; regenerating changes nothing).
+
+## 6 · How MCP is used
+
+**Unreal's MCP** (the `ModelContextProtocol` and `AllToolsets` plugins, Experimental in 5.8) is the
+agent's eyes and hands in a running editor: look (screenshots, logs, actor lists), try (spawn and
+set properties in a scratch level), import generated assets, compile with Live Coding, run the
+automation tests. Anything that must exist next time is written as code and committed; an MCP session
+is never the only record of how something was made.
+
+- Find tools with `list_toolsets`, `describe_toolset`, `call_tool`; keep the names used in
+  `tools/mcp/TOOLSETS.md`.
+- Save before a bulk change. Serialise changes that touch the same asset: the server accepts
+  concurrent calls and does not keep their order. Read every result; anything not an explicit success
+  is a stop.
+- One editor per worker, each on its own fixed port, each worktree with its own `.mcp.json`.
+- Long jobs (cooking, packaging, lighting) run through UAT or a commandlet from the shell, with the
+  editor closed, not through MCP.
+- The editor's Python tools (`execute_tool_script`, `execute_python`) are for reading, never for
+  making anything that must persist. <Decide: allow them at all?>
+- The MCP plugins are editor-only and never in a packaged build. The port never leaves loopback.
+
+**Blender's MCP** (Blender Lab's server, Blender 5.1 or newer) runs committed generators in a
+background Blender (`execute_blender_code_for_cli`) and checks what they made (`get_objects_summary`,
+`get_object_detail_summary`, `render_thumbnail_to_path`). Every generator also runs without MCP, from
+the command line. No cloud model generators.
+
+## 7 · Provenance
+
+No third-party source is vendored without a row in `PROVENANCE.md`: what, which version or commit,
+whose, which licence, what is taken. Implement, do not port, from anything whose licence the game
+cannot carry: nothing under the GPL, the statically linked LGPL or CC BY-SA, which Unreal's EULA
+forbids combining with the engine. Data that ships is open data; nothing from Cesium ion or Google
+goes into a build, because neither may be stored offline. The core came from a32x-cbt's
+`flight/orbit` at <commit>, under <the licence you chose> (`DECISIONS.md` <D-nnn>).
+
+*Enforced by:* the licence gate over `PROVENANCE.md` and `third_party/`; G9's licence lens.
+
+## 8 · Failure is visible
+
+A load failure, a missing generated asset, a Snapshot block whose length disagrees with the Core's, a
+Tape that diverges: each is an error on screen and in the log at startup, never an empty level. Walls
+are visible too: anything not built says so, in the HUD, when the player reaches it.
+
+## 9 · The Fiction Budget
+
+`FICTION.md` lists every departure from physics: the drive (2,000 s of specific impulse at
+thrust-to-weight 1.2 or more) and the Ring existing in 2038. A second section lists the shortcuts the
+slice inherited from the browser sketch (a sphere Earth, no J2, laws that know the exact state, the
+Ring placed where the crew arrives, ...), so none is mistaken for a claim. A claim the world makes that
+is in neither list and physics does not allow is a bug.
+
+## 10 · Waves, gates and scope
+
+- Work runs in waves. Contracts freeze before a wave starts and change only between waves. Each
+  packet has owner directories; a worker touches nothing else, and files an issue instead.
+- A worker's "done" is not acceptance: gates G0 to G9 and the lead's review are. Tests and
+  implementation of anything with an oracle go to different agents.
+- A wave starts on <the owner>'s word and finishes at its gate.
+- Never claim fidelity to any real vehicle, place or station.
+- Git: commit locally, on a branch; push and pull requests only on <the owner>'s word. Commit messages
+  as `<type>: <what>` (`feat`, `fix`, `docs`, `refactor`, `test`), a body that says what changed and
+  what it was checked against, and the attribution lines the harness asks for.
+
+## 11 · The shell on Windows
+
+PowerShell 7 (`pwsh`) or Git Bash. Absolute paths for UBT and UAT; forward slashes in paths written
+into documents. No heredocs in briefs. C++ for everything that computes; tools in C++, PowerShell or
+Node; Python only where the host program requires it (Blender's generators).
