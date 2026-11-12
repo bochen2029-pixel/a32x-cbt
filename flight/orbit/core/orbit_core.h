@@ -1,0 +1,176 @@
+// orbit_core.h — a sketch: one spaceplane, a round Earth and a ring in orbit.
+//
+// The whole core is this header and orbit_core.cpp. It links nothing: no A32NX, no JSBSim, no
+// engine. It advances only in whole fixed steps, and the same inputs give the same state, so a
+// run can be replayed. Units are SI and angles are radians unless a name says otherwise.
+//
+// Frames. ECI: Earth-centred, not rotating, z along the pole; it coincides with the Earth-fixed
+// frame at t = 0. Body: x forward, y to the right wing, z down. Site: east, north, up at the
+// start point, turning with the Earth; the view draws in it.
+
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#define OC_DT 0.02 /* seconds per step: fifty steps a second, as the Airbus flies */
+
+/* who is flying: the pilot; the scripted crew (runway to orbit); the crew's approach, which flies to
+   a point on the ring's axis, OC_STANDOFF_M off the hub's port, and holds there; the crew flying home
+   (orbit_return.h); the crew docking at the hub (orbit_dock.h); the crew landing on the ring's flight
+   deck (orbit_deck.h) */
+enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN = 3, OC_AUTO_DOCK = 4, OC_AUTO_DECK = 5 };
+
+/* The ring's shape, one for the core and the page. Its frame: the axis, fixed among the stars, and ref,
+   a unit vector in its plane that turns with it at OC_RING_SPIN about the axis. The floor and the roof
+   are cylinders about the axis, OC_RING_WIDTH_M long, centred on the ring's plane; the rim walls close
+   them from OC_RING_RIM_M out to the hull. Spoke k (of OC_RING_SPOKES) runs from the hub to the roof
+   along sin(2 pi k / OC_RING_SPOKES) ref + cos(2 pi k / OC_RING_SPOKES) (ref x axis), in the plane. The
+   hub is a cylinder on the axis, its port at -axis, OC_HUB_PORT_M from the centre. */
+#define OC_RING_SPIN 0.0443     /* rad/s: one g at the floor, a turn in 142 s */
+#define OC_RING_FLOOR_M 5000.0  /* radius of the floor */
+#define OC_RING_WIDTH_M 1000.0  /* the band's length along the axis */
+#define OC_RING_HULL_M 5040.0   /* radius of the hull, outside the floor */
+#define OC_RING_ROOF_M 4700.0   /* radius of the roof: 300 m over the floor */
+#define OC_RING_RIM_M 4620.0    /* inner radius of the rim walls */
+#define OC_RING_SPOKES 6
+#define OC_RING_SPOKE_M 70.0    /* a spoke's square section */
+#define OC_HUB_RADIUS_M 160.0
+#define OC_HUB_PORT_M 350.0     /* from the ring's centre to the hub's port, along the axis */
+#define OC_STANDOFF_M 300.0
+
+/* The flight deck (orbit_deck.h), part of the same shape: an open sector of the band, OC_DECK_ARC_M of
+   arc along the floor and the band's whole width across, centred at OC_DECK_ANGLE_DEG in the spokes'
+   convention (along sin(a) ref + cos(a) (ref x axis)), midway between spokes 0 and 1. The roof stops at
+   the sector's ends and the floor is the deck; the rim walls and the hull go on across it. At each end a
+   pressure bulkhead OC_DECK_BULKHEAD_M thick, from the floor to the roof and across the band: its face is
+   the sector's end, a plane through the axis, and its body lies outside the sector, under the roof.
+   OC_DECK_PADS pads on the deck's centreline, OC_DECK_PAD_SPACING_M apart along the floor and centred in
+   the sector, each OC_DECK_PAD_RADIUS_M across its radius. */
+#define OC_DECK_ANGLE_DEG 30.0
+#define OC_DECK_ARC_M 1500.0
+#define OC_DECK_BULKHEAD_M 20.0
+#define OC_DECK_PADS 3
+#define OC_DECK_PAD_SPACING_M 400.0
+#define OC_DECK_PAD_RADIUS_M 25.0
+
+/* what the attitude hold points at, hands off, above the air. OC_SAS_PORT holds the craft lined up on
+   the hub's port and turning with it (orbit_dock.h), so a pilot docking by hand flies translation only.
+   OC_SAS_DECK flies the craft jet-borne on the deck's terms (orbit_deck.h): the stick sets its velocity
+   against the deck, the throttle its climb or sink, and the attitude and the drive's swivel are the law's */
+enum { OC_SAS_HOLD = 0, OC_SAS_PROGRADE = 1, OC_SAS_RETROGRADE = 2, OC_SAS_TARGET = 3, OC_SAS_PORT = 4, OC_SAS_DECK = 5 };
+
+/* the scripted crew's phases, in order */
+enum {
+    OC_PH_HOLD = 0,   /* brakes on, waiting for the window */
+    OC_PH_ROLL = 1,   /* take-off roll */
+    OC_PH_ROTATE = 2, /* nose up, off the runway */
+    OC_PH_CLIMB = 3,  /* an aeroplane's climb, turning to the launch azimuth */
+    OC_PH_ASCENT = 4, /* full power through the air, on a pitch schedule */
+    OC_PH_INSERT = 5, /* above the air: guided to a round orbit at the ring's height */
+    OC_PH_ORBIT = 6   /* in orbit, engine off; the crew points at the ring and hands over */
+};
+
+/* indices into oc_out() */
+enum {
+    OC_T = 0,     /* s since the start */
+    OC_PHASE,     /* OC_PH_* */
+    OC_AUTO,      /* OC_AUTO_* */
+    OC_SAS,       /* OC_SAS_* */
+    OC_CRASHED,   /* 1 after a ground impact */
+    OC_WINDOW,    /* s until the crew releases the brakes; negative after */
+    OC_SITE_E,    /* craft position in the site frame, m */
+    OC_SITE_N,
+    OC_SITE_U,
+    OC_QW,        /* body -> site quaternion */
+    OC_QX,
+    OC_QY,
+    OC_QZ,
+    OC_LAT_DEG,
+    OC_LON_DEG,
+    OC_ALT,       /* m above the sphere */
+    OC_HDG_DEG,   /* of the nose, local */
+    OC_PITCH_DEG,
+    OC_ROLL_DEG,
+    OC_TAS,       /* m/s through the air */
+    OC_MACH,
+    OC_QBAR,      /* Pa */
+    OC_VS,        /* m/s, up */
+    OC_ALPHA_DEG,
+    OC_BETA_DEG,
+    OC_G,         /* felt acceleration, g */
+    OC_VORB,      /* m/s, inertial */
+    OC_APO,       /* m above the sphere; the highest point of the present orbit; 1e12 on an escape path */
+    OC_PERI,      /* m above the sphere; negative while the path still meets the ground */
+    OC_INC_DEG,
+    OC_T_APO,     /* s to the highest point; 0 on an escape path */
+    OC_THROTTLE,  /* 0..1, what the engine is giving */
+    OC_PROP,      /* kg of propellant left */
+    OC_MASS,      /* kg */
+    OC_GEAR,      /* 1 down */
+    OC_ON_GROUND, /* 1 with weight on the wheels */
+    OC_RING_E,    /* ring centre in the site frame, m */
+    OC_RING_N,
+    OC_RING_U,
+    OC_RING_AX_E, /* ring spin axis, unit, site frame */
+    OC_RING_AX_N,
+    OC_RING_AX_U,
+    OC_RING_REF_E, /* a unit vector fixed in the ring, in its plane, site frame */
+    OC_RING_REF_N,
+    OC_RING_REF_U,
+    OC_RING_RANGE, /* m to the ring's centre */
+    OC_RING_RATE,  /* m/s; negative is closing */
+    OC_SUN_E,      /* unit vector to the Sun, site frame */
+    OC_SUN_N,
+    OC_SUN_U,
+    OC_VREL_E,     /* velocity relative to the ring, in the frame turning with its orbit; site axes, m/s */
+    OC_VREL_N,
+    OC_VREL_U,
+    OC_PORT_RANGE, /* m to the approach's hold point, OC_STANDOFF_M off the hub's port */
+    OC_AIR_LAW,    /* 1 while the hand-flying law is the air's (pitch and bank hold), 0 rate command: it takes
+                      over above 400 Pa and hands back below 200 Pa, and holds on the ground */
+    /* the flight director (orbit_fd.h): what the crew's guidance would command now, while a person flies */
+    OC_FD_VALID,      /* 1 while the command below is a guidance's; 0: hide the cues */
+    OC_FD_PHASE,      /* OC_FD_PH_*: whose guidance, and where it is */
+    OC_FD_PITCH_DEG,  /* the attitude it asks for, as OC_PITCH_DEG, OC_HDG_DEG and OC_ROLL_DEG reckon the craft's. */
+    OC_FD_HDG_DEG,    /* The heading is where it points the nose; in the air its laws turn by the bank, and the */
+    OC_FD_BANK_DEG,   /* heading is the craft's own */
+    OC_FD_THROTTLE,   /* 0..1 */
+    OC_FD_ALPHA_DEG,  /* the flight home's angle of attack, from the coast to the flare; else 0 */
+    OC_FD_LIFT_BANK_DEG, /* and its bank of the lift about the air's velocity, + right (OC_RET_BANK_CMD_DEG) */
+    OC_FD_GEAR,       /* 1: the guidance has the gear down */
+    OC_FD_ON,         /* 1 while the director is switched on (oc_fd) */
+    OC_COUNT
+};
+
+/* Put the craft on the ground at this point of the sphere, nose along heading_deg (true). */
+void oc_reset(double lat_deg, double lon_deg, double heading_deg);
+
+/* The pilot's hands. pitch + is nose up, roll + is right wing down, yaw + is nose right, each
+   -1..1; throttle 0..1; tx, ty, tz are the small thrusters along body x, y, z, each -1..1. */
+void oc_controls(double pitch, double roll, double yaw, double throttle,
+                 double tx, double ty, double tz, int gear_down, double brake);
+
+void oc_auto(int mode);
+void oc_sas(int mode);
+
+/* Advance n whole steps. */
+void oc_step(int n);
+
+/* The readouts, OC_COUNT doubles, valid until the next call. */
+const double* oc_out(void);
+int oc_out_len(void);
+
+/* A hash of the whole state: two runs with the same inputs give the same number. */
+unsigned oc_hash(void);
+
+/* The raw state for tests: position and velocity in ECI. */
+void oc_eci(double* r3, double* v3);
+
+/* The standard atmosphere, for tests: density kg/m3, pressure Pa, temperature K, sound m/s. */
+void oc_atmosphere(double alt_m, double* rho, double* p, double* temp, double* sound);
+
+#ifdef __cplusplus
+}
+#endif

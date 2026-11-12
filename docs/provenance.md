@@ -232,6 +232,193 @@ system fonts (Arial, Consolas and their kin) and falls back to the browser's own
 The sky is computed, not photographed, and the Dallas country is drawn coarsely on purpose: a 1980s
 visual system's register. Nothing here is fit for navigation.
 
+### 1h · The orbit sketch: a spaceplane, a round Earth, a ring
+
+`flight/orbit` is ours, GPLv3: a sketch made on the operator's word of 2026-11-12, outside the roadmap's
+phases (`flight/orbit/README.md`). Its core links nothing from A32NX or JSBSim; its page reads
+`flight/web`'s KDFW drawing (1f, 1g) unchanged. Every texture is painted by code; no image, model or
+font file ships.
+
+| source | licence | what is taken |
+|---|---|---|
+| Natural Earth 1:50m land and lakes, `geojson/ne_50m_land.geojson` (1,636,166 bytes, SHA-256 `e874b27a51d146452be360cafb3cc50c86001074a67d534113e6534682f9826b`) and `ne_50m_lakes.geojson` (876,018 bytes, SHA-256 `d350b75978b26fe839b797c2c529b2fb8f47fb3983c03f4964e36d5df9378a52`), from `nvkelso/natural-earth-vector` at `ca96624` (version 5.2.0-pre), downloaded 2026-11-12 | public domain: "All versions of Natural Earth raster + vector map data … are in the public domain" (its `LICENSE.md`) | the coastlines and lakes the globe is painted from: simplified to 0.03° and kept in hundredths of a degree by `flight/orbit/web/tools/land.mjs` into `web/data/land.js`, 855 land rings and 393 lakes. The GeoJSON files are not in the repository |
+| U.S. Standard Atmosphere, 1976 (NOAA, NASA and the US Air Force) | public domain, a work of the US government | the atmosphere to 86 km: its layers' base heights and lapse rates, its sea-level values and constants, as a method; the densities at 86, 120, 200 and 500 km that the core's exponentials pass through above it. The tests check the core against its tables |
+| E. C. Polhamus, *A concept of the vortex lift of sharp-edge delta wings based on a leading-edge-suction analogy*, NASA TN D-3767 (1966) | public domain, a work of the US government | the form of a slender delta's lift and drag: a potential term and a vortex term. The two constants, 2.4 and 3.0, are this project's |
+| Newtonian impact theory | textbook | the lift and drag of a surface at hypersonic speed, blended in from Mach 1.5 to 5 |
+| R. F. Jaggers, *An explicit solution to the exoatmospheric powered flight guidance and trajectory optimization problem for rocket propelled vehicles*, AIAA Guidance and Control Conference (1977): the Space Shuttle's powered explicit guidance | the paper's method | as a method: steering linear in time, solved again each step for the time still to burn, with the rocket equation's integrals for thrust over a falling mass. Cut down for this sketch, a flat-Earth gravity term falling to nothing at orbital speed; the code is ours |
+| this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the flight's date (12 November 2026, 19:00 UTC), the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
+
+Each further part of the sketch keeps its own sources here, in the subsection below that names it.
+
+#### Docking
+
+| source | licence | what is taken |
+|---|---|---|
+| probe-and-drogue docking, the kind Soyuz and Progress use: a probe on the active craft, a cone with a socket on the passive one | general engineering knowledge; no document is copied | the idea of the mechanism only: a probe's head guided by a cone into a socket, where latches catch it and then draw the craft in. No dimension, tolerance, load or procedure of any real system is used |
+| the signed distance of a point from a box | textbook geometry | the Ring's band, hub and spokes as boxes in the Ring's frame, which a sphere touches where its centre is nearer than its radius; each sphere is swept along its step in pieces shorter than half the smallest radius |
+| this project | — | every number: the probe's place and length, the six tolerances of the catch, the probe's spring, damper and stroke, the draw-in, the separation speed, the craft's spheres, the crew's way round the Ring and its closing profile, and the target painted on the hub's face |
+
+#### The flight deck
+
+`flight/orbit/core/deck.cpp`, `orbit_deck.h`, `deck_state.h`, `web/src/deck-view.js`, `deck-hud.js` and their
+tests are ours, GPLv3. What is taken below is taken as ideas and methods; no code is copied, and no number
+of a real aircraft, ship or station is used.
+
+| source | licence | what is taken |
+|---|---|---|
+| the F-35B's short take-off and vertical landing: a swivelling aft nozzle, a lift fan ahead of the centre of mass and roll posts in the wings, balanced so the lift passes through it; and its "unified" flight controls, in which the stick commands translational velocity in the hover and the throttle the vertical speed | general engineering knowledge of a publicly described aircraft; no document is copied | the ideas only: the drive swivelling from aft to straight down through the centre of mass, attitude bled from the drive while jet-borne, and the deck hold's stick as a velocity and throttle as a climb or sink. The swivel's rate, the posts' and jet's shares and every gain are this project's |
+| the instrument landing system: a localizer, a glide path, deviation needles and a flight director | general aviation knowledge | the idea of a beam to fly and needles that point to it; here a path in the Ring's turning frame, curved with the floor |
+| motion in a rotating frame, and plane polar coordinates (any text on classical mechanics, e.g. D. Kleppner and R. Kolenkow, *An Introduction to Mechanics*) | textbook | the centrifugal and Coriolis accelerations, and that in a cylinder about the Ring's axis, fixed among the stars, the motion is ρ̈ − ρψ̇² radially and ρψ̈ + 2ρ̇ψ̇ along: the laws work their thrust out from these exactly |
+| feedback linearisation (J.-J. E. Slotine and W. Li, *Applied Nonlinear Control*, 1991) | textbook method | asking for the deck coordinates' accelerations and cancelling the known dynamics to get the thrust, with linear loops on the errors |
+| the owner's booster-lander simulator (`bochen2029-pixel/booster-lander-simulator` at `e0e5769`: `core/guidance_hoverslam.c`, `CLAUDE_v1.md` §9.1 and §13.3), Bo Chen, 2026 | MIT | as ideas, read and not copied: a speed scheduled by the distance still to go at a constant deceleration, v = √(v₁² + 2 a d), the deceleration frozen when the burn starts so the profile does not steepen as the propellant goes (here the glide's bleed); a place loop that commands a capped velocity, then tracks it, so the approach decays without overshoot (here the hover); a touchdown judged by sink, drift and tilt against stated limits; and Monte-Carlo runs on fixed seeds with the worst case printed. No code |
+| P. R. Dahl, *A solid friction model*, The Aerospace Corporation, TOR-0158(3107-18)-1 (1968) | the report's idea | a contact that sticks as a stiff spring until friction gives way, the bristle idea, as the tyres' hold on the deck at rest. The spring, its damping and the friction are this project's |
+| K. Perlin, "Improving noise", *ACM Transactions on Graphics* 21 (2002), 681–682 | the paper's result | the quintic step 6x⁵ − 15x⁴ + 10x³, whose second derivative is nought at both ends, for the course onto the centreline |
+| this project | — | the deck's shape and the pads' places (with the Ring's drawing), the craft's hard points, the touchdown's tolerances and crash limits, the glide's height and side, the final's clearance and bend, the swivel's rate, the roll posts' and lift jet's authority, the tyres' spring and friction, the departure and the wait, every gain, the pads' paint and lights, and the approach display |
+
+The landing does not claim the fidelity of any real system: the drive is the sketch's one fiction, and a
+craft that lands like this on a turning deck has never been built.
+
+#### The walk
+
+`flight/orbit/core/walk.cpp` and `orbit_walk.h`, `flight/orbit/web/src/walk-*.js` are ours, GPLv3.
+
+| source | licence | what is taken |
+|---|---|---|
+| Newtonian mechanics in a rotating frame: the centrifugal and Coriolis terms | textbook | as a method: the walker's and a ball's motion in the ring's frame, held by its floors. The tests work each motion out again in the frame that does not turn, where it is a straight line |
+| the classical fourth-order Runge–Kutta method | textbook | as a method: free flight in the ring's frame |
+| C. Schlick, *An Inexpensive BRDF Model for Physically-based Rendering*, Computer Graphics Forum 13(3), 1994 | the paper's method | the Fresnel term of the canal's water and the lifts' glass, as a formula |
+| this project | — | the walker's size, pace, push, friction and jump; the hub's lobby; the lifts and their ride (the sideways push held to 1.5 m/s², the hub's easing at half the riders' weight, the braking); the floor's plan (streets, the canal and its bridges, the plazas, the paths, 1,500 blocks laid out from a seeded hash); the Sun's way into the band; the roof's lattice and lamps; the fill light and the haze; the signs, canvas text in the system's fonts |
+
+The walk's physics is Newton's; its numbers are chosen, and the place is drawn by code. It describes no real
+station.
+
+#### The flight home
+
+`core/return.cpp`, `web/src/return-view.js`. Methods only: no code or data file is taken from any of
+these, and the code is ours.
+
+| source | licence | what is taken |
+|---|---|---|
+| K. Sutton and R. A. Graves Jr., *A general stagnation-point convective-heating equation for arbitrary gas mixtures*, NASA TR R-376 (1971) | public domain, a work of the US government | the stagnation point's heat flux, q̇ = k √(ρ / R<sub>n</sub>) V³, and its constant for the Earth's air, 1.7415 × 10⁻⁴ in SI units. The nose radius, 1 m, is ours |
+| P. Lu, "Entry guidance: a unified method", *Journal of Guidance, Control, and Dynamics* 37(3), 2014 | the paper's method | the numerical predictor-corrector: the rest of the entry flown forward with the vehicle's own model each guidance cycle, the bank's size on a profile whose one parameter is moved until the predicted miss at the entry's end is nil; the quasi-equilibrium glide as the condition a steady glide's sink rate is damped toward. Ours is simpler: the profile linear in speed (Lu's is in energy), a secant step on its start, the miss measured as path to go at a gate |
+| P. Lu, C. J. Brunner, S. J. Stachowiak, G. F. Mendeck, M. A. Tigges and C. J. Cerimele, "Verification of a fully numerical entry guidance algorithm", *Journal of Guidance, Control, and Dynamics* 40(2), 2017 | the paper's method | after it: fading-memory filters on the ratios of the sensed to the modelled lift and drag accelerations, which scale the predictor's model in flight. The memory (10 s), the threshold below which the air teaches nothing, and the second pair against the air data's dynamic pressure below Mach 4 are ours |
+| J. C. Harpold and C. A. Graves Jr., "Shuttle entry guidance", *Journal of the Astronautical Sciences* 27(3), 1979 | the paper's method | the lateral logic: the bank reverses when the bearing to the target passes a deadband that narrows as the speed falls. Our deadband, 8 to 12°, is on the bearing to where the glide joins the circle below |
+| T. E. Moore, *Space Shuttle entry terminal area energy management*, NASA TM-104744 (1991) | public domain, a work of the US government | the heading alignment circle: a circle tangent to the extended centreline, flown to and round onto the final, with the energy to spend reckoned over the path to go. Ours spends it by angle of attack and whole turns round the circle, not a speed brake, and the drive is relit for a powered final |
+| radiative equilibrium (Stefan and Boltzmann) | physics | the skin's temperature, the heat flux and the air's own temperature against εσT⁴, emissivity 0.85 (ours) |
+| E. B. Wilson, "Probable inference, the law of succession, and statistical inference", *Journal of the American Statistical Association* 22 (1927) | the paper's method | the 95 % interval on a Monte Carlo's success rate |
+| SplitMix64: G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014; S. Vigna's C version | the published algorithm; Vigna's code is public domain | the Monte Carlo's generator: its increment and its two multipliers |
+| `booster-lander-simulator`, this project's owner's 6-DOF propulsive-landing simulator | MIT | a practice, read and not ported: predictors shoot forward only, never integrating the plant back; a controller is judged by its success rate over many dispersed runs, with an interval, and development pools are kept apart from held-out pools flown once. No code taken |
+| this project | — | the plan (the pass search, the late pass taken with more bank, the burn to a 60 km low point), the entry's angle of attack schedule and its easing, the limits and their margins, the gate, the terminal area's and the approach's laws, the flare and the rollout, the feed-forward of the Earth's turn on the final, the dispersions and their boxes, the glow and the trail |
+
+#### The Sun and the Moon
+
+`core/sky.cpp` and `core/orbit_sky.h` are ours: the code is written from the methods below, and
+`test/test_sky.cpp` holds it to each method's worked example and to an ephemeris that shares nothing
+with them. The page's part (`web/src/sky.js`, `sky-model.js`, `moon-face.js`) is ours too: the Moon's
+face is painted by code from the Gazetteer's numbers, the stars drawn from Wikidata's, and no image of
+the Moon or the sky was copied or ships. `web/test/sky.test.mjs` holds the page's Moon, as seen from
+KDFW, to Horizons.
+
+| source | licence | what is taken |
+|---|---|---|
+| J. Meeus, *Astronomical Algorithms*, 2nd ed. (Willmann-Bell, 1998) | a textbook's methods and published constants; it prints no code | the Julian Day (ch. 7); Greenwich sidereal time (ch. 12); precession from J2000.0 (ch. 21); the mean obliquity and the nutation's four largest terms (ch. 22); the Sun by the low-accuracy method, 0.01° (ch. 25); the Moon (ch. 47): the five fundamental arguments and tables 47.A and 47.B whole, 60 terms in longitude and distance, 60 in latitude, and the additive terms, about 10″; the phase angle (ch. 48); the Moon's attitude from Cassini's laws, which gives the optical librations (ch. 53). Formulae and coefficients are written out in `sky.cpp`; the tests reproduce the book's examples 7.a, 12.a, 12.b, 21.b, 25.a, 47.a, 48.a and 53.a: its series and sums to the last digit it prints, its apparent places to an arcsecond (the book's examples carry the full nutation or a one-term shortcut, the core the four terms) |
+| M. Chapront-Touzé and J. Chapront, *The lunar ephemeris ELP 2000*, Astronomy and Astrophysics 124 (1983) | — | named for the record: the lunar theory whose principal terms the book's tables carry. Nothing is taken from the paper itself |
+| NASA/JPL Horizons (ssd.jpl.nasa.gov/horizons), ephemeris DE441, queried 2026-11-12 | a public service of the US government; nothing of it ships | the independent values the tests hold the core to, copied by value into `test_sky.cpp`: the Sun's and the Moon's apparent places, distances and place in KDFW's sky on 2026-11-12 at 19:00 and 20:00 UTC and on 2026-12-24 at 03:00 UTC, the Moon's lit fraction, phase angle, sub-Earth point and pole angle there, the local sidereal time, the Moon's lit fraction on 1969-07-20, and the Sun's and the Moon's closest approach over KDFW on 2024-04-08. Against it over 2018 to 2034 the core's Moon stays within 7″ and 41 km and its Sun within 21″. And into `sky.test.mjs`, the Moon as seen from KDFW at those three times: its lit fraction, phase angle, sub-observer point, pole angle and angular diameter |
+| Gazetteer of Planetary Nomenclature, IAU Working Group for Planetary System Nomenclature and USGS Astrogeology Science Center (planetarynames.wr.usgs.gov): the Moon's named features as a shapefile, `MOON_nomenclature_center_pts.zip` (23,845,070 bytes, SHA-256 `8093d4028a944f0db5a16a96262f1117872440edd599241df7278065f2b8a9d3`), and the pages of 42 features, downloaded 2026-11-12 | public domain: the shapefile's metadata gives its use constraints as "Public domain."; a work of the US government | packed by `web/tools/moon.mjs` into `web/data/moon.js` (the inputs' sizes and digests in its header): the outlines of 42 maria, lacus, sinus and paludes, simplified to 0.15°, and the centre and diameter of the 4,164 named craters of 8 km and more within 100° of the near side's middle; the names, centres and diameters of 40 craters treated by name (rays, dark floors). The shapefile and the pages are not in the repository |
+| Wikidata (www.wikidata.org), through its query service, 2026-11-12 | CC0 1.0 | packed by `web/tools/stars.mjs` into `web/data/stars.js` (the answers' sizes and digests in its header): the 8,615 stars with a V magnitude under 6.5, their right ascension and declination for J2000.0, their magnitude, and their spectral class, read as a B−V colour. Clusters, nebulae, galaxies, novae, supernovae, planets and entries with no spectral class are left out. The Yale Bright Star Catalogue was the first choice; HEASARC, which serves its fifth edition, says Yale or its authors may still hold its copyright, so it is not used |
+| R. J. Pike, *Size-dependence in the shape of fresh craters on the Moon*, in *Impact and Explosion Cratering* (Pergamon, 1977) | the paper's measured relations | the depth and rim height of a fresh lunar crater from its diameter: 0.196 D^1.010 and 0.036 D^1.014 km below 15 km, 1.044 D^0.301 and 0.236 D^0.399 above. How far each crater is worn is this project's |
+| H. Seeliger (1888), the Lommel–Seeliger law of a dusty surface: brightness as cos i / (cos i + cos e) | textbook | the Moon's shading, which leaves its full disc as bright at the limb as at the middle; and the law's whole-disc light at phase angle α, 1 − sin(α/2) tan(α/2) ln cot(α/4) |
+| *Allen's Astrophysical Quantities* (4th ed., A. N. Cox, ed., 2000): the Moon's magnitude with phase angle, 0.026 \|α\| + 4 × 10⁻⁹ α⁴ | published values | how much faster the real Moon fades with phase than the law alone: the ratio, held beyond 150° |
+| the IAU's radii: the Moon's mean 1,737.4 km; the Sun's nominal 695,700 km (IAU 2015 Resolution B3) | facts | the discs' sizes |
+| this project | — | the default epoch; Terrestrial Time taken as UTC + 69.184 s and UT1 as UTC; the range of dates taken, 1900 to 2100. On the page: the plains' tones and colours, the highlands' mottling, how worn each crater is, the rays (how many, how long, and their directions, a seeded draw but for Tycho's long ray to Bessel), the dark floors and the bright young craters, Reiner Gamma's swirl and the Aristarchus plateau's dark patch, and the outlines of Mare Frigoris and Mare Insularum, where the Gazetteer gives a box and a circle; the eye's adjustments (the Moon's own exposure with no tone curve, its fall with phase at the power 0.35, earthshine lifted 250 times); the Sun's glare; the stars' sizes, brightness and tints, and the spectral classes' B−V; the telescope's 1.4° |
+
+#### Graphics
+
+The tiers, the Ring's detail and its flight deck, the craft, the Earth's lighting and its night lights,
+the page's layout (`flight/orbit/README.md`, Graphics). Every texture is still painted by code, into
+typed arrays (`web/src/paint.js`); no image, model or font file ships.
+
+| source | licence | what is taken |
+|---|---|---|
+| Natural Earth 1:10m populated places, `geojson/ne_10m_populated_places_simple.geojson` (4,932,147 bytes, SHA-256 `fd3fa867a320cbd5c5b6bb5bc550afeec2939fb2cef688e508007282a55ac42f`), from `nvkelso/natural-earth-vector` at `ca96624` (version 5.2.0-pre), downloaded 2026-11-12 | public domain: "All versions of Natural Earth raster + vector map data … are in the public domain" (its `LICENSE.md`) | each place's point and its urban population (`pop_max`), coded by `flight/orbit/web/tools/places.mjs` into `web/data/places.js`, 7,332 places of 7,342 (those with no population dropped); the night side's lights are painted from them, a spot for each town whose spread and brightness by population are this project's. The GeoJSON file is not in the repository |
+| three.js's post-processing examples, `examples/jsm/postprocessing/UnrealBloomPass.js` and `OutputPass.js`, from the installed `three` 0.186.1 (§2) | MIT | the glow pass and the pass that tone-maps the picture onto the canvas, used as they are and bundled with three.js; `web/src/pipeline.js` replaces the glow's bright-pass shader (a clamp, and NaN dropped) and makes the output opaque |
+| three.js's AgX tone mapping (Filament's, after Blender's) | MIT | the tone curve, as three.js has it. The look applied in its slot (a power of 1.18, saturation 1.22) is this project's, after Blender's "Punchy" look as a method |
+| C. Cox and W. Munk, *Measurement of the roughness of the sea surface from photographs of the Sun's glitter*, J. Opt. Soc. Am. 44 (1954) | the paper's method | the sea's glint as a distribution of its waves' slopes, Gaussian in their tangent; the variance, a light breeze's, is this project's choice |
+| E. Bruneton, *Precomputed Atmospheric Scattering: a New Implementation* (2017) | its constants as physical data; the implementation's code (BSD-3-Clause) is not used | ozone's absorption coefficients at the three colours and its layer from 10 to 40 km, as 1g's atmosphere has them |
+| NACA Report 460, *The characteristics of 78 related airfoil sections* (1933) | public domain, a work of the US government | the four-digit sections' thickness distribution, for the craft's wing along its chord |
+| the airglow's green line (atomic oxygen at 557.7 nm, near 95 km) | textbook | its height and colour; how bright it is drawn is this project's |
+| the owner's booster-lander-simulator (`ui/src/fx/plume.ts`, `ui/src/scene/postfx.ts`, its `DECISIONS.md`, D-010), Bo Chen, read from a clone | MIT | ideas, no code: the picture kept in HDR with AgX's roll-off and a glow over only what is brighter than white; the plume as a marched volume whose shock diamonds open out and fade as the air thins; the plume made the brightest thing in the frame. The shaders here are written for three.js's WebGL renderer, where its are TSL for WebGPU. Its volumetric cloud deck is not adopted: the sketch's launch keeps its clear day over Texas |
+| this project | — | the tiers and how a device's report places it in one; the Ring's plan (its walls, ribs, girders, trusses, lift tubes, glazing, town, radiators, solar mast and lights) and its flight deck, drawn to the deck's numbers (`RING.deck`, from orbit_core.h's `OC_DECK_*`); the craft's shape, tiles, panels and plume; the Earth's land colours, fields, relief, clouds and their shadows, and its lighting brought to the craft's scale; the depth slices; the page's layout |
+
+#### The map and the sound
+
+The sound is made as it plays from the browser's Web Audio nodes; no sound file, sample or recording
+ships. The map is drawn by code from the core's state and the coastlines already here. What is taken below
+is taken as ideas, numbers and methods, and the code is this project's.
+
+| source | licence | what is taken |
+|---|---|---|
+| The operator's ASTRA-7 warp-hull audio study, `astra-7/ASTRA_AUDIO` (`DESIGN_SPEC.md`, `Source/AstraAudio/WarpHullSynthNode.cpp`, at `2077332`), Bo Chen, 2026 | MIT | the voice: a drive heard through its hull, every layer driven by the state and none a recording. Its drone's partial ratios 1, 2, 2.98, 4.21 with gains 1, 0.5, 0.3, 0.18 (the drive's hum); a bank of eight hull modes on a stretched inharmonic series, which ours moves down a step for a smaller hull, damped less as the drive rises so that the hull rings under power and rings down after; two-operator FM with the modulator at π times the carrier, a shear that never resolves, with its DC blocker as a highpass; the soft ceiling tanh(1.15 x) × 0.85 on the master |
+| The operator's booster-lander simulator, `DECISIONS.md` D-011 and `ui/src/audio/propagation.ts` and `crackle.ts` (at `e0e5769`), Bo Chen, 2026 | MIT | sound as an observer that writes nothing back; the delay by the time sound takes to arrive, 1 / r spreading, and the air's absorption as a lowpass whose corner falls log-linearly from 18 kHz at 150 m to 30 Hz at 20 km (its two anchors); crackle as shocklets at random, up to 900 a second at full thrust, leaning positive; a reverb whose impulse response is made in code; a panner through a head (HRTF) |
+| The operator's subsim, `spec/SPEC-dsp.md` REQ-AUDIO-005 (at `ceb0059`), Bo Chen, unpublished | none stated; an idea only | that compressed time is not played as if it were real: here quieter at each doubling and silent from 50×, not muted above 1× |
+| K. Sutton and R. A. Graves, *A general stagnation-point convective-heating equation for arbitrary gas mixtures*, NASA TR R-376 (1971) | public domain, a work of the US government | the stagnation heating k √(ρ / r) v³ with k = 1.7415 × 10⁻⁴ for air, which an entry's plasma is as loud as |
+| H. D. Curtis, *Orbital Mechanics for Engineering Students*, algorithms 3.3 and 3.4; D. A. Vallado, *Fundamentals of Astrodynamics and Applications* | textbook methods | the map's Kepler's problem by the universal variable: Stumpff's functions, Newton's method on Kepler's equation, the Lagrange coefficients (Curtis), and the starting guess for a hyperbola (Vallado). As methods; the code is ours |
+| W. H. Clohessy and R. S. Wiltshire, *Terminal guidance system for satellite rendezvous*, Journal of the Aerospace Sciences 27 (1960) | the paper's result | the frame that turns with a round orbit (radial, along the track, across it) that the map draws a rendezvous in; and, as a test, that a craft 1 km below drifts ahead at 3/2 n Δh |
+| Natural Earth's coastlines and lakes (above) | public domain | drawn again by the map, on its globe and its ground track, from `web/data/land.js` |
+| ISO 9613-1:1993, *Acoustics — Attenuation of sound during propagation outdoors — Part 1: Calculation of the absorption of sound by the atmosphere* | the standard's formula, as a method; no text of the standard is copied | the air's absorption of sound by frequency, temperature, humidity and pressure (the oxygen's and the nitrogen's relaxation and the classical term), coded in `airAbsorption`; a test holds it to the values ISO 9613-2's table 2 gives at 10 and 20 °C |
+| W. C. Sabine (1900) and C. F. Eyring, *Reverberation time in "dead" rooms*, J. Acoust. Soc. Am. 1 (1930); the critical distance after Hopkins and Stryker (1948) | textbook methods | each room's reverberation time by octave from its volume, its surfaces and the air, −S ln(1 − ᾱ) + 4mV; its diffuse field against a sound's own, √(16π / A) |
+| tables of absorption coefficients by octave, 125 Hz to 4 kHz, for grass and turf, water, heavy glass, concrete and paving, rubber flooring, perforated metal over an absorber, steel panels, as textbooks of architectural acoustics reproduce them | facts, rounded | the coefficients in `MATERIALS`; their ends at 63 Hz and 8 kHz, and which material stands for which surface of the band, the lobby and a car, are this project's |
+| G. B. Whitham, *The flow pattern of a supersonic projectile*, Comm. Pure Appl. Math. 5 (1952); H. W. Carlson, *Simplified sonic-boom prediction*, NASA TP-1122 (1978) | a method; Carlson's is public domain, a work of the US government | the boom heard where the Mach cone's surface passes the ear, an N-wave whose overpressure falls as the distance to the −¾, with the air's pressure where it is made and where it is heard; the N-wave's length from the craft's at the cone's angle. A rule of scale from them, not Carlson's whole method |
+| M. Minnaert, *On musical air-bubbles and the sounds of running water*, Phil. Mag. 16 (1933) | the paper's result | a bubble rings at about 3.26 m/s over its radius in water at a bar: the canal's bubbles |
+| R. McN. Alexander and A. S. Jayes, *A dynamic similarity hypothesis for the gaits of quadrupedal mammals*, J. Zool. 201 (1983) | an idea | the Froude number's similarity: at a given v² / g L the cadence goes as √(g / L), which with the cadence's rise with the speed (to the 0.4, fitted here to 1.87 steps a second at 1.4 m/s and 2.85 running at 4) makes the walk's g to the 0.3 |
+| J. W. Cooley and J. W. Tukey, *An algorithm for the machine calculation of complex Fourier series*, Math. Comp. 19 (1965) | textbook method | the transform the rooms' answers are made with, frame by frame in the frequency domain |
+| this project | — | the sound's instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the flight deck's voices (the hover's thrum and its mode, the duct, the lift jet's whine, the roll posts, the actuators, the plating's modes) and how the jets' work is found from the craft's motion; the Ring's rooms' shapes, their echoes and the band's 20 dB lift; the footsteps' surfaces, the canal, the town's hum, the draught, the lifts, the hatch; the tour's tone. The map's views, its layout and the Ring's orbit found from the readouts |
+
+#### The flight director
+
+`core/fd.cpp`, `orbit_fd.h`, `fd_state.h`, `web/src/fd-view.js`, `fd-hud.js` and their tests are ours,
+GPLv3. The guidance it shows is the crews' own (above, and "The flight home"); it runs their functions on a
+copy of the state. What is taken below is taken as ideas and methods; no code is copied.
+
+| source | licence | what is taken |
+|---|---|---|
+| the flight director and the primary flight display: a pitch bar and a bank bar the pilot flies the aircraft symbol onto, a bank scale with a commanded index, a flight path director to fly the velocity onto | general aviation knowledge | the ideas only: the bars, the single cue (here for the nose, since the crews command an attitude), magenta for what is commanded. The layout, the soft scales and the colours are this project's |
+| the ILS's geometry: ICAO Annex 10, Volume I, as in 1f; and the FAA's *Aeronautical Information Manual*, 1-1-9, Instrument Landing System: a localizer course tailored to 700 ft wide at the threshold, a glide slope's coverage | public domain (the AIM, a work of the US government); ICAO as a method | as in 1f: full scale two dots, 350 ft either side of the centreline at the threshold in angle from the antenna; a dot of the glide slope 0.12 of its angle; the localizer received within 18 NM and 35° of the course, the glide slope within 10 NM and 8°. The runway's place, heading and length are `flight/web`'s (1f); the 3° path through 50 ft is the PAPI's there (`GLIDE`) |
+| D. T. McRuer and H. R. Jex, "A review of quasi-linear pilot models", *IEEE Transactions on Human Factors in Electronics* HFE-8(3), 1967 | the paper's method | the test's person: a gain on each cue's error, limited at the stick's stops, a reaction time, 0.3 s, and lead where the craft lags (the flight home's person leads by 0.4 s); and that a gain too high for the delay and the craft's lag oscillates (here the roll in thin air). The gains are this project's |
+| this project | — | which guidance runs in the shadow and when, the margins on its phases, the readouts, the shadow's start from oc_auto's pick and returnEngage, the localizer's antenna 1,000 ft past the far end (1f's typical siting) and the glide slope judged at the wheels, the 8 key's three modes, and the person's gains |
+
+#### Rigour
+
+`flight/orbit/INVARIANTS.md`, `flight/orbit/test/test_invariants.cpp` and `flight/orbit/evidence/` are
+ours, GPLv3. Nothing in them is copied from the sources below; the two of the owner's are read for their
+method, and Abacus is run, not shipped.
+
+| source | licence | what is taken |
+|---|---|---|
+| Subsim, the owner's own submarine simulator (a private repository, read at `ceb0059`): its `INVARIANTS.md`, `GATES.md`, `CONVENTIONS.md`, and ADRs 0008 (determinism and numerics), 0011 (data with receipts) and 0016 (gates with negative controls) | the owner's own | as a doctrine. Each invariant names what enforces it. Each check is shown able to fail. A test that could not set up what it measures fails rather than passes. A tolerance is derived, never fitted. Every quoted number has a receipt. The same binary gives the same hash, and different builds a bounded deviation |
+| Abacus, the owner's catalogue of certified math commands (a private repository; abacus 0.1.0 at `14025b5`, built outside this repository for this work) | MIT, the owner's | used, not shipped: its `check.contains`, `check.equal`, `check.units`, `units.const` and `float.inspect` certify the sketch's numbers. Its 76 requests and answers, each with its SHA-256 receipt, are in `flight/orbit/evidence/`, whose `INDEX.md` says what each backs; `abacus batch` re-runs them. Nothing of Abacus is in this repository or in any build |
+| NIST, CODATA 2022 recommended values, through Abacus's frozen copy of NIST's table | facts | standard gravity, 9.80665 m/s², exact |
+| IERS Conventions (2010), Table 1.1; WGS 84 (NIMA TR8350.2) | facts | the Earth's gravitational parameter, 3.986004418×10¹⁴ m³/s², which the core uses. The Earth's turn among the stars, 7.292115×10⁻⁵ rad/s, against which the core's 7.2921159×10⁻⁵ (2π over the mean sidereal day) was checked |
+| H. Moritz, *Geodetic Reference System 1980* | facts | the Earth's mean radius, 6,371,008.8 m, of which the core's sphere is the kilometre |
+| ISO 2533:1975, *Standard Atmosphere* | facts | the gas constant the core uses, 287.05287 J/(kg K), the 1976 standard's own being 287.05307 |
+| The Astronomical Almanac's low-precision formulas for the Sun; J. Meeus, *Astronomical Algorithms* (2nd ed., 1998), chapter 25 | methods | the Sun's declination on 12 November 2026, worked two ways, against the core's −17.9° |
+| D. Brouwer, "On the accumulation of errors in numerical integration", *Astronomical Journal* 46 (1937), 149–153 | method | rounding over many steps as a random walk, for the invariants' bounds |
+| W. Kahan, "Further remarks on reducing truncation errors", *Communications of the ACM* 8 (1965), 40 | method | compensated summation, so the ledgers add no rounding of their own |
+| E. Hairer, S. P. Nørsett and G. Wanner, *Solving Ordinary Differential Equations I* (2nd ed., 1993) | method | RK4's order, and the difference of a second- and a fourth-order rule as an estimate of error, for the ledgers' bounds |
+
+#### The guide
+
+`flight/orbit/guide/` (`guide.html`, `build-guide.mjs`) is ours, GPLv3: a guide to the sketch, printed to a
+PDF from screenshots of the built page. Neither the screenshots nor the PDF is committed (`guide/out/`). It
+drives Chrome, Chromium or Edge with this repository's own DevTools driver (`app/tools/chrome.mjs`) and
+fetches nothing. Its type is named, not shipped: Charter or Cambria (Caladea where neither is installed),
+Inter and JetBrains Mono, as the printing machine has them; the PDF embeds subsets of those it finds, each
+under its own licence (Caladea Apache-2.0; Inter and JetBrains Mono the SIL Open Font License).
+
+The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
+and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
+here is fit for navigation, and none of it describes a real vehicle.
+
 ---
 
 ## 2 · Third-party dependencies
@@ -244,8 +431,8 @@ visual system's register. Nothing here is fit for navigation.
 | JSBSim's 737 and CFM56 data | `flight/` from P7, read at run time | GPL; LGPL-2.1 | no, read from the JSBSim clone |
 | JSBSim's CFM56_5 data | `flight/`: the seed of our A320's engines, six of its numbers kept in our engine file (§1e); read at run time until those engines were fitted | LGPL-2.1 | no; not read since |
 | FlyByWire A32NX | `flight/` from P6 | GPLv3 | no, cloned separately, `66021c2` |
-| Emscripten (emsdk) | `flight/`'s WebAssembly build (P7): build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
-| three.js | `flight/web`: the out-the-window view, bundled into the page at build time | MIT | no, `npm i`, `0.186.1` |
+| Emscripten (emsdk) | `flight/`'s WebAssembly build (P7), and `flight/orbit`'s: build only, but its JavaScript runtime and system libraries are linked into the module (§2b) | emsdk MIT; Emscripten MIT or NCSA; musl MIT; libc++ Apache-2.0 with LLVM exception | no, installed separately, `6.0.12` |
+| three.js | `flight/web`: the out-the-window view, bundled into the page at build time; `flight/orbit`'s page too, from `flight/web`'s install | MIT | no, `npm i`, `0.186.1` |
 | esbuild | `flight/web` too: bundles the page and its worker | MIT | no, `npm i`, `0.28.2` |
 | MSVC (Visual Studio 2022) | `flight/launcher`: builds `A32X.exe`, whose C runtime it links in statically (§2a) | Visual Studio's; the runtime a System Library in GPLv3's sense | no, installed separately |
 
