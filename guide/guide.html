@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Runway to Ring: a guide to the orbit sketch</title>
+<meta name="description" content="What the orbit sketch is, how to fly it, how it is built, and where it stood on 12 November 2026.">
+<!--
+  The orbit sketch's guide, laid out as Letter pages for print. build-guide.mjs, beside this file, takes the
+  screenshots it shows and prints it to a PDF; opened in a browser it shows the same pages, with the
+  screenshots from out/shots/ when they have been taken. Every page is a fixed box: the script at the end
+  numbers the pages, the figures and the contents, and says (window.guideFaults) which page overflows or
+  which screenshot is missing, so that the build refuses them. No font, image or script is fetched. GPLv3.
+-->
+<style>
+  @page { size: 8.5in 11in; margin: 0; }
+  :root {
+    --ink: #1b222b;
+    --soft: #4b5664;
+    --faint: #7a8593;
+    --rule: #d3dae2;
+    --wash: #f1f4f7;
+    --accent: #1d5c94;
+    --warm: #ad5a14;
+    --serif: Charter, "Bitstream Charter", Cambria, Caladea, Georgia, serif;
+    --sans: Inter, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; font: 10pt/1.42 var(--serif); color: var(--ink); background: #fff; font-kerning: normal; }
+  @media screen {
+    body { background: #59616c; padding: 12px 0; }
+    .page { margin: 0 auto 16px; box-shadow: 0 3px 14px rgba(0, 0, 0, 0.35); }
+    .page.overflow { outline: 4px solid #e0442e; }
+  }
+
+  /* a page: a fixed box with its body, a running head and a foot */
+  .page { width: 8.5in; height: 11in; position: relative; overflow: hidden; background: #fff; break-after: page; page-break-after: always; }
+  .page:last-of-type { break-after: auto; page-break-after: auto; }
+  .page > .body { position: absolute; left: 0.72in; right: 0.72in; top: 0.64in; bottom: 0.74in; overflow: hidden; }
+  .page > .head { position: absolute; left: 0.72in; right: 0.72in; top: 0.36in; font: 600 7pt/1 var(--sans); letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--faint); }
+  .page > .foot { position: absolute; left: 0.72in; right: 0.72in; bottom: 0.4in; display: flex; justify-content: space-between;
+    font: 7.2pt/1 var(--sans); color: var(--faint); border-top: 0.5pt solid var(--rule); padding-top: 5pt; }
+  .page > .foot .folio { font-weight: 600; color: var(--soft); }
+
+  h1 { font: 650 20pt/1.12 var(--sans); letter-spacing: -0.012em; margin: 0 0 7pt; }
+  h1 .n { color: var(--accent); margin-right: 7pt; }
+  h2 { font: 650 12.2pt/1.25 var(--sans); margin: 11pt 0 4pt; letter-spacing: -0.005em; }
+  h2 .n { color: var(--accent); margin-right: 5pt; }
+  h3 { font: 650 9.6pt/1.3 var(--sans); margin: 8pt 0 2pt; color: var(--ink); }
+  h1 + h2, h2:first-child, h3:first-child { margin-top: 0; }
+  p { margin: 0 0 5.5pt; hyphens: auto; -webkit-hyphens: auto; }
+  .lede { font-size: 11pt; line-height: 1.4; color: var(--soft); margin-bottom: 8pt; }
+  ul, ol { margin: 0 0 6pt; padding-left: 15pt; }
+  li { margin: 0 0 2.5pt; }
+  li::marker { color: var(--accent); }
+  b, strong { font-weight: 700; }
+  a { color: inherit; text-decoration: none; }
+  .url { font: 8.2pt var(--mono); color: var(--accent); word-break: break-all; }
+  code { font: 8.4pt var(--mono); background: var(--wash); padding: 0 2pt; border-radius: 2pt; }
+  kbd { font: 600 7.8pt/1 var(--mono); border: 0.6pt solid #aab4bf; border-bottom-width: 1.3pt; border-radius: 2.5pt; padding: 1.3pt 3pt 0.8pt;
+    background: #fbfcfd; white-space: nowrap; }
+  pre { font: 7.8pt/1.42 var(--mono); background: var(--wash); padding: 6pt 8pt; border-radius: 3pt; margin: 3pt 0 8pt; white-space: pre-wrap; }
+  .sans { font-family: var(--sans); }
+  .small { font-size: 8.6pt; }
+  .soft { color: var(--soft); }
+
+  table { border-collapse: collapse; width: 100%; font: 7.9pt/1.33 var(--sans); margin: 3pt 0 8pt; font-variant-numeric: tabular-nums; }
+  th { text-align: left; font-weight: 650; border-bottom: 0.8pt solid var(--ink); padding: 2pt 7pt 2.5pt 0; vertical-align: bottom; }
+  td { border-bottom: 0.5pt solid var(--rule); padding: 2.2pt 7pt 2.2pt 0; vertical-align: top; }
+  tr:last-child td { border-bottom: 0.8pt solid var(--rule); }
+  td:last-child, th:last-child { padding-right: 0; }
+  td.k { white-space: nowrap; font-weight: 600; }
+  td.k kbd { font-size: 7.4pt; }
+  table.tight td { padding-top: 1.5pt; padding-bottom: 1.5pt; }
+  table caption { caption-side: top; text-align: left; font: 650 8.4pt var(--sans); padding-bottom: 3pt; }
+
+  figure { margin: 4pt 0 9pt; }
+  figure img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 2pt; background: #0d1116; }
+  figure img.tall { aspect-ratio: auto; }
+  figure .missing { display: flex; align-items: center; justify-content: center; width: 100%; aspect-ratio: 16 / 9; background: #e8ecf0;
+    color: var(--faint); font: 8pt var(--sans); border-radius: 2pt; }
+  figcaption { font: 7.9pt/1.36 var(--sans); color: var(--soft); margin-top: 3.5pt; }
+  figcaption .fn { font-weight: 650; color: var(--ink); }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 9pt; }
+  .pair figcaption { min-height: 0; }
+  .side { display: grid; grid-template-columns: 1fr 2.05in; gap: 14pt; align-items: start; }
+  .side.wide { grid-template-columns: 1fr 2.9in; }
+  .cols { columns: 2; column-gap: 18pt; }
+  .cols > * { break-inside: avoid; }
+
+  .note { border-left: 2.4pt solid var(--accent); background: var(--wash); padding: 5pt 9pt 5.5pt; margin: 5pt 0 9pt; font-size: 9.2pt; }
+  .note.warm { border-left-color: var(--warm); }
+  .note p:last-child { margin-bottom: 0; }
+  .note h3 { margin-top: 0; }
+  .facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; border-top: 0.8pt solid var(--ink); border-bottom: 0.8pt solid var(--ink);
+    margin: 4pt 0 10pt; }
+  .facts div { padding: 5pt 6pt 5pt 0; border-right: 0.5pt solid var(--rule); }
+  .facts div:last-child { border-right: 0; }
+  .facts div + div { padding-left: 7pt; }
+  .facts b { display: block; font: 650 13pt/1.1 var(--sans); color: var(--accent); letter-spacing: -0.01em; }
+  .facts span { font: 7.5pt/1.3 var(--sans); color: var(--soft); }
+
+  /* the cover */
+  .cover { background: #070b10; color: #eef3f8; }
+  .cover .art { position: absolute; left: 0; right: 0; top: 0; height: 5.35in; }
+  .cover .art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cover .art::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1.4in; background: linear-gradient(rgba(7, 11, 16, 0), #070b10); }
+  .cover .title { position: absolute; left: 0.8in; right: 0.8in; top: 5.05in; }
+  .cover .kicker { font: 600 8pt/1 var(--sans); letter-spacing: 0.22em; text-transform: uppercase; color: #8fb8e0; }
+  .cover h1 { font: 700 46pt/1 var(--sans); letter-spacing: -0.025em; margin: 10pt 0 10pt; color: #fff; }
+  .cover .sub { font: 400 13pt/1.38 var(--serif); color: #c8d3de; max-width: 5.6in; }
+  .cover .where { position: absolute; left: 0.8in; right: 0.8in; bottom: 0.72in; display: grid; grid-template-columns: 1.15in 1fr; gap: 3pt 12pt;
+    font: 8pt/1.35 var(--sans); color: #b8c4d0; border-top: 0.6pt solid rgba(200, 215, 230, 0.3); padding-top: 9pt; }
+  .cover .where b { color: #eef3f8; font-weight: 600; }
+  .cover .where .url { color: #9cc8f2; font-size: 7.8pt; }
+  .cover .fine { grid-column: 1 / -1; margin-top: 6pt; color: #8d99a6; font-size: 7.4pt; }
+
+  /* contents */
+  #toc { list-style: none; padding: 0; margin: 4pt 0 0; font: 9.4pt/1.25 var(--sans); }
+  #toc li { display: flex; align-items: baseline; margin: 0; padding: 1.55pt 0; }
+  #toc li.h1 { font-weight: 650; margin-top: 6pt; }
+  #toc li.h1:first-child { margin-top: 0; }
+  #toc li.h2 { padding-left: 16pt; color: var(--soft); font-size: 9pt; }
+  #toc li .dots { flex: 1; border-bottom: 0.7pt dotted #b3bcc6; margin: 0 5pt 3pt; }
+  #toc li .pg { font-variant-numeric: tabular-nums; min-width: 14pt; text-align: right; }
+
+  svg text { font-family: var(--sans); }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ cover -->
+<section class="page cover">
+  <div class="art"><img data-shot="cover" alt="The spaceplane in a 500 km orbit, the Ring 25 km ahead and the Earth below"></div>
+  <div class="title">
+    <div class="kicker">The orbit sketch · a guide</div>
+    <h1>Runway to Ring</h1>
+    <div class="sub">A 60-tonne spaceplane from runway 17C at Dallas/Fort Worth to a ring station spinning for one g in a 500 km orbit, and back. What it is, how to fly it, how it is built, and where it stood on 12 November 2026.</div>
+  </div>
+  <div class="where">
+    <b>Code</b><span>github.com/bochen2029-pixel/a32x-cbt, branch <b>orbit-sketch</b>, directory <code style="background:none;color:inherit">flight/orbit</code></span>
+    <b>Review</b><span class="url">github.com/bochen2029-pixel/a32x-cbt/pull/1</span>
+    <b>Play</b><span class="url">claude.ai/artifact/PB6pcca87oqNiikJSXQRbo</span>
+    <b>This edition</b><span>12 November 2026, from commit 599e051; screenshots taken from that build at the medium tier</span>
+    <span class="fine">A sketch, not a simulation of any real vehicle, station, docking system or airport procedure. Its numbers are chosen so that it can be flown from a keyboard and shows the physics; none describes a real system. The cover is the page itself, with its readouts hidden.</span>
+  </div>
+</section>
+
+<!-- ============================================================ contents -->
+<section class="page" data-part="Contents">
+  <h1>Contents</h1>
+  <p class="small soft" style="margin-bottom:6pt">Section 1 is the whole thing on one page; section 2 gets you flying; section 3 takes the loop a part at a time, with the numbers its tests hold it to. Sections 4 to 7 are for whoever picks the code up again. Every number is from the repository's README files or a test at commit 599e051, and the test is named where it prints it.</p>
+  <ol id="toc"></ol>
+</section>
+
+<!-- ============================================================ 1 what it is -->
+<section class="page" data-part="1 · What it is">
+  <h1 id="what"><span class="n">1</span>What it is</h1>
+  <p class="lede">A spaceplane takes off from KDFW runway 17C like an aeroplane, keeps climbing, reaches a 500 km orbit and closes on a ring station there. It docks at the station's hub. Its crew walks inside, where the floor curves up ahead and behind and meets itself overhead. It can land on the station's open flight deck as a jump jet lands on a ship. Then it flies home to 17C, through entry, and stops on the centreline.</p>
+  <p>It is called <b>Runway to Ring</b>, and in the repository <i>the orbit sketch</i>. It was made in one day, 12 November 2026, on the owner's word and outside the roadmap of the repository it lives in, a32x-cbt, whose product is an A320 trainer. It stands apart from the A320: its own small flight core, its own page, and no file of the Airbus product changed.</p>
+  <div class="facts">
+    <div><b>60 t</b><span>the craft at take-off, half of it propellant</span></div>
+    <div><b>2,000 s</b><span>the drive's specific impulse: the one fiction</span></div>
+    <div><b>500 km</b><span>the orbit, round, at 32.84° to the equator</span></div>
+    <div><b>5 km</b><span>the Ring's radius; 1 g at its floor, a turn in 142 s</span></div>
+  </div>
+  <h2>The one fiction</h2>
+  <p>The drive gives 706 kN, 1.2 times the take-off weight, at 2,000 s of specific impulse. That is the only thing in the sketch that physics does not allow today. At 450 s, the best of chemical rockets, half the craft's mass in propellant would buy about 3 km/s, a third of what orbit takes. At 2,000 s the crew reaches orbit having spent 10.92 km/s of rocket-equation velocity and keeps 4.39 t of propellant, about 2.7 km/s more. Everything else is ordinary mechanics: gravity, the 1976 standard atmosphere, the lift of a slender delta, a spinning wheel.</p>
+  <h2>The loop, flown by the crew</h2>
+  <svg viewBox="0 0 700 118" width="100%" role="img" aria-label="The loop on a time line, in seconds from the start">
+    <line x1="18" y1="44" x2="682" y2="44" stroke="#1d5c94" stroke-width="2"/>
+    <g font-size="10.5" fill="#1b222b">
+      <circle cx="18" cy="44" r="5" fill="#1d5c94"/><text x="18" y="26" text-anchor="start" font-weight="650">0 s</text><text x="18" y="64">on 17C,</text><text x="18" y="77">brakes on 20 s</text>
+      <circle cx="122" cy="44" r="4" fill="#fff" stroke="#1d5c94" stroke-width="2"/><text x="122" y="26" text-anchor="middle" font-weight="650">43 s</text><text x="122" y="64" text-anchor="middle">airborne</text>
+      <circle cx="210" cy="44" r="4" fill="#fff" stroke="#1d5c94" stroke-width="2"/><text x="210" y="26" text-anchor="middle" font-weight="650">192 s</text><text x="210" y="64" text-anchor="middle">above the air,</text><text x="210" y="77" text-anchor="middle">38.6 km</text>
+      <circle cx="300" cy="44" r="5" fill="#1d5c94"/><text x="300" y="26" text-anchor="middle" font-weight="650">753 s</text><text x="300" y="64" text-anchor="middle">orbit; the Ring</text><text x="300" y="77" text-anchor="middle">25 km ahead</text>
+      <circle cx="398" cy="44" r="5" fill="#1d5c94"/><text x="398" y="26" text-anchor="middle" font-weight="650">1,807 s</text><text x="398" y="64" text-anchor="middle">docked at</text><text x="398" y="77" text-anchor="middle">the hub</text>
+      <circle cx="494" cy="44" r="4" fill="#fff" stroke="#ad5a14" stroke-width="2"/><text x="494" y="26" text-anchor="middle" font-weight="650">2,726 s</text><text x="494" y="64" text-anchor="middle">de-orbit burn,</text><text x="494" y="77" text-anchor="middle">125 m/s</text>
+      <circle cx="682" cy="44" r="5" fill="#ad5a14"/><text x="682" y="26" text-anchor="end" font-weight="650">7,868 s</text><text x="682" y="64" text-anchor="end">stopped on 17C,</text><text x="682" y="77" text-anchor="end">2 h 11 min later</text>
+    </g>
+    <text x="350" y="108" text-anchor="middle" font-size="9.5" fill="#4b5664">The crew's whole loop, from test_return's lands_after_undocking: dock, let go at 1,817 s, the return engaged at once. The time axis is not to scale.</text>
+  </svg>
+  <p>The page lets you take the controls at any point and give them back: the crew picks up from wherever the craft is. The walk inside the Ring and the deck landing are side trips from the hub. The Sun, the Moon and the stars stand where they really were over KDFW at 19:00 UTC on 12 November 2026, one in the afternoon in Texas, or on any date from 1900 to 2100.</p>
+  <h2>Where everything lives</h2>
+  <table class="tight">
+    <tr><th style="width:1.25in">what</th><th>where</th></tr>
+    <tr><td class="k">the code</td><td>GitHub, <b>bochen2029-pixel/a32x-cbt</b>, branch <b>orbit-sketch</b>, under <code>flight/orbit/</code>; GPLv3, as all of <code>flight/</code> is</td></tr>
+    <tr><td class="k">the review</td><td>draft pull request 1, <span class="url">https://github.com/bochen2029-pixel/a32x-cbt/pull/1</span>, from orbit-sketch</td></tr>
+    <tr><td class="k">the page, hosted</td><td><span class="url">https://claude.ai/artifact/PB6pcca87oqNiikJSXQRbo</span>, private to the owner until shared</td></tr>
+    <tr><td class="k">the page, local</td><td><code>flight/orbit/build-web/index.html</code> once built (section 7): one file, run from <code>file://</code></td></tr>
+    <tr><td class="k">the Unreal kit</td><td><code>flight/orbit/handoff/</code>, and the zip it makes (section 6)</td></tr>
+    <tr><td class="k">this guide</td><td><code>flight/orbit/guide/</code>: <code>guide.html</code> and <code>build-guide.mjs</code>, which takes the screenshots and prints the PDF</td></tr>
+  </table>
+  <p class="small soft">At commit 599e051 the core's tests pass 120 of 120 natively and as WebAssembly, the page's 146 of 146. It is not a simulation of any real vehicle and claims no fidelity to one: in the README's words it "is fit for nothing but a look". Every number in it comes out of the physics or is written down as chosen.</p>
+</section>
+
+<!-- ============================================================ 2 quick start -->
+<section class="page" data-part="2 · Quick start">
+  <h1 id="start"><span class="n">2</span>Quick start</h1>
+  <h2 id="open" data-toc>Open it</h2>
+  <p><b>Hosted:</b> open the artifact link (cover) in any recent desktop or phone browser. It is private to the owner until he shares it. <b>Local:</b> build the page (section 7) and open <code>flight/orbit/build-web/index.html</code>; it runs from the file, with no server and no network. Sound starts with your first key, click or tap, as browsers require; <kbd>Y</kbd> mutes it.</p>
+  <figure id="fig-ui"><img data-shot="ui" alt="The page as it opens on 17C, with the help panel shown"><figcaption>The page as it opens on a desktop: the craft on 17C, the crew holding the brakes for 20 s. At the top left the status line says who flies and what is next; at the bottom left the readouts; at the top right the buttons in three groups (the flight; the view and time; the page); beside them the help, which <kbd>H</kbd> or HELP shows and hides.</figcaption></figure>
+  <h2 id="tour-first" data-toc>See the whole of it first: the tour</h2>
+  <p>Press <b>TOUR</b> or <kbd>0</kbd>. The crew flies the loop by its own modes, as a person pressing the buttons would, with a caption for each part and the time warp and the view set for it: the take-off and climb, the guidance above the air, orbit, docking at the hub, a look round the hub's lobby and a moment on the floor, then the way home through entry to a stop on 17C. It takes about ten minutes on a desktop. Any key or button that does more than change what is shown ends it and leaves you the controls as they stand; help, the map, the Moon's telescope, sound and the view leave it running.</p>
+  <h2 id="first">Or fly it</h2>
+  <ol>
+    <li>Watch the crew release the brakes at 20 s and rotate at 95 m/s. Press <kbd>Space</kbd> (or CREW) at any moment to take the controls; press it again to give them back.</li>
+    <li>Press <kbd>O</kbd> (TO ORBIT) to skip the climb. The crew flies it at full speed and stops in orbit, the Ring 25 km ahead.</li>
+    <li>In orbit: <kbd>T</kbd> flies the approach to the hold point off the hub; <kbd>P</kbd> docks; <kbd>Enter</kbd>, docked, goes aboard to walk; <kbd>C</kbd> lands on the flight deck; <kbd>R</kbd> flies home.</li>
+    <li><kbd>,</kbd> and <kbd>.</kbd> run time slower and faster, up to 100 times; <kbd>V</kbd> changes the view; <kbd>Backspace</kbd> starts again on 17C.</li>
+  </ol>
+</section>
+
+<section class="page" data-part="2 · Quick start">
+  <h2 id="keys" data-toc>The keys, in flight</h2>
+  <table>
+    <tr><th style="width:1.3in">key</th><th style="width:1.05in">gamepad</th><th>does</th></tr>
+    <tr><td class="k"><kbd>0</kbd> · TOUR</td><td></td><td>the tour: the whole loop flown by the crew, with words; any key takes over</td></tr>
+    <tr><td class="k"><kbd>Space</kbd> · CREW</td><td>A</td><td>the crew on, or the controls to you</td></tr>
+    <tr><td class="k"><kbd>W</kbd> <kbd>S</kbd>, <kbd>↑</kbd> <kbd>↓</kbd></td><td>left stick</td><td>pitch down, up</td></tr>
+    <tr><td class="k"><kbd>A</kbd> <kbd>D</kbd>, <kbd>←</kbd> <kbd>→</kbd></td><td>left stick</td><td>bank left, right</td></tr>
+    <tr><td class="k"><kbd>Q</kbd> <kbd>E</kbd></td><td>right stick</td><td>yaw; the nose wheel on the ground</td></tr>
+    <tr><td class="k"><kbd>Shift</kbd> <kbd>Ctrl</kbd>; <kbd>Z</kbd> <kbd>X</kbd></td><td>triggers</td><td>throttle up, down; full, cut. Thrust follows the throttle with a 0.4 s lag</td></tr>
+    <tr><td class="k"><kbd>I</kbd> <kbd>K</kbd> <kbd>J</kbd> <kbd>L</kbd> <kbd>U</kbd> <kbd>M</kbd></td><td>d-pad</td><td>the small thrusters: fore and aft, left and right, up and down (the d-pad gives the first two)</td></tr>
+    <tr><td class="k"><kbd>1</kbd> to <kbd>6</kbd> · HOLD</td><td>X cycles 1 to 4</td><td>hold the attitude, prograde, retrograde, toward the Ring, on the hub's port (for docking), the deck hold (hovering)</td></tr>
+    <tr><td class="k"><kbd>G</kbd>, <kbd>B</kbd> · GEAR</td><td>Y (gear)</td><td>gear; brakes</td></tr>
+    <tr><td class="k"><kbd>T</kbd> · APPROACH</td><td></td><td>in orbit within 50 km of the Ring: the crew flies to the hold point off the hub</td></tr>
+    <tr><td class="k"><kbd>P</kbd> · DOCK</td><td></td><td>near the Ring: the crew docks at the hub's port; docked: let go</td></tr>
+    <tr><td class="k"><kbd>C</kbd> · LAND DECK</td><td></td><td>near the Ring: the crew lands on the Ring's flight deck</td></tr>
+    <tr><td class="k"><kbd>R</kbd> · RETURN</td><td></td><td>the crew flies home to KDFW 17C from anywhere in orbit; again: skip the wait for a pass</td></tr>
+    <tr><td class="k"><kbd>Enter</kbd> · WALK</td><td></td><td>docked: go aboard and walk</td></tr>
+    <tr><td class="k"><kbd>O</kbd> · TO ORBIT</td><td>Start</td><td>skip ahead to orbit, the crew flying</td></tr>
+    <tr><td class="k"><kbd>,</kbd> <kbd>.</kbd> · TIME − +</td><td>bumpers</td><td>time slower, faster: 0, 1, 2, 5, 10, 25, 50 and 100 times</td></tr>
+    <tr><td class="k"><kbd>V</kbd> · VIEW</td><td>B</td><td>the view: chase, cockpit, from the Ring</td></tr>
+    <tr><td class="k"><kbd>N</kbd>, <kbd>Shift</kbd>+<kbd>N</kbd> · MAP</td><td></td><td>the map: the orbit, the Ring close to, the ground track; shift-N the next of them</td></tr>
+    <tr><td class="k"><kbd>F</kbd></td><td></td><td>the Moon through a telescope, 1.4° across, and back</td></tr>
+    <tr><td class="k"><kbd>Y</kbd> · SOUND</td><td></td><td>sound off, on; the mouse wheel over SOUND sets the volume</td></tr>
+    <tr><td class="k"><kbd>9</kbd> · GFX</td><td></td><td>graphics: auto, low, medium, high, in turn; remembered</td></tr>
+    <tr><td class="k">drag, wheel</td><td></td><td>look round the craft; zoom</td></tr>
+    <tr><td class="k"><kbd>H</kbd> · HELP, <kbd>Backspace</kbd> · RESTART</td><td></td><td>the help; start again on 17C</td></tr>
+  </table>
+  <h2 id="hands">How the stick flies</h2>
+  <p>In the air the stick moves pitch and bank targets that the flight law holds, turning in balance, much as a fly-by-wire airliner's law does: let go and the craft keeps the attitude it was given. Above the air, where the dynamic pressure is under 400 Pa (the law hands back below 200 Pa), the stick commands rates and the craft holds the attitude it is left at, or points where <kbd>1</kbd> to <kbd>4</kbd> say. The readouts' AIR LAW or RATE line says which law is flying.</p>
+  <p><b>On a touch screen</b> a stick sits under the left thumb and a throttle under the right; between them the six buttons used most (TOUR, CREW, TO ORBIT, VIEW, TIME +, MORE), and MORE opens the rest (figure <a class="ref" href="#fig-phone"></a>). <b>A gamepad</b> with the standard mapping works as the table says, and its buttons fire on the press.</p>
+</section>
+
+<section class="page" data-part="2 · Quick start">
+  <h2 id="walkkeys" data-toc>The keys, walking</h2>
+  <table>
+    <tr><th style="width:1.75in">keys</th><th style="width:0.8in">gamepad</th><th style="width:0.95in">touch</th><th>does</th></tr>
+    <tr><td class="k"><kbd>W</kbd> <kbd>S</kbd>, <kbd>↑</kbd> <kbd>↓</kbd>; <kbd>A</kbd> <kbd>D</kbd></td><td>left stick</td><td>the stick</td><td>walk; step aside</td></tr>
+    <tr><td class="k"><kbd>←</kbd> <kbd>→</kbd>, drag, or a click to hold the mouse (<kbd>Esc</kbd> lets go)</td><td>right stick</td><td>drag</td><td>turn and look</td></tr>
+    <tr><td class="k"><kbd>Shift</kbd></td><td>B</td><td>RUN</td><td>run</td></tr>
+    <tr><td class="k"><kbd>Space</kbd></td><td>A</td><td>JUMP</td><td>jump</td></tr>
+    <tr><td class="k"><kbd>E</kbd>, <kbd>Enter</kbd></td><td>X</td><td>USE, WALK</td><td>ride a lift, call one; go back aboard at the hatch</td></tr>
+    <tr><td class="k"><kbd>F</kbd>, <kbd>G</kbd></td><td>Y</td><td>BALL</td><td>drop a ball; throw one</td></tr>
+    <tr><td class="k"><kbd>,</kbd> <kbd>.</kbd></td><td>bumpers</td><td>TIME − +</td><td>time 1 to 50 times (the lift takes 5½ minutes)</td></tr>
+    <tr><td class="k"><kbd>Backspace</kbd>, <kbd>H</kbd></td><td></td><td>RESTART, HELP</td><td>back to the hatch; the walk's own help</td></tr>
+  </table>
+  <h2 id="address" data-toc>Options in the address</h2>
+  <p>A few choices are made by adding them to the page's address, after a <code>?</code> and joined by <code>&amp;</code>: for example <code>index.html?at=775&amp;q=low</code>.</p>
+  <table>
+    <tr><th style="width:1.6in">add</th><th>does</th></tr>
+    <tr><td class="k"><code>?at=775</code></td><td>start that many seconds into the crew's flight. At 775 the craft is in orbit with the Ring 25 km ahead; any number works (<code>?at=330</code> is above the air)</td></tr>
+    <tr><td class="k"><code>?walk</code>, <code>?walk=lift</code>, <code>?walk=floor</code></td><td>start in the walk: at the hatch in the hub's lobby, in lift 1's car at the hub, or on the floor by lift 1, without docking first</td></tr>
+    <tr><td class="k"><code>?q=low</code>, <code>medium</code>, <code>high</code></td><td>the graphics tier, overriding the page's own choice (section 3.10)</td></tr>
+    <tr><td class="k"><code>?date=2026-12-24T03:00Z</code></td><td>the flight's date and time: UTC unless a zone is written, 1900 to 2100. A date the page cannot take stops it and says why</td></tr>
+    <tr><td class="k"><code>?tm=</code>, <code>?ex=</code>, <code>?volume=</code></td><td>for looking into the picture and the sound: the tone mapping (<code>agx</code>, the default; <code>aces</code>; <code>neutral</code>), the exposure, the starting volume</td></tr>
+  </table>
+  <div class="note warm">
+    <p><b>The hosted link takes no options.</b> The claude.ai artifact link passes no query string to the page, so <code>?at=</code>, <code>?walk</code>, <code>?q=</code> and <code>?date=</code> work only on the local file (or the same file behind a local web server), not on the hosted link. On the hosted page, TO ORBIT stands in for <code>?at=775</code>, GFX for <code>?q=</code>, and docking then WALK for <code>?walk</code>; the date is always 12 November 2026, 19:00 UTC.</p>
+  </div>
+  <h2 id="phone-note">On a phone</h2>
+  <p>The page places a phone in the low graphics tier by itself, from what the device says of itself, and steps further down if its first frames come slowly. Everything works by touch, the walk included (figure <a class="ref" href="#fig-phone"></a>). The readouts shorten to fit a narrow screen, and the map, when shown, covers the readouts and the buttons but never the stick or the throttle.</p>
+</section>
+
+<!-- ============================================================ 3 the loop -->
+<section class="page" data-part="3 · The loop, part by part">
+  <h1 id="loop"><span class="n">3</span>The loop, part by part</h1>
+  <p class="lede">Each part below says what it does, how to fly it, and the numbers its tests hold it to. The core is in parts too (section 4), and each part's test program is named in the tables.</p>
+  <h2 id="ascent"><span class="n">3.1</span>The take-off and the climb to orbit</h2>
+  <figure id="fig-takeoff"><img data-shot="takeoff" alt="The craft rotating on runway 17C"><figcaption>Rotation on 17C at 38 s, the drive at 70 %. The readouts' clock, T+00:18, counts from the brakes' release at 20 s. KDFW's terminals are in the distance; the field is <code>flight/web</code>'s drawing of it, unchanged.</figcaption></figure>
+  <p>The crew holds the brakes for 20 s, then flies the whole ascent: 12½ minutes to orbit. It takes off due south, as 17C points, rotates at 95 m/s, and from 300 m turns left, banked 30°, to the launch azimuth, 090. A pitch schedule carries it through the air, the throttle eased through the region of highest dynamic pressure. Above the air it steers by a cut-down version of the Space Shuttle's powered explicit guidance: the sine of the thrust's elevation is linear in time, and the line is solved again each step so that the burn ends at the Ring's height with no climb left and a round orbit's speed.</p>
+  <table>
+    <tr><th>from <code>test_orbit</code> and <code>orbit_run</code></th><th></th></tr>
+    <tr><td>brakes off, rotate, airborne</td><td>20 s; 34 s at 95 m/s; 43 s (the gear up)</td></tr>
+    <tr><td>highest dynamic pressure</td><td>36.6 kPa, at Mach 0.8 and 2 km, the throttle eased</td></tr>
+    <tr><td>highest load</td><td>2.09 g, at the end of the burn</td></tr>
+    <tr><td>above the air (dynamic pressure under 1 kPa)</td><td>38.6 km, at 192 s</td></tr>
+    <tr><td>engine off, in orbit</td><td>753 s: 500.4 × 499.7 km, inclined 32.84°</td></tr>
+    <tr><td>propellant left</td><td>4.39 t of 30: about 2.7 km/s of Δv</td></tr>
+    <tr><td>one revolution</td><td>5,669 s, Kepler's period for the orbit to 0.02 s (<code>kepler_holds</code>)</td></tr>
+  </table>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <div class="pair">
+    <figure id="fig-climb"><img data-shot="climb" alt="The craft climbing through Mach 1"><figcaption>Through Mach 1 at 10 km, 110 s after the start, climbing at 263 m/s.</figcaption></figure>
+    <figure id="fig-ascent"><img data-shot="ascent" alt="The craft above the air at 124 km"><figcaption>Above the air at 124 km, 330 s: the guidance flies the rest, 7 minutes more to orbit.</figcaption></figure>
+  </div>
+  <h3>What it flies on</h3>
+  <ul>
+    <li><b>The Earth:</b> a sphere of 6,371 km, its gravity a point mass's, turning once a sidereal day. The ground is level to the local plumb line, gravity and the Earth's turn together, so a parked craft stays parked (it moves under 1 cm in 30 s, <code>ground_settles</code>).</li>
+    <li><b>The air:</b> the 1976 standard atmosphere to 86 km, held within 0.5 % of its tables to 80 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km, within 20 %. No wind.</li>
+    <li><b>The craft:</b> a delta lifting body of 150 m² and 18 m span, its lift Polhamus's for a slender delta blending to Newtonian impact from Mach 1.5 to 5, with static and damping derivatives and three gear legs. A rate loop by dynamic inversion flies it inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give.</li>
+    <li><b>The step:</b> 0.02 s, fifty a second, by fourth-order Runge–Kutta in an inertial frame. Time can run 100 times faster; past a cap the page drops time rather than stretch a step.</li>
+  </ul>
+  <h3>Flying it yourself</h3>
+  <p>Take the controls on the runway or anywhere in the climb. On the runway <kbd>Q</kbd> <kbd>E</kbd> steer the nose wheel; full throttle (<kbd>Z</kbd>) and the brakes off (<kbd>B</kbd>) start the roll, and a pull at about 95 m/s lifts the nose. In the air the stick sets pitch and bank and the law holds them. A take-off by hand at full power is airborne within 30 s; half the stick to the right asks 22.5° of bank, and let go, the law holds 18 to 27° with under 1° of sideslip (<code>hand_flown_takeoff</code>). Give the controls back at any height and the crew takes the climb from where it is: from a hand-flown climb at 3 km it still reaches orbit, 500.6 × 499.8 km at 727 s (<code>crew_takes_over</code>).</p>
+  <p>Above the air there is nothing to bank against: the stick turns the craft at a rate, and <kbd>1</kbd> holds it where it is left, <kbd>2</kbd> and <kbd>3</kbd> point it along or against its motion through space, <kbd>4</kbd> at the Ring. Burning prograde raises the far side of the orbit; the map (section 3.9) shows the orbit's new shape as it changes.</p>
+  <div class="note">
+    <p><b>Why 32.84°?</b> KDFW is at 32.9° north. A launch due east from there gives an orbit inclined at about the site's latitude, the least inclination reachable without a turn in space; the orbit's plane then passes over KDFW once a day, which is what the flight home waits for.</p>
+  </div>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="ring"><span class="n">3.2</span>Orbit and the Ring</h2>
+  <figure id="fig-orbit"><img data-shot="orbit" alt="In orbit with the Ring 25 km ahead"><figcaption>In orbit at 775 s (<code>?at=775</code>): 501.2 × 500.0 km, the Ring 25.0 km ahead and closing at 0.3 m/s. Seen from behind its axis, the Ring is a wheel 10 km across with six spokes and its hub at the centre.</figcaption></figure>
+  <p>The Ring waits in a round 500 km orbit in the crew's plane, 25 km ahead of where the crew arrives: at reset the core flies the crew once, unseen, to find that place. A real launch window is the inverse problem, the launch timed to the station; this sketch does not solve it. The Ring's spin axis is fixed among the stars, as a spinning wheel's is, set along the track where the crew arrives, so the hub's port faces the arriving craft.</p>
+  <table>
+    <tr><th style="width:2.2in">the Ring, from <code>orbit_core.h</code></th><th></th></tr>
+    <tr><td>floor, band, roof</td><td>5,000 m from the axis; 1,000 m along it; the roof 300 m over the floor</td></tr>
+    <tr><td>spin</td><td>0.0443 rad/s: 1.0006 g at 5,000 m, a turn in 141.8 s; the floor moves at ωr = 221.5 m/s</td></tr>
+    <tr><td>structure</td><td>the hull at 5,040 m; rim walls from 4,620 m; six spokes 70 m square; a hub 160 m in radius</td></tr>
+    <tr><td>the hub's port, the hold point</td><td>350 m out along the axis; the hold point 300 m beyond it</td></tr>
+    <tr><td>the flight deck</td><td>an open sector, 1,500 m of floor at 30° from spoke 0, three pads (section 3.5)</td></tr>
+  </table>
+  <p>The readouts give the velocity relative to the Ring in the frame that turns with its orbit, so a craft keeping station in the same orbit reads zero. The Ring's own frame does not turn that way, so a craft holding off its hub reads about 0.7 m/s there: 0.7206 m/s against the orbit's rate times 650 m, 0.7205 (<code>readouts_are_derived</code>).</p>
+  <p><b>The approach</b> (<kbd>T</kbd>, APPROACH) takes the craft from where it reaches orbit to the hold point, 300 m off the hub's port on its axis, in 730 s on the small thrusters alone, the drive's propellant untouched (<code>approach_holds</code>). It goes round the outside of the Ring when it must. It is offered only where it makes sense: in orbit, within 50 km of the Ring and passing it under 50 m/s in the frame turning with its orbit. An audit found that the approach engaged from 380 km behind flew the craft into the ground; it is gated now, and from 48 km it reaches the hold point in 1,544 s with the lowest point of the orbit never under 487 km (<code>approach_gated_like_docking</code>).</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="dock"><span class="n">3.3</span>The approach and docking</h2>
+  <div class="pair">
+    <figure id="fig-hub"><img data-shot="hub" alt="At the hold point off the hub"><figcaption>At the hold point, 300 m off the hub's port. The spokes run out to the band 5 km away; the hub's face carries the port's target.</figcaption></figure>
+    <figure id="fig-reticle"><img data-shot="reticle" alt="The cockpit view with the docking reticle"><figcaption>The cockpit view (<kbd>V</kbd>) closing on the port, under 25 m to go: the docking reticle over the drogue.</figcaption></figure>
+  </div>
+  <p>The craft's port is a probe on its nose, on the docking axis, its head 18 m ahead of the centre of mass and 2 m past the nose: the pilot looks straight down the axis from the cockpit, and the laws that point the nose point the port. The hub's port is a drogue, a cone with a socket, at the centre of the hub's face on the Ring's axis, painted round with a target 36 m across: a bullseye, an alignment cross, and the key, a broad orange bar. The face turns with the Ring, 2.54° a second, once in 142 s. To dock is to line up on the axis, roll into phase with the key and turn with it, right wing down at the Ring's spin, and close slowly.</p>
+  <table>
+    <tr><th style="width:1.45in">at first touch</th><th style="width:1.2in">to be caught</th><th>why</th></tr>
+    <tr><td>closing</td><td>0.03 to 0.30 m/s</td><td>slower does not trip the latches; faster, the probe's rebound takes the head out before they close</td></tr>
+    <tr><td>off the port's centre</td><td>under 0.30 m</td><td>the drogue's mouth is 0.6 m across, and its cone guides a head in from anywhere inside it</td></tr>
+    <tr><td>across the face</td><td>under 0.10 m/s</td><td>a head sliding over the mouth skids past it</td></tr>
+    <tr><td>the nose off the axis</td><td>under 3°</td><td>further, the probe binds in the cone</td></tr>
+    <tr><td>the key out of phase</td><td>under 2°</td><td>the latches and the hatch's pins must meet</td></tr>
+    <tr><td>the spin, against the port's</td><td>under 0.30°/s</td><td>in the 6 s the latches take to draw the craft in, the key then drifts under 2°</td></tr>
+  </table>
+  <p>Outside them the head bounces off the face on the probe's spring and damper (a period of 1.26 s, three tenths of critical damping), and the craft comes away at about half the speed it came in. A contact that uses the probe's whole 0.4 m stroke, about 3 m/s, is a crash. Caught, the craft is drawn in over 6 s. Docked, it is part of the hub: its place, velocity, attitude and rates are worked out from the Ring's at every step, never integrated, so nothing drifts. Letting go (<kbd>P</kbd>) pushes it off at 0.15 m/s along the axis, still turning with the port; <kbd>1</kbd> stops the turn.</p>
+  <p>Every other part of the craft is a few spheres, swept along each step against the Ring: the band, the rim walls and their lips, the six spokes, the hub. A touch is a crash, and the status line says what hit what: the right wing on the roof, the tail on a spoke. Between the spokes, and out through the rim's opening, the way is free.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <figure id="fig-docked"><img data-shot="docked" alt="The craft docked at the hub, seen from below"><figcaption>Docked, seen from below the craft: its probe in the drogue at the centre of the hub's face, inside the hub's collar, the whole turning with the Ring at 2.54° a second. A spoke runs down to the band. From here <kbd>Enter</kbd> goes aboard, <kbd>P</kbd> lets go, <kbd>R</kbd> flies home.</figcaption></figure>
+  <h3>The crew's docking</h3>
+  <p><kbd>P</kbd> or DOCK, in orbit within 50 km of the Ring and passing it at under 50 m/s in the frame turning with its orbit; elsewhere the page says why not. The crew flies to the hold point (round the outside of the Ring when the craft is beyond it or inside it), on to the axis, into phase with the port, in at 1 m/s easing to 0.1 m/s from 20 m, and the catch.</p>
+  <h3>By hand</h3>
+  <p><kbd>5</kbd> holds the craft on the port, lined up and turning with it, so the hands fly translation only: <kbd>I</kbd> <kbd>K</kbd> close and open, <kbd>J</kbd> <kbd>L</kbd> and <kbd>U</kbd> <kbd>M</kbd> move it across. In the cockpit view the reticle's crosshair is the docking axis where it meets the port's face; the port's alignment cross turns with its key; a ring shows where the port's axis points, an arc the port's turn against the craft. Each mark is green inside the catch's tolerance and amber outside it.</p>
+  <table>
+    <tr><th style="width:2.5in">from <code>test_dock</code> (28 tests)</th><th></th></tr>
+    <tr><td>the crew, from the hold point</td><td>lined up in 9 s, caught at 337 s, docked at 343 s: 1.00 m/s easing to 0.10 m/s at the face, within 1 mm of the axis</td></tr>
+    <tr><td>the crew, from where it reaches orbit, 24.6 km out</td><td>docked in 1,058 s</td></tr>
+    <tr><td>the crew, from inside the Ring's far end</td><td>out of that end, round the hull 5.5 km from the axis, docked in 898 s</td></tr>
+    <tr><td>docked for 10 minutes</td><td>the probe's head within 3 × 10⁻⁹ m of the port; the spin the Ring's to 10⁻¹⁴ rad in 10 s</td></tr>
+    <tr><td>let go</td><td>3.15 m off the face 20 s on, opening at 0.165 m/s, still turning with the port</td></tr>
+    <tr><td>by hand, on the keys, under the port hold</td><td>caught 339 s from the hold point, at 0.10 m/s, 0.03 m off the centre</td></tr>
+    <tr><td>in at 1.5 m/s; in at 5 m/s</td><td>a bounce, 0.20 m of the stroke used, away at 0.69 m/s; a crash at the port</td></tr>
+    <tr><td>1 m off the centre; at 0.015 m/s; not turning; sliding; 4.2° off the axis</td><td>not caught, each for its own reason, none a crash; the slow one caught on its next try, at 0.1 m/s</td></tr>
+    <tr><td>into the roof, a rim wall, a spoke, the hub</td><td>a crash, and what hit: the right wing, the probe, the tail, the left wing</td></tr>
+    <tr><td>48 km behind, drifting 16 m/s in the orbit's frame</td><td>docking engages; by the plain difference of velocities it would read 52 m/s</td></tr>
+  </table>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="walk"><span class="n">3.4</span>The walk inside the Ring</h2>
+  <figure id="fig-walk"><img data-shot="walk-floor" alt="First person on the Ring's floor, looking along the canal"><figcaption>On the canal's promenade, 400 m spinward of spoke 1, looking spinward: the floor rises ahead until it meets itself overhead, under the roof's glass lattice, between the rim walls. The town is built from the core's own plan, so the walker meets what is drawn.</figcaption></figure>
+  <p>Off the craft, through the hatch into the hub, down a spoke in a lift, and out onto the floor. <kbd>Enter</kbd> or WALK starts it when the craft is docked at the hub; at the hatch, <kbd>E</kbd> goes back aboard and the flight returns. The walk has its own core, <code>core/walk.cpp</code>, on the flight's fixed steps, and its own page, <code>web/src/walk-view.js</code>, which draws the whole frame while walking. The flight goes on underneath: the Ring keeps turning and orbiting.</p>
+  <p>The physics is the Ring's turning frame and nothing else. A body in it feels the centrifugal pull ω²r outward and Coriolis's −2ω × v, and whatever holds it. Seen from outside, a body let go goes straight; the tests work each motion out again that way and hold the two equal. Up is toward the axis everywhere, so a jumper's turn about the axis speeds up on the way up, and a jump lands <b>spinward</b>, where on the Earth it lands to the west, against the spin.</p>
+  <p>The lift's ride is chosen for its riders. Coriolis's push, 2ωv, is sideways and the same at any height, so the cruise is the speed that holds it to 1.5 m/s², 16.9 m/s. At the hub the riders weigh three hundredths of a g, and a car that left faster than they fall would leave them on its ceiling: it leaves, and arrives, at half their weight. At the floor it starts and stops at 1 m/s². While it moves the riders hold its rail.</p>
+  <p>The page draws three passes: the real sky first (the flight's own Earth, air and stars, from where the eye is as the Ring turns), then the Ring's inside over it, far and near. The Sun lights the band only where it gets in over a rim wall's top, worked out for each pixel. On 12 November it stands 23.7° out of the Ring's plane, so the middle of the band has about 50 s of sunlight in each turn of 142 s, and the strip under the wall on the Sun's side none. The roof's lamps and the Earth's light fill the rest.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <div class="side wide">
+    <div>
+      <table>
+        <tr><th style="width:1.35in">from <code>test_walk</code> (18 tests)</th><th></th></tr>
+        <tr><td>standing on the floor</td><td>1.0004 g; at rest nothing moves in five minutes</td></tr>
+        <tr><td>walking at 1.4 m/s</td><td>the floor pushes 1.27 % harder going spinward, 1.26 % softer against: 2ωv, and v²/r besides</td></tr>
+        <tr><td>running at 4 m/s</td><td>3.65 % heavier spinward, 3.58 % lighter against</td></tr>
+        <tr><td>a 1 m jump</td><td>0.903 s, and it comes down 53.3 mm spinward, on the straight line outside to 10⁻⁹ m</td></tr>
+        <tr><td>a ball dropped from 2 m</td><td>0.639 s; it lands 37.7 mm antispinward of straight below</td></tr>
+        <tr><td>a ball thrown at 12 m/s, 34° up</td><td>14.6 m spinward, 16.7 m antispinward: lighter that way</td></tr>
+        <tr><td>the hub's lobby, 150 m from the axis</td><td>0.03 g. A jump is a leap of 25 m that lasts 21 s and comes down 38.5 m spinward</td></tr>
+        <tr><td>the lift, hub to floor</td><td>334 s: ω²r at each height, 0.19 g at 560 m, 0.82 g at 4 km; pushed sideways at 1.5 m/s²; at rest at the floor at one g</td></tr>
+        <tr><td>the floor's plan</td><td>1,824 solid things: 1,500 low blocks, 240 parapets along the canal, the spokes' feet, the lifts' shafts</td></tr>
+      </table>
+    </div>
+    <figure id="fig-lift" style="margin-top:0"><img data-shot="walk-lift" alt="Riding a lift down to the floor"><figcaption>In lift 1's car (<code>?walk=lift</code>, then <kbd>E</kbd>), 100 m over the floor and slowing: the riders weigh 1.09 g, and Coriolis pushes them 1.27 m/s² antispinward.</figcaption></figure>
+  </div>
+  <div class="note">
+    <p><b>Two of the canon's numbers, measured.</b> The larger game's canon (section 6) says a 2 m drop lands 3.8 cm off the plumb point and running 5 m/s spinward adds 4.6 % weight. The walk's tests give 37.7 mm for the drop, and the law behind the second, 2ωv + v²/r, held to 1 % at 1.4 and 4 m/s; at 5 m/s the same law gives 4.57 %.</p>
+  </div>
+  <h3>What is not in the walk</h3>
+  <p>People and furnishing; doors into the blocks, which are solid; water to swim in, since the parapets keep the walker out; the shadows of the blocks, the spokes and the hub on the floor; the way from the port to the hatch, which the walk skips; the Earth's tide across the Ring, six parts in ten thousand of a g.</p>
+  <h3>What to try</h3>
+  <ul>
+    <li>Drop a ball (<kbd>F</kbd>) and look where it lands: a marker stands on the floor straight below where it was let go, and the ball comes down 37.7 mm antispinward of it. Throw one (<kbd>G</kbd>) spinward, then against the spin, and compare.</li>
+    <li>Jump in the lobby: 21 seconds in the air.</li>
+    <li>Ride the lift down (<kbd>E</kbd> in a car) and watch the readouts: the weight grows from 0.03 g to one g, and the push sideways stays at 1.5 m/s² all the way. Run time faster (<kbd>.</kbd>) for the 5½ minutes it takes.</li>
+  </ul>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="deck"><span class="n">3.5</span>The flight deck</h2>
+  <figure id="fig-deck-glide"><img data-shot="deck-glide" alt="The glide along the Ring's flight deck"><figcaption>The glide (<kbd>C</kbd>, LAND DECK): 400 m over the floor, nose spinward, the drive pushing the craft after the deck as the speed against it bleeds away. The chase view rides with the deck, so the floor runs ahead and rises like a ramp. The approach display, bottom left, carries the deck's ILS, the hover's plan and a height tape.</figcaption></figure>
+  <p>The Ring has a deck: an open sector of its band, 1,500 m of the floor's arc and the band's whole 1 km across, midway between spokes 0 and 1. The roof stops at the sector's ends; at each end a pressure bulkhead 20 m thick stands from the floor to the roof. Three pads, 25 m in radius, lie on the centreline 400 m apart. It was the owner's idea: come in from the rim, match the Ring's turn and curve, fly an airliner's approach down a curved deck, then hover to a landing on a pad, as an F-35B does.</p>
+  <h3>Why it is a hover</h3>
+  <p>In the Ring's own frame, which turns once in 142 s, the floor stands still and everything over it is pulled outward at ω²r, one g at the floor: a craft holding still over a spot of the deck must thrust toward the axis at that. Seen from the stars it is moving with the floor at ωr, 221.5 m/s, and the thrust bends its path round. A craft at rest among the stars feels no pull at all, and the deck sweeps past under it. Moving at u against the deck, along it, the pull is (ωr + u)²/r: flying spinward makes the craft heavier, antispinward lighter. So to land is to take up the deck's speed while coming down onto it, and the weight grows from nothing to one g as the speed against the deck goes.</p>
+  <h3>The craft as a jet</h3>
+  <p>The drive swivels, as an F-35B's does, from aft to straight down through the centre of mass, at 15° a second: the same drive, the same flow of propellant. Jet-borne, roll posts in the wings and a lift jet in the nose bleed up to 5 % of its thrust for attitude. Each law asks for the accelerations it wants along the deck, above it and across it, and gets the thrust from the exact equations of motion in a cylinder about the Ring's axis: the turning frame's pulls are worked out, not left to feedback, and the tides are fed forward.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <div class="pair">
+    <figure id="fig-deck-hover"><img data-shot="deck-hover" alt="The craft hovering over pad 2"><figcaption>The hover, 20 m over pad 2's centre, held still for two seconds before the descent: the swivel down, the craft feeling 0.996 g from the spin alone.</figcaption></figure>
+    <figure id="fig-deck-pad"><img data-shot="deck-pad" alt="The craft at rest on the pad"><figcaption>At rest on pad 2, the brakes on, landed at 0.28 m/s and 0.0 m from its centre. The bulkhead and its hangar door close the sector's end; the rim wall's windows run along its side.</figcaption></figure>
+  </div>
+  <h3>The crew's landing</h3>
+  <p>From the hold point (or anywhere near the Ring, by docking's way round it) the crew flies out to a point 400 m over the floor, beside the spokes' plane, at rest among the stars: the deck sweeps by underneath at 204 m/s, and the craft waits, weightless, until the nearest pad is far enough ahead. Then the glide, the airliner's part: along the deck at 400 m, the speed against it bleeding away on a schedule by the distance to go, the swivel turning down as the weight comes on. Past the last spoke the course leaves its side for the centreline and steepens down through the roof's gap. Then the jet's part: a hover 20 m over the pad's centre, and a descent at 2 m/s easing to 0.25 m/s at the touch. The craft comes in tail first: the deck overtakes it, and the nose points the way the craft must be pushed.</p>
+  <h3>By hand</h3>
+  <p><kbd>6</kbd> is the deck hold, the F-35B's unified control in the deck's frame. The stick is a velocity against the deck, 10 m/s at its stops; centred, the hold keeps the craft's place. The throttle is the climb or the sink, 8 m/s at its stops; its middle holds the height, and near the deck the sink eases to a touchdown's, so a shut throttle lands the craft. <kbd>Q</kbd> <kbd>E</kbd> turn the nose. Taking the controls from the crew over the deck gives this hold, never the plain one, which would let the craft fall.</p>
+  <table>
+    <tr><th style="width:1.2in">at the touchdown</th><th style="width:1.15in">the crew's aim</th><th style="width:0.8in">a crash past</th><th>why</th></tr>
+    <tr><td>sink</td><td>0.5 m/s</td><td>3 m/s</td><td>at 3 m/s the legs' dampers alone load them past 7 g</td></tr>
+    <tr><td>drift across the deck</td><td>0.3 m/s</td><td>2 m/s</td><td>faster sideways a tyre trips and a leg folds</td></tr>
+    <tr><td>off level</td><td>2°</td><td>10°</td><td>at 10° the low wingtip is under a metre from the deck</td></tr>
+    <tr><td>from a pad's centre</td><td>5 m</td><td></td><td>on the deck but off the pad is a landing, and said so</td></tr>
+  </table>
+  <h3>A first landing by hand</h3>
+  <ol>
+    <li>From the hold point (<kbd>T</kbd>, or docked and let go), press <kbd>C</kbd>: the crew flies out, waits for the pad and glides in.</li>
+    <li>When the status line reads HOVER, press <kbd>Space</kbd>. You have the deck hold, the throttle at its middle: the craft stays where it is, 20 m up.</li>
+    <li>Fly it over the pad's centre with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and let go; the hold keeps the place. The approach display's PLAN shows the pad.</li>
+    <li>Shut the throttle (<kbd>X</kbd>): the sink eases to a touchdown's near the deck and the craft lands. On the deck, <kbd>Shift</kbd> lifts off again.</li>
+  </ol>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <table>
+    <tr><th style="width:2.15in">from <code>test_deck</code> (18 tests; not yet certified in <code>evidence/</code>)</th><th></th></tr>
+    <tr><td>the crew, from the hold point</td><td>the glide at 123 s, the hover at 226 s, at rest on pad 2 at 255 s: sink 0.278 m/s, drift 0.002 m/s, 0.01 m from the centre, 0.03° off level</td></tr>
+    <tr><td>the glide</td><td>from 203.6 m/s against the deck and 0.0000 g to 1.5 m/s and 0.983 g in 104 s; the swivel from 0° to 89°; at most 6.1 m off the path across, 1.5 m in height</td></tr>
+    <tr><td>the crew, from where it reaches orbit</td><td>at the hold point at 717 s, at rest on the pad at 972 s, the same touchdown</td></tr>
+    <tr><td>24 seeded starts round the hold point, up to 101 m and 1.84 m/s off it</td><td>all land, on pads 1, 2 and 3 (6, 12, 6), in 253 to 256 s; the worst sink 0.278 m/s</td></tr>
+    <tr><td>hovering 20 m over a pad</td><td>the felt acceleration 0.99617 g against ω²r's 0.99659 g (the tides the difference); the drive's flow 16.28 kg/s against mω²r/(Isp g₀)'s 16.29</td></tr>
+    <tr><td>parked on the pad ten minutes, the brakes on</td><td>moved at most 0.15 mm; the legs 5.7 cm compressed</td></tr>
+    <tr><td>by hand, from the hover</td><td>the stick right 4 s: 9.9 m/s across, the place along held to 3 cm; let go, at rest and held to 0.1 m; the throttle shut: down in 20 s at 0.28 m/s</td></tr>
+    <tr><td>let go of the hold 12 m up</td><td>a crash at 10.9 m/s, the gear on the deck, the wreck left there</td></tr>
+    <tr><td>what it costs, from the hold point</td><td>1,794 kg of 4,388: 1,051 m/s of Δv against the deck's own 221.5 m/s, most of it holding the craft up</td></tr>
+  </table>
+  <p>The gear meets the deck as it meets the runway, against the deck's motion, and its tyres stick to the spot where they come to rest, so a craft parked on a pad stays put under the Earth's tide on the Ring. The rest of the craft is a few hard points swept against the deck each step; any of them on it is a crash. The bulkheads, and the roof everywhere but over the sector, are as solid as the rest of the Ring.</p>
+  <div class="note warm">
+    <p><b>Why the deck is a vacuum.</b> The Ring's air is held by its roof and sealed walls, and the deck sits behind bulkheads, open to space. An open Ring that held its air by spin alone, as in the film <i>Elysium</i>, would need to be far bigger: at 5 km the spin's pull is too weak over so short a height and the air would pour out of the open sides. Section 6 has the owner's note on what size it would take.</p>
+  </div>
+  <figure id="fig-deck-weight" style="margin-top:8pt">
+    <svg viewBox="0 0 700 232" width="100%" role="img" aria-label="The weight felt over the deck against the speed against the deck: none at rest among the stars, one g at rest on the deck, more flying spinward">
+      <g stroke="#d3dae2" stroke-width="0.8"><line x1="70" y1="145.8" x2="670" y2="145.8"/><line x1="70" y1="101.6" x2="670" y2="101.6"/><line x1="70" y1="57.4" x2="670" y2="57.4"/></g>
+      <line x1="70" y1="190" x2="670" y2="190" stroke="#4b5664" stroke-width="1"/>
+      <line x1="510.8" y1="22" x2="510.8" y2="190" stroke="#7a8593" stroke-width="0.8" stroke-dasharray="3 3"/>
+      <path d="M70.0,190.0 L75.0,190.0 L80.0,190.0 L85.0,189.9 L90.0,189.8 L95.0,189.7 L100.0,189.6 L105.0,189.4 L110.0,189.3 L115.0,189.1 L120.0,188.9 L125.0,188.6 L130.0,188.4 L135.0,188.1 L140.0,187.8 L145.0,187.4 L150.0,187.1 L155.0,186.7 L160.0,186.3 L165.0,185.9 L170.0,185.4 L175.0,185.0 L180.0,184.5 L185.0,184.0 L190.0,183.4 L195.0,182.9 L200.0,182.3 L205.0,181.7 L210.0,181.1 L215.0,180.4 L220.0,179.8 L225.0,179.1 L230.0,178.4 L235.0,177.6 L240.0,176.8 L245.0,176.1 L250.0,175.3 L255.0,174.4 L260.0,173.6 L265.0,172.7 L270.0,171.8 L275.0,170.9 L280.0,169.9 L285.0,169.0 L290.0,168.0 L295.0,167.0 L300.0,165.9 L305.0,164.9 L310.0,163.8 L315.0,162.7 L320.0,161.6 L325.0,160.4 L330.0,159.2 L335.0,158.0 L340.0,156.8 L345.0,155.6 L350.0,154.3 L355.0,153.0 L360.0,151.7 L365.0,150.4 L370.0,149.0 L375.0,147.7 L380.0,146.3 L385.0,144.8 L390.0,143.4 L395.0,141.9 L400.0,140.4 L405.0,138.9 L410.0,137.4 L415.0,135.8 L420.0,134.3 L425.0,132.6 L430.0,131.0 L435.0,129.4 L440.0,127.7 L445.0,126.0 L450.0,124.3 L455.0,122.5 L460.0,120.8 L465.0,119.0 L470.0,117.2 L475.0,115.4 L480.0,113.5 L485.0,111.6 L490.0,109.7 L495.0,107.8 L500.0,105.9 L505.0,103.9 L510.0,101.9 L515.0,99.9 L520.0,97.8 L525.0,95.8 L530.0,93.7 L535.0,91.6 L540.0,89.5 L545.0,87.3 L550.0,85.2 L555.0,83.0 L560.0,80.7 L565.0,78.5 L570.0,76.2 L575.0,73.9 L580.0,71.6 L585.0,69.3 L590.0,66.9 L595.0,64.6 L600.0,62.2 L605.0,59.7 L610.0,57.3 L615.0,54.8 L620.0,52.3 L625.0,49.8 L630.0,47.3 L635.0,44.7 L640.0,42.1 L645.0,39.5 L650.0,36.9 L655.0,34.3 L660.0,31.6 L665.0,28.9 L670.0,26.2" fill="none" stroke="#1d5c94" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="70" cy="190" r="4.5" fill="#1d5c94" stroke="#fff" stroke-width="2"/>
+      <circle cx="510.8" cy="101.6" r="4.5" fill="#1d5c94" stroke="#fff" stroke-width="2"/>
+      <g font-size="10.5" fill="#4b5664"><text x="112.8" y="205" text-anchor="middle">−200</text><text x="212.3" y="205" text-anchor="middle">−150</text><text x="311.8" y="205" text-anchor="middle">−100</text><text x="411.3" y="205" text-anchor="middle">−50</text><text x="510.8" y="205" text-anchor="middle">0</text><text x="610.3" y="205" text-anchor="middle">+50</text><text x="62" y="193.5" text-anchor="end">0</text><text x="62" y="149.3" text-anchor="end">0.5</text><text x="62" y="105.1" text-anchor="end">1</text><text x="62" y="60.9" text-anchor="end">1.5</text></g>
+      <g font-size="10.5" fill="#1b222b">
+        <text x="84" y="132">at rest among the stars: weightless,</text>
+        <text x="84" y="145">the deck sweeping by at 221.5 m/s</text>
+        <text x="500.8" y="91.6" text-anchor="end">at rest on the deck: one g</text>
+        <text x="300" y="183">the glide runs this way →</text>
+        <text x="520.8" y="40">spinward, faster than</text>
+        <text x="520.8" y="53">the deck: heavier</text>
+      </g>
+      <text x="370" y="226" text-anchor="middle" font-size="10.5" fill="#4b5664">the craft's speed against the deck, along it, m/s (spinward +)</text>
+      <text x="16" y="16" font-size="10.5" fill="#4b5664">weight felt, g</text>
+    </svg>
+    <figcaption>The weight a craft feels over the deck: (ωr + u)²/r at the floor's radius, as a share of one g, against u, its speed against the deck. The crew's glide climbs the curve from its left end, at rest among the stars (0.0000 g at 203.6 m/s against the deck, 400 m up), to near its marked point (0.983 g at 1.5 m/s): <code>deck.glide_bleeds_the_deck_speed</code>.</figcaption>
+  </figure>
+  <p class="small soft">Every number of the deck is chosen to make a landing that can be flown from a keyboard and shows the physics. None of them describes a real aircraft, ship or station.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="home"><span class="n">3.6</span>The flight home</h2>
+  <figure id="fig-entry"><img data-shot="entry" alt="Entry, the craft glowing"><figcaption>Entry (<kbd>R</kbd>, RETURN) at Mach 24 and 76 km, some 4,450 km of path to go: 330 kW/m² on the nose, the nose 40° above the air's flow and banked 52° left, the glow and the trail drawn from the core's own heat flux. The guidance predicts the rest of the entry every 2 s and moves the bank until the prediction ends at its gate.</figcaption></figure>
+  <p><b>RETURN</b> hands the craft to the crew to fly home to KDFW 17C from wherever it is in orbit: the insertion orbit, held off the hub (it backs away first, on the small thrusters), docked (it lets go first), or an orbit the pilot has changed. Nothing in it writes where the craft is: it commands body rates, the throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the flight, the craft does not arrive.</p>
+  <ul>
+    <li><b>The plan.</b> The orbit's plane stands still among the stars while the Earth turns KDFW under it. KDFW lies at almost the orbit's inclination, so it passes close to the plane once a day. Within 1,200 km of the plane, the plan's limit, the runway is in reach for about 3½ hours either side of that passing: four or five passes a day, and a wait of up to about 19 hours. <b>RETURN</b> again, or TO ORBIT, skips to a minute before the burn.</li>
+    <li><b>The burn.</b> Tail first at 30 % thrust until the orbit's low point is 60 km: 121 to 127 m/s from the round orbit.</li>
+    <li><b>The entry.</b> The nose 40° above the air's flow, the bank's size setting the range and its side the cross-range, reversing when the runway's bearing drifts past a deadband. A predictor flies the rest of the entry with the core's air and lift every 2 s, and a corrector moves the bank until it ends at the gate, 200 km of path short of the threshold at 800 m/s.</li>
+    <li><b>What it learns.</b> Each step it feels its own acceleration and compares the drag and lift in it with its model's; fading-memory filters keep the ratios, and the predictor and the approach fly by them.</li>
+    <li><b>The terminal area and the approach.</b> From Mach 2.6 and about 31 km, a glide to a circle of 5 km radius that touches the extended centreline 14 km north of the threshold, round it onto a long final; the drive relit at low throttle, the 3° glide path flown as an airliner flies it, gear down, a flare from 12 m, the brakes, the nose wheel on the line.</li>
+  </ul>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <div class="pair">
+    <figure id="fig-final"><img data-shot="final" alt="On final for 17C"><figcaption>On final for 17C from the north, 8.2 km out at 449 m and 111 m/s: under power, gear down, on the 3° glide path.</figcaption></figure>
+    <figure id="fig-stopped"><img data-shot="stopped" alt="Stopped on 17C"><figcaption>Stopped on 17C, 2.12 km down the runway on its centreline, two hours after RETURN was pressed in orbit: down 431 m past the threshold, 0.1 m off the line, sinking 0.74 m/s.</figcaption></figure>
+  </div>
+  <table>
+    <tr><th>started (<code>test_return</code>)</th><th>burn</th><th>touchdown</th><th>heat, peak</th><th>load, peak</th><th>propellant</th></tr>
+    <tr><td>at insertion, 800 s</td><td>2,675 s, 127 m/s</td><td>7,881 s</td><td>387 kW/m², 1,683 K</td><td>1.63 g</td><td>1.12 t</td></tr>
+    <tr><td>a pass just missed, 2,620 s</td><td>2,790 s, 127 m/s</td><td>7,870 s</td><td>412 kW/m²</td><td>1.66 g</td><td>1.12 t</td></tr>
+    <tr><td>after the day's last pass, 3,700 s</td><td>69,696 s</td><td>74,679 s, 19.7 h on</td><td>389 kW/m²</td><td>1.65 g</td><td>0.47 t</td></tr>
+    <tr><td>off the Ring's hub, 1,600 s</td><td>2,766 s, 121 m/s</td><td>7,865 s</td><td>387 kW/m²</td><td>1.65 g</td><td>1.11 t</td></tr>
+    <tr><td>the far side raised to 806 km</td><td>71,731 s, 196 m/s</td><td>77,343 s</td><td>387 kW/m²</td><td>1.68 g</td><td>1.34 t</td></tr>
+  </table>
+  <p>Every one touches down 429 to 437 m past the threshold, 0.07 m left of the centreline, sinking 0.74 m/s at 99 to 100 m/s, and stops 2.1 km down the runway. The limits are 600 kW/m² at the stagnation point of a 1 m nose (Sutton and Graves's heat flux; the skin in radiative equilibrium at 1,880 K), 2.5 g and 20 kPa; the guidance keeps 15 to 20 % inside them.</p>
+  <h3>Robustness</h3>
+  <p>The guidance's model of the air and the craft was made wrong while the craft flew the core's own: the density off by a factor and a wave in height, the lift and drag coefficients each by a factor, all drawn at random, the return started anywhere in a day. A landing counts when it touches down in the first 900 m, within 3 m of the line, sinking under 2 m/s, stops on the runway and stays inside the limits. Pools 2026 and 2027 were drawn after the guidance was built and flown once, with nothing changed since.</p>
+  <table>
+    <tr><th>pool</th><th>the model wrong by</th><th class="n">runs</th><th class="n">landed</th><th>95 % interval</th></tr>
+    <tr><td>1, while building</td><td>density ×0.75 to 1.25, a wave to 15 %; lift, drag ×0.9 to 1.1</td><td class="n">64</td><td class="n">64</td><td>94.3–100 %</td></tr>
+    <tr><td><b>2026, held out</b></td><td>the same</td><td class="n">200</td><td class="n"><b>200</b></td><td><b>98.1–100 %</b></td></tr>
+    <tr><td>2, while building</td><td>density ×0.6 to 1.4, a wave to 25 %; lift, drag ×0.8 to 1.2</td><td class="n">64</td><td class="n">60</td><td>85.0–97.5 %</td></tr>
+    <tr><td><b>2027, held out</b></td><td>the same</td><td class="n">100</td><td class="n"><b>91</b></td><td><b>83.8–95.2 %</b></td></tr>
+  </table>
+  <p>Every run lost had a model whose lift over drag was off by more than a factor of 1.2; the entry's reach then fell short of where the plan, made in orbit before anything could be learned, sent it. <code>test_return monte_carlo &lt;first&gt; &lt;count&gt; &lt;pool&gt;</code> flies a pool and prints the rate with its Wilson interval.</p>
+  <h3>Watching it, or flying part of it</h3>
+  <p>The readouts' HOME, HEAT and GUIDE lines follow the flight home: the distance to the runway and how far it lies off the track, the heat on the nose with its peak and the skin's temperature, the load, the bank the guidance asks and how far its prediction misses the gate. <kbd>Space</kbd> takes the controls at any point and gives them back; the crew picks the flight up from wherever the craft is. RETURN after the stop says the flight is over; <kbd>Backspace</kbd> starts again on 17C.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="sky"><span class="n">3.7</span>The Sun, the Moon and the stars</h2>
+  <div class="side wide">
+    <div>
+      <p>The flight has a date: 12 November 2026 at 19:00:00 UTC unless the address says otherwise. That is one in the afternoon at KDFW, the Sun 38° up in the south-south-west and still 32° up where the crew reaches the Ring; a thin Moon, 11 % lit, stands 23° up in the south-south-east. From there the sky moves with the flight's clock: the Moon its half a degree an hour among the stars, the Sun its degree a day. Nothing in the flight depends on the date.</p>
+      <p>The core works the sky out by J. Meeus's <i>Astronomical Algorithms</i>: the Sun to 0.01°, the Moon from the whole of his tables to about 10″, the Earth's sidereal time, precession and nutation, and the Moon's attitude by Cassini's laws, which gives its librations. The eye is not at the Earth's centre: from the runway the Moon stands 0.83° lower than from there, and the page draws it from wherever the eye is.</p>
+    </div>
+    <figure id="fig-moon" style="margin-top:0"><img data-shot="moon" alt="The Moon through the telescope" style="aspect-ratio:1/1;object-position:50% 50%"><figcaption>The Moon through the telescope (<kbd>F</kbd>), 1.4° across, from orbit at 19:13 UTC: 11 % lit, its face painted from the IAU's gazetteer; the readouts hidden.</figcaption></figure>
+  </div>
+  <ul>
+    <li><b>The Moon</b> is a sphere of its true angular size along the true line to it, turned as the core says, lit by the Sun at its phase, with earthshine against a dark sky. Its face is painted by code from the IAU's Gazetteer of Planetary Nomenclature: 44 maria at their outlines, the 4,164 named craters of 8 km and more on the near side at their places and sizes, and the rays of Tycho, Copernicus and a dozen more.</li>
+    <li><b>The Sun</b> above the air gets a glare: a core, a halo, four faint spikes and two lens ghosts, reddened where its light grazes the air and gone as the Earth covers it.</li>
+    <li><b>The stars</b>: 8,615 real ones to magnitude 6.5, from Wikidata, at their places for J2000.0 turned by the core's sidereal time, precession and nutation. Orion is where Orion is.</li>
+  </ul>
+  <table>
+    <tr><th>from <code>test_sky</code> and <code>sky.test.mjs</code></th><th>the core or the page</th><th>JPL Horizons (DE441)</th></tr>
+    <tr><td>the Sun from KDFW, 2026-11-12 19:00 UTC</td><td>az 194.453°, el 37.968°</td><td>194.452°, 37.968°</td></tr>
+    <tr><td>the Moon from KDFW</td><td>az 151.806°, el 22.562°, 405,165 km</td><td>151.804°, 22.563°, 405,192 km</td></tr>
+    <tr><td>the Moon as the page draws it</td><td>11.478 % lit, 1779.9″ across</td><td>11.481 %, 1779.9″</td></tr>
+    <tr><td>the full Moon of 2026-12-24 03:00 UTC</td><td>az 82.527°, el 43.545°, 99.88 % lit</td><td>82.522°, 43.543°, 99.88 %</td></tr>
+    <tr><td>the eclipse of 2024-04-08 over KDFW</td><td>the centres 0.0114° apart at 18:43:21 UTC</td><td>0.0110° at 18:42:32</td></tr>
+    <tr><td>2018 to 2034</td><td>the Moon within 7″ and 41 km, the Sun within 21″</td><td></td></tr>
+  </table>
+  <p class="small">What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own, so the full Moon keeps its contrast; a crescent is brighter than a camera shows it; earthshine is lifted 250 times and shown only against a dark sky. What is not here: the planets; refraction; the Earth's shadow on the Moon and the Moon's on the Earth in eclipses; moonlight on the ground.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="map"><span class="n">3.8</span>The map</h2>
+  <div class="pair">
+    <figure id="fig-map-a"><img data-shot="map-ring" alt="The map's first view"><figcaption>The map (<kbd>N</kbd>, MAP) in orbit near the Ring opens on RING: the rendezvous in the frame turning with the Ring's orbit, the Ring's band edge-on, the craft 25 km behind, with the numbers a pilot flies by below.</figcaption></figure>
+    <figure id="fig-map-b"><img data-shot="map-ground" alt="The map's ground track"><figcaption>The ground track (shift-<kbd>N</kbd>): the track flown, the next one and a half revolutions with the Earth turning under them, the Ring's track and KDFW.</figcaption></figure>
+  </div>
+  <table>
+    <tr><th style="width:0.7in">view</th><th>shows</th></tr>
+    <tr><td class="k">ORBIT</td><td>the orbit seen from above the Ring's plane, north up: the Earth with its coastlines, turned as it has turned; the Ring's round orbit; the craft's conic, dim where it runs under the ground, with its highest and lowest points; KDFW where the Earth has carried it</td></tr>
+    <tr><td class="k">RING</td><td>the rendezvous in the frame that turns with the Ring's orbit: the Ring's band, the hold point, the craft and its path over the next revolution, the nearest it comes and when; its scale steps from 1 to 5,000 km across</td></tr>
+    <tr><td class="k">GROUND</td><td>the coastlines on a flat map: the track flown, the next one and a half revolutions, the Ring's track, KDFW</td></tr>
+  </table>
+  <p>The conic comes from the core's own state, and the core's apoapsis, periapsis, inclination and time to apoapsis come back out of it to within a metre, a millionth of a degree and half a second. What is to come is Kepler's problem, two bodies only, which over a ten-minute coast stays within 50 m of the core's own flight (<code>map.test.mjs</code>).</p>
+  <h2 id="sound"><span class="n">3.9</span>The sound</h2>
+  <p>Every sound is made as it plays, by the browser's own Web Audio nodes: no sound file, sample or recording anywhere. It reads the readouts and writes nothing back. The ear is aboard in the cockpit view and with the camera in the others, and sound reaches it three ways: through the air (the drive's roar and crackle, the wind, an entry's plasma, each as strong as the air is dense, so the drive fades with height to nothing), through the structure (the drive's rumble and eight hull modes that ring under load, all there is in a vacuum), and in the cabin (fans and a 400 Hz hum). A camera outside hears the drive late by the time sound takes, thinned with distance; past the speed of sound only a camera inside the drive's Mach cone hears it.</p>
+  <table class="tight">
+    <tr><th style="width:1in">when</th><th>what is heard</th></tr>
+    <tr><td>in the air</td><td>wind rising with dynamic pressure; a rumble through Mach 1 and a thump crossing it; buffet past 14° of angle of attack</td></tr>
+    <tr><td>an entry</td><td>the plasma's roar and crackle as loud as the heating; a boom going subsonic</td></tr>
+    <tr><td>the gear</td><td>the tyres and the runway's joints, the brakes, a thud at touchdown as hard as the sink rate</td></tr>
+    <tr><td>docking, a crash</td><td>a clunk, the latches, a hiss as the pressures meet; one heavy impact, then silence</td></tr>
+  </table>
+  <p class="small soft">The mix is set so the drive at full power at sea level is the loudest thing, about −20 dBFS at the default volume, each voice's gain measured by rendering it alone in Chromium. Time run faster plays 3 dB quieter at each doubling, and not at all from 50 times.</p>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="tiers"><span class="n">3.10</span>Graphics, from a phone to a big card</h2>
+  <div class="pair">
+    <figure id="fig-tier-low"><img data-shot="tier-low" alt="The hold point at the low tier"><figcaption><b>Low</b>, for phones and integrated graphics: each material tone-maps itself; no reflections; the Ring at 192 segments.</figcaption></figure>
+    <figure id="fig-tier-high"><img data-shot="tier-high" alt="The hold point at the high tier"><figcaption><b>High</b>, for a desktop card: the picture kept in HDR and tone-mapped once, what is brighter than white glowing; the Sun's shadow round the craft.</figcaption></figure>
+  </div>
+  <p>The page draws at one of three tiers and places a device in one from what it says of itself: the renderer WebGL names, its largest texture, whether it can draw into a half-float target, the screen, a finger for a pointer, the memory. Left to itself it times its first frames and steps down a tier, or at low draws fewer pixels, when they come slowly. <code>?q=</code>, <kbd>9</kbd> and GFX choose a tier (auto, low, medium, high, in turn; remembered). Changing tier rebuilds the Ring, the craft, the Earth's textures and the stars in place, and the flight goes on.</p>
+  <table class="tight">
+    <tr><th style="width:1.05in"></th><th>low</th><th>medium</th><th>high</th></tr>
+    <tr><td>drawing buffer</td><td>1.5 pixels a CSS pixel, 1.3 M pixels at most</td><td>2, 2.4 M; a 4× multisampled half-float target</td><td>2, 6 M</td></tr>
+    <tr><td>reflections</td><td>none</td><td>the far scene in a 64-texel cube</td><td>128 texels</td></tr>
+    <tr><td>the Sun's shadow</td><td>a soft spot under the craft</td><td>the same</td><td>a 2,048 map round the craft</td></tr>
+    <tr><td>the Earth</td><td>land mask 2,048 texels round; 6 samples of air</td><td>4,096; 10 samples; cloud shadows, relief, ozone, the glint's facets</td><td>8,192; 16 samples</td></tr>
+    <tr><td>the Ring</td><td>192 segments; textures 512; the town painted</td><td>384; 1,024; relief; trusses; the town's buildings standing</td><td>512; 2,048; 5 rings of lights</td></tr>
+    <tr><td>a frame: runway, orbit, hub</td><td>0.5, 1.0, 0.6 s</td><td>2.2, 2.0, 1.8 s</td><td>2.1, 2.1, 3.2 s</td></tr>
+  </table>
+  <div class="side" style="grid-template-columns: 1fr 1.55in">
+    <div>
+      <p>The frame times are Chromium's in software GL (SwiftShader) at 1,440 × 810, by the GPU's own timer round each pass: they compare the tiers with each other, not with a graphics card. The Earth's full-screen pass is most of every frame. A phone at low draws 585 × 996 pixels for an iPhone 13's screen, with an eighth of high's texture memory.</p>
+      <p>The picture keeps AgX's tone curve, and the Earth takes the same sunlight as the craft, so a white cloud and the craft's white paint are alike and the sea is dark blue, as in photographs from orbit. Where the Ring and the near things lie at depths of their own, each is drawn in a depth slice of its own: at 25 km one depth buffer cannot tell apart surfaces less than about 75 m from each other.</p>
+    </div>
+    <figure id="fig-phone" style="margin-top:0"><img data-shot="phone" class="tall" alt="The page on a phone" style="aspect-ratio:390/664"><figcaption>A phone at low: the stick, the throttle, the six buttons used most.</figcaption></figure>
+  </div>
+</section>
+
+<section class="page" data-part="3 · The loop, part by part">
+  <h2 id="tour"><span class="n">3.11</span>The tour</h2>
+  <figure id="fig-tour"><img data-shot="tour" alt="The tour's caption over the runway"><figcaption>The tour's first caption, over 17C. TOUR stays lit while it runs.</figcaption></figure>
+  <p>For whoever has no stick, or wants to see the whole of it first: TOUR (or <kbd>0</kbd>) flies the loop by the crew's own modes, as a person pressing the buttons would, with a caption for each part and the time warp and the view set for it. It was made because the owner asked whether someone without a joystick could still see it in action.</p>
+  <table>
+    <tr><th style="width:1.15in">stage</th><th>what the tour does</th><th style="width:0.75in">time warp</th></tr>
+    <tr><td>KDFW, runway 17C</td><td>starts again on 17C; the take-off at one to one</td><td>1×</td></tr>
+    <tr><td>through the air</td><td>the climb, its Mach number, height and dynamic pressure; through Mach 1 and the most it felt</td><td>2×</td></tr>
+    <tr><td>above the air</td><td>the guidance flies to a round orbit at 500 km</td><td>25×</td></tr>
+    <tr><td>in orbit</td><td>the orbit's numbers and the Ring ahead, for a few seconds</td><td>1×</td></tr>
+    <tr><td>to the Ring</td><td>DOCK: the crew flies to the hold point, lines up, closes; the last of it seen from the Ring</td><td>100× to 2×</td></tr>
+    <tr><td>aboard</td><td>the hub's lobby, then the floor 5 km from the axis</td><td>1×</td></tr>
+    <tr><td>the way home</td><td>RETURN, and RETURN again to skip the wait; the burn</td><td>100×, 10×</td></tr>
+    <tr><td>entry, KDFW 17C</td><td>the heat and the load; the glide; the approach; the touchdown and the stop</td><td>25× to 1×</td></tr>
+  </table>
+  <p>It takes about ten minutes on a desktop. Any command but one that only changes what is shown ends it and takes over from where the craft is. <code>tour-plan.js</code> is the plan, pure and tested on made-up states (<code>tour.test.mjs</code>); <code>tour.js</code> is the button, the caption and the commands. The tour keeps its own frame clock, since the page's update hooks pause in the hub's enclosed lobby; a run in Chromium caught it standing still there before that was fixed.</p>
+</section>
+
+<!-- ============================================================ 4 how it is built -->
+<section class="page" data-part="4 · How it is built">
+  <h1 id="built"><span class="n">4</span>How it is built</h1>
+  <p class="lede">Two halves meet at one seam. The core is C++ and knows nothing of drawing; the page is JavaScript and owns nothing that moves. The page steps the core, reads its readouts, and draws them.</p>
+  <svg viewBox="0 0 700 300" width="100%" role="img" aria-label="The core's parts and the page's modules, and the seam between them">
+    <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#1d5c94"/></marker></defs>
+    <rect x="6" y="8" width="290" height="246" rx="6" fill="#f1f4f7" stroke="#1b222b" stroke-width="1"/>
+    <text x="18" y="28" font-size="12.5" font-weight="650" fill="#1b222b">core/ · C++17, no engine headers</text>
+    <text x="18" y="44" font-size="9.5" fill="#4b5664">fixed 0.02 s step · RK4 · inertial frame · deterministic</text>
+    <g font-size="9.6" fill="#1b222b">
+      <rect x="18" y="54" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="26" y="69"><tspan font-weight="650">orbit_core.cpp</tspan>  the flight, the crew to orbit, the approach</text>
+      <rect x="18" y="80" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="26" y="95"><tspan font-weight="650">dock.cpp</tspan>  docking; contact with the Ring</text>
+      <rect x="18" y="106" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="26" y="121"><tspan font-weight="650">deck.cpp</tspan>  the flight deck; the craft as a jet</text>
+      <rect x="18" y="132" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="26" y="147"><tspan font-weight="650">return.cpp</tspan>  the flight home</text>
+      <rect x="18" y="158" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="26" y="173"><tspan font-weight="650">walk.cpp</tspan>  a person in the Ring's turning frame</text>
+      <rect x="18" y="184" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="26" y="199"><tspan font-weight="650">sky.cpp</tspan>  the Sun, the Moon, sidereal time</text>
+      <text x="18" y="225" font-size="9.2" fill="#4b5664">each: a header (its C API, readouts block, constants),</text>
+      <text x="18" y="238" font-size="9.2" fill="#4b5664">exports/&lt;part&gt;.txt, test/test_&lt;part&gt;.cpp; internal.h shared</text>
+    </g>
+    <rect x="404" y="8" width="290" height="246" rx="6" fill="#f1f4f7" stroke="#1b222b" stroke-width="1"/>
+    <text x="416" y="28" font-size="12.5" font-weight="650" fill="#1b222b">web/ · the page, three.js</text>
+    <text x="416" y="44" font-size="9.5" fill="#4b5664">one HTML file, from file://, fetching nothing</text>
+    <g font-size="9.6" fill="#1b222b">
+      <rect x="416" y="54" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="424" y="69"><tspan font-weight="650">core.js</tspan>  the core as WebAssembly, or plain JS</text>
+      <rect x="416" y="80" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="424" y="95"><tspan font-weight="650">main.js</tspan>  fixed steps, the camera, two passes</text>
+      <rect x="416" y="106" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="424" y="121"><tspan font-weight="650">earth.js ring.js craft.js</tspan>  what is drawn</text>
+      <rect x="416" y="132" width="266" height="22" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="424" y="147"><tspan font-weight="650">hud.js input.js quality.js</tspan>  readouts, hands, tiers</text>
+      <rect x="416" y="158" width="266" height="48" rx="3" fill="#fff" stroke="#c3ccd6"/><text x="424" y="173"><tspan font-weight="650">features.js</tspan>  the parts beyond the flight:</text>
+      <text x="424" y="187">tour · sky · dock · ret · walk · map · deck</text><text x="424" y="200">· sound, each with the same few hooks</text>
+      <text x="416" y="225" font-size="9.2" fill="#4b5664">test/*.test.mjs under node; tools/build.mjs makes</text>
+      <text x="416" y="238" font-size="9.2" fill="#4b5664">build-web/index.html, about 1.9 MB</text>
+    </g>
+    <line x1="298" y1="100" x2="400" y2="100" stroke="#1d5c94" stroke-width="1.6" marker-end="url(#ar)"/>
+    <text x="349" y="92" text-anchor="middle" font-size="9.4" fill="#1d5c94" font-weight="650">readouts</text>
+    <line x1="400" y1="150" x2="300" y2="150" stroke="#1d5c94" stroke-width="1.6" marker-end="url(#ar)"/>
+    <text x="350" y="142" text-anchor="middle" font-size="9.4" fill="#1d5c94" font-weight="650">oc_* calls</text>
+    <text x="350" y="166" text-anchor="middle" font-size="8.6" fill="#4b5664">controls, modes,</text>
+    <text x="350" y="178" text-anchor="middle" font-size="8.6" fill="#4b5664">holds, step(n)</text>
+    <text x="350" y="282" text-anchor="middle" font-size="9.6" fill="#4b5664">The same core builds natively for its tests and as WebAssembly for the page; the two agree to the digits printed, not bit for bit.</text>
+  </svg>
+  <h2 id="core" data-toc>The core</h2>
+  <p><code>flight/orbit/core</code> is C++17 that includes only <code>&lt;cmath&gt;</code>, <code>&lt;cstdint&gt;</code> and <code>&lt;cstring&gt;</code>: no engine, no clock, no random source, no thread, no file. It advances only in whole fixed steps of 0.02 s, fifty a second, by fourth-order Runge–Kutta in an Earth-centred inertial frame; the readouts are given in the site's east, north and up, turning with the Earth. Time is the step count. The same inputs give the same state, bit for bit, and a hash of the whole state (<code>oc_hash</code>) shows it. The crew, the approach, docking, the deck and the flight home live inside it as modes that command only rates, throttle, thrusters, gear and brakes, as a pilot does.</p>
+  <p>It is one program in parts, each with its own contract: a public header with its constants, its C functions and a <b>readouts block</b> (an array of doubles the page reads after every step, named by an enum); its exports, one function a line, in <code>core/exports/&lt;part&gt;.txt</code>; its own state inside the core's <code>State</code>, so a run replays; and its own test program, <code>test/test_&lt;part&gt;.cpp</code>, whose tests CMake registers from lines reading <code>// TEST: &lt;name&gt;</code>. What the parts share is <code>core/internal.h</code>. The Ring's shape is one set of numbers in <code>orbit_core.h</code> that the core, the drawing and the tests all use.</p>
+  <div class="note">
+    <p><b>The same flight, every time.</b> <code>flight/orbit/build/orbit_run 10 800</code> flies the crew to 800 s and prints the flight every 10 s and a hash of the state. At 599e051 the hash is <code>ea7847fe</code> natively, under g++ 13.3 and clang 18 alike, from <code>-O0</code> to <code>-O3</code>, and <code>370241c5</code> as WebAssembly: each binary repeats itself bit for bit, and the two builds agree to every digit printed but not to the bit, since their C libraries' <code>sin</code> and <code>exp</code> differ in the last place.</p>
+  </div>
+</section>
+
+<section class="page" data-part="4 · How it is built">
+  <h2 id="page" data-toc>The page</h2>
+  <p><code>flight/orbit/web</code> is plain JavaScript modules and three.js 0.186, bundled with esbuild (both from <code>flight/web</code>'s packages) into <b>one HTML file</b> that opens from <code>file://</code> and fetches nothing: about 1.9 MB, of which the core as WebAssembly is 0.3 MB and the same core compiled to plain JavaScript another 0.3 MB. Where a host will not run WebAssembly the page runs the plain JavaScript and says so in its status line. Every texture is painted by code; no image, model, font or sound file ships. The coastlines, the towns, the Moon's features and the stars are data files made by tools in <code>web/tools/</code> from public-domain or CC0 sources, each tool saying where its inputs come from.</p>
+  <p><code>main.js</code> keeps the core stepping at its fixed rate: each frame it adds the frame's time, times the warp, to a debt, runs whole steps, and drops the debt past a cap rather than stretch a step. The camera sits at the origin of what is drawn and everything is placed from it, in two passes: the far one (the Earth, its air, the stars, anything past 300 km) and the near one, so a centimetre at the wheels and the Earth's whole disc both have depth. The Earth is drawn per pixel, each ray meeting the sphere exactly, so it is as round from the runway as from orbit, under a single-scattering atmosphere.</p>
+  <p>Each part beyond the flight is a module of its own listed in <code>features.js</code>, with the same few hooks: <code>init(ctx)</code> once; <code>command(name, ctx)</code> for a key or a button, true if it took it; <code>update(ctx)</code> each frame before drawing; <code>hud(ctx)</code> for more readout lines; <code>status(ctx)</code> for the status line; and <code>owns(ctx)</code> with <code>frame(ctx, dt)</code> for a part that draws the whole frame itself, as the walk does. A part reads the core's readouts and gives commands; none writes the flight's state. The page keeps a handle, <code>window.orbitSketch</code>, for tests and for tools such as this guide's: the core, the page's state, and <code>command(name)</code>.</p>
+  <h2 id="tests" data-toc>The tests</h2>
+  <table>
+    <tr><th>suite</th><th>how it runs</th><th class="n">at 599e051</th></tr>
+    <tr><td>the core, natively</td><td><code>ctest</code> in <code>flight/orbit/build</code>: seven test programs, each test by name</td><td class="n">120 of 120</td></tr>
+    <tr><td>the core, as WebAssembly</td><td>the same tests built by Emscripten 6.0.12 and run under node</td><td class="n">120 of 120</td></tr>
+    <tr><td>the page</td><td><code>node --test</code> over <code>web/test/*.test.mjs</code>: twenty files, no browser</td><td class="n">146 of 146</td></tr>
+    <tr><td>the handoff kit's zip</td><td><code>node --test</code> over the packager's tests</td><td class="n">10, 1 skipped</td></tr>
+  </table>
+  <table class="tight">
+    <tr><th>the core's tests by part</th><th class="n">orbit</th><th class="n">dock</th><th class="n">deck</th><th class="n">return</th><th class="n">walk</th><th class="n">sky</th><th class="n">invariants</th></tr>
+    <tr><td>tests</td><td class="n">11</td><td class="n">28</td><td class="n">18</td><td class="n">14</td><td class="n">18</td><td class="n">15</td><td class="n">16</td></tr>
+  </table>
+  <p>The tests state physics where they can rather than how the code is written: the crew's orbit within 5 km and 0.5°, Kepler's period to a step, a jump's landing against the straight line seen from outside, the Moon against JPL's Horizons, the hover's thrust against mω²r. The page's tests run its modules under node with no browser: the readouts' names held equal to the headers', the map's Kepler against the core, the sound's mix as a function of the readouts, the tour on made-up states. A test of the page in a real browser is still to come (section 5).</p>
+</section>
+
+<section class="page" data-part="4 · How it is built">
+  <h2 id="rigour" data-toc>The rigour</h2>
+  <p><code>flight/orbit/INVARIANTS.md</code> writes down what the core promises, in the owner's manner from his submarine simulator, subsim: each rule with why it holds and what enforces it, every check shown able to fail, every tolerance derived (from RK4's order, the step, and the rounding of doubles) and never fitted. <code>test/test_invariants.cpp</code> holds them as physics.</p>
+  <table>
+    <tr><th style="width:0.35in">#</th><th style="width:2.2in">the core promises</th><th>held by, and how closely</th></tr>
+    <tr><td>O1</td><td>energy and angular momentum keep in a vacuum</td><td>two revolutions of an 838 × 5,059 km orbit: energy to 1.5 × 10⁻¹³ of itself; each revolution on Kepler's period to 1.5 ns</td></tr>
+    <tr><td>O2</td><td>thin air is the only loss in orbit</td><td>the ledger over two revolutions closes to 3.1 × 10⁻⁶ J/kg of the air's 0.097</td></tr>
+    <tr><td>O3</td><td>work and energy balance on the ascent</td><td>per kilogram, the drive's 3.375 × 10⁷ J/kg less the air's, closing to 7.5 × 10⁻⁶ J/kg</td></tr>
+    <tr><td>O4</td><td>the propellant's bookkeeping</td><td>25,612.1 kg used to orbit, equal to the flow's integral to 1.9 × 10⁻⁸ kg</td></tr>
+    <tr><td>O5</td><td>one frame, seen three ways</td><td>87,630 steps, each check within a few unit roundoffs</td></tr>
+    <tr><td>O6</td><td>replay, bit for bit</td><td>17 marks over 64,000 steps, in pieces, stopped and resumed: one hash</td></tr>
+    <tr><td>O7</td><td>no readout is ever NaN or infinite</td><td>the crew's whole flight and three hours off the hub, 577,630 steps; an abuse run of 404,689 steps, every control at random and past its stops, 58 crashes</td></tr>
+    <tr><td>O8–O12</td><td>readouts derived from the state; the Ring's shape is one set of numbers; every number has a receipt; time is the step count; native and WebAssembly agree to the printed digits</td><td><code>readouts_are_derived</code>, <code>ring_shape</code>, <code>certified_numbers</code>, and both builds running every test</td></tr>
+    <tr><td>O13, O14</td><td>the air pushes off the windward face; the insertion's plan is one plan</td><td>0 of 2,148 angles wrong; 554 plans each within 4 × 10⁻¹² m/s of their own cutoff</td></tr>
+  </table>
+  <p><b>Receipts.</b> <code>flight/orbit/evidence/</code> keeps 76 requests to Abacus, the owner's tool of certified arithmetic, and its answers, each graded exact with a SHA-256 receipt: the core's constants, the 1976 atmosphere from its defining constants, Kepler's period and the circular speed at 500 km, the rocket equation's figures, the Ring's spin and its one g. <code>evidence/INDEX.md</code> says what each backs and lists the mismatches it found (none moved a test). The deck's numbers are not yet certified there.</p>
+  <h3>The audit</h3>
+  <p>At about 15:00 UTC an independent, read-only audit of the physics was run against commit c56d77b: the dynamics, the aerodynamics, the laws, the gear, the orbit maths, the guidance, the Ring, docking, the walk, the frames, the atmosphere, the Earth's shader, the page and the sound. Its verified defects were fixed, each with a test that fails without the fix (commit 62c5ff0):</p>
+  <ul class="small">
+    <li>the crew's approach from far out flew into the ground; the approach is now gated as docking is;</li>
+    <li>Polhamus's lift pointed into the windward face past 155° of angle of attack, in a tail slide (230 angles wrong before, none after);</li>
+    <li>the spokes ended 80 m short of the roof in the contact model, so a craft in the spokes' plane above the roof was never hit;</li>
+    <li>the insertion guidance kept a burn time updated after the solve, so its plan missed its own cutoff by up to 15 m/s and 750 m;</li>
+    <li>a camera outside, in vacuum, still heard the hull; and the readouts' AIR LAW guessed the law where the core now says it.</li>
+  </ul>
+  <p>Commit 70d5682 then fixed three tests the audit found passing for the wrong reason: an attitude hold that let the attitude drift 23°, and two docking verdicts (sliding, angled) that no test reached. The audit's suspicions it could not settle are listed as G7 to G11 in section 5. An earlier rigour pass had found three defects of its own (the hash missed fields, a control that is not a number poisoned the state, an escape path's lowest point read wrong), fixed at the merge a3556c9.</p>
+</section>
+
+<!-- ============================================================ 5 where it left off -->
+<section class="page" data-part="5 · Where it left off">
+  <h1 id="left"><span class="n">5</span>Where it left off</h1>
+  <p class="lede">Nothing is furnished and nothing is finished: the README says so in its first paragraph. This is where each part stood on 12 November 2026.</p>
+  <h2>What is solid</h2>
+  <ul>
+    <li><b>The loop flies itself end to end.</b> Take-off to orbit, the approach, docking, the walk, the deck landing and the flight home each run under the crew from where the last one left the craft, and the whole loop runs in one test (<code>lands_after_undocking</code>). The tour flies it on the page.</li>
+    <li><b>The core is deterministic and watched.</b> One hash of the whole state, replay in pieces, conservation and work-energy ledgers with derived tolerances, no NaN under abuse, every readout re-derived, every constant certified.</li>
+    <li><b>The physics is stated, not tuned.</b> The walk's Coriolis and the deck's hover are worked out against the view from outside the Ring; the Moon is held to Horizons; the flight home survives a wrong model 200 times in 200 within the narrower pool.</li>
+    <li><b>The page runs anywhere a browser does</b>, from a phone to a desktop card, from one file, with no network.</li>
+  </ul>
+  <h2>What is weak or not done, part by part</h2>
+  <table>
+    <tr><th style="width:1.05in">part</th><th>weak, or not done</th></tr>
+    <tr><td class="k">the world</td><td>The Earth is a smooth sphere of 6,371 km (no J2, no terrain; WGS-84 would put the ground at KDFW 860 m higher); no wind; the Ring's orbit never decays; the small thrusters take no propellant; no failures.</td></tr>
+    <tr><td class="k">the crew to orbit</td><td>Its ascent costs 10.92 km/s, against the larger game's 9.4 km/s estimate; nobody has optimised it. The Ring is placed where the crew arrives: no launch window is solved.</td></tr>
+    <tr><td class="k">docking</td><td>Every number is chosen for a keyboard, not taken from a real system. The latches judge the head's slide in the inertial frame while the readouts give the port's turning frame (G7, at most 0.013 m/s apart). Above about 15 m/s the probe could step over a wall lip of no thickness (G8).</td></tr>
+    <tr><td class="k">the walk</td><td>No people, furnishing, doors, water or floor shadows; the way from the port to the hatch is skipped; the Earth's tide across the Ring is left out.</td></tr>
+    <tr><td class="k">the flight deck</td><td>Its numbers are the tests' own and not yet certified in <code>evidence/</code>. The deck is a vacuum sector; landing costs 1,051 m/s of Δv, most of it holding the craft up.</td></tr>
+    <tr><td class="k">the flight home</td><td>The plan's reach (1,200 km off the plane) is for round and moderately eccentric orbits: an orbit raised to 2,650 km is not planned. A craft beyond the entry's reach glides short; there is no landing elsewhere. The predictor knows the mass exactly and has no sensor noise. Winds, another runway or a failure would test the terminal area as the dispersions do not. On the wide pool, 91 of 100: preferring a nearer pass would buy margin.</td></tr>
+    <tr><td class="k">the sky</td><td>No planets, refraction, eclipse shadows, moonlight on the ground, or the Moon's physical libration (0.04°).</td></tr>
+    <tr><td class="k">the page</td><td>A session on the page cannot be replayed: it logs neither the steps nor the controls (G2). Nothing tests the page in a real browser; its tests run its modules under node. Beyond 300 km the Ring and the craft get no haze (G10). Seen well off the view's centre, the Ring at 25 km loses its far edge: its depth slice's near plane is set from distance rather than from depth along the view (found making this guide; <code>web/src/slices.js</code>).</td></tr>
+    <tr><td class="k">everywhere</td><td>No VR, no people in the Ring, nothing furnished, no failures, no terrain. Truth on the HUD: the readouts are exact, where a real craft's instruments would not be.</td></tr>
+  </table>
+</section>
+
+<section class="page" data-part="5 · Where it left off">
+  <h2 id="gaps" data-toc>What the invariants do not yet enforce</h2>
+  <p><code>INVARIANTS.md</code> keeps the list, G1 to G12. Condensed:</p>
+  <table>
+    <tr><th style="width:0.35in"></th><th>the gap</th><th style="width:2.15in">what would settle it</th></tr>
+    <tr><td>G1</td><td>The page draws the spokes' section with a literal 70 in <code>ring.js</code>, not the header's number</td><td>use <code>RING.spoke</code></td></tr>
+    <tr><td>G2</td><td>A session on the page cannot be replayed</td><td>log (controls, steps) per frame</td></tr>
+    <tr><td>G3</td><td>No test holds the native and WebAssembly builds to a stated agreement on one flight</td><td>a test comparing the two on one flight</td></tr>
+    <tr><td>G4</td><td>That the core reads no clock is held by review alone</td><td>a grep gate in the tests</td></tr>
+    <tr><td>G5</td><td>The ledgers restate the force model; a new force must be added there too, or they fail, on purpose</td><td>(by design)</td></tr>
+    <tr><td>G6</td><td>A start that is not a number: fixed at a3556c9</td><td>(done)</td></tr>
+    <tr><td>G7</td><td>Docking judges the slide in the inertial frame, the readouts in the port's</td><td>decide which the latches judge</td></tr>
+    <tr><td>G8</td><td>Above about 15 m/s the probe could step over a lip of no thickness</td><td>graze a lip with the probe alone</td></tr>
+    <tr><td>G9</td><td>A crash on the ground is judged by height and sink alone: no wingtip or tail strike</td><td>contact points for the wingtips and tail</td></tr>
+    <tr><td>G10</td><td>Beyond 300 km the Ring and the craft get no haze</td><td>draw the Ring from the runway</td></tr>
+    <tr><td>G11</td><td>The map's Ring state is degenerate 90° round the orbit from the Ring</td><td>a unit test at 90°</td></tr>
+    <tr><td>G12</td><td>Seen well off the view's axis, the Ring loses its far edge: its depth slice's near plane is set by distance, not depth (found making this guide)</td><td>a near plane that allows for the view's angle</td></tr>
+  </table>
+  <h2 id="next" data-toc>What the next steps would be</h2>
+  <p>In the browser sketch, smallest first:</p>
+  <ol>
+    <li>Close G1, G3, G4 and G11: each is a line or a test.</li>
+    <li>Certify the deck's numbers in <code>evidence/</code>, as the rest are.</li>
+    <li>Settle G7 and G8, docking's open questions, each with a test.</li>
+    <li>A test of the page in a real browser: open the built file headless, fly the tour, read no page error. This guide's tool already drives the page that way.</li>
+    <li>A replay log for the page (G2), the canon's Tape in its smallest form: (step, call, arguments).</li>
+    <li>Wingtip and tail contact on the ground (G9).</li>
+    <li>The flight home preferring a nearer pass when the first is marginal.</li>
+    <li>The Ring's depth slice: a near plane that allows for the view's angle (<code>ringDepth</code> × the cosine of the field's half-diagonal), and a test with the Ring off the view's axis.</li>
+  </ol>
+  <p>Beyond the sketch, the larger plan is to carry the core into an Unreal Engine 5.8 project, which has not been started: section 6. The order there is decided by its own canon and the first slice, not by this list.</p>
+  <div class="note">
+    <p><b>The state of the branch.</b> Everything is on <b>orbit-sketch</b>, ahead of master, in draft pull request 1. Nothing of the orbit sketch is merged into master. The A320 trainer and the flyable A320 are untouched by it, and the repository's own suites (<code>app/</code>'s 182) were green when the sketch began.</p>
+  </div>
+</section>
+
+<!-- ============================================================ 6 unreal -->
+<section class="page" data-part="6 · The Unreal Engine plan">
+  <h1 id="unreal"><span class="n">6</span>The Unreal Engine plan</h1>
+  <p class="lede">The sketch is a proof that the airframe, the drive and the Ring work together, flown in a browser. The game it points at, with the working title <i>Meridian Ring</i>, is meant for Unreal Engine 5.8. Nothing of the Unreal version exists yet. What exists is a kit to start it from cold.</p>
+  <h2>The canon</h2>
+  <p>The game has its own canon, <code>ARCHITECTURE.md</code> (draft 0.1 of 2026-11-12, not in this repository; the kit carries it, checked by its SHA-256). It is the owner's design for the whole game: a life aboard a ring city with a spaceplane that flies from its hub to KDFW and back, a deterministic Core that owns every number, a View that draws, laws L1 to L12, falsifiers that must run before a slice is done, and a build order. Its numbers match the sketch's where they meet: the Ring of 5 km for one g, the 2.54° a second to match at the hub, the drive of 2,000 s; where they differ (the ascent's cost, the propellant fraction, what "500 km" is measured from), <code>CANON_DELTA.md</code> says so.</p>
+  <h2>The handoff kit</h2>
+  <p><code>flight/orbit/handoff/</code> is written for a new Claude Code session on the owner's Windows machine, which was not here, and for the owner. Each document answers one question:</p>
+  <table>
+    <tr><th style="width:1.45in">document</th><th>answers</th></tr>
+    <tr><td class="k">README.md</td><td>what is in the kit, the reading order, how to start, and the first message to paste</td></tr>
+    <tr><td class="k">CANON_DELTA.md</td><td>what the sketch settles against the canon, each number with the test that shows it; where it departs; what it never touched; a section for each part, docking to the tour</td></tr>
+    <tr><td class="k">UNREAL_PORT.md</td><td>part by part: what becomes a plugin around the existing core, what becomes actors, what Unreal gives for free and what it costs, the frames and units, performance tiers, VR</td></tr>
+    <tr><td class="k">FIRST_SLICE.md</td><td>the walled-off first demo: who makes which asset, how MCP is used, the waves and gates, the exit tests, the step list for the local harness</td></tr>
+    <tr><td class="k">LICENSING.md</td><td>the licence question, for the owner to decide before the core moves</td></tr>
+    <tr><td class="k">CLAUDE.md.template</td><td>house rules for the new repository</td></tr>
+    <tr><td class="k">BOOTSTRAP_PROMPT.md</td><td>the first message for the local session, and why it is written as it is</td></tr>
+    <tr><td class="k">OPEN_RING_AIR.md</td><td>the owner's open Ring that holds its air by its spin, and the size at which it works</td></tr>
+    <tr><td class="k">SOURCES.md</td><td>where every claim about Unreal, Cesium, Blender, Claude Code and the licences came from: read, only searched (unverified), or measured</td></tr>
+  </table>
+  <h3>The zip, and the first message</h3>
+  <pre>node flight/orbit/handoff/tools/package.mjs --canon &lt;ARCHITECTURE.md&gt; --page flight/orbit/build-web/index.html
+node --test flight/orbit/handoff/tools/package.test.mjs</pre>
+  <p>The packager takes the kit, the canon, the core's sources, tests, tools and CMake, its invariants and receipts, the page's sources and the built page, the GPLv3's text and a manifest with a SHA-256 for every file, from git's objects at HEAD, and refuses a file that differs from the commit or a canon other than the draft the kit was written against. It writes <code>flight/orbit/build/handoff/orbit-handoff-&lt;commit&gt;.zip</code> and reads it back. Carry the zip to the Windows machine, unzip it, start Claude Code in an empty folder with Git for Windows installed, and paste the first message from the kit's README with its two paths filled in. The message tells the session to check every file's hash first, read the kit in order, read the machine without changing it, scaffold the repository as text, and stop to ask the licence question before it copies any core.</p>
+</section>
+
+<section class="page" data-part="6 · The Unreal Engine plan">
+  <h2 id="licence" data-toc>The decision to make first: the licence</h2>
+  <p>The sketch is GPLv3, because everything in <code>flight/</code> is, by this repository's rule. Unreal Engine's EULA forbids combining the engine with GPL code, and the GPL wants the whole of a combined work under the GPL, which Epic's code cannot be. So the core, as licensed today, cannot go into a shipped Unreal game. But it is the owner's to relicense: it links no third-party GPL code (only <code>&lt;cmath&gt;</code>, <code>&lt;cstdint&gt;</code>, <code>&lt;cstring&gt;</code>), takes nothing from A32NX or JSBSim, and what it took from outside is method or public domain. <code>LICENSING.md</code> sets out three options and recommends the first:</p>
+  <ol>
+    <li><b>Relicense the sketch's own code</b> (MIT or Apache-2.0) before it goes into the Unreal project; the copy here can stay GPLv3 or be dual-licensed, written down in both repositories.</li>
+    <li><b>Keep it GPLv3 and out of the game's binary</b>: the core as its own program, Unreal talking to it over a local socket. A grey zone; take advice before shipping on it.</li>
+    <li><b>Write a new core from the canon</b>: possible, and wasteful.</li>
+  </ol>
+  <p class="small soft">The kit says plainly that it is not legal advice. Nothing has been relicensed.</p>
+  <h2 id="slice" data-toc>The first slice</h2>
+  <p>The smallest Unreal build in which you sit in the Shuttle (the canon's word for the craft) on 17C, take off, reach orbit, see the Ring, dock, and walk 100 m inside it, everything else walled off and saying so. It is built in waves, the owner's way from subsim: contracts first, a walking skeleton, parallel packets each with owner directories, mechanical gates (G0 to G9: clean builds, the contracts' hash, determinism at three frame rates, no binary asset in git outside an allow-list, budgets, screenshots looked at by someone other than the author, an independent reviewer), and the points where the owner looks.</p>
+  <table>
+    <tr><th style="width:0.75in">wave</th><th>makes</th><th style="width:2.1in">exit</th></tr>
+    <tr><td>0, the lead</td><td>reads the machine; scaffolds the repository as text; the licence decision; the core built with MSVC and its tests green; contracts frozen; the project as text; a cube driven by the core</td><td>the gates green, and a cube leaves 17C and reaches orbit in the editor</td></tr>
+    <tr><td>1, the View</td><td>Earth and sky (Cesium on the sketch's 6,371 km sphere, offline imagery), the Shuttle from a Blender generator, the Ring kit by Geometry Script, KDFW 17C, input, cameras and HUD, materials</td><td>the Shuttle on 17C under a real sky; the Ring from 25 km</td></tr>
+    <tr><td>2</td><td>docking, the walk, sound by MetaSounds built at run time, tiers, an editor MCP toolset</td><td>dock, go aboard, walk 100 m, meet the barrier</td></tr>
+    <tr><td>3, 4</td><td>PCVR over Link; later Quest standalone</td><td>the whole path in a headset at 72 Hz</td></tr>
+  </table>
+  <p>What the port keeps: the core, unchanged, as a static library built by CMake with precise floating point, outside Unreal's build tool, whose Development builds are reported to use fast maths (which changes the state's hash). The fixed step inside the engine's variable tick, with the debt dropped past a cap, as the page does. The Snapshot (the readouts) drawn, Commands in, nothing read back. What Unreal gives instead of the page's work: double-precision world positions (no camera at the origin, no two passes), a sky atmosphere, Cesium's globe, Enhanced Input, MetaSounds, Niagara, Unreal's own MCP server for the agents. The flight deck and the tour carry over as they are: the deck is part of the core, and the tour is the slice's natural walking-skeleton check, the whole loop flown through the same commands a player gives.</p>
+</section>
+
+<section class="page" data-part="6 · The Unreal Engine plan">
+  <h2 id="harness" data-toc>The local harness</h2>
+  <p>The work is meant to be done the way the owner built his Inspection Simulator: Claude Code on the Windows machine, driving <b>Unreal Engine 5.8</b> through the engine's own MCP server (Experimental in 5.8: the <code>ModelContextProtocol</code> and <code>AllToolsets</code> plugins, on loopback, one editor and port per worker), <b>Blender</b> through Blender Lab's MCP server for the generators that make the Shuttle and other hero shapes (each also runnable from the command line), and <b>Android Studio</b> for the Quest build later. MCP is for looking, trying, importing, compiling and testing; anything that must exist next time is written as code and committed, so an MCP session is never the only record of how something was made. Long jobs (cooking, packaging) go through Unreal's automation tool from the shell, with the editor closed.</p>
+  <p>The kit records the traps it found: Geometry Script mesh writes reported to crash packaged 5.8.3 builds (generate in the editor and bake), the Fab plugin's 0.0.22 update breaking C++ builds on launcher engines, no Lumen, Nanite or MegaLights on Quest, Epic and Meta naming different Android NDKs, and Cesium's ion data and Google's tiles not allowed offline. Each claim about Unreal is marked in <code>SOURCES.md</code> as read or only searched; the searched ones are unverified until opened on the owner's machine.</p>
+  <h2 id="openring" data-toc>The owner's open Ring</h2>
+  <p>The owner's idea for later (<code>handoff/OPEN_RING_AIR.md</code>): a Ring open to space, as in the film <i>Elysium</i>, its air held to the floor by the spin as the Earth's is held by the Earth, thick at the floor and gone at the hub. A craft landing on the deck would then go from vacuum to sea level in one approach, the aerodynamics changing all the way down, while everything turns. The note works the physics. In the turning frame a still, isothermal gas balances dp/dr = ρω²r, so</p>
+  <pre>p(r) = p_floor · exp( −(R² − r²) / (2 R H) ),   ω²R = g,   H = R_s T / g = 8,434 m at 288 K</pre>
+  <table>
+    <tr><th>radius</th><th class="n">spin period</th><th class="n">floor speed</th><th>air at the axis, of the floor's</th><th>thins to a millionth at</th></tr>
+    <tr><td>5 km, this sketch</td><td class="n">142 s</td><td class="n">221 m/s</td><td><b>74 %</b></td><td>never</td></tr>
+    <tr><td>50 km</td><td class="n">449 s</td><td class="n">700 m/s</td><td>5.2 %</td><td>never</td></tr>
+    <tr><td>200 km</td><td class="n">897 s</td><td class="n">1,400 m/s</td><td>7 × 10⁻⁶</td><td>never</td></tr>
+    <tr><td>1,000 km, a Bishop ring</td><td class="n">2,006 s</td><td class="n">3,132 m/s</td><td>2 × 10⁻²⁶</td><td>124 km up</td></tr>
+  </table>
+  <p>At the sketch's 5 km an open Ring holds no air at all: the spin's pull is too weak over so short a height, so the air would fill the wheel at three quarters of the floor's pressure and pour out of the open sides. That is why the sketch's Ring has a glazed roof and sealed walls, and why its deck is a vacuum behind bulkheads: the sketch is consistent as it stands. Done faithfully, the idea wants a <b>Bishop ring</b>, Forrest Bishop's 1997 concept: about 1,000 km in radius with walls about 200 km high and an open top. There the air reaches near-vacuum about 120 km above the floor, and <b>the deck landing becomes an entry</b>: the air turns with the floor at up to 3.1 km/s, so a craft coming down from near the axis, at rest among the stars, meets it at up to Mach 9, brakes, heats and glows, then glides to the deck. The air does most of the rotation-matching, as the Earth's air takes 7.6 km/s off a craft coming home. The model would need the air turning with the Ring, density by the formula above, gravity falling in a straight line toward the axis, entry heating as <code>return.cpp</code> already has it, and the deck's guidance starting from the bottom of an entry; the structure would need streaming from orbit down to a pad. Nothing of it is built.</p>
+</section>
+
+<!-- ============================================================ 7 picking it up -->
+<section class="page" data-part="7 · Picking it up again">
+  <h1 id="again"><span class="n">7</span>How to pick it up again</h1>
+  <h2>The layout</h2>
+<pre>flight/orbit/
+  README.md           the source of truth: every part, its numbers, its keys
+  INVARIANTS.md       what the core promises, and what enforces it
+  CMakeLists.txt      the core, orbit_run, a test program per part; the WebAssembly build
+  core/               orbit_core.h + .cpp (the flight), return, dock, deck, walk, sky:
+                      each a header and a .cpp; internal.h what they share;
+                      exports/&lt;part&gt;.txt what the page may call
+  test/               test_&lt;part&gt;.cpp: tests named by "// TEST: &lt;name&gt;" lines
+  tools/orbit_run.cpp the crew's flight printed every N seconds, and its hash
+  evidence/           Abacus's receipts and INDEX.md
+  web/                index.html (the page's shell), src/ (its modules), data/ (made by tools/),
+                      test/ (node --test), tools/build.mjs (the one-file build)
+  handoff/            the Unreal kit and its packager (section 6)
+  guide/              this guide: guide.html and build-guide.mjs; out/ is not committed
+  build/, build-wasm/, build-web/   build outputs, ignored by git</pre>
+  <h2>Build and test</h2>
+  <p>From the repository's root. The core and its tests, natively (CMake 3.25 or newer, any C++17 compiler):</p>
+<pre>cmake -S flight/orbit -B flight/orbit/build
+cmake --build flight/orbit/build
+ctest --test-dir flight/orbit/build --output-on-failure        # 120 tests</pre>
+  <p>The same as WebAssembly, with Emscripten 6.0.12, and its tests under node; this build also makes the core as plain JavaScript:</p>
+<pre>emcmake cmake -S flight/orbit -B flight/orbit/build-wasm
+cmake --build flight/orbit/build-wasm
+ctest --test-dir flight/orbit/build-wasm --output-on-failure   # 120 tests</pre>
+  <p>The page, which uses <code>flight/web</code>'s three.js and esbuild (<code>npm ci</code> in <code>flight/web</code> first), and its tests:</p>
+<pre>node flight/orbit/web/tools/build.mjs --core flight/orbit/build-wasm/orbit_core.js \
+     --core-js flight/orbit/build-wasm/orbit_core_plain.js
+node --test flight/orbit/web/test/*.test.mjs                   # 146 tests</pre>
+  <p>Then open <code>flight/orbit/build-web/index.html</code>. <code>build-web/page.html</code> is the same page without the document's skeleton, for a host that wraps a page in its own, as claude.ai's artifacts do. Two more:</p>
+<pre>flight/orbit/build/orbit_run 10 800                  # the crew's flight, every 10 s, and its hash
+node flight/orbit/guide/build-guide.mjs              # this guide, into guide/out/
+node --test flight/orbit/guide/build-guide.test.mjs  # its figures and screenshots agree</pre>
+  <p class="small soft">Run one part's tests with <code>ctest -R dock</code>, or one test by name, <code>flight/orbit/build/test_dock crew_docks_from_hold</code>, which prints its numbers. The guide's tool needs Chrome, Chromium or Edge installed (it drives one over the DevTools protocol with <code>app/tools/chrome.mjs</code>) and takes a quarter to half an hour in software GL. Before a commit all three suites must be green, and the repository's own <code>CLAUDE.md</code> rules apply: tests with the feature, no runtime dependency without a reason, nothing from A32NX in <code>app/</code>.</p>
+</section>
+
+<section class="page" data-part="7 · Picking it up again">
+  <h2 id="newpart" data-toc>How a new part is added</h2>
+  <p>Contract first: the header and its tests before the code behind them. That is how docking, the walk, the flight home, the sky and the deck were built in parallel by separate sessions on one afternoon without stepping on each other.</p>
+  <ol>
+    <li><b>A header</b>, <code>core/orbit_&lt;part&gt;.h</code>: its chosen constants, its C functions, its enums, and its readouts block (an enum of indices ending in <code>OC_&lt;PART&gt;_COUNT</code>, and <code>oc_&lt;part&gt;_out()</code> with <code>oc_&lt;part&gt;_out_len()</code>). Say in it which numbers are chosen and that none describes a real system.</li>
+    <li><b>Its state</b> in a struct of its own inside the core's <code>State</code> (as <code>dock_state.h</code> does), so a run replays, and folded into the hash.</li>
+    <li><b>Its hooks</b> in <code>internal.h</code>: reset, the step, the readouts, the hash, a crew mode if it has one; <code>orbit_core.cpp</code> calls them.</li>
+    <li><b>Its exports</b>, <code>core/exports/&lt;part&gt;.txt</code>, one function a line: what the page may call.</li>
+    <li><b>Its tests</b>, <code>test/test_&lt;part&gt;.cpp</code>, each named in a line reading <code>// TEST: &lt;name&gt;</code>, and the part added to the <code>foreach</code> in <code>CMakeLists.txt</code>. State physics: what is measured, against what, within what.</li>
+    <li><b>Its page module</b>, <code>web/src/&lt;part&gt;-view.js</code>, listed in <code>features.js</code>, reading its block with <code>core.addBlock(key, out, len, names)</code>, which refuses loudly if the page and the core disagree on its length; and a page test holding its names to the header.</li>
+    <li><b>Its README section</b>, with its numbers and the tests that show them, its keys in the table, and what is not in it; its sources in <code>docs/provenance.md</code>, section 1h.</li>
+  </ol>
+  <h2 id="timeline" data-toc>What happened on 12 November 2026</h2>
+  <p class="small soft">Times are UTC, from the commits on orbit-sketch (<code>git log --oneline master..orbit-sketch</code>).</p>
+  <table class="tight">
+    <tr><th style="width:0.75in">when</th><th>what</th></tr>
+    <tr><td>the morning</td><td>The brainstorm, and from it the canon of the larger game, <code>ARCHITECTURE.md</code>, draft 0.1: the document the handoff kit's <code>CANON_DELTA.md</code> compares the sketch against.</td></tr>
+    <tr><td>12:44</td><td>The first sketch (3da3282): the craft, a round Earth, the crew from 17C to a 500 km orbit in 753 s, the Ring 25 km ahead, the page in one file.</td></tr>
+    <tr><td>13:01</td><td>The module split (340a13c): the core in parts, each with its own header, readouts, exports and tests, as stubs; the page's <code>features.js</code>.</td></tr>
+    <tr><td>13:39–14:39</td><td>The parts built in parallel, each in its own worktree: the Sun and the Moon, docking, the walk, the flight home, sound, the handoff kit, graphics tiers, the rigour pass with its Abacus receipts, the map.</td></tr>
+    <tr><td>14:17–15:21</td><td>Merged one by one: docking, the kit, rigour (its three defects fixed), sound and the map, the walk, the Sun and the Moon, the flight home (with a new test flying the whole loop).</td></tr>
+    <tr><td>15:31–15:51</td><td>The independent audit's fixes (6f9547a, 62c5ff0) and its three tests made to mean what they say (70d5682).</td></tr>
+    <tr><td>15:52</td><td>The tour (5a885f7), for testers without a joystick.</td></tr>
+    <tr><td>16:10–16:40</td><td>The flight deck (bb362c0, merged a6368af): the owner's idea of landing from the rim like an airliner, then hovering to the pad as the booster lander does, built as an open deck and an F-35B-style swivelling drive.</td></tr>
+    <tr><td>16:44</td><td>The owner's open Ring, worked out for the Unreal version (8a274bd).</td></tr>
+    <tr><td>16:59–17:00</td><td>Graphics merged (a2a6773); the last fix (599e051): walking, <kbd>F</kbd> drops a ball and leaves the telescope alone.</td></tr>
+    <tr><td>17:00 on</td><td>This guide, and the handoff kit's final pass: the parts' results set against the canon.</td></tr>
+  </table>
+</section>
+
+<section class="page" data-part="Appendix">
+  <h1 id="appendix">Appendix: the numbers at a glance, and the words</h1>
+  <div class="cols">
+    <table class="tight">
+      <tr><th colspan="2">the craft</th></tr>
+      <tr><td>mass at take-off</td><td>60 t; 30 t of it propellant</td></tr>
+      <tr><td>wing</td><td>a delta lifting body, 150 m², 18 m span</td></tr>
+      <tr><td>as drawn</td><td>34.3 m from nose to the bells' mouths</td></tr>
+      <tr><td>the drive</td><td>706 kN, 2,000 s; 36 kg/s at full thrust</td></tr>
+      <tr><td>the swivel</td><td>aft to straight down, 15°/s</td></tr>
+      <tr><td>small thrusters</td><td>0.5 m/s² a side</td></tr>
+      <tr><td>the probe</td><td>its head 18 m ahead of the centre of mass</td></tr>
+    </table>
+    <table class="tight">
+      <tr><th colspan="2">the orbit and the Ring</th></tr>
+      <tr><td>orbit</td><td>500.4 × 499.7 km, 32.84°, 5,669 s</td></tr>
+      <tr><td>the Ring</td><td>5,000 m; band 1,000 m; roof 300 m up</td></tr>
+      <tr><td>spin</td><td>0.0443 rad/s; 142 s a turn; 221.5 m/s</td></tr>
+      <tr><td>port, hold point</td><td>350 m out on the axis; 300 m beyond</td></tr>
+      <tr><td>the deck</td><td>1,500 m at 30°; 3 pads, 25 m, 400 m apart</td></tr>
+      <tr><td>the lobby</td><td>150 m from the axis, 0.03 g</td></tr>
+      <tr><td>the lift</td><td>334 s, 16.9 m/s, 1.5 m/s² sideways</td></tr>
+    </table>
+    <table class="tight">
+      <tr><th colspan="2">the flight</th></tr>
+      <tr><td>to orbit</td><td>753 s; 36.6 kPa; 2.09 g; 4.39 t left</td></tr>
+      <tr><td>approach, docking</td><td>730 s to the hold point; 343 s to docked</td></tr>
+      <tr><td>deck landing</td><td>255 s from the hold point; 1,794 kg</td></tr>
+      <tr><td>home</td><td>burn 121 to 127 m/s; touchdown 429 to 437 m past the threshold, 0.74 m/s</td></tr>
+      <tr><td>limits home</td><td>600 kW/m², 2.5 g, 20 kPa</td></tr>
+    </table>
+    <table class="tight">
+      <tr><th colspan="2">the build</th></tr>
+      <tr><td>step</td><td>0.02 s, RK4, inertial frame</td></tr>
+      <tr><td>tests</td><td>120 native, 120 WebAssembly, 146 page</td></tr>
+      <tr><td>the page</td><td>one file, about 1.9 MB</td></tr>
+      <tr><td>crew's hash, 800 s</td><td><code>ea7847fe</code> natively (g++ 13.3, clang 18)</td></tr>
+    </table>
+  </div>
+  <h2>Words used here</h2>
+  <table>
+    <tr><th style="width:1.3in">word</th><th>means</th></tr>
+    <tr><td class="k">the crew</td><td>the scripted pilot inside the core, flying through the same rates, throttle and thrusters a person would; the canon calls it the scripted autopilot</td></tr>
+    <tr><td class="k">the core</td><td>the C++ library that owns every number that moves; the page only draws it</td></tr>
+    <tr><td class="k">readouts</td><td>what the core reports after every step, a block of numbers per part; the canon's Snapshot</td></tr>
+    <tr><td class="k">a step</td><td>0.02 s of the flight; the canon's Tick (1/240 s there)</td></tr>
+    <tr><td class="k">spinward, antispinward</td><td>along the floor the way the Ring turns, and against it</td></tr>
+    <tr><td class="k">the hold point</td><td>300 m off the hub's port, on the Ring's axis, where the approach stops</td></tr>
+    <tr><td class="k">a hold</td><td>an attitude the stability law keeps: the attitude, prograde, retrograde, the Ring, the port, the deck</td></tr>
+    <tr><td class="k">dynamic pressure, q</td><td>½ρv²: how hard the air pushes; under 400 Pa the craft flies by rates, as in space</td></tr>
+    <tr><td class="k">PEG</td><td>powered explicit guidance, the Space Shuttle's insertion steering, cut down</td></tr>
+    <tr><td class="k">ωr, ω²r</td><td>the floor's speed and its pull at radius r: 221.5 m/s and one g at the floor</td></tr>
+    <tr><td class="k">Coriolis</td><td>the sideways push, −2ω × v, on anything moving in the turning frame</td></tr>
+    <tr><td class="k">a tier</td><td>how much the page draws: low, medium, high</td></tr>
+    <tr><td class="k">the kit</td><td><code>flight/orbit/handoff/</code>: what a new session needs to start the Unreal version</td></tr>
+  </table>
+</section>
+
+<script>
+  // Number the pages, the figures and the contents; point the figures at the screenshots; and say what is
+  // unfit to print. Nothing here is fetched: the screenshots are files beside this one (out/shots), or in
+  // the folder the address names (?shots=<file URL>), which build-guide.mjs gives.
+  (() => {
+    const q = new URLSearchParams(location.search);
+    const shots = (q.get('shots') || 'out/shots').replace(/\/+$/, '');
+    const pages = [...document.querySelectorAll('.page')];
+
+    pages.forEach((page, i) => {
+      const body = document.createElement('div');
+      body.className = 'body';
+      while (page.firstChild) body.appendChild(page.firstChild);
+      page.appendChild(body);
+      if (page.classList.contains('cover')) {   // the cover keeps its own layout, edge to edge
+        body.className = 'cover-body';
+        return;
+      }
+      const head = document.createElement('div');
+      head.className = 'head';
+      head.textContent = `Runway to Ring · ${page.dataset.part || ''}`;
+      const foot = document.createElement('footer');
+      foot.className = 'foot';
+      foot.innerHTML = '<span>The orbit sketch, a guide · 12 November 2026 · commit 599e051</span><span class="folio"></span>';
+      foot.querySelector('.folio').textContent = String(i + 1);
+      page.append(head, foot);
+    });
+
+    // figures: numbered in order, their images pointed at the screenshots
+    const figures = [...document.querySelectorAll('figure')].filter((f) => !f.closest('.cover'));
+    const numberOf = new Map();
+    figures.forEach((fig, i) => {
+      numberOf.set(fig.id, i + 1);
+      const cap = fig.querySelector('figcaption');
+      if (cap) {
+        const fn = document.createElement('span');
+        fn.className = 'fn';
+        fn.textContent = `Figure ${i + 1}. `;
+        cap.prepend(fn);
+      }
+    });
+    for (const a of document.querySelectorAll('a.ref')) {
+      const n = numberOf.get(a.getAttribute('href').slice(1));
+      a.textContent = n ? String(n) : '?';
+    }
+    const missing = [];
+    for (const img of document.querySelectorAll('img[data-shot]')) {
+      img.addEventListener('error', () => {
+        missing.push(img.dataset.shot);
+        const box = document.createElement('div');
+        box.className = 'missing';
+        box.textContent = `screenshot "${img.dataset.shot}" not taken yet: node flight/orbit/guide/build-guide.mjs`;
+        img.replaceWith(box);
+      }, { once: true });
+      img.src = `${shots}/${img.dataset.shot}.jpg`;
+    }
+
+    // the contents: every numbered heading, with its page
+    const toc = document.getElementById('toc');
+    for (const h of document.querySelectorAll('.page h1[id], .page h2[id]')) {
+      const page = h.closest('.page');
+      if (page.querySelector('#toc') || (h.tagName === 'H2' && !h.querySelector('.n') && !h.hasAttribute('data-toc'))) continue;
+      const li = document.createElement('li');
+      li.className = h.tagName.toLowerCase();
+      const a = document.createElement('a');
+      a.href = `#${h.id}`;
+      a.textContent = h.textContent.replace(/^(\d+(\.\d+)?)/, '$1  ');
+      const dots = document.createElement('span');
+      dots.className = 'dots';
+      const pg = document.createElement('span');
+      pg.className = 'pg';
+      pg.textContent = String(pages.indexOf(page) + 1);
+      li.append(a, dots, pg);
+      toc.appendChild(li);
+    }
+
+    // what would make the print wrong: text past a page's bottom, a screenshot not there
+    window.guideFaults = () => {
+      const faults = [];
+      pages.forEach((page, i) => {
+        const body = page.querySelector(':scope > .body, :scope > .cover-body');
+        const over = body.scrollHeight - body.clientHeight;
+        page.classList.toggle('overflow', over > 1);
+        if (over > 1) faults.push(`page ${i + 1} (${page.dataset.part || 'cover'}) runs ${over} px past its bottom`);
+      });
+      for (const name of missing) faults.push(`no screenshot "${name}"`);
+      return faults;
+    };
+
+    const images = [...document.images];
+    Promise.all(images.map((img) => (img.complete ? null : new Promise((done) => { img.addEventListener('load', done); img.addEventListener('error', done); }))))
+      .then(() => document.fonts.ready)
+      .then(() => { window.guideFaults(); document.body.dataset.ready = '1'; });
+  })();
+</script>
+</body>
+</html>

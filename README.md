@@ -729,3 +729,10 @@ the crew's flight every 10 s for 900 s.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
 state. Native and WebAssembly runs agree to the digits printed above, not bit for bit.
+
+The guide, a PDF for whoever comes to the sketch cold (`guide/`): `node flight/orbit/guide/build-guide.mjs`
+opens the built page in Chrome, Chromium or Edge over the DevTools protocol, takes its screenshots there
+and prints `guide/guide.html` to `guide/out/Runway-to-Ring-guide.pdf`; a quarter to half an hour in
+software GL. `--list` names the screenshots, `--only` retakes some, `--skip-shots` only prints. `guide/out/`
+is not committed. `node --test flight/orbit/guide/build-guide.test.mjs` holds the guide's figures and the
+tool's screenshots to each other.
