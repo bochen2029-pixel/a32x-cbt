@@ -6,10 +6,11 @@
 //
 // How it flies, phase by phase:
 //   wait      The orbit's plane stands still while the Earth turns under it, so the runway comes within
-//             reach on a few passes each day. The plan shoots the whole descent forward from a trial burn
-//             time, with the entry's own law, and moves the burn until the shot ends at the gate; it takes
-//             the first pass whose cross-range is inside what the craft can fly, and is made again while
-//             the craft waits.
+//             reach on a few passes each day. The plan finds, pass by pass, the burn time that puts the
+//             entry's end abeam the runway, and how far off the plane the runway is then; the first pass
+//             close enough it shoots properly, the whole descent with the entry's own law, moving the
+//             burn until the shot ends at the gate. A pass just missed is taken with more bank. The plan
+//             is made again while the craft waits.
 //   burn      Tail first, until the orbit's lowest point is at PERI_TARGET: cut on the orbit flown, not
 //             on a clock.
 //   entry     Nose 40 degrees above the air's velocity, easing below Mach 5 so that the lift coefficient
@@ -25,6 +26,9 @@
 //   approach  Under power, as an airliner flies it: level until the glide path comes down, then 3 degrees
 //             to the runway, the speed held by the throttle, the gear down.
 //   flare     The sink rate taken off in the last metres, the wheels on, the nose lowered, the brakes.
+//
+// All the way down it learns how wrong its model of the air and the craft is, from the acceleration it
+// feels against what the model says (learn, below); tests make the model wrong to show it does.
 //
 // Every number marked chosen is this sketch's; docs/provenance.md, 1h, names the methods. GPLv3.
 

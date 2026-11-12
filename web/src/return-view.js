@@ -98,12 +98,13 @@ export function returnHud(r, s, narrow = false) {
   const kw = (w) => `${(w / 1000).toFixed(0)} kW/m²`;
   if (flying && ph < RET_PH.rollout) {
     const where = ph <= RET_PH.coast ? `runway ${fmtSide(r.cross)} of the pass` : ph >= RET_PH.approach ? `${Math.abs(r.cross).toFixed(1)} m off the line` : `runway ${fmtSide(r.cross)}`;
-    if (narrow) lines.push(`HOME ${fmtDistance(r.range)}  ${where}`);
+    const side = Math.abs(r.cross) < 50 ? 'ahead' : `${fmtDistance(Math.abs(r.cross))} ${r.cross > 0 ? 'L' : 'R'}`;
+    if (narrow) lines.push(`HOME ${fmtDistance(r.range)}  ${side}`);
     else lines.push(`HOME ${fmtDistance(r.range).padStart(9)} to KDFW 17C   ${where}   path to go ${fmtDistance(r.togo)}`);
   }
   if (r.heatPeak > 1000 || r.loadPeak > 0.05) {
     const over = r.heat > LIMITS.heat * 0.85 ? ' !' : '';
-    if (narrow) lines.push(`HEAT ${kw(r.heat)}${over} ${r.temp.toFixed(0)} K  ${r.load.toFixed(1)} g`);
+    if (narrow) lines.push(`HEAT ${(r.heat / 1000).toFixed(0)} kW${over}  ${r.temp.toFixed(0)} K`);
     else lines.push(`HEAT ${kw(r.heat)}${over} (peak ${kw(r.heatPeak)})   ${(r.heatLoad / 1e6).toFixed(0)} MJ/m²   skin ${r.temp.toFixed(0)} K   LOAD ${r.load.toFixed(2)} g (peak ${r.loadPeak.toFixed(2)})`);
   }
   if (!narrow && (ph === RET_PH.coast || ph === RET_PH.entry)) {
@@ -119,7 +120,7 @@ export function returnHud(r, s, narrow = false) {
   }
   if (r.touched > 0) {
     const off = `${Math.abs(r.tdOff).toFixed(1)} m ${r.tdOff >= 0 ? 'right' : 'left'}`;
-    if (narrow) lines.push(`DOWN ${r.tdAlong.toFixed(0)} m, ${off}, ${r.tdSink.toFixed(1)} m/s`);
+    if (narrow) lines.push(`DOWN ${r.tdAlong.toFixed(0)} m  ${Math.abs(r.tdOff).toFixed(1)} ${r.tdOff >= 0 ? 'R' : 'L'}  ${r.tdSink.toFixed(1)} m/s`);
     else lines.push(`DOWN ${r.tdAlong.toFixed(0)} m past the threshold, ${off} of the line, sinking ${r.tdSink.toFixed(2)} m/s${r.stopped > 0 ? `   stopped at ${fmtDistance(r.stopAlong)}` : ''}`);
   }
   return lines;
@@ -387,8 +388,8 @@ export const ret = {
   update(ctx) {
     const core = ctx.core, r = this.r;
     if (this.skipping) {
-      // Step the core fast, within a few milliseconds a frame, until the burn is near.
-      const until = performance.now() + 14;
+      // Step the core fast, within half the frame's time (14 to 60 ms), until the burn is near.
+      const until = performance.now() + Math.min(60, Math.max(14, 500 * (ctx.dt || 0)));
       let why = skipDone(r, Math.round(core.s.auto), ctx.AUTO);
       while (!why && performance.now() < until) {
         core.step(500);
