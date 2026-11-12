@@ -43,6 +43,10 @@ test('the phases, the events and the limits are the header\'s', { skip: noThree 
   const events = enumNames('OC_RET_EV_NONE = 0', 'OC_RET_EV_TOUCHDOWN = 6', 'OC_RET_EV_').concat('OC_RET_EV_TOUCHDOWN');
   assert.deepEqual(events.map((n) => camel(n, 'OC_RET_EV_')), Object.keys(view.RET_EV));
   assert.deepEqual(view.LIMITS, { heat: define('OC_RET_HEAT_LIMIT'), load: define('OC_RET_LOAD_LIMIT'), qbar: define('OC_RET_QBAR_LIMIT') });
+  assert.equal(view.NEAR_RING, define('OC_RET_NEAR_RING_M'));
+  const refusals = enumNames('OC_RET_NO_NONE = 0', 'OC_RET_NO_RIDING = 2', 'OC_RET_NO_').concat('OC_RET_NO_RIDING');
+  assert.deepEqual(refusals.map((n) => camel(n, 'OC_RET_NO_')), Object.keys(view.RET_NO));
+  assert.deepEqual(Object.values(view.RET_NO), refusals.map((_, i) => i));
 });
 
 test('waits read as a clock does, and the runway lies left or right', { skip: noThree }, () => {
@@ -64,6 +68,18 @@ test('the flight home starts in orbit or on the way down, not on the runway or t
   assert.equal(view.canReturn({ ...s, peri: 60000, vs: -150, alt: 110000 }, none).ok, true);
   assert.equal(view.canReturn({ ...s, peri: -6e6, vs: -20, alt: 5000 }, { phase: view.RET_PH.terminal, stopped: 0 }).ok, true);
   assert.equal(view.canReturn({ ...s, crashed: 1 }, none).ok, false);
+});
+
+test('not on the deck, nor riding with it past the Ring, as the core refuses it; clear of the Ring, or slow by it, yes', { skip: noThree }, () => {
+  // parked on a pad its own orbit's lowest point swings over 150 km for two thirds of the Ring's turn
+  const parked = { crashed: 0, peri: 300000, onGround: 0, vs: 0, alt: 500000, ringRange: 4997, vrelE: 150, vrelN: -160, vrelU: 3 };
+  const none = { phase: 0, stopped: 0 };
+  assert.equal(view.canReturn(parked, none, { onDeck: 1 }).ok, false);
+  assert.match(view.canReturn(parked, none, { onDeck: 1 }).why, /deck/);
+  assert.equal(view.canReturn(parked, none, { onDeck: 0 }).ok, false, 'hovering with the deck, 219 m/s past the Ring');
+  assert.equal(view.canReturn(parked, none).ok, false, 'riding, with no deck readouts');
+  assert.equal(view.canReturn({ ...parked, ringRange: 9500 }, none, { onDeck: 0 }).ok, true, 'flung clear of the Ring');
+  assert.equal(view.canReturn({ ...parked, ringRange: 650, vrelE: 0.7, vrelN: 0, vrelU: 0 }, none, { onDeck: 0 }).ok, true, 'held off the hub');
 });
 
 test('skipping ahead stops before the burn, or when there is nothing to wait for', { skip: noThree }, () => {

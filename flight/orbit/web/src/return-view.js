@@ -6,17 +6,24 @@
 // Everything shown comes from the core's readouts; nothing here flies. GPLv3.
 
 import * as THREE from 'three';
+import { DOCK } from './dock-hud.js';
 import { fmtDistance } from './hud.js';
 
 // The readouts, orbit_return.h's OC_RET_* in its order (a test reads the header to hold the two equal).
 export const RET_OUT = [
   'phase', 'event', 'tEvent', 'range', 'cross', 'togo', 'bankCmd', 'alphaCmd', 'miss', 'reversals', 'dv', 'passes',
   'heat', 'heatPeak', 'heatLoad', 'temp', 'glow', 'load', 'loadPeak', 'qbarPeak', 'over', 'glideDev',
-  'touched', 'tdSink', 'tdAlong', 'tdOff', 'tdSpeed', 'tdPitch', 'tdT', 'stopped', 'stopAlong', 'stopOff', 'propUsed',
+  'touched', 'tdSink', 'tdAlong', 'tdOff', 'tdSpeed', 'tdPitch', 'tdT', 'stopped', 'stopAlong', 'stopOff', 'propUsed', 'refused',
 ];
 export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5, terminal: 6, approach: 7, flare: 8, rollout: 9, stopped: 10 };
 export const RET_EV = { none: 0, clear: 1, burn: 2, burnEnd: 3, interface: 4, terminal: 5, touchdown: 6 };
 export const LIMITS = { heat: 600000, load: 2.5, qbar: 20000 };   // OC_RET_HEAT_LIMIT, _LOAD_LIMIT, _QBAR_LIMIT
+export const NEAR_RING = 9000;   // m, OC_RET_NEAR_RING_M: nearer the Ring's centre the crew backs away first
+export const RET_NO = { none: 0, deck: 1, riding: 2 };   // OC_RET_NO_*: why RETURN was refused
+const REFUSED = {
+  [RET_NO.deck]: 'On the deck: take off and clear the Ring first',
+  [RET_NO.riding]: 'Riding with the Ring: the crew flies home from clear of it, or from at rest by it',
+};
 const SKIP_UNTIL = 60;   // s before the burn: the skip stops, so the turn's end and the burn are seen
 
 // A wait, as a clock reads it: hours and minutes when long, minutes and seconds, seconds.
@@ -35,9 +42,12 @@ export function fmtSide(m) {
 }
 
 // May the flight home start? From orbit, or taken back on the way down; not from the runway, nor on the
-// climb to orbit.
-export function canReturn(s, r) {
+// climb to orbit; and, as the core refuses it, not on the Ring's deck (deck: its readouts, when the page
+// has them) nor near the Ring moving past it faster than docking would close, riding with the deck.
+export function canReturn(s, r, deck) {
   if (s.crashed > 0) return { ok: false, why: 'The craft has crashed' };
+  if (deck && deck.onDeck > 0.5) return { ok: false, why: REFUSED[RET_NO.deck] };
+  if (s.ringRange < NEAR_RING && Math.hypot(s.vrelE, s.vrelN, s.vrelU) > DOCK.engageSpeed) return { ok: false, why: REFUSED[RET_NO.riding] };
   if (s.peri > 150000) return { ok: true };
   if (r.phase > RET_PH.none && !(s.onGround > 0.5 && r.stopped > 0)) return { ok: true };   // taken back on the way home
   if (s.onGround < 0.5 && s.vs < 0 && s.alt > 20000) return { ok: true };                    // falling from orbit already
@@ -371,7 +381,7 @@ export const ret = {
     }
     if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say('Home, stopped on 17C: Backspace starts again'); return true; }
     if (auto === ctx.AUTO.return) { ctx.say('The crew is flying home: Space takes the controls'); return true; }
-    const may = canReturn(s, r);
+    const may = canReturn(s, r, ctx.core.deck);
     if (!may.ok) { ctx.say(may.why); return true; }
     let words = 'The crew flies home to KDFW 17C';
     if (docked(ctx.core)) {
@@ -380,6 +390,7 @@ export const ret = {
     }
     ctx.core.auto(ctx.AUTO.return);
     ctx.core.read();
+    if (Math.round(ctx.core.s.auto) !== ctx.AUTO.return) { ctx.say(REFUSED[Math.round(r.refused)] || 'The flight home cannot start here'); return true; }
     ctx.say(words);
     this.skipping = false;
     this.announce = Math.round(r.phase) === RET_PH.wait;   // the plan is made on the core's next step: say it then

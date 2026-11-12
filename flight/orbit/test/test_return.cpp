@@ -18,10 +18,14 @@
 // TEST: the_same_twice
 // TEST: model_is_the_plant
 // TEST: plan_says_when
+// TEST: return_refused_on_the_deck
+// TEST: departs_clear_of_the_mast
 
 #include "../core/orbit_core.h"
+#include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"
 #include "../core/orbit_return.h"
+#include "../core/internal.h"   // to place the craft where no crew mode takes it (departs_clear_of_the_mast)
 
 #include <cmath>
 #include <cstdint>
@@ -147,15 +151,23 @@ void print(const Run& r) {
                 ret(OC_RET_STOP_OFF));
 }
 
-// What a landing must be.
+// What a landing must be. These tests fly in still air with the guidance's instruments exact, and there it
+// promises more than a landing: once the approach has learned the craft's coefficients it flies the same
+// final whatever its model was, so
+//   - the wheels touch in the touchdown zone's middle, 300 to 600 m past the threshold, where the 3 degree
+//     path (the wheels 15 m over the threshold) and the flare put them;
+//   - sinking 0.5 to 1.0 m/s: the flare's aim, 0.5, and no more than twice it;
+//   - within 0.3 m of the centreline: the final's lateral law holds the line with a stiffness of 0.012 per
+//     second squared, so 0.3 m off is a side push of 3.6 mm/s2 left unbalanced, under half the 8 mm/s2 of
+//     the Earth's turn that it feeds forward.
 void landed(const Run& r) {
     print(r);
     CHECK(r.finite, "every readout finite");
     CHECK(get(OC_CRASHED) == 0, "not crashed, at %.0f s", get(OC_T));
     CHECK(ret(OC_RET_TOUCHED) > 0, "touched down");
-    CHECK(ret(OC_RET_TD_ALONG) > 0 && ret(OC_RET_TD_ALONG) < OC_RET_ZONE_M, "in the touchdown zone: %.0f m past the threshold", ret(OC_RET_TD_ALONG));
-    CHECK(std::fabs(ret(OC_RET_TD_OFF)) < 3.0, "near the centreline: %.2f m", ret(OC_RET_TD_OFF));
-    CHECK(ret(OC_RET_TD_SINK) < 2.0, "a gentle touch: %.2f m/s down", ret(OC_RET_TD_SINK));
+    CHECK(ret(OC_RET_TD_ALONG) > 300 && ret(OC_RET_TD_ALONG) < 600, "in the touchdown zone's middle: %.0f m past the threshold", ret(OC_RET_TD_ALONG));
+    CHECK(std::fabs(ret(OC_RET_TD_OFF)) < 0.3, "on the centreline: %.2f m", ret(OC_RET_TD_OFF));
+    CHECK(ret(OC_RET_TD_SINK) > 0.5 && ret(OC_RET_TD_SINK) < 1.0, "the flare's touch: %.2f m/s down", ret(OC_RET_TD_SINK));
     CHECK(ret(OC_RET_STOPPED) > 0, "stopped");
     CHECK(ret(OC_RET_STOP_ALONG) > 0 && ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M,
           "stopped on the runway: %.0f m along, %.2f m off", ret(OC_RET_STOP_ALONG), ret(OC_RET_STOP_OFF));
@@ -347,6 +359,76 @@ void planSaysWhen() {
     CHECK(get(OC_PERI) < 70000 && get(OC_PERI) > 50000, "the orbit's low point %.0f km", get(OC_PERI) / 1000);
 }
 
+// RETURN on the Ring's deck, or riding with it, is refused and leaves whoever was flying in charge: the way out,
+// backing away on the small thrusters with the gear up, is for a craft at rest by the Ring, and from the deck
+// it put the belly on the deck in 0.6 s (the audit of 599e051). Parked on a pad the craft's own orbit swings
+// with the Ring's turn, so RETURN is asked when its lowest point reads over 150 km; hovering over the pad it
+// rides with the deck at 200 m/s past the Ring. A craft clear of the Ring, or slow by it, is not refused
+// (lands_after_leaving_the_hub, lands_after_undocking).
+void returnRefusedOnTheDeck() {
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
+    oc_auto(OC_AUTO_APPROACH);
+    while (get(OC_PORT_RANGE) > 5 && get(OC_T) < 3000) oc_step(50);
+    oc_auto(OC_AUTO_DECK);
+    bool askedHovering = false;
+    while (oc_deck_out()[OC_DECK_PHASE] != OC_DECK_PH_LANDED && get(OC_CRASHED) == 0 && get(OC_T) < 4000) {
+        oc_step(10);
+        if (!askedHovering && oc_deck_out()[OC_DECK_PHASE] == OC_DECK_PH_HOVER) {
+            askedHovering = true;
+            const double past = std::sqrt(get(OC_VREL_E) * get(OC_VREL_E) + get(OC_VREL_N) * get(OC_VREL_N) + get(OC_VREL_U) * get(OC_VREL_U));
+            oc_auto(OC_AUTO_RETURN);
+            std::printf("  hovering %.0f m over the pad, %.0f m/s past the Ring: RETURN refused %.0f, the deck's crew still flying (%.0f)\n",
+                        oc_deck_out()[OC_DECK_HEIGHT], past, ret(OC_RET_REFUSED), get(OC_AUTO));
+            CHECK(ret(OC_RET_REFUSED) == OC_RET_NO_RIDING && get(OC_AUTO) == OC_AUTO_DECK, "hovering: refused %.0f, auto %.0f", ret(OC_RET_REFUSED), get(OC_AUTO));
+        }
+    }
+    CHECK(askedHovering, "the crew's deck landing never hovered");
+    CHECK(oc_deck_out()[OC_DECK_ON_DECK] > 0 && get(OC_CRASHED) == 0, "on the deck: %.0f, crashed %.0f", oc_deck_out()[OC_DECK_ON_DECK], get(OC_CRASHED));
+    while (get(OC_PERI) < 150000 && get(OC_T) < 5000) oc_step(5);
+    const double auto0 = get(OC_AUTO), peri = get(OC_PERI);
+    oc_auto(OC_AUTO_RETURN);
+    std::printf("  parked on the deck, its own orbit's lowest point reading %.0f km: RETURN refused %.0f, auto %.0f as before\n", peri / 1000,
+                ret(OC_RET_REFUSED), get(OC_AUTO));
+    CHECK(ret(OC_RET_REFUSED) == OC_RET_NO_DECK && get(OC_AUTO) == auto0, "on the deck: refused %.0f, auto %.0f", ret(OC_RET_REFUSED), get(OC_AUTO));
+    oc_step(3000);
+    std::printf("  60 s on: crashed %.0f, on the deck %.0f, gear %.0f\n", get(OC_CRASHED), oc_deck_out()[OC_DECK_ON_DECK], get(OC_GEAR));
+    CHECK(get(OC_CRASHED) == 0 && oc_deck_out()[OC_DECK_ON_DECK] > 0 && get(OC_GEAR) > 0, "60 s on: crashed %.0f, on the deck %.0f, gear %.0f", get(OC_CRASHED),
+          oc_deck_out()[OC_DECK_ON_DECK], get(OC_GEAR));
+}
+
+// Backing away on the Ring's far side, the craft keeps clear of what the page draws there and the core does
+// not collide with: the hub's solar mast out along the axis from 350 to 910 m, its arrays 284 m round it
+// from 475 to 905 m (web/src/ring-plan.js). Placed 600 m out along the axis on that side and 350 m from it,
+// at rest in the frame turning with the Ring's orbit, the craft never comes within the arrays' reach and
+// its own half span, 293 m, of the axis while it is beside them. Before, the way out drew it onto the axis
+// and out along it, through the arrays and the mast.
+void departsClearOfTheMast() {
+    using namespace oc;
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
+    const double t = timeOf(g);
+    const V3 side = unit(cross(ring.axis, ring.normal));
+    const V3 rel = ring.axis * 600.0 + side * 350.0;
+    g.r = ringPos(t) + rel;
+    g.v = ringVel(t) + cross(ring.normal * ring.rate, rel);
+    g.w = {0, 0, 0};
+    oc_auto(OC_AUTO_RETURN);
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_DEPART, "backing away: phase %.0f", ret(OC_RET_PHASE));
+    double closest = 1e9, farthestOut = 0;
+    while (ret(OC_RET_PHASE) == OC_RET_PH_DEPART && get(OC_CRASHED) == 0 && get(OC_T) < t + 3000) {
+        oc_step(5);
+        const V3 d = g.r - ringPos(timeOf(g));
+        const double along = dot(d, ring.axis), off = norm(d - ring.axis * along);
+        if (along > 350 - 10 && along < 910 + 50) closest = std::fmin(closest, off);
+        farthestOut = std::fmax(farthestOut, along);
+    }
+    std::printf("  from 600 m along the axis on the far side, 350 m off it: clear of the Ring at %.0f s, %.0f m out; beside the mast and its arrays, "
+                "%.0f m from the axis at the nearest\n", get(OC_T) - t, farthestOut, closest);
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_WAIT && get(OC_CRASHED) == 0, "clear: phase %.0f, crashed %.0f", ret(OC_RET_PHASE), get(OC_CRASHED));
+    CHECK(closest > 293, "%.0f m from the axis beside the mast and its arrays", closest);
+}
+
 struct Test { const char* name; void (*fn)(); };
 const Test tests[] = {
     {"readouts_block", readoutsBlock},
@@ -363,6 +445,8 @@ const Test tests[] = {
     {"the_same_twice", theSameTwice},
     {"model_is_the_plant", modelIsThePlant},
     {"plan_says_when", planSaysWhen},
+    {"return_refused_on_the_deck", returnRefusedOnTheDeck},
+    {"departs_clear_of_the_mast", departsClearOfTheMast},
 };
 
 // The Monte Carlo, on demand (not a ctest): test_return monte_carlo <first> <count> <pool> [rho wave coef].

@@ -40,6 +40,19 @@ enum {
 #define OC_RET_LOAD_LIMIT 2.5       /* g, off the ground */
 #define OC_RET_QBAR_LIMIT 20000.0   /* Pa, from the burn to the runway */
 
+/* Nearer the ring's centre than this, the flight home backs away from it first, on the small thrusters,
+   out along its axis; and there it is refused while the craft moves past the ring faster than
+   OC_DOCK_ENGAGE_SPEED in the frame turning with its orbit: riding with the deck, which the way out is
+   not for. It is refused on the deck. */
+#define OC_RET_NEAR_RING_M 9000.0
+
+/* why RETURN was last refused (OC_RET_REFUSED); a refusal leaves whoever was flying in charge */
+enum {
+    OC_RET_NO_NONE = 0,
+    OC_RET_NO_DECK = 1,      /* on the ring's flight deck */
+    OC_RET_NO_RIDING = 2     /* near the ring and moving past it with the deck, or faster than docking would close */
+};
+
 /* the runway, from its threshold (the start point): what a landing is judged against */
 #define OC_RET_RUNWAY_M 4085.0      /* its length (docs/provenance.md, 1f: 13,400 ft) */
 #define OC_RET_RUNWAY_HALF_M 23.0   /* half its width (150 ft) */
@@ -82,6 +95,7 @@ enum {
     OC_RET_STOP_ALONG,    /* m past the threshold */
     OC_RET_STOP_OFF,      /* m off the centreline */
     OC_RET_PROP_USED,     /* kg of propellant since the return was engaged */
+    OC_RET_REFUSED,       /* OC_RET_NO_*: why RETURN was last refused */
     OC_RET_COUNT
 };
 
