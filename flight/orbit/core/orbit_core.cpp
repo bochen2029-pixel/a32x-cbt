@@ -621,6 +621,7 @@ void writeOut() {
     const double range = norm(dr);
     out[OC_RING_RANGE] = range;
     out[OC_RING_RATE] = range > 1 ? dot(dr, dv) / range : 0;
+    skyWriteOut(s);   // sky.cpp: the Sun and the Moon now; moves sunEci
     const V3 sun = toSite(sunEci);
     out[OC_SUN_E] = sun.x; out[OC_SUN_N] = sun.y; out[OC_SUN_U] = sun.z;
     // relative to the ring, in the frame that turns with its orbit: what a pilot closing on it sees

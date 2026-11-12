@@ -246,7 +246,7 @@ font file ships.
 | E. C. Polhamus, *A concept of the vortex lift of sharp-edge delta wings based on a leading-edge-suction analogy*, NASA TN D-3767 (1966) | public domain, a work of the US government | the form of a slender delta's lift and drag: a potential term and a vortex term. The two constants, 2.4 and 3.0, are this project's |
 | Newtonian impact theory | textbook | the lift and drag of a surface at hypersonic speed, blended in from Mach 1.5 to 5 |
 | R. F. Jaggers, *An explicit solution to the exoatmospheric powered flight guidance and trajectory optimization problem for rocket propelled vehicles*, AIAA Guidance and Control Conference (1977): the Space Shuttle's powered explicit guidance | the paper's method | as a method: steering linear in time, solved again each step for the time still to burn, with the rocket equation's integrals for thrust over a falling mass. Cut down for this sketch, a flat-Earth gravity term falling to nothing at orbital speed; the code is ours |
-| this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the Sun's place on 12 November, the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
+| this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the flight's date (12 November 2026, 19:00 UTC), the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
 
 Each further part of the sketch keeps its own sources here, in the subsection below that names it.
 
@@ -264,7 +264,16 @@ Nothing taken from outside yet.
 
 #### The Sun and the Moon
 
-Nothing taken from outside yet.
+`core/sky.cpp` and `core/orbit_sky.h` are ours: the code is written from the methods below, and
+`test/test_sky.cpp` holds it to each method's worked example and to an ephemeris that shares nothing
+with them.
+
+| source | licence | what is taken |
+|---|---|---|
+| J. Meeus, *Astronomical Algorithms*, 2nd ed. (Willmann-Bell, 1998) | a textbook's methods and published constants; it prints no code | the Julian Day (ch. 7); Greenwich sidereal time (ch. 12); precession from J2000.0 (ch. 21); the mean obliquity and the nutation's four largest terms (ch. 22); the Sun by the low-accuracy method, 0.01° (ch. 25); the Moon (ch. 47): the five fundamental arguments and tables 47.A and 47.B whole, 60 terms in longitude and distance, 60 in latitude, and the additive terms, about 10″; the phase angle (ch. 48); the Moon's attitude from Cassini's laws, which gives the optical librations (ch. 53). Formulae and coefficients are written out in `sky.cpp`; the tests reproduce the book's examples 7.a, 12.a, 12.b, 21.b, 25.a, 47.a, 48.a and 53.a: its series and sums to the last digit it prints, its apparent places to an arcsecond (the book's examples carry the full nutation or a one-term shortcut, the core the four terms) |
+| M. Chapront-Touzé and J. Chapront, *The lunar ephemeris ELP 2000*, Astronomy and Astrophysics 124 (1983) | — | named for the record: the lunar theory whose principal terms the book's tables carry. Nothing is taken from the paper itself |
+| NASA/JPL Horizons (ssd.jpl.nasa.gov/horizons), ephemeris DE441, queried 2026-11-12 | a public service of the US government; nothing of it ships | the independent values the tests hold the core to, copied by value into `test_sky.cpp`: the Sun's and the Moon's apparent places, distances and place in KDFW's sky on 2026-11-12 at 19:00 and 20:00 UTC and on 2026-12-24 at 03:00 UTC, the Moon's lit fraction, phase angle, sub-Earth point and pole angle there, the local sidereal time, the Moon's lit fraction on 1969-07-20, and the Sun's and the Moon's closest approach over KDFW on 2024-04-08. Against it over 2018 to 2034 the core's Moon stays within 7″ and 41 km and its Sun within 21″ |
+| this project | — | the default epoch; Terrestrial Time taken as UTC + 69.184 s and UT1 as UTC; the range of dates taken, 1900 to 2100 |
 
 #### Graphics
 
