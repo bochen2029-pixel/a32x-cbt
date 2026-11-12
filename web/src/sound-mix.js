@@ -439,25 +439,34 @@ export function newEvents() {
 
 // What the last frame is remembered by.
 export function newMemory() {
-  return { t: -1, thr: 0, mach: 0, gear: 1, onGround: 1, crashed: 0, docked: 0, vs: 0, g: 0, rcs: 0, valid: 0 };
+  return { t: -1, thr: 0, lit: 0, mach: 0, gear: 1, onGround: 1, crashed: 0, docked: 0, vs: 0, g: 0, rcs: 0, touched: -1e9, valid: 0 };
 }
+
+// The drive is lit from when its thrust passes 1 % until it falls under 0.3 %: so the approach's low throttle,
+// held near 5 %, lights it once and does not stop it.
+export const LIGHT = 0.01, OUT = 0.003;
 
 // What happened between the last frame and this one: each a strength 0..1 (boom: +1 through the speed of
 // sound going up, -1 coming down; gear: +1 down, -1 up), 0 for nothing. A frame that follows a jump in
 // time (a restart, a skip ahead, the clock run fast) reports nothing: its moments were not lived through.
+// The wheels back on the ground within 2 s of a touchdown (a bounce) touch down again softly, the tyres
+// already turning.
 export function detect(mem, s, extra, out) {
   for (const k of EVENT_KEYS) out[k] = 0;
   const t = num(s.t), dt = t - mem.t;
   const thr = sat(num(s.throttle)), mach = num(s.mach), gear = num(s.gear) > 0.5 ? 1 : 0, onGround = num(s.onGround) > 0.5 ? 1 : 0;
   const crashed = num(s.crashed) > 0.5 ? 1 : 0, docked = num(extra.docked) > 0.5 ? 1 : 0, g = num(s.g), rcs = num(extra.rcs);
+  const lit = thr >= LIGHT ? 1 : thr < OUT ? 0 : mem.lit;
   if (mem.valid && dt > 0 && dt <= 1.0) {
-    if (mem.thr < 0.02 && thr >= 0.02) out.ignition = 0.7;
-    if (mem.thr >= 0.05 && thr < 0.05) out.shutdown = 0.6;
+    if (!mem.lit && lit) out.ignition = 0.7;
+    if (mem.lit && !lit) out.shutdown = 0.6;
     if ((mem.mach - 1) * (mach - 1) < 0 && num(s.qbar) > 50) out.boom = mach > mem.mach ? 1 : -1;
     if (gear !== mem.gear) out.gear = gear ? 1 : -1;
     if (!mem.onGround && onGround && !crashed) {
-      out.touchdown = 0.3 + 0.7 * sat(-mem.vs / 4);
-      out.screech = sat(num(s.tas) / 80);
+      const again = t - mem.touched < 2;
+      out.touchdown = (0.3 + 0.7 * sat(-mem.vs / 4)) * (again ? 0.5 : 1);
+      out.screech = again ? 0 : sat(num(s.tas) / 80);
+      mem.touched = t;
     }
     if (!mem.crashed && crashed) out.crash = 1;
     if (!mem.docked && docked) out.capture = 1;
@@ -468,7 +477,7 @@ export function detect(mem, s, extra, out) {
     if (mem.rcs < 0.08 && rcs >= 0.08) out.rcsOn = sat(rcs);
     if (mem.rcs >= 0.08 && rcs < 0.08) out.rcsOff = sat(mem.rcs);
   }
-  mem.t = t; mem.thr = thr; mem.mach = mach; mem.gear = gear; mem.onGround = onGround; mem.crashed = crashed;
+  mem.t = t; mem.thr = thr; mem.lit = lit; mem.mach = mach; mem.gear = gear; mem.onGround = onGround; mem.crashed = crashed;
   mem.docked = docked; mem.vs = num(s.vs); mem.g = g; mem.rcs = rcs; mem.valid = 1;
   return out;
 }

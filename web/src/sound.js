@@ -799,33 +799,39 @@ export class Engine {
 // moments; the flight's own moments (the drive lighting, the gear, a touchdown, the speed of sound, a capture
 // when core.dock.docked goes to 1, a crash), the deck's (the gear on the plating, the swivel, the roll posts)
 // and the walk's (footsteps, a landing, the ball, the lifts, the hatch) are found from the readouts and need
-// no call.
+// no call. What a cue is given is taken as a number in its range, or its default: a part of the page that
+// passes NaN gets the default, not a fault in the browser's audio.
+const fin = (v, d, lo = 0, hi = 1) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : d);
+const unitDir = (v, d) => {
+  const ok = Array.isArray(v) && v.length === 3 && v.every(Number.isFinite), n = ok ? Math.hypot(v[0], v[1], v[2]) : 0;
+  return n > 0 ? [v[0] / n, v[1] / n, v[2] / n] : d;
+};
 export const CUES = {
-  strike: (e, t, p) => e.strike(t, p.strength ?? 0.5, p.hz ?? 600),
-  thump: (e, t, p) => e.thump(t, p.strength ?? 0.5, p.from ?? 70, p.to ?? 36, p.seconds ?? 0.4),
-  contact: (e, t, p) => e.contact(t, p.speed ?? 0.1),
-  latch: (e, t, p) => e.latch(t, p.n ?? 4),
+  strike: (e, t, p) => e.strike(t, fin(p.strength, 0.5), fin(p.hz, 600, 40, 12000)),
+  thump: (e, t, p) => e.thump(t, fin(p.strength, 0.5), fin(p.from, 70, 20, 400), fin(p.to, 36, 15, 400), fin(p.seconds, 0.4, 0.05, 3)),
+  contact: (e, t, p) => e.contact(t, fin(p.speed, 0.1, 0, 10)),
+  latch: (e, t, p) => e.latch(t, Math.round(fin(p.n, 4, 1, 8))),
   capture: (e, t) => e.capture(t),
   release: (e, t) => e.release(t),
-  hiss: (e, t, p) => e.hiss(t, p.seconds ?? 4, p.strength ?? 1),
-  boom: (e, t, p) => e.boom(t, p.n ?? 2),
-  nwave: (e, t, p) => e.nwave(t, p.strength ?? 1, p.seconds ?? 0.12),
-  ignition: (e, t, p) => e.ignition(t, p.strength ?? 0.7),
-  shutdown: (e, t, p) => e.shutdown(t, p.strength ?? 0.6),
+  hiss: (e, t, p) => e.hiss(t, fin(p.seconds, 4, 0.1, 20), fin(p.strength, 1)),
+  boom: (e, t, p) => e.boom(t, Math.round(fin(p.n, 2, 1, 3))),
+  nwave: (e, t, p) => e.nwave(t, fin(p.strength, 1), fin(p.seconds, 0.12, 0.02, 0.4)),
+  ignition: (e, t, p) => e.ignition(t, fin(p.strength, 0.7)),
+  shutdown: (e, t, p) => e.shutdown(t, fin(p.strength, 0.6)),
   gear: (e, t, p) => e.gear(t, p.down ?? true),
-  touchdown: (e, t, p) => e.touchdown(t, p.strength ?? 0.6, p.screech ?? 0.5),
-  pad: (e, t, p) => e.pad(t, p.strength ?? 0.5, p.sink ?? 0.3),
+  touchdown: (e, t, p) => e.touchdown(t, fin(p.strength, 0.6), fin(p.screech, 0.5)),
+  pad: (e, t, p) => e.pad(t, fin(p.strength, 0.5), fin(p.sink, 0.3, 0, 5)),
   liftoff: (e, t) => e.liftoff(t),
-  swivel: (e, t, p) => e.swivelStop(t, p.strength ?? 0.5),
-  puff: (e, t, p) => e.puff(t, p.strength ?? 0.5, p.side ?? 0),
+  swivel: (e, t, p) => e.swivelStop(t, fin(p.strength, 0.5)),
+  puff: (e, t, p) => e.puff(t, fin(p.strength, 0.5), fin(p.side, 0, -1, 1)),
   crash: (e, t) => e.crash(t),
-  step: (e, t, p) => e.step(t, p.surface ?? 'grass', p.side ?? 0, p.weight ?? 1),
-  land: (e, t, p) => e.land(t, p.surface ?? 'grass', p.strength ?? 1),
-  ball: (e, t, p) => e.ball(t, p.strength ?? 0.5, p.distance ?? 2, p.dir ?? [0, -0.6, -0.8], p.surface ?? 'paving'),
-  door: (e, t, p) => e.door(t, p.open ?? true, p.distance ?? 3, p.dir ?? [0, 0, -1]),
-  brake: (e, t, p) => e.brake(t, p.aboard ?? true, p.distance ?? 0, p.dir ?? [0, -1, 0]),
+  step: (e, t, p) => e.step(t, p.surface ?? 'grass', fin(p.side, 0, -1, 1), fin(p.weight, 1, 0, 1.6)),
+  land: (e, t, p) => e.land(t, p.surface ?? 'grass', fin(p.strength, 1, 0, 1.6)),
+  ball: (e, t, p) => e.ball(t, fin(p.strength, 0.5), fin(p.distance, 2, 0.3, 300), unitDir(p.dir, [0, -0.6, -0.8]), p.surface ?? 'paving'),
+  door: (e, t, p) => e.door(t, p.open ?? true, fin(p.distance, 3, 0.3, 300), unitDir(p.dir, [0, 0, -1])),
+  brake: (e, t, p) => e.brake(t, p.aboard ?? true, fin(p.distance, 0, 0, 300), unitDir(p.dir, [0, -1, 0])),
   hatch: (e, t, p) => e.hatch(t, p.open ?? true),
-  bubble: (e, t, p) => e.bubble(t, p.radius ?? 0.005, p.strength ?? 1),
+  bubble: (e, t, p) => e.bubble(t, fin(p.radius, 0.005, 0.0015, 0.02), fin(p.strength, 1)),
   chime: (e, t) => e.chime(t),
 };
 const SCENES = { flight: 0, ring: 1, hub: 2, car: 3 };
@@ -968,6 +974,7 @@ function listen(ctx, owned) {
     for (let k = 0; k < 3; k++) {
       const a = (st.w1[k] - st.w0[k]) / dt;
       st.acc[k] += (a - st.acc[k]) * Math.min(1, dt / 0.08);
+      if (!Number.isFinite(st.acc[k])) st.acc[k] = 0;
     }
     st.w0.set(st.w1);
   } else { i.att = 0; st.acc.fill(0); }
@@ -1158,8 +1165,8 @@ const api = {
   cues: Object.keys(CUES),
   // Play a moment by name, with what it takes (CUES, above; delay: seconds from now). False, and said once, for
   // a name that is not a cue. Muted or not yet started, a cue is taken and not played.
-  cue(name, params = {}) {
-    const f = CUES[name];
+  cue(name, given = {}) {
+    const f = Object.hasOwn(CUES, name) ? CUES[name] : null, params = given && typeof given === 'object' ? given : {};
     if (!f) {
       if (!st.warned[name]) {
         st.warned[name] = true;
@@ -1168,7 +1175,7 @@ const api = {
       }
       return false;
     }
-    if (audible()) f(st.engine, st.ac.currentTime + 0.005 + (params.delay ?? 0), params);
+    if (audible()) f(st.engine, st.ac.currentTime + 0.005 + fin(params.delay, 0, 0, 30), params);
     return true;
   },
   // A standing condition: heat 0..1 (the entry's heating, in place of the derived one; NaN to derive again),
