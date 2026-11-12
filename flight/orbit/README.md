@@ -63,6 +63,8 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | the Ring | 25.0 km ahead, closing at 0.3 m/s |
 | the crew's approach | 729 s to the hold point, 300 m off the hub's port, on the small thrusters |
 | one revolution | 5,669 s, Kepler's period for the orbit to 0.02 s |
+| the crew docks, from orbit (`test_return`'s `lands_after_undocking`) | at the hub's port at 1,807 s |
+| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,868 s: 432 m past the threshold, 0.07 m off the centreline, sinking 0.74 m/s |
 
 ## What is in it
 
@@ -218,7 +220,108 @@ from the port to the hatch, the Earth's tide across the ring (six parts in ten t
 
 ### The flight home
 
-To come.
+**RETURN** (R) hands the craft to the crew to fly home to KDFW 17C from wherever it is in orbit: the
+insertion orbit, held off the Ring's hub (it backs away first, on the small thrusters), docked (it lets
+go of the port first), or an orbit the pilot has changed. The crew waits for a pass from which the
+runway can be reached, burns tail first, falls to the air, flies the entry nose high and banked, glides
+round a circle onto a long final from the north, and lands under power. The wait can be most of a day:
+**RETURN** again, or TO ORBIT, skips ahead to a minute before the burn. Space takes the controls at any
+point and gives them back; the crew picks the flight home up from wherever the craft is.
+
+How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
+throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the
+flight, the craft does not arrive.
+
+- **The plan.** The orbit's plane stands still among the stars while the Earth turns KDFW under it.
+  KDFW lies at almost the orbit's inclination, so it passes close to the plane once a day, under the
+  orbit's northernmost point. The entry can reach about 1,500 km either side of the plane, and from
+  21,000 to 31,000 km along the track after the burn, by how much of its lift it banks away. Within
+  1,200 km, the plan's limit, the runway is in reach for about 3½ hours either side of that daily
+  passing: four or five passes a day, and a wait of up to about 19 hours. The plan shoots a trial
+  entry, finds pass by pass the burn time that puts its end abeam the runway, then shoots the first
+  pass in reach properly, moving the burn until the shot, flown with the entry's own law, ends at the
+  gate. A pass just missed is still taken by burning at once and banking more. The plan is made again
+  every ten minutes while the craft waits.
+- **The burn.** Tail first at 30 % thrust, until the orbit's low point is 60 km: cut on the orbit
+  flown, not on a clock. 121 to 127 m/s from the round orbit.
+- **The entry.** Nose 40° above the air's flow (easing below Mach 5 to hold the lift coefficient),
+  the bank's size setting the range: every 2 s a predictor flies the rest of the entry with the core's
+  air and lift, and a corrector moves the bank until the predicted end is the gate, 200 km of path short
+  of the threshold at 800 m/s. The bank's side sets the cross-range: it reverses when the runway's
+  bearing drifts past a deadband of 8 to 12°. A feedback on the sink rate keeps the glide from skipping,
+  and the bank is held to what the equilibrium glide allows inside the limits.
+- **What it learns.** Each step it feels its own acceleration (the change in velocity, less gravity and
+  the known thrust) and compares the drag and lift in it with its model's. Two pairs of fading-memory
+  filters keep the ratios. Against the model's air, they scale the entry's predictor and law; against
+  the air data's dynamic pressure, below Mach 4, they correct the coefficients the glide and the
+  approach fly by.
+- **The terminal area.** From Mach 2.6 and about 31 km: a glide to a circle of 5 km radius that touches
+  the extended centreline 14 km north of the threshold, round it, and onto the final, the energy spent
+  by angle of attack; whole turns round the circle when too high.
+- **The approach.** The drive relit at low throttle: level until the 3° glide path comes down, then
+  down it as an airliner flies it, gear down, the speed held by the throttle; a flare from 12 m, the
+  wheels on, the nose lowered, the brakes, the nose wheel on the centreline. The lateral law feeds
+  forward the Earth's turn, which pushes a craft flying south at 100 m/s 8 mm/s² to the right.
+
+The limits (`orbit_return.h`, chosen; the guidance keeps 15 to 20 % inside them): heat 600 kW/m² at the
+stagnation point of a 1 m nose, where the skin in radiative equilibrium (emissivity 0.85) is at 1,880 K,
+about 1,600 °C, the range reinforced carbon–carbon, the Shuttle's nose cap, is made for; 2.5 g; 20 kPa
+of dynamic pressure. The heat flux is Sutton and Graves's; the readouts give it, its peak, its sum, the
+skin's temperature and a glow for the page.
+
+From the tests (`test/test_return.cpp`):
+
+| started | burn | entry interface | touchdown | heat, peak | load, peak | propellant |
+|---|---|---|---|---|---|---|
+| at insertion, 800 s | 2,675 s, 127 m/s | 4,754 s, 11,200 km out | 7,881 s, 2.0 h later | 387 kW/m², 1,683 K | 1.63 g | 1.12 t |
+| a pass just missed, 2,620 s | 2,790 s, 127 m/s | 4,869 s | 7,870 s | 412 kW/m² | 1.66 g | 1.12 t |
+| after the day's last pass, 3,700 s | 69,696 s (the runway 1,028 km off the plane) | 71,775 s | 74,679 s, 19.7 h later | 389 kW/m² | 1.65 g | 0.47 t |
+| off the Ring's hub, 1,600 s | 2,766 s, 121 m/s | 4,731 s | 7,865 s | 387 kW/m² | 1.65 g | 1.11 t |
+| the far side raised to 806 km | 71,731 s, 196 m/s | 74,198 s | 77,343 s | 387 kW/m² | 1.68 g | 1.34 t |
+
+Every one touches down 429 to 437 m past the threshold, 0.07 m left of the centreline, sinking 0.74 m/s
+at 99 to 100 m/s, and stops 2.1 km down the runway on its centreline. Peak dynamic pressure 9.0 to
+9.4 kPa. The tests also start it from six times round the day, from a lowered orbit, with the pilot
+taking the controls in the entry, the glide and on final and giving them back, and with the
+guidance's model wrong at the corners of the box below. They check that the same inputs give the same
+flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g).
+
+**Robustness.** The guidance's model of the air and the craft made wrong while the craft flies the
+core's own (`oc_return_model_error`): the density off by a factor and a wave of 12 km in height, the
+lift and drag coefficients each by a factor, all drawn at random, with the return started anywhere in
+a day. A landing counts when it touches down in the first 900 m, within 3 m of the centreline, sinking
+under 2 m/s, stops on the runway and stays inside the limits. Pools 1 and 2 were flown while the
+guidance was being built, and it was changed after them; 2026 and 2027 were drawn afterwards and flown
+once, with nothing changed since.
+
+| pool | the guidance's model wrong by, each drawn evenly | runs | landed | 95 % interval |
+|---|---|---|---|---|
+| 1, while building | density ×0.75 to 1.25 and a wave of up to 15 %; lift and drag each ×0.9 to 1.1 | 64 | 64 | 94.3–100 % |
+| 2026, held out | the same | 200 | **200** | **98.1–100 %** |
+| 2, while building | density ×0.6 to 1.4 and a wave of up to 25 %; lift and drag each ×0.8 to 1.2 | 64 | 60 | 85.0–97.5 % |
+| 2027, held out | the same | 100 | **91** | **83.8–95.2 %** |
+
+Every landing in them touches down 424 to 437 m past the threshold, 0.07 m left of the line, sinking
+0.73 to 0.74 m/s: once the approach has learned the coefficients it flies the same. Peak heat 308 to
+517 kW/m², peak load 1.49 to 2.11 g, peak dynamic pressure 10.2 kPa at most. Every run lost had a model
+whose lift over drag was off by more than a factor of 1.2 either way (×0.74 to 0.80, ×1.22 to 1.45): the
+entry's reach then fell short of where the plan, made in orbit before anything could be learned, sent
+it. In the wide pools, 118 of 118 runs with that factor within 1.2 landed; beyond it, 15 of 16 where the
+runway lay within 700 km of the plane, and 18 of 30 where it lay 1,000 km off, on the first pass of the
+day's window, the one most starts take. The plan takes the first pass in reach; preferring a nearer
+pass, one or two later, would buy margin for an hour or three of waiting.
+
+Run it: `flight/orbit/build/test_return monte_carlo <first> <count> <pool> [density wave coefficients]`
+prints a line for each run and the rate with a 95 % Wilson interval; shard a pool across processes by
+`first`.
+
+What is weak. The plan's reach (1,200 km off the plane) and its search are for round orbits and
+moderately eccentric ones: an orbit raised to 1,475 km is planned, one to 2,650 km is not. A craft
+dropped into the air beyond the entry's reach glides toward the runway and comes down short; there is
+no landing elsewhere. Every dispersed landing ends almost the same, because the entry delivers the same
+gate and the approach learns the coefficients: winds, a different runway or a failure would test the
+terminal area as the dispersions do not. The predictor knows the craft's mass exactly and has no sensor
+noise. Seen from the chase view, the trail's near end can show as pale bands against a bright limb.
 
 ### The Sun and the Moon
 
@@ -374,15 +477,14 @@ in orbit, work and energy on the ascent, the propellant's bookkeeping, one frame
 bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, and a
 receipt for every number. `test/test_invariants.cpp` holds them as physics, with tolerances derived from
 RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`). Its
-`// DEFECT:` lines are three invariants the core breaks today, each with a fix proposed in
-`INVARIANTS.md`; `test_invariants defects` runs them. `evidence/` keeps the receipts. Every constant and
+Three defects it found are fixed and their tests run with the rest: the hash missed fields, non-finite
+controls were taken, and an escape path's periapsis was wrong. `INVARIANTS.md` keeps what was found. `evidence/` keeps the receipts. Every constant and
 every number stated here is certified by Abacus, the owner's tool of certified arithmetic, or cited
 where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists the mismatches found.
 
 ## What is not
 
-Re-entry and landing back. The
-Ring's inside, its people, anything furnished. Terrain: the globe is smooth and the field flat. The
+The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Wind. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
 
 ## Handoff to Unreal

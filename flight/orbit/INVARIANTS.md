@@ -64,11 +64,12 @@ second figure is given.
   residual motion. The coast's felt acceleration under 10⁻⁹ g, from the thin air's ½ρv²S c_d/m with
   c_d < 0.1. Standing, gravity less the Earth's turn to 10⁻⁴ g.
 
-## Defects: invariants the core breaks today
+## Defects: invariants the core broke, now fixed
 
-Each has a test, named on a `// DEFECT:` line of `test_invariants.cpp`. ctest does not run those lines,
-so the suite stays green, but each fails when run by name (`test_invariants defects` runs all three).
-When a fix lands, its line becomes a `// TEST:` line. Each fix below was tried on a copy of the core: the
+Each was found with a test on a `// DEFECT:` line of `test_invariants.cpp`, which ctest does not run and
+which fails when run by name (`test_invariants defects` runs any that stand). All three fixes landed at
+the merge of this pass (`a3556c9`), and their lines are `// TEST:` lines now; what follows is what was
+found, as it was found. Each fix below was tried on a copy of the core: the
 three tests pass, and so do the other 26, natively and as WebAssembly.
 
 - **D1. The hash is not of the whole state** (O6). `orbit_core.h` calls `oc_hash` "a hash of the whole

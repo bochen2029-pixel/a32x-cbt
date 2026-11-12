@@ -978,7 +978,7 @@ void ringShape() {
                 OC_HUB_PORT_M + OC_STANDOFF_M, OC_RING_WIDTH_M / 2);
 }
 
-// ---- the defects: each test states an invariant the core breaks today -----------------------------
+// ---- the defects found: each test states an invariant the core broke, fixed at the merge (a3556c9) --
 
 // The hash is the state's (orbit_core.h: "a hash of the whole state"): equal hashes, equal futures. Who
 // flies, what the hold points at and the pilot's hands all decide the future; a change of any must change

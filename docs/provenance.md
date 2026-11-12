@@ -274,7 +274,21 @@ station.
 
 #### The flight home
 
-Nothing taken from outside yet.
+`core/return.cpp`, `web/src/return-view.js`. Methods only: no code or data file is taken from any of
+these, and the code is ours.
+
+| source | licence | what is taken |
+|---|---|---|
+| K. Sutton and R. A. Graves Jr., *A general stagnation-point convective-heating equation for arbitrary gas mixtures*, NASA TR R-376 (1971) | public domain, a work of the US government | the stagnation point's heat flux, q̇ = k √(ρ / R<sub>n</sub>) V³, and its constant for the Earth's air, 1.7415 × 10⁻⁴ in SI units. The nose radius, 1 m, is ours |
+| P. Lu, "Entry guidance: a unified method", *Journal of Guidance, Control, and Dynamics* 37(3), 2014 | the paper's method | the numerical predictor-corrector: the rest of the entry flown forward with the vehicle's own model each guidance cycle, the bank's size on a profile whose one parameter is moved until the predicted miss at the entry's end is nil; the quasi-equilibrium glide as the condition a steady glide's sink rate is damped toward. Ours is simpler: the profile linear in speed (Lu's is in energy), a secant step on its start, the miss measured as path to go at a gate |
+| P. Lu, C. J. Brunner, S. J. Stachowiak, G. F. Mendeck, M. A. Tigges and C. J. Cerimele, "Verification of a fully numerical entry guidance algorithm", *Journal of Guidance, Control, and Dynamics* 40(2), 2017 | the paper's method | after it: fading-memory filters on the ratios of the sensed to the modelled lift and drag accelerations, which scale the predictor's model in flight. The memory (10 s), the threshold below which the air teaches nothing, and the second pair against the air data's dynamic pressure below Mach 4 are ours |
+| J. C. Harpold and C. A. Graves Jr., "Shuttle entry guidance", *Journal of the Astronautical Sciences* 27(3), 1979 | the paper's method | the lateral logic: the bank reverses when the bearing to the target passes a deadband that narrows as the speed falls. Our deadband, 8 to 12°, is on the bearing to where the glide joins the circle below |
+| T. E. Moore, *Space Shuttle entry terminal area energy management*, NASA TM-104744 (1991) | public domain, a work of the US government | the heading alignment circle: a circle tangent to the extended centreline, flown to and round onto the final, with the energy to spend reckoned over the path to go. Ours spends it by angle of attack and whole turns round the circle, not a speed brake, and the drive is relit for a powered final |
+| radiative equilibrium (Stefan and Boltzmann) | physics | the skin's temperature, the heat flux and the air's own temperature against εσT⁴, emissivity 0.85 (ours) |
+| E. B. Wilson, "Probable inference, the law of succession, and statistical inference", *Journal of the American Statistical Association* 22 (1927) | the paper's method | the 95 % interval on a Monte Carlo's success rate |
+| SplitMix64: G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014; S. Vigna's C version | the published algorithm; Vigna's code is public domain | the Monte Carlo's generator: its increment and its two multipliers |
+| `booster-lander-simulator`, this project's owner's 6-DOF propulsive-landing simulator | MIT | a practice, read and not ported: predictors shoot forward only, never integrating the plant back; a controller is judged by its success rate over many dispersed runs, with an interval, and development pools are kept apart from held-out pools flown once. No code taken |
+| this project | — | the plan (the pass search, the late pass taken with more bank, the burn to a 60 km low point), the entry's angle of attack schedule and its easing, the limits and their margins, the gate, the terminal area's and the approach's laws, the flare and the rollout, the feed-forward of the Earth's turn on the final, the dispersions and their boxes, the glow and the trail |
 
 #### The Sun and the Moon
 
