@@ -74,7 +74,8 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | part | how | from |
 |---|---|---|
 | the Earth | a sphere of 6,371 km, its gravity a point mass's, turning once a sidereal day; the ground level to the local plumb line, so a parked craft stays parked | ours |
-| the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %). No wind | the standard's, to 86 km; ours above |
+| the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %) | the standard's, to 86 km; ours above |
+| the wind | none unless set (`oc_wind`, "The wind" below): a field of height, place and time from a seed, the mean wind of MIL-F-8785C's log law near the ground up to a jet stream 10 to 12 km up, and von Kármán's gusts at that specification's intensities and lengths | MIL-F-8785C; von Kármán; Kraichnan's random Fourier modes |
 | the craft | 60 t, half of it propellant; a delta lifting body, 150 m², 18 m span; Polhamus's lift for a slender delta, blending to Newtonian impact from Mach 1.5 to 5; static and damping derivatives; three gear legs | ours; Polhamus's method |
 | the drive | 1.2 × the take-off weight, 706 kN, at 2,000 s of specific impulse: **the one fiction**. At 450 s, the best of chemical rockets, half the craft's mass in propellant would buy 3 km/s, a third of what orbit takes. Thrust follows the throttle with a 0.4 s lag | ours |
 | control | a rate loop by dynamic inversion, inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give | ours |
@@ -92,8 +93,8 @@ holding off its hub reads about 0.7 m/s there.
 
 The core is one program in parts, each with its own header, readouts and tests: `core/orbit_core.cpp`
 (the flight, the crew to orbit, the approach), `return.cpp` (the flight home), `dock.cpp` (docking and
-contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `walk.cpp` (a person inside
-the Ring); `internal.h` is what they share. The
+contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `wind.cpp` (the wind),
+`walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
 page is the same: `web/src/main.js` flies and draws, and each further part is a module of its own
 (`web/src/features.js` lists them and says what each may do). The Ring's shape is one set of numbers,
 in `orbit_core.h`, that the core and the drawing both use.
@@ -317,6 +318,45 @@ it. The view leans a quarter of the way toward the felt up, so the lift's sidewa
 Not in the walk: people, furnishing, doors into the blocks (they are solid), water to swim in (the parapets
 keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the Earth's light, the way
 from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g).
+
+### The wind
+
+The air has its own motion over the turning Earth only when a wind is set: `oc_wind(seed, strength)`
+(`orbit_wind.h`, `core/wind.cpp`), kept through everything but a reset. The seed picks the day; the
+strength scales the whole field, 1 being MIL-F-8785C's light day (15 knots 20 ft up), 2 its moderate (30),
+3 its severe (45). `orbit_core.cpp` takes the wind off the craft's velocity wherever the air's push is
+reckoned, so it moves every aerodynamic force and moment and every readout made from the airspeed; nothing
+else reads it, and the crews learn it from their instruments or not at all.
+
+- **The mean wind.** Up to 1,000 ft, the specification's log law, W20 ln(h / z₀) / ln(20 ft / z₀) with
+  z₀ = 0.15 ft, veering with height through 25° as an Ekman layer does, from the surface wind to the wind
+  above it, which may come from anywhere. Above, a smooth climb to a westerly jet stream's core 10 to 12 km
+  up (30 m/s at strength 1, give or take 30 %), 30 % of it 8 km higher, an upper wind of 15 m/s from 35 to
+  80 km, and nothing from 100 km; its speed and direction wander round the world and through the days, as
+  the westerlies' long waves do.
+- **The gusts.** Von Kármán's isotropic turbulence, at the specification's intensities and lengths by
+  height: near the ground σ_w = 0.1 W20 with L_w the height, and the level gusts stronger and longer by its
+  formulae; from 2,000 ft L = 2,500 ft and σ = 0.1 W20, fading from 15 km to nothing at 25 km. The field
+  is a sum of 120 random Fourier modes (Kraichnan's method) in 40 shells from 30 km to 25 m, each turning
+  slowly in time at its eddies' rate; shorter gusts the craft's own size averages out. Sampled along any
+  straight path it has von Kármán's longitudinal spectrum along the path and the transverse across it.
+
+From the tests (`test/test_wind.cpp`; `invariants.windy_ledger`, `invariants.wind_finite`):
+
+| | |
+|---|---|
+| no wind (the default, or a strength of 0) | the field never evaluated; every hash and readout as before the wind existed, bit for bit, natively and as WebAssembly (`INVARIANTS.md`, O15) |
+| the mean wind near the ground | the log law to 5 × 10⁻¹¹; the veer from 20 to 1,000 ft 11.11°, as the law's share of the 25° says |
+| the jet, 50 seeds over KDFW | the strongest wind from 1 to 30 km between 10.0 and 12.0 km up, 17 to 47 m/s; the steepest shear above 300 m 0.008 s⁻¹ |
+| the gusts 8 km up, 48 seeds, octaves from 1.6 km to 50 m | within 12 % of the field's own spectrum along and across; down to 100 m within 7 % of MIL-F-8785C's von Kármán, and 95 % off Dryden's in the shortest octave; variance 0.97, 1.00, 1.02 of (0.1 W20)² |
+| the gusts 50 ft up, 48 seeds | σ_w 1.006 of 0.1 W20; σ_u 1.853 of it, the specification's 1.839 |
+| parked in a 13 m/s wind | the airspeed reads the air's speed past the craft exactly; the craft rocks on its gear at 1 cm/s |
+| still air at v − w against the wind at v | the same push, to 2 × 10⁻¹⁴ |
+| the crew to orbit through severe winds, 24 to 28 m/s on the runway | 748 to 754 s, 500.5 × 499.7 km, the same as in still air within 6 s and 0.1 km |
+| the ascent's work and energy in a severe wind | the ledger closes to 4.4 × 10⁻⁵ J/kg; reckoned on the velocity over the ground instead, it misses by 7 × 10⁵ |
+
+The field's numbers are the specification's where it gives them and this sketch's elsewhere (the jet, the
+upper wind, the Ekman turn's size, the wander); it describes no real day's weather.
 
 ### The flight home
 
@@ -681,7 +721,8 @@ where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists t
 
 ## What is not
 
-The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Wind. The
+The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Weather but the
+wind: no cloud, rain or shear of a front, and the wind does not change the air's density or temperature. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
 
 ## Handoff to Unreal

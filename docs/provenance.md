@@ -292,6 +292,23 @@ craft that lands like this on a turning deck has never been built.
 The walk's physics is Newton's; its numbers are chosen, and the place is drawn by code. It describes no real
 station.
 
+#### The wind
+
+`flight/orbit/core/wind.cpp`, `orbit_wind.h`, `wind_state.h` and `test/test_wind.cpp` are ours, GPLv3. Methods
+and published numbers only; no code or data file is taken.
+
+| source | licence | what is taken |
+|---|---|---|
+| US Department of Defense, MIL-F-8785C, *Military specification: flying qualities of piloted airplanes* (5 November 1980), §3.7, "Atmospheric disturbances"; the same models in MIL-HDBK-1797 | public domain, a work of the US government, approved for public release | the mean wind's log law near the ground, W20 ln(h / z₀) / ln(20 ft / z₀), with z₀ = 0.15 ft for the terminal flight phases; the von Kármán turbulence model's intensities and length scales by height (below 1,000 ft σ_w = 0.1 W20, L_w = h, σ_u = σ_w / (0.177 + 0.000823 h)^0.4, L_u = h / (0.177 + 0.000823 h)^1.2, h in feet; from 2,000 ft L = 2,500 ft; straight between), its longitudinal and transverse spectra and their constant 1.339, and the light, moderate and severe days as W20 of 15, 30 and 45 knots. Above 2,000 ft the intensity, 0.1 W20 to 15 km and fading to nothing at 25 km, is ours, not the specification's table |
+| T. von Kármán, "Progress in the statistical theory of turbulence", *Proceedings of the National Academy of Sciences* 34 (1948), 530–539 | the paper's result | the energy spectrum of isotropic turbulence, E(k) ∝ k⁴ / (1 + (kL′)²)^(17/6), from which the gusts are made |
+| R. H. Kraichnan, "Diffusion by a random velocity field", *Physics of Fluids* 13 (1970), 22–31 | the paper's method | a turbulent velocity field as a sum of random Fourier modes, each wavevector drawn evenly over directions and its velocity square to it, their amplitudes from the energy spectrum |
+| J. C. H. Fung, J. C. R. Hunt, N. A. Malik and R. J. Perkins, "Kinematic simulation of homogeneous turbulence by unsteady random Fourier modes", *Journal of Fluid Mechanics* 236 (1992), 281–318 | the paper's method | the modes in shells spaced evenly in ln k, and each turning in time at its eddies' rate, Kolmogorov's k^(2/3); our count (40 shells of 3), range (30 km to 25 m) and rate's size are ours |
+| S. B. Pope, *Turbulent Flows*, Cambridge University Press (2000), §6.5 | textbook | the relations between the energy spectrum and the one-dimensional spectra along a line, by which the test holds the gusts to von Kármán's |
+| V. W. Ekman, "On the influence of the earth's rotation on ocean-currents", *Arkiv för matematik, astronomi och fysik* 2(11) (1905); the atmospheric Ekman layer in any text on dynamic meteorology | the paper's result | that the wind near the ground is turned toward low pressure, to the left of the wind above it north of the equator; the turn's size, 25°, is ours |
+| this project | — | the jet stream (its height, 10 to 12 km, its speed, 30 m/s at strength 1, and its fall above), the upper wind, the wind's wander round the world and through the days, the seed's draws, the strength's scale, and the gusts' fading above 15 km |
+
+The wind is a sketch's: shaped like the specification's and an atmosphere's, it describes no real day.
+
 #### The flight home
 
 `core/return.cpp`, `web/src/return-view.js`. Methods only: no code or data file is taken from any of
