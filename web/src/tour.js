@@ -16,7 +16,7 @@ const CSS = `
 `;
 
 // commands that only change what is shown: they leave the tour running
-const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view']);
+const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view', 'fd']);
 
 export const tour = {
   name: 'tour',
