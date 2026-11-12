@@ -724,8 +724,8 @@ nothing: the docking reticle and the deck's display are drawn there.
   then sit on the craft, as an autopilot's do), and off, when the core stops computing it. It leaves the
   tour running.
 
-From the tests (`test/test_fd.cpp`, `web/test/fd.test.mjs`; these numbers are the tests' own and are not yet certified in
-`evidence/`):
+From the tests (`test/test_fd.cpp`, `web/test/fd.test.mjs`; these numbers are the tests' own and are not yet
+certified in `evidence/`):
 
 | | |
 |---|---|
@@ -734,19 +734,27 @@ From the tests (`test/test_fd.cpp`, `web/test/fd.test.mjs`; these numbers are th
 | on or off | the same controls give the same flight, the state's hash less the director's own and the place and velocity bit for bit, at every mark: a pilot's climb (240), the crew's flight to orbit (753), the flight home with a pilot in the entry for a minute (501). A throttle of 0.999 for a second is told apart |
 | a person flying by the cues alone, 0.3 s late, the stick proportional to each cue's error (full at 10° of pitch, 60° of bank in the air), the throttle toward its cue at the keys' rate or slammed | off the ground at 40.3 s; the cue to shut at 749.4 s, shut at 750.5 s; ten seconds later **504.1 × 500.0 km**, inclined 32.86°, 4,376 kg left. The crew, measured the same way (the engine's tail and all): 501.2 × 500.0 km, 32.84°, 4,388 kg. Max q 35.8 kPa, 2.17 g. The cues flown within 3.0° in pitch and 2.3° in bank where they move smoothly (0.24° and 0.06° on the mean) |
 | the same person, the throttle full until its cue says shut | 572.0 × 499.1 km: the cue's taper is what puts the orbit at the Ring's height |
+| the flight home, the crew's from the insertion orbit until the person takes it, who also leads the cue by 0.4 s and brakes once down | taken waiting for the pass (the burn by hand too), falling to the air, or on final: **down 310 to 311 m past the threshold, 0.10 m off the centreline**, sinking 3.8 to 3.9 m/s at 106 m/s, stopped 2.25 km down the runway 0.2 m off; heat 387 to 438 kW/m², 1.63 to 1.96 g, 9.5 kPa at most. The crew's own: 432 m, 0.07 m, 0.74 m/s |
+| the same, without the lead, taken falling to the air | down 305 m past, 0.10 m off, but 4.87 m/s and 2.70 g: past the load's 2.5 g limit |
 | the crew's own final into 17C | within 0.021 dot of the localizer and 0.020 dot of the glide slope from 12 km to 1 km out |
 
 The check on the person is 10 km at either end of the orbit, 0.3° of inclination, 5° of each cue where it
 moves smoothly; where a cue steps (a new phase, the turn's bank, the insertion's first pitch) the 5 s after
-are left out.
+are left out. Coming home it is the flight home's own judge of a landing (the first 900 m, 3 m of the
+centreline, stopped on the runway, inside the limits), with the sink under 5 m/s.
 
 What is weak. Where the climb's pitch schedule hands over to the insertion guidance, at 38 km, the pitch cue
 steps 15° up while the hand-flying law is still the air's, down to 200 Pa, in air too thin for its roll: a
 person who grabs the bank, full stick at 30° of bank error, flies a roll oscillation there that rolls the
 craft past 90° before the rate law takes over; the test's person, at 60°, does not. The director's
-throttle and pitch are the crew's, not smoothed for a hand. The director follows the crew to orbit unless a
-flight home is under way, so a hand-flown circuit back to 17C from a take-off gets the climb's cues; the
-ILS is there for it. The localizer's antenna and coverage are a textbook ILS's, not KDFW's published one.
+throttle and pitch are the crew's, not smoothed for a hand. Coming home they are an attitude, and the
+air law holds an attitude by pitch and bank: in the entry's bank reversals, at 70° of bank, its pitch
+target turns the nose mostly in yaw, and the angle of attack the guidance wants is hard to hold by it; a
+person who does not lead the cue passes 2.5 g. The entry asks for up to 85° of bank about the air, and the
+air law stops its bank at 75°. The flare is 2 s long, from 12 m: a hand 0.3 s late lands at about 4 m/s
+where the crew lands at 0.74. The director follows the crew to orbit unless a flight home is under way, so
+a hand-flown circuit back to 17C from a take-off gets the climb's cues; the ILS is there for it. The
+localizer's antenna and coverage are a textbook ILS's, not KDFW's published one.
 
 ### Rigour
 
