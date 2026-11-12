@@ -197,11 +197,25 @@ const FRAGMENT = /* glsl */ `
         // the samples packed toward where the air is: near the eye from low down, near the ground when
         // looking down from above most of it (air.js holds the same two lines to a fine reference)
         bool deep = tEarth > 0.0 && uAlt > HR;
+        // from above most of the air, a ray along the limb that misses the ground is densest at its lowest
+        // point, tc: the chord split there, each half packed toward it (air.js's 'limb')
+        float tc = -b;
+        bool limb = tEarth <= 0.0 && uAlt > HR && tc > t0 && tc < t1;
         for (int i = 0; i < VIEW_STEPS; i++) {
-          float s0 = float(i) / float(VIEW_STEPS), s1 = float(i + 1) / float(VIEW_STEPS);
-          float a0 = deep ? 1.0 - (1.0 - s0) * (1.0 - s0) : s0 * s0, a1 = deep ? 1.0 - (1.0 - s1) * (1.0 - s1) : s1 * s1;
-          float t = t0 + L * 0.5 * (a0 + a1);
-          float ds = L * (a1 - a0);
+          float t, ds;
+          if (limb) {
+            bool first = i < VIEW_STEPS / 2;
+            float m = float(first ? VIEW_STEPS / 2 : VIEW_STEPS - VIEW_STEPS / 2), k = float(first ? i : i - VIEW_STEPS / 2);
+            float s0 = k / m, s1 = (k + 1.0) / m, A = first ? t0 : tc, Lh = first ? tc - t0 : t1 - tc;
+            float a0 = first ? 1.0 - (1.0 - s0) * (1.0 - s0) : s0 * s0, a1 = first ? 1.0 - (1.0 - s1) * (1.0 - s1) : s1 * s1;
+            t = A + Lh * 0.5 * (a0 + a1);
+            ds = Lh * (a1 - a0);
+          } else {
+            float s0 = float(i) / float(VIEW_STEPS), s1 = float(i + 1) / float(VIEW_STEPS);
+            float a0 = deep ? 1.0 - (1.0 - s0) * (1.0 - s0) : s0 * s0, a1 = deep ? 1.0 - (1.0 - s1) * (1.0 - s1) : s1 * s1;
+            t = t0 + L * 0.5 * (a0 + a1);
+            ds = L * (a1 - a0);
+          }
           vec3 p = o + d * t;
           vec3 dens = density(max(length(p) - RE, 0.0));
           od += dens * ds * 0.5;

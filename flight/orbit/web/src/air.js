@@ -10,8 +10,19 @@
 export const RE = 6371000, RA = RE + 100000;
 export const HR = 8000, HM = 1200;
 
-// The ith of n spans of a view ray from t0 to t0 + L: its middle and its length, m.
-export function viewSpan(i, n, t0, L, deep) {
+// The ith of n spans of a view ray from t0 to t0 + L: its middle and its length, m. mode: 'eye' packs the
+// samples toward the eye (low down, looking up or along); 'ground' toward the far end (from above most of
+// the air, the ray ending on the ground); 'limb' toward the ray's lowest point tc (from above most of the
+// air, a ray along the limb that misses the ground: the chord split at tc, each half packed toward it).
+// A boolean is the old form: true 'ground', false 'eye'.
+export function viewSpan(i, n, t0, L, mode, tc = 0) {
+  if (mode === 'limb') {
+    const h = n >> 1, first = i < h, m = first ? h : n - h, k = first ? i : i - h;
+    const s0 = k / m, s1 = (k + 1) / m, A = first ? t0 : tc, Lh = first ? tc - t0 : t0 + L - tc;
+    const a0 = first ? 1 - (1 - s0) * (1 - s0) : s0 * s0, a1 = first ? 1 - (1 - s1) * (1 - s1) : s1 * s1;
+    return { t: A + Lh * 0.5 * (a0 + a1), ds: Lh * (a1 - a0) };
+  }
+  const deep = mode === true || mode === 'ground';
   const s0 = i / n, s1 = (i + 1) / n;
   const a0 = deep ? 1 - (1 - s0) * (1 - s0) : s0 * s0, a1 = deep ? 1 - (1 - s1) * (1 - s1) : s1 * s1;
   return { t: t0 + L * 0.5 * (a0 + a1), ds: L * (a1 - a0) };
@@ -30,11 +41,12 @@ export function opticalDepth(alt, mu, n, nearEye = false) {
   if (discA <= 0) return { rayleigh: 0, mie: 0, ground: false };
   const t0 = Math.max(0, -b - Math.sqrt(discA));
   const t1 = tEarth > 0 ? tEarth : -b + Math.sqrt(discA);
-  const L = t1 - t0, deep = !nearEye && tEarth > 0 && alt > HR;
+  const L = t1 - t0, tc = -b;
+  const mode = nearEye ? 'eye' : tEarth > 0 && alt > HR ? 'ground' : tEarth <= 0 && alt > HR && tc > t0 && tc < t1 ? 'limb' : 'eye';
   const steps = n || 20000;
   let rayleigh = 0, mie = 0;
   for (let i = 0; i < steps; i++) {
-    const { t, ds } = n ? viewSpan(i, n, t0, L, deep) : { t: t0 + L * (i + 0.5) / steps, ds: L / steps };
+    const { t, ds } = n ? viewSpan(i, n, t0, L, mode, tc) : { t: t0 + L * (i + 0.5) / steps, ds: L / steps };
     const h = Math.max(0, Math.hypot(o[0] + d[0] * t, o[1] + d[1] * t) - RE);
     rayleigh += Math.exp(-h / HR) * ds;
     mie += Math.exp(-h / HM) * ds;

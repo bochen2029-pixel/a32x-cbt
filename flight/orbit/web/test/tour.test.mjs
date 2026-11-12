@@ -106,6 +106,16 @@ test('if the start leaves no crew flying, the tour asks for it, once: CREW toggl
   assert.deepEqual(outs.flatMap((o) => o.commands), ['reset', 'crew']);
 });
 
+test('the skip of the wait is asked again if it was not taken, and never while it is skipping', () => {
+  const home = (s, wall) => ({ ...s, onGround: false, retPhase: RET_PH.wait, wall });
+  let stage = 'home', memory = { since: 0 };
+  const step = (s) => { const o = tourStep(stage, memory, { ...base, ...s }); stage = o.stage; memory = o.memory; return o.commands; };
+  assert.deepEqual(step(home({}, 0)), ['return', 'return'], 'RETURN on the way in, and the skip at once');
+  assert.deepEqual(step(home({}, 1)), [], 'not again within 3 s');
+  assert.deepEqual(step(home({}, 4)), ['return'], 'not taken: asked again');
+  assert.deepEqual(step(home({ skipping: true }, 9)), [], 'skipping: never a second press, which would stop it');
+});
+
 test('a crash ends the tour and says so', () => {
   const outs = drive([{ t: 0 }, { t: 50, crashed: true, wall: 1 }]);
   assert.equal(outs.at(-1).ended, true);

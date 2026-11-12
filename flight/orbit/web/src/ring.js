@@ -14,7 +14,7 @@ import { Paint, rng } from './paint.js';
 import {
   ARRAYS, CANAL, COLLAR, DECK, DECK_A, DECK_DOOR, DECK_HALF, DECK_WALL, FOOT, HALF, INNER, MAST, PORT, QUAY, RING, SQUARE, SQUARES,
   TILE, TILES, bulkheads, lights as planLights, radiators as planRadiators, spokeAngle, standing, structure, town,
-} from './ring-plan.js';
+wallFaces, } from './ring-plan.js';
 
 export { RING };
 
@@ -257,13 +257,14 @@ function paintFloor(T, plan, seed) {
 
 // The deck: dark plates in rows, their seams, wear down the middle, a painted line along each side and
 // across each end, small lights set in the plating by the edges; the centreline left plain, where the
-// pads are drawn. u along the deck (its bulkheads included), v across it.
+// pads are drawn. u along the deck (its bulkheads included), v across it: the band's whole width, HALF
+// each side, as the core's deck.
 function paintDeck(T, seed) {
-  const len = DECK.arc + 2 * DECK.bulkhead, w = T / 2, h = T / 4, su = w / len, sv = h / (2 * INNER), r = rng(seed);
+  const len = DECK.arc + 2 * DECK.bulkhead, w = T / 2, h = T / 4, su = w / len, sv = h / (2 * HALF), r = rng(seed);
   const p = new Paint(w, h, { base: [0.085, 0.09, 0.1], rough: 0.65, metal: 0.35 });
-  const X = (u) => (u + len / 2) * su, Y = (v) => (v + INNER) * sv;
+  const X = (u) => (u + len / 2) * su, Y = (v) => (v + HALF) * sv;
   for (let u = -len / 2; u < len / 2; u += 12) {
-    for (let v = -INNER; v < INNER; v += 8) {
+    for (let v = -HALF; v < HALF; v += 8) {
       const k = 0.075 + r() * 0.04;
       p.rect(X(u), Y(v), X(u + 12), Y(v + 8), { albedo: [k, k * 1.03, k * 1.1], height: 0.2 + r() * 0.1, rough: 0.55 + r() * 0.2 });
       p.seam(X(u), Y(v), X(u + 12), Y(v + 8), 1, 0.4, 0.7);
@@ -271,13 +272,13 @@ function paintDeck(T, seed) {
   }
   p.rect(X(-len / 2), Y(-180), X(len / 2), Y(180), { tint: 0.85 });              // where the craft come and go, darker
   const paint = { albedo: [0.55, 0.42, 0.08], rough: 0.5, metal: 0 }, white = { albedo: [0.6, 0.6, 0.58], rough: 0.5, metal: 0 };
-  for (const v of [-(INNER - 55), INNER - 55]) p.rect(X(-len / 2), Y(v - 2.5), X(len / 2), Y(v + 2.5), paint);
-  for (const u of [-(DECK.arc / 2 - 30), DECK.arc / 2 - 30]) p.rect(X(u - 2.5), Y(-INNER + 55), X(u + 2.5), Y(INNER - 55), paint);
+  for (const v of [-(HALF - 55), HALF - 55]) p.rect(X(-len / 2), Y(v - 2.5), X(len / 2), Y(v + 2.5), paint);
+  for (const u of [-(DECK.arc / 2 - 30), DECK.arc / 2 - 30]) p.rect(X(u - 2.5), Y(-HALF + 55), X(u + 2.5), Y(HALF - 55), paint);
   // lanes toward the bulkheads' doors along each side, kept off the centreline and its pads
-  for (const v of [-(INNER - 140), INNER - 140, -(INNER - 250), INNER - 250]) {
+  for (const v of [-(HALF - 140), HALF - 140, -(HALF - 250), HALF - 250]) {
     for (let u = -DECK.arc / 2 + 40; u < DECK.arc / 2 - 40; u += 30) p.rect(X(u), Y(v - 1.5), X(u + 18), Y(v + 1.5), white);
   }
-  for (let u = -DECK.arc / 2 + 12; u < DECK.arc / 2; u += 24) for (const v of [-(INNER - 65), INNER - 65]) p.rect(X(u), Y(v - 1), X(u + 2), Y(v + 1), { glow: 1, albedo: [0.4, 0.45, 0.5] });
+  for (let u = -DECK.arc / 2 + 12; u < DECK.arc / 2; u += 24) for (const v of [-(HALF - 65), HALF - 65]) p.rect(X(u), Y(v - 1), X(u + 2), Y(v + 1), { glow: 1, albedo: [0.4, 0.45, 0.5] });
   p.grain(r, 0.05, 0.05);
   return p;
 }
@@ -349,10 +350,11 @@ function cylinder({ r, y0, y1, segs, inward = false, uTiles = 1, vTiles = 1, a0 
 }
 
 // A flat ring across the axis at y, facing +y (facing 1) or -y; u round, v from r0 to r1.
-function annulus({ r0, r1, y, segs, facing, uTiles = 1, vTiles = 1 }) {
+function annulus({ r0, r1, y, segs, facing, uTiles = 1, vTiles = 1, a0 = 0, a1 = TAU }) {
   const pos = [], nor = [], uv = [], idx = [];
+  segs = Math.max(2, Math.ceil(segs * ((a1 - a0) / TAU)));
   for (let i = 0; i <= segs; i++) {
-    const a = (i / segs) * TAU, s = Math.sin(a), c = Math.cos(a);
+    const a = a0 + ((a1 - a0) * i) / segs, s = Math.sin(a), c = Math.cos(a);
     for (const [r, v] of [[r0, 0], [r1, vTiles]]) {
       pos.push(r * s, y, r * c);
       nor.push(0, facing, 0);
@@ -627,10 +629,13 @@ export class Ring {
 
     // the band: hull, end walls inside and out, the rims' inner faces, the floor, the glazed roof
     add(cylinder({ r: RING.hull, y0: -HALF, y1: HALF, segs, uTiles: 120 }), hullM);
+    // Over the deck's open sector the walls stand at the band's faces, where the core's deck, its gear and
+    // its rim wall end (HALF); elsewhere they are WALL thick, their inner faces at INNER.
+    const [thick] = wallFaces();   // (not `town`: that is the plan's, imported)
     for (const side of [-1, 1]) {
       add(annulus({ r0: RING.rim, r1: RING.hull, y: side * HALF, segs, facing: side, uTiles: 120 }), wallM);
-      add(annulus({ r0: RING.rim, r1: RING.floor, y: side * INNER, segs, facing: -side, uTiles: 120 }), innerM);
-      add(cylinder({ r: RING.rim, y0: side > 0 ? INNER : -HALF, y1: side > 0 ? HALF : -INNER, segs, inward: true, uTiles: 240, vTiles: 0.12 }), hullM);
+      for (const f of wallFaces()) add(annulus({ r0: RING.rim, r1: RING.floor, y: side * f.y, segs, facing: -side, uTiles: 120, a0: f.a0, a1: f.a1 }), innerM);
+      add(cylinder({ r: RING.rim, y0: side > 0 ? INNER : -HALF, y1: side > 0 ? HALF : -INNER, segs, inward: true, uTiles: 240, vTiles: 0.12, a0: thick.a0, a1: thick.a1 }), hullM);   // the thick walls' lips
     }
     // the floor, but for the deck's sector and its bulkheads; the roof, but for the deck
     const open = DECK_HALF + DECK_WALL;
@@ -644,7 +649,7 @@ export class Ring {
     const deckM = surface({ maps: deck, shared: S, floor: true });
     const doorM = surface({ maps: door, shared: S });
     this.materials.push(deckM, doorM);
-    add(cylinder({ r: RING.floor, y0: -INNER, y1: INNER, segs: segs * 4, inward: true, a0: DECK_A - open, a1: DECK_A + open, local: true }), deckM);
+    add(cylinder({ r: RING.floor, y0: -HALF, y1: HALF, segs: segs * 4, inward: true, a0: DECK_A - open, a1: DECK_A + open, local: true }), deckM);   // the band's whole width, as the core's deck
     for (const b of bulkheads()) {
       // the face toward the deck, with its door: a quad standing radially, across the band
       const f = b.face, n = [-b.side * Math.cos(f), 0, b.side * Math.sin(f)];

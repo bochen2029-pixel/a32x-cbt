@@ -474,8 +474,10 @@ against JPL's Horizons (DE441), which shares nothing with the book:
 | 2024-04-08 over KDFW, the eclipse | the centres 0.0114° apart at 18:43:21 UTC | 0.0110° at 18:42:32 |
 | 2018 to 2034 | the Moon within 7″ and 41 km, the Sun within 21″ | |
 
-What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own and
-no tone curve, as an eye adapted to it sees it, the full Moon's highlands at three quarters of white; its
+What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own and,
+on the low tier, no tone curve, as an eye adapted to it sees it, the full Moon's highlands at three
+quarters of white (on medium and high the frame is kept in HDR and tone-mapped once, with AgX, and the
+Moon goes through that curve too: its highlands read about 0.77 in sRGB there, against 0.88 on low); its
 fall with phase is taken at the power 0.35, so a crescent is brighter than a camera would show it; and
 earthshine is lifted 250 times from its true ten-thousandth of sunlight, and shown only against a dark
 sky. What is not here: the planets; refraction, which lifts the Sun and the Moon half a degree at the

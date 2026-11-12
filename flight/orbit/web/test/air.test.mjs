@@ -2,7 +2,7 @@
 // samples must find the air near the ground, where it is, and from the runway near the eye. GPLv3.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { opticalDepth, viewSpan } from '../src/air.js';
+import { RE, opticalDepth, viewSpan } from '../src/air.js';
 import { SETTINGS, TIERS } from '../src/quality.js';
 
 const views = [
@@ -11,13 +11,15 @@ const views = [
   ['from 10 km, 10 degrees down', 1e4, -Math.sin(Math.PI / 18)],
   ['from the runway, straight up', 3, 1],
   ['from the runway, 5 degrees down', 3, -Math.sin(Math.PI / 36)],
+  // along the limb from orbit, the ray missing the ground, its lowest point at 0.5, 5 and 20 km
+  ...[500, 5000, 20000].map((h) => [`from 500 km, along the limb ${h / 1000} km up`, 5e5, -Math.sqrt(1 - ((RE + h) / (RE + 5e5)) ** 2)]),
 ];
 
 test('the spans cover the whole ray, in order', () => {
-  for (const deep of [false, true]) {
+  for (const deep of [false, true, 'eye', 'ground', 'limb']) {
     let sum = 0, last = -1;
     for (let i = 0; i < 10; i++) {
-      const { t, ds } = viewSpan(i, 10, 100, 1000, deep);
+      const { t, ds } = viewSpan(i, 10, 100, 1000, deep, 430);
       sum += ds;
       assert.ok(t > last && ds > 0);
       last = t;

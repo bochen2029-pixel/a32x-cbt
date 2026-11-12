@@ -3,6 +3,7 @@
 // buttons do, through the page's own dispatcher; any command from anyone else ends it, so whoever is
 // watching can take over at any moment. GPLv3.
 
+import { ret } from './return-view.js';
 import { snapshot, tourStep } from './tour-plan.js';
 import { PLACE } from './walk-core.js';
 
@@ -105,7 +106,7 @@ export const tour = {
     if (!this.on) return;
     this.wall += dt;
     const walking = !!(ctx.walk && ctx.walk.v.on);
-    const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall));
+    const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall, { skipping: ret.skipping }));
     // back aboard before the flight's commands: while walking, the walk holds them
     if (out.walk === 'stop' && walking) ctx.walk.stop('Back aboard');
     for (const c of out.commands) this.give(ctx, c);
