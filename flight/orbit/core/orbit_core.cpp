@@ -662,12 +662,7 @@ void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
     g.phase = OC_PH_HOLD;
     g.autoMode = OC_AUTO_CREW;
     g.sas = OC_SAS_HOLD;
-    // The Sun of 12 November at one in the afternoon, local solar time, at the start: its declination
-    // -17.9 deg, the hour angle 15 deg west of the site (chosen). Held fixed among the stars for the
-    // flight, as a day's drift of a degree allows. Where the crew reaches the ring, a third of the way
-    // to the east, it is mid-afternoon, and the Sun is behind the craft as it closes on the ring.
-    const double dec = -17.9 * D2R, sub = lo - 15.0 * D2R;
-    sunEci = {std::cos(dec) * std::cos(sub), std::cos(dec) * std::sin(sub), std::sin(dec)};
+    skyReset(site);   // sky.cpp: the Sun (and the Moon) at the flight's date and time
     placeRing();
     writeOut();
 }
