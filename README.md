@@ -161,8 +161,9 @@ cabin: fans and a 400 Hz hum.
 
 A camera outside hears only what the air carries to it, late by the time the sound takes (a chase camera
 70 m behind hears the drive 0.2 s late), thinned as 1 / r, its high notes taken by the distance first,
-and from where the drive is, through a head (HRTF). Past the speed of sound the chase camera rides outside
-the drive's Mach cone and hears none of it; above the air, nothing comes through the air at all. Time run
+and from where the drive is, through a head (HRTF). Past the speed of sound only a camera inside the
+drive's Mach cone hears it: in the crew's steep climb the chase camera, trailing level behind, is outside
+it and hears only the structure. Above the air nothing comes through the air at all. Time run
 faster is played 3 dB quieter at each doubling and not at all from 50×, and the moments only near real
 time.
 
