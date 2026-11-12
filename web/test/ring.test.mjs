@@ -103,6 +103,19 @@ test('the radiators and the solar mast keep to the hub', () => {
   assert.ok(MAST.y1 - MAST.y0 > 300, 'the mast long enough to hold the arrays clear');
 });
 
+test('over the deck the walls stand at the band\'s faces, where the core\'s deck ends; round the rest, WALL inside', async () => {
+  const { DECK_A, DECK_HALF, HALF, INNER, wallFaces } = await import('../src/ring-plan.js');
+  const faces = wallFaces();
+  const span = faces.reduce((t, f) => t + (f.a1 - f.a0), 0);
+  assert.ok(Math.abs(span - 2 * Math.PI) < 1e-12, 'the faces go once round');
+  const over = faces.filter((f) => f.a0 <= DECK_A && DECK_A <= f.a1);
+  assert.equal(over.length, 1);
+  assert.equal(over[0].y, HALF, 'over the deck: at the band\'s face, as deck.cpp\'s rim (W2 = RING.width / 2)');
+  assert.ok(Math.abs(over[0].a0 - (DECK_A - DECK_HALF)) < 1e-12 && Math.abs(over[0].a1 - (DECK_A + DECK_HALF)) < 1e-12, 'exactly the open sector');
+  assert.equal(HALF, RING.width / 2);
+  assert.ok(faces.filter((f) => f !== over[0]).every((f) => f.y === INNER), 'elsewhere the thick walls\' inner faces');
+});
+
 test('the flight deck: open between spokes 0 and 1, sealed by its bulkheads, the town clear of it', async () => {
   const { DECK, DECK_A, DECK_HALF, DECK_WALL, bulkheads, onDeck, standing, fromDeck } = await import('../src/ring-plan.js');
   assert.ok(Math.abs(DECK_A - (spokeAngle(0) + spokeAngle(1)) / 2) < 1e-9, 'midway between spokes 0 and 1');
