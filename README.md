@@ -28,10 +28,11 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | Q E | right stick | yaw; the nose wheel on the ground |
 | Shift, Ctrl; Z, X | triggers | throttle up, down; full, cut |
 | I K, J L, U M | d-pad | the small thrusters: fore and aft, left and right, up and down |
-| 1 2 3 4 5 | X cycles | hold attitude, prograde, retrograde, the Ring, the hub's port |
+| 1 2 3 4 5 6 | X cycles | hold attitude, prograde, retrograde, the Ring, the hub's port, the deck (hover) |
 | G, B | Y | gear; brakes |
 | T | | in orbit: the crew flies the approach to the hub |
 | P | | in orbit near the Ring: the crew docks at the hub; docked, let go |
+| C | | in orbit near the Ring: the crew lands on the Ring's flight deck |
 | O | Start | skip ahead to orbit |
 | , . | bumpers | time slower, faster (up to 100×) |
 | V | B | view: chase, cockpit, from the Ring |
@@ -90,7 +91,8 @@ holding off its hub reads about 0.7 m/s there.
 
 The core is one program in parts, each with its own header, readouts and tests: `core/orbit_core.cpp`
 (the flight, the crew to orbit, the approach), `return.cpp` (the flight home), `dock.cpp` (docking and
-contact with the Ring), `walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
+contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `walk.cpp` (a person inside
+the Ring); `internal.h` is what they share. The
 page is the same: `web/src/main.js` flies and draws, and each further part is a module of its own
 (`web/src/features.js` lists them and says what each may do). The Ring's shape is one set of numbers,
 in `orbit_core.h`, that the core and the drawing both use.
@@ -161,6 +163,102 @@ From the tests (`test/test_dock.cpp`):
 
 Every number here is chosen to make a docking that can be flown from a keyboard and fails where it is
 flown badly. None of them describes a real docking system.
+
+### The flight deck
+
+The Ring has a deck: an open sector of its band, 1,500 m of the floor's arc and the band's whole 1 km
+across, centred 30° round from spoke 0, midway to spoke 1. The roof stops at the sector's ends and the
+floor is the deck; the rim walls and the hull go on across it. At each end a pressure bulkhead 20 m thick
+stands from the floor to the roof, its face the sector's end and its body under the roof. Three pads, 25 m
+in radius, lie on the centreline 400 m apart (`orbit_core.h`, `OC_DECK_*`; the page's `RING.deck`).
+
+**Why it is a hover.** In the Ring's own frame, which turns once in 142 s, the floor stands still and
+everything over it is pulled outward at ω²r, one g at the floor: a craft holding still over a spot of the
+deck must thrust toward the axis at that. Seen from the stars it is moving with the floor at ωr, 221.5 m/s,
+and the thrust bends its path round. A craft at rest among the stars feels no pull at all, and the deck
+sweeps past under it at ωr. Moving at u against the deck, along it, the pull is (ωr + u)²/r: flying
+spinward makes the craft heavier, antispinward lighter. So to land is to take up the deck's speed while
+coming down onto it, and the weight grows from nothing to one g as the speed against the deck goes.
+
+**The craft as a jet.** The drive swivels, as an F-35B's does: from aft (thrust along the nose) to straight
+down through the centre of mass (thrust toward the craft's top), at 15°/s, the same drive with the same flow
+of propellant. Jet-borne, roll posts in the wings and a lift jet in the nose bleed up to 5 % of its thrust
+for attitude, in proportion to the thrust through the swivel: 0.40 rad/s² in roll and 0.14 in pitch at full
+thrust, besides the small thrusters and the gimbal. Each law asks for the deck coordinates' accelerations
+(along the floor's arc, the height over it, across) and gets the thrust from the exact equations of motion
+in a cylinder about the Ring's axis, which is fixed among the stars (ρ̈ − ρψ̇² and ρψ̈ + 2ρ̇ψ̇): the
+turning frame's pulls are worked out, not left to feedback, and the tides (the craft and the Ring's centre
+falling a little differently, a few thousandths of a metre a second squared) are fed forward. One
+allocation turns the force into a level attitude turned as little as will put the force where the swivel
+sweeps (banked or yawed square to the wings, the nose pitched for what the swivel cannot reach), the
+swivel's angle, the throttle, and the small thrusters for the rest.
+
+**The crew's deck landing** (C, or LAND DECK, in orbit within 50 km of the Ring; within its reach the
+craft's own orbit is not asked about, since moving with the deck its lowest point swings by hundreds of
+kilometres): to the approach's hold point if the craft is not near it, round the Ring as docking goes; out
+into the Ring to a point 400 m over the floor and 100 m to the hold point's side of the spokes' plane, at
+rest among the stars (the nearest pad chosen); there the deck sweeps by underneath at 204 m/s, and the
+craft waits, weightless, until the pad is far enough ahead that the bleed fits between 3 and 5 m/s². Then
+the glide, the airliner's part: along the deck at 400 m, a height that follows the floor's curve, the nose
+spinward and the drive pushing the craft after the deck, so that the speed against it bleeds away on a
+schedule by the distance still to go (constant deceleration, frozen as the glide starts). The swivel turns
+from near aft back down as the weight comes on. Past the last spoke the course leaves its side for the
+centreline; the path steepens over the pad on a smooth step down through the roof's gap, never lower than
+355 m where it crosses the sector's end, at a speed that keeps the bend's pull under 3 m/s². Then the F-35's
+part: a hover 20 m over the pad's centre, held still for two seconds, and a descent at 2 m/s easing to
+0.25 m/s at the touch. On the deck the drive idles, the brakes go on, and the pilot has the craft, held on
+the deck. Relative to the deck the craft comes in tail first: the deck overtakes it, and the nose points the
+way the craft must be pushed. A landing is refused docked, crashed, out of orbit away from the Ring, far,
+fast past it, on the deck already, or under 2,000 kg of propellant.
+
+**By hand**: 6 is the deck hold, the F-35B's unified control in the deck's frame. The stick is a velocity
+against the deck in the nose's axes, 10 m/s at its stops, and centred the hold keeps the craft's place,
+along and across each on its own; held at a stop it also winds up a speed that runs down when let go, so a
+long way can be flown on the keys. The throttle is the climb or the sink, 8 m/s at its stops; its middle
+holds the height, and near the deck the sink eases itself to a touchdown's, so that a shut throttle lands
+the craft. Q E turn the nose. Taking the controls from the crew over the deck gives this hold, the throttle
+set to its middle; Space while hovering by hand gives the craft to the deck crew. The HUD carries the deck's
+lines, and the approach display the deck's ILS (a localizer along the centreline, beside the spokes until
+past the last; a glide path that follows the floor's curve then steepens), the hover's plan nose up with the
+pad, the craft's velocity and the flight director's, and a height tape: fly the cyan line onto the magenta
+circle. While the deck matters the chase view rides with it, behind the craft on its track, so the deck runs
+ahead to the pad and rises like a ramp.
+
+The gear meets the deck as it meets the runway, against the deck's motion, and its tyres stick to the spot
+where they come to rest, held by a stiff spring up to what friction holds: a craft parked on a pad stays put
+under the Earth's tide on the Ring, which a rolling friction alone would rock by a centimetre. The rest of
+the craft is a few hard points (the probe, the nose and canopy, the belly, the back, the bells, the
+wingtips and wings' edges, the fins), swept along each step against the deck; one on it is a crash. The
+bulkheads, and the roof everywhere but over the sector, are docking's solid structure.
+
+| at the touchdown | the crew's aim, and a good landing | a crash past | why |
+|---|---|---|---|
+| sink | 0.5 m/s | 3 m/s | at 3 m/s the legs' dampers alone load them past 7 g |
+| drift, across the deck's face | 0.3 m/s | 2 m/s | faster sideways a tyre trips and a leg folds |
+| off level | 2° | 10° | at 10° the low wingtip is under a metre from the deck |
+| from a pad's centre | 5 m | | on the deck but off the pad is a landing, and said so |
+
+From the tests (`test/test_deck.cpp`; these numbers are the tests' own and are not yet certified in
+`evidence/`):
+
+| | |
+|---|---|
+| the crew, from the hold point | out into the Ring at once; the glide at 123 s, the hover at 226 s, down at 238 s, at rest on pad 2 at 255 s: sink 0.278 m/s, drift 0.002 m/s, 0.01 m from the centre, 0.03° off level |
+| the glide | from 203.6 m/s against the deck (ωr at 400 m up is 203.4) and 0.0000 g to 1.5 m/s and 0.983 g in 104 s; the swivel from 0° to 89°; under the roof's height only over the sector, 571 m from its centre; at most 6.1 m off the path across, 1.5 m in height |
+| the crew, from where it reaches orbit, 25.0 km out | at the hold point at 717 s, at rest on the pad at 972 s, the same touchdown |
+| 24 seeded starts round the hold point, up to 101 m and 1.84 m/s off it | all land, on pads 1, 2 and 3 (6, 12, 6), in 253 to 256 s; the worst sink 0.278 m/s, drift 0.002 m/s, 0.01 m off the centre, 0.04°, 1,853 kg; at most 6.3 m off the path across, 1.5 m in height |
+| hovering 20 m over a pad, and 155 m | the felt acceleration 0.99617 g against ω²r 0.99659 g, and 0.96895 against 0.96955 (the tides the difference); the thrust within 0.03° of the way to the axis; the drive's flow 16.28 kg/s against mω²r/(Isp g0) 16.29 |
+| parked on the pad ten minutes, the brakes on | moved at most 0.15 mm; felt 0.9992 to 0.9995 g; the legs 5.7 cm compressed |
+| by hand, from the hover, on the keys | the stick right 4 s: 9.9 m/s across, the place along held to 3 cm; let go, at rest and held to 0.1 m; the throttle shut: down in 20 s at 0.28 m/s, 0.4 m from the pad's centre |
+| by hand, from the pad | the throttle open: 40 m up in 6.3 s; centred, the height held to 4 cm; the stick forward 4 s: 10.7 m/s, let go, at rest 56 m on and held there |
+| let go of the hold 12 m up, and 12 cm up | a crash at 10.9 m/s, the gear on the deck, the wreck left there; a firm touchdown at 0.69 m/s |
+| flown at a bulkhead, let down onto the roof 3.7 km from the sector | the probe hits the bulkhead at 48 m/s; the body hits the roof 305 m over the floor |
+| let down over the sector's middle, the gear up | through the roof's height to the deck, and the belly on it |
+| the swivel | at most 15.00°/s; from 84.6° aft again in 5.64 s when the plain hold takes over |
+| what it costs, from the hold point | 1,794 kg of 4,388: 1,051 m/s of delta-v against the deck's own 221.5 m/s, most of it holding the craft up; out and waiting 225 kg, the glide 1,119, the hover 195, the descent 256 |
+
+Every number here is chosen to make a landing that can be flown from a keyboard and shows the physics.
+None of them describes a real aircraft, ship or station.
 
 ### The walk
 

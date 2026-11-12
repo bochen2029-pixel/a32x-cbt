@@ -68,7 +68,9 @@ enum {
     OC_DOCK_HIT_RIM = 3,   /* a rim wall */
     OC_DOCK_HIT_SPOKE = 4,
     OC_DOCK_HIT_HUB = 5,
-    OC_DOCK_HIT_PORT = 6   /* the port's face, harder than the probe's stroke takes */
+    OC_DOCK_HIT_PORT = 6,     /* the port's face, harder than the probe's stroke takes */
+    OC_DOCK_HIT_DECK = 7,     /* the flight deck: with anything but the gear, or harder than the gear takes (orbit_deck.h) */
+    OC_DOCK_HIT_BULKHEAD = 8  /* a bulkhead at an end of the deck's open sector */
 };
 enum {
     OC_DOCK_PART_NONE = 0,
@@ -77,7 +79,8 @@ enum {
     OC_DOCK_PART_BODY = 3,
     OC_DOCK_PART_LEFT_WING = 4,
     OC_DOCK_PART_RIGHT_WING = 5,
-    OC_DOCK_PART_TAIL = 6
+    OC_DOCK_PART_TAIL = 6,
+    OC_DOCK_PART_GEAR = 7
 };
 
 /* why oc_auto(OC_AUTO_DOCK) was refused; a refusal leaves whoever was flying in charge */

@@ -10,17 +10,20 @@ export const OUT = [
 ];
 
 export const DT = 0.02;
-export const AUTO = { off: 0, crew: 1, approach: 2, return: 3, dock: 4 };
-export const SAS = { hold: 0, prograde: 1, retrograde: 2, target: 3, port: 4 };
+export const AUTO = { off: 0, crew: 1, approach: 2, return: 3, dock: 4, deck: 5 };
+export const SAS = { hold: 0, prograde: 1, retrograde: 2, target: 3, port: 4, deck: 5 };
 export const PHASES = ['HOLD', 'TAKE-OFF ROLL', 'ROTATE', 'CLIMB', 'ASCENT', 'INSERTION', 'ORBIT'];
 export const PH = { hold: 0, roll: 1, rotate: 2, climb: 3, ascent: 4, insert: 5, orbit: 6 };
-export const SAS_NAMES = ['HOLD', 'PROGRADE', 'RETROGRADE', 'TARGET', 'PORT'];
+export const SAS_NAMES = ['HOLD', 'PROGRADE', 'RETROGRADE', 'TARGET', 'PORT', 'DECK'];
 export const HUB_PORT_M = 350, STANDOFF_M = 300;
 
-// The ring's shape: orbit_core.h's OC_RING_* and OC_HUB_*, held equal to them by a test. Spoke k runs
-// along sin(2 pi k / spokes) ref + cos(2 pi k / spokes) (ref x axis); the hub's port is at -axis.
+// The ring's shape: orbit_core.h's OC_RING_*, OC_HUB_* and OC_DECK_*, held equal to them by a test. Spoke k
+// runs along sin(2 pi k / spokes) ref + cos(2 pi k / spokes) (ref x axis); the hub's port is at -axis. The
+// flight deck is the open sector centred at deck.angle (degrees, the spokes' convention), deck.arc of the
+// floor long, its bulkheads outside its ends, its pads on the centreline.
 export const RING = {
   spin: 0.0443, floor: 5000, width: 1000, hull: 5040, roof: 4700, rim: 4620, spokes: 6, spoke: 70, hub: 160, port: HUB_PORT_M,
+  deck: { angle: 30, arc: 1500, bulkhead: 20, pads: 3, padSpacing: 400, padRadius: 25 },
 };
 
 // KDFW 17C, its end and true heading (docs/provenance.md, 1f): where every flight starts.
