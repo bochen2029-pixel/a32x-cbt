@@ -343,6 +343,7 @@ async function main() {
     ctx.dt = dt;
     const owner = FEATURES.find((f) => f.owns && f.owns(ctx));
     if (owner) {   // a feature that draws the whole frame itself
+      renderer.info.reset();   // the pipeline counts a frame's draws when it draws; here the feature does
       owner.frame(ctx, dt);
       s = core.s;
       requestAnimationFrame(frame);

@@ -761,6 +761,9 @@ export class Ring {
     this.owned.push(mastPoints);
     this.lights = this.lightPoints;   // the name the sketch has always had
 
+    // the hub, its port and its collar take the craft's shadow, where the tier casts one (docked there)
+    for (const m of this.owned) if (m.material === hubM || m.material === portM || m.material === mouthM) m.receiveShadow = true;
+
     if (this.envMap) this.setEnvMap(this.envMap);
   }
 
