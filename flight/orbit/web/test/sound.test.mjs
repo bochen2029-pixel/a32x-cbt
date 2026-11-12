@@ -4,17 +4,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  C0, HEAT_REF, HULL, HULL_RING, JOINT_M, LEVEL, MIX_KEYS, RHO0, SHEAR_RATIO, SPREAD_REF, WARP_SILENT, WHEELBASE_M, absorbHz, airOf, carried,
-  crackleCurve, crackleDrive, crackleRate, detect, fillNoise, heatFlux, hullQ, joints, mix, newEvents, newInputs, newMemory, newMix, ringTime,
-  roomResponse, shearIndex, spread, thrusting, toCamera, turnRate, turning, warpDuck,
+  C0, HEAT_REF, HULL, HULL_RING, JOINT_M, LEVEL, MIX_KEYS, RHO0, SHEAR_RATIO, SPREAD_REF, WARP_SILENT, WHEELBASE_M, absorbHz, airOf, boomStrength,
+  carried, conePassed, crackleCurve, crackleDrive, crackleRate, detect, fillNoise, heatFlux, hullQ, joints, mix, newEvents, newInputs, newMemory,
+  newMix, ringTime, shearIndex, spread, thrusting, toCamera, turnRate, turning, warpDuck,
 } from '../src/sound-mix.js';
 import { CUES, Engine, REF, TRIM } from '../src/sound.js';
+import { fakeAudio, reach, voice } from './fake-audio.mjs';
 
 const near = (a, b, tol, what = '') => assert.ok(Math.abs(a - b) <= tol, `${what} ${a} is not ${b} within ${tol}`);
 const run = (over = {}) => mix(Object.assign(newInputs(), over), newMix());
 // what reaches an ear aboard, as power: each voice comes out at REF x its level (sound.js measures it so)
 const JET = ['roar', 'tear', 'crack'], SKIN = ['wind', 'plasma', 'plasCrack'];
-const HULLV = ['vib', 'hum', 'shear', 'kick', 'windLow', 'buffet', 'rcs', 'roll', 'brake'], CABIN = ['fans', 'elec'], RING = ['room', 'airy', 'lift'];
+const HULLV = ['vib', 'hum', 'shear', 'kick', 'windLow', 'buffet', 'rcs', 'roll', 'brake', 'hover', 'duct', 'whine', 'posts', 'actuator'], CABIN = ['fans', 'elec'];
+const RING = ['room', 'airy', 'city', 'canal', 'draught', 'rush', 'lift'];
 function power(m) {
   let p = 0;
   for (const k of JET) p += (m[k] * m.jetAboard) ** 2;
@@ -50,9 +52,10 @@ test('a chase camera 70 m behind a parked drive hears it about 0.2 s late, and t
   assert.ok(m.vib > 0.3 && m.hum > 0.15, 'the drive is felt through the structure');
   // a camera outside, in vacuum, hears nothing of the craft: not the drive, not its hull, not its cabin
   const o = run({ thr: 1, rho: 0, onGround: 0, gear: 0, tas: 7600, mach: 25, qbar: 0, outside: 1 });
-  for (const k of ['hullView', 'cabinView', 'jetAboard', 'skinAboard']) assert.equal(o[k], 0, `${k} outside in vacuum`);   // the drive through the air: carried(), above
+  for (const k of ['hullView', 'cabinView', 'jetAboard', 'skinAboard', 'hullAir', 'cabinAir', 'knocksAir']) assert.equal(o[k], 0, `${k} outside in vacuum`);
+  // in the air near the ground it does, and the hull and the cabin come to it through the air, as the drive does
   const a = run({ thr: 1, onGround: 1, tas: 40, mach: 0.12, qbar: 980, outside: 1 });
-  assert.ok(a.hullView > 0.4 && a.cabinView > 0.35, 'and in the air near the ground it does');
+  assert.ok(a.hullAir > 0.8 && a.cabinAir > 0.7 && a.hullView === 0 && a.cabinView === 0, 'the craft, through the air only');
 });
 
 test('flying along, the sound takes the time that solves |d + v t| = c t: behind sooner, ahead later', () => {
@@ -80,6 +83,37 @@ test('past the speed of sound only a camera inside the cone behind hears the dri
   carried(-70, 0, 0, v, 0, 0, c, h);
   const t = h.delay;
   near(Math.abs(-70 + v * t), c * t, 1e-6, 'and when it is heard, the wait solves the same');
+});
+
+test('a listener on the ground hears a passing boom only inside the Mach cone, once, as the cone passes', () => {
+  // a craft flying level along x at 10 km over a still listener; carried() with the craft's velocity is the
+  // wait for what the listener hears now, for any listener, so the cone's passing is where it first finds one
+  const c = 300, alt = 10000, h = {};
+  const pass = (mach, dt = 0.01) => {
+    const v = mach * c, booms = [];
+    let was = null, before = 0, after = 1;
+    for (let t = -80; t <= 80; t += dt) {
+      const x = v * t;   // the craft, past the listener
+      carried(-x, 0, -alt, v, 0, 0, c, h);
+      if (was !== null && conePassed(was, h.heard, mach, mach)) booms.push({ x, angle: Math.atan2(alt, x) });
+      if (!booms.length) before = Math.max(before, h.heard); else after = Math.min(after, h.heard);
+      was = h.heard;
+    }
+    return { booms, before, after };
+  };
+  const M = 1.6, { booms, before, after } = pass(M);
+  assert.equal(booms.length, 1, 'one boom');
+  assert.ok(before === 0 && after > 0, 'nothing before it, the craft heard after it');
+  // when it comes the craft is alt sqrt(M^2 - 1) on, the listener on the cone, mu = asin(1 / M) off its path behind
+  near(booms[0].x, alt * Math.sqrt(M * M - 1), 0.02 * alt, 'where the craft is');
+  near(booms[0].angle, Math.asin(1 / M), 0.02, 'the cone\'s half-angle');
+  assert.equal(pass(0.8).booms.length, 0, 'slower than sound: no boom, the craft heard all the way');
+  assert.equal(pass(0.8).before, 1);
+  // how hard: the N-wave's overpressure falls as the distance to the 3/4 and with the air
+  near(boomStrength(140, RHO0) / boomStrength(70, RHO0), 2 ** -0.75, 1e-12);
+  near(boomStrength(70, RHO0 / 4) / boomStrength(70, RHO0), 0.5, 1e-12);
+  assert.equal(boomStrength(70, 0), 0, 'no air, no boom');
+  assert.ok(!conePassed(0, 1, 0.9, 0.95), 'subsonic: the drive coming into hearing is no boom');
 });
 
 test('distance thins the sound: 1 at the chase view\'s 70 m, falling as 1 / r, the high notes going first', () => {
@@ -279,43 +313,6 @@ test('the drive is heard from where it is: a direction from the camera, in the c
   const m = run({ dirX: 3, dirY: 0, dirZ: 4 });
   near(Math.hypot(m.outX, m.outY, m.outZ), 1, 1e-12, 'a unit vector to the panner');
 });
-
-test('a great room\'s answer: nothing until the sound reaches a wall, then 60 dB down in its time', () => {
-  const fs = 8000, l = new Float32Array(fs * 6), r = new Float32Array(fs * 6);
-  roomResponse(l, r, fs, { seconds: 4, predelay: 0.05 });
-  for (let i = 0; i < 0.05 * fs; i++) assert.equal(l[i], 0);
-  const energy = (from, to) => { let e = 0; for (let i = Math.floor(from * fs); i < Math.floor(to * fs); i++) e += l[i] * l[i] + r[i] * r[i]; return e; };
-  const fall = 10 * Math.log10(energy(0.1, 0.3) / energy(4.0, 4.2));
-  assert.ok(fall > 45 && fall < 75, `${fall.toFixed(1)} dB between 0.1 s and 4 s`);
-  assert.ok(l.every(Number.isFinite) && r.every(Number.isFinite));
-  assert.deepEqual(fillNoise(new Float32Array(4), 9), fillNoise(new Float32Array(4), 9), 'the same seed, the same noise');
-});
-
-// A stand-in for Web Audio: enough to build the instrument and watch what it is told.
-function fakeAudio() {
-  const sent = [];
-  const param = (value = 0) => ({
-    value, setTargetAtTime(v, t, tau) { sent.push(['target', v, t, tau]); }, setValueAtTime(v, t) { sent.push(['value', v, t]); },
-    linearRampToValueAtTime(v, t) { sent.push(['ramp', v, t]); }, exponentialRampToValueAtTime(v, t) { sent.push(['exp', v, t]); assert.ok(v > 0, 'an exponential ramp to zero'); },
-    cancelScheduledValues() {},
-  });
-  const node = (extra = {}) => Object.assign({ connect(d) { assert.ok(d, 'connected to nothing'); return d; }, disconnect() {}, start() {} }, extra);
-  const ac = {
-    sampleRate: 48000, currentTime: 0, destination: node(),
-    createGain: () => node({ gain: param(1) }),
-    createBiquadFilter: () => node({ type: 'lowpass', frequency: param(350), Q: param(1) }),
-    createBuffer: (ch, n) => { const data = Array.from({ length: ch }, () => new Float32Array(n)); return { getChannelData: (c) => data[c] }; },
-    createBufferSource: () => node({ buffer: null, loop: false }),
-    createOscillator: () => node({ type: 'sine', frequency: param(440) }),
-    createWaveShaper: () => node({ curve: null, oversample: 'none' }),
-    createStereoPanner: () => node({ pan: param(0) }),
-    createPanner: () => node({ positionX: param(0), positionY: param(0), positionZ: param(0) }),
-    createDelay: () => node({ delayTime: param(0) }),
-    createDynamicsCompressor: () => node({ threshold: param(), knee: param(), ratio: param(), attack: param(), release: param() }),
-    createConvolver: () => node({ buffer: null, normalize: true }),
-  };
-  return { ac, sent };
-}
 
 test('the instrument follows every target the mix makes, and each moment and cue plays without a fault', () => {
   const { ac, sent } = fakeAudio(), e = new Engine(ac);
