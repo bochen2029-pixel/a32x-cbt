@@ -20,5 +20,9 @@ test('the status line says what the craft does and what the pilot can do next', 
   assert.equal(status({ ...s, phase: PH.orbit }, 1).line, 'CREW · IN ORBIT · the Ring 25.0 km ahead');
   assert.equal(status({ ...s, auto: AUTO.approach, portRange: 3 }, 1).line, 'APPROACH · HOLDING 300 m OFF THE HUB PORT');
   assert.equal(status({ ...s, auto: AUTO.off, onGround: 0, qbar: 0, sas: 3 }, 1).line, 'HAND · RATE + TARGET');
+  // the law the core flies (OC_AIR_LAW), not a guess from the dynamic pressure: between its 200 and 400 Pa
+  // either may hold, by which way the craft came
+  assert.match(status({ ...s, auto: AUTO.off, onGround: 0, qbar: 300, airLaw: 1, sas: 0 }, 1).line, /^HAND · AIR LAW/);
+  assert.match(status({ ...s, auto: AUTO.off, onGround: 0, qbar: 300, airLaw: 0, sas: 0 }, 1).line, /^HAND · RATE \+/);
   assert.equal(status({ ...s, crashed: 1 }, 1).line, 'CRASHED');
 });

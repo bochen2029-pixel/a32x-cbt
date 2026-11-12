@@ -154,12 +154,12 @@ int touch(V3 p, double r) {
     if (deck < 0 && rho < OC_RING_ROOF_M && std::hypot(std::fmax(OC_RING_RIM_M - rho, 0.0), by) < r) return OC_DOCK_HIT_RIM;
     if (outsideBox(rho - OC_HUB_RADIUS_M, ay - OC_HUB_PORT_M) < r) return OC_DOCK_HIT_HUB;
     const double sh = OC_RING_SPOKE_M / 2;
-    if (ay < sh + r && rho < OC_RING_RIM_M + r) {
+    if (ay < sh + r && rho < OC_RING_ROOF_M + r) {   // a spoke runs from the hub to the roof, where the band's structure begins
         const double step = 2 * PI / OC_RING_SPOKES;
         const double th = std::atan2(p.x, p.z);   // spoke k lies at k steps (orbit_core.h)
         const double off = th - std::round(th / step) * step;
         const double along = rho * std::cos(off), across = rho * std::sin(off);
-        const double qx = std::fabs(along - (OC_HUB_RADIUS_M + OC_RING_RIM_M) / 2) - (OC_RING_RIM_M - OC_HUB_RADIUS_M) / 2;
+        const double qx = std::fabs(along - (OC_HUB_RADIUS_M + OC_RING_ROOF_M) / 2) - (OC_RING_ROOF_M - OC_HUB_RADIUS_M) / 2;
         const double qy = ay - sh, qz = std::fabs(across) - sh;
         const double mx = std::fmax(qx, 0.0), my = std::fmax(qy, 0.0), mz = std::fmax(qz, 0.0);
         if (std::sqrt(mx * mx + my * my + mz * mz) + std::fmin(std::fmax(qx, std::fmax(qy, qz)), 0.0) < r) return OC_DOCK_HIT_SPOKE;

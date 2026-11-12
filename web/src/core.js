@@ -6,7 +6,7 @@ export const OUT = [
   'lat', 'lon', 'alt', 'hdg', 'pitch', 'roll', 'tas', 'mach', 'qbar', 'vs', 'alpha', 'beta', 'g',
   'vorb', 'apo', 'peri', 'inc', 'tApo', 'throttle', 'prop', 'mass', 'gear', 'onGround',
   'ringE', 'ringN', 'ringU', 'ringAxE', 'ringAxN', 'ringAxU', 'ringRefE', 'ringRefN', 'ringRefU',
-  'ringRange', 'ringRate', 'sunE', 'sunN', 'sunU', 'vrelE', 'vrelN', 'vrelU', 'portRange',
+  'ringRange', 'ringRate', 'sunE', 'sunN', 'sunU', 'vrelE', 'vrelN', 'vrelU', 'portRange', 'airLaw',
 ];
 
 export const DT = 0.02;

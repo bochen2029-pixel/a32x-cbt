@@ -190,6 +190,7 @@ void rateLoop(State& s, const Local& L, V3 wc);           // body rates in, torq
 V3 airLaw(State& s, const Local& L, double yawRate);      // hold s.thetaT and s.phiT, turn in balance
 V3 alongTrack(const State& s, const Local& L);
 V3 point(const State& s, const Local& L, V3 dir, double gain, double limit);
+void pegSolve(State& s, const Local& L);   // the crew's insertion guidance: sets pegF0, pegF1, pegT, pegAt
 
 // ---- the features' hooks ------------------------------------------------------------------------
 // return.cpp: the flight home (OC_AUTO_RETURN). dock.cpp: docking at the hub and contact with the ring
@@ -229,8 +230,10 @@ int deckBand(V3 p, double r);   // the band round the open sector, for a sphere 
 
 void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 
-// sky.cpp: where the Sun and the Moon are, for the flight's date and time; sets sunEci at oc_reset.
+// sky.cpp: where the Sun and the Moon are, for the flight's date and time (orbit_sky.h); sets sunEci
+// at oc_reset and, with its own readouts block, whenever the readouts are written.
 void skyReset(const Site& site);
+void skyWriteOut(const State& s);
 
 // FNV-1a over bytes, for the state hash
 inline void hashBytes(unsigned& h, const void* p, unsigned long n) {

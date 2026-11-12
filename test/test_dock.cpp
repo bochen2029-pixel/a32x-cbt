@@ -18,15 +18,19 @@
 // TEST: gross_contact_crashes
 // TEST: off_centre_contact_bounces
 // TEST: slow_contact_does_not_latch
+// TEST: sliding_contact_bounces
+// TEST: angled_contact_bounces
 // TEST: spin_must_match
 // TEST: roof_is_solid
 // TEST: rim_wall_is_solid
 // TEST: spoke_is_solid
+// TEST: spoke_reaches_the_roof
 // TEST: hub_is_solid
 // TEST: open_middle_is_free
 // TEST: approach_goes_round
 // TEST: docking_refused
 // TEST: judges_speed_in_the_orbit_frame
+// TEST: approach_gated_like_docking
 // TEST: deterministic
 
 #include "../core/orbit_core.h"
@@ -35,6 +39,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <initializer_list>
 
 namespace {
 
@@ -479,7 +484,10 @@ void dockedRidesTheRing() {
     CHECK(tilt < 1e-9 && key < 1e-9, "nose %.3g rad off the axis, roof %.3g rad off the key", tilt, key);
     CHECK(turn < 1e-9, "the roof's turn in 10 s differs from the spin's by %.3g rad", turn);
     CHECK(range < 1e-6, "the centre of mass moved %.3g m along the axis", range);
-    CHECK(readout < 1e-9, "docking's readouts: range, roll rate or closing off zero by %.3g", readout);
+    // zero to roundoff: a few unit roundoffs of a position 6,871 km from the Earth's centre, 16 u |r| = 1.2e-8 m
+    // (and the rates' alike); the trajectory's last digits move it, so the bound is the arithmetic's, not a run's
+    const double roundoff = 16 * 1.1102230246251565e-16 * 6.871e6;
+    CHECK(readout < roundoff, "docking's readouts: range, roll rate or closing off zero by %.3g (roundoff %.2g)", readout, roundoff);
     CHECK(std::fabs(get(OC_RING_RATE)) < 1e-6, "range rate to the ring's centre %.3g m/s", get(OC_RING_RATE));
     CHECK(finite(), "finite");
 }
@@ -644,6 +652,57 @@ void offCentreContactBounces() {
     CHECK(dk(OC_DOCK_CONTACT) == 0 && dk(OC_DOCK_CLOSING) < -0.01 && dk(OC_DOCK_CLOSING) > -0.1, "the head came off the face: closing %.3f m/s", dk(OC_DOCK_CLOSING));
 }
 
+// Centred, slow and lined up, but sliding across the face at three times the tolerance: the latches do
+// not hold, and the head comes off the face. (The audit of c56d77b found no test reached this verdict.)
+void slidingContactBounces() {
+    if (!toHold()) return;
+    oc_auto(OC_AUTO_OFF);
+    oc_sas(OC_SAS_PORT);
+    Hands h{1.0, 0.10, false};
+    const double t0 = get(OC_T), before = dk(OC_DOCK_C_T);
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && dk(OC_DOCK_GAP) > 0.06 && dk(OC_DOCK_C_T) == before)
+        handStep(h, lined() ? clampd(0.05 * dk(OC_DOCK_GAP), h.contact, h.closeMax) : 0);
+    // 6 cm off the face: the small thrusters full across, still closing at 0.1 m/s, to the touch
+    while (get(OC_T) - t0 < 960 && get(OC_CRASHED) == 0 && dk(OC_DOCK_C_T) == before) {
+        oc_controls(0, 0, 0, 0, thruster(0.1 - dk(OC_DOCK_CLOSING), false), 1, 0, 0, 0);
+        oc_step(1);
+    }
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(500);
+    std::printf("  contact at %.3f m/s, %.3f m off the centre, sliding at %.3f m/s: verdict %d\n", dk(OC_DOCK_C_SPEED), dk(OC_DOCK_C_OFFSET), dk(OC_DOCK_C_SLIDE),
+                idk(OC_DOCK_VERDICT));
+    CHECK(dk(OC_DOCK_C_T) != before, "no contact");
+    CHECK(dk(OC_DOCK_C_SLIDE) > 2 * OC_DOCK_TOL_SLIDE && dk(OC_DOCK_C_OFFSET) < OC_DOCK_TOL_OFFSET_M && dk(OC_DOCK_C_SPEED) <= OC_DOCK_V_MAX,
+          "sliding %.3f m/s, %.3f m off, %.3f m/s in", dk(OC_DOCK_C_SLIDE), dk(OC_DOCK_C_OFFSET), dk(OC_DOCK_C_SPEED));
+    CHECK(dk(OC_DOCK_VERDICT) == OC_DOCK_V_SLIDING, "verdict %.0f", dk(OC_DOCK_VERDICT));
+    CHECK(dk(OC_DOCK_DOCKED) == 0 && get(OC_CRASHED) == 0, "docked %.0f, crashed %.0f", dk(OC_DOCK_DOCKED), get(OC_CRASHED));
+}
+
+// Centred and slow, but the craft's axis 5 degrees off the port's, held there among the stars: the probe
+// meets the drogue askew, and the latches do not hold. (Nor did any test reach this verdict.)
+void angledContactBounces() {
+    if (!toHold()) return;
+    oc_auto(OC_AUTO_OFF);
+    oc_sas(OC_SAS_PORT);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(500);                                 // lined up, turning with the port
+    oc_sas(OC_SAS_HOLD);
+    oc_controls(0.2, 0, 0, 0, 0, 0, 0, 0, 0);     // pitch at 0.05 rad/s for 1.76 s: 5 degrees off the axis
+    oc_step(88);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc_step(250);                                 // held there; the port turns on, its roll unmatched
+    Hands h{1.0, 0.10, false};
+    h.waitLined = false;
+    const double took = handFliesIn(h, 1500);
+    std::printf("  contact after %.0f s at %.3f m/s, %.3f m off the centre, %.2f deg off the axis: verdict %d\n", took, dk(OC_DOCK_C_SPEED), dk(OC_DOCK_C_OFFSET),
+                dk(OC_DOCK_C_ANGLE_DEG), idk(OC_DOCK_VERDICT));
+    CHECK(took > 0, "no contact");
+    CHECK(dk(OC_DOCK_C_ANGLE_DEG) > OC_DOCK_TOL_ANGLE_DEG && dk(OC_DOCK_C_OFFSET) < OC_DOCK_TOL_OFFSET_M && dk(OC_DOCK_C_SLIDE) < OC_DOCK_TOL_SLIDE,
+          "%.2f deg off, %.3f m off, sliding %.3f m/s", dk(OC_DOCK_C_ANGLE_DEG), dk(OC_DOCK_C_OFFSET), dk(OC_DOCK_C_SLIDE));
+    CHECK(dk(OC_DOCK_VERDICT) == OC_DOCK_V_ANGLE, "verdict %.0f", dk(OC_DOCK_VERDICT));
+    CHECK(dk(OC_DOCK_DOCKED) == 0 && get(OC_CRASHED) == 0, "docked %.0f, crashed %.0f", dk(OC_DOCK_DOCKED), get(OC_CRASHED));
+}
+
 // A contact slower than the window does not trip the latches; backed off and brought in again at
 // 0.1 m/s, the same craft is captured.
 void slowContactDoesNotLatch() {
@@ -736,6 +795,28 @@ void spokeIsSolid() {
     CHECK(get(OC_CRASHED) == 1, "a minute in the spokes' plane without a crash");
     CHECK(dk(OC_DOCK_HIT) == OC_DOCK_HIT_SPOKE, "hit %s", hitName(idk(OC_DOCK_HIT)));
     CHECK(std::fabs(w.axial) < OC_RING_SPOKE_M / 2 + 25 && std::fabs(w.spoke) * D2R * w.radial < OC_RING_SPOKE_M / 2 + 25, "%.0f m along the axis, %.1f deg from a spoke", w.axial, w.spoke);
+}
+
+// The spokes run from the hub to the roof, where the band's structure begins: held still in the spokes'
+// plane 50 m above the roof, between the rim walls' tops (4,620 m from the axis) and the roof (4,700 m),
+// the craft is met by a spoke sweeping by at 206 m/s.
+void spokeReachesTheRoof() {
+    if (!handsAtHold()) return;
+    const Nav at = navNow();
+    bool ok = flyTo({at.x, 4550, 0}, 25, 400);                 // out along the right wing, off the band's face
+    if (ok) ok = flyTo({-60, 4550, 0}, 25, 300);               // in over the band, inside the rim walls' tops
+    if (ok) ok = flyTo({-60, 4650, 0}, 10, 120);               // down to 50 m above the roof, short of the spokes' plane
+    CHECK(ok, "crashed on the way: %s", hitName(idk(OC_DOCK_HIT)));
+    if (!ok) return;
+    const Where w0 = where();
+    const double t0 = get(OC_T);
+    Nav was = navNow();
+    oc_step(1);
+    while (get(OC_T) - t0 < 60 && get(OC_CRASHED) == 0) was = flyStep({0, 4650, 0}, was, 5);   // into the plane, and wait
+    const Where w = where();
+    std::printf("  from %.0f m off the axis, %.0f m along it: %.0f s in the plane, hit %s at %.0f m off the axis\n", w0.radial, w0.axial, get(OC_T) - t0,
+                hitName(idk(OC_DOCK_HIT)), w.radial);
+    CHECK(get(OC_CRASHED) == 1 && dk(OC_DOCK_HIT) == OC_DOCK_HIT_SPOKE, "a minute in the spokes' plane above the roof: hit %s", hitName(idk(OC_DOCK_HIT)));
 }
 
 // Flown in from the side, the craft meets the hub's wall.
@@ -869,6 +950,47 @@ void judgesSpeedInTheOrbitFrame() {
           get(OC_AUTO), dk(OC_DOCK_REFUSED), dk(OC_DOCK_PHASE));
 }
 
+// The crew's approach is taken where docking is, and flies home to the hold point from the edge of that:
+// from 48 km behind, with the periapsis kept well above the air; from 60 km, or from the runway, it is
+// refused and nothing changes. (Far out, cancelling the plain difference from the Ring's velocity, n d,
+// would put the periapsis into the ground: from 380 km behind it once did.)
+void approachGatedLikeDocking() {
+    oc_reset(LAT, LON, HDG);
+    const double auto0 = get(OC_AUTO);
+    oc_auto(OC_AUTO_APPROACH);
+    CHECK(get(OC_AUTO) == auto0, "on the runway the approach is refused: auto %.0f", get(OC_AUTO));
+    for (const double range : {48000.0, 60000.0}) {
+        if (!toOrbit()) return;
+        oc_auto(OC_AUTO_OFF);
+        oc_sas(OC_SAS_HOLD);
+        oc_controls(0, 0, 0, 0, 1, 0, 0, 0, 0);   // 2 m/s along the nose, toward the Ring: the craft climbs and falls behind
+        oc_step(200);
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+        while (get(OC_RING_RANGE) < range && get(OC_T) < 9000 && get(OC_CRASHED) == 0) oc_step(50);
+        const double vrel = norm(site(OC_VREL_E));
+        oc_auto(OC_AUTO_APPROACH);
+        std::printf("  %.1f km from the Ring, passing at %.1f m/s: the approach %s\n", get(OC_RING_RANGE) / 1000, vrel,
+                    get(OC_AUTO) == OC_AUTO_APPROACH ? "taken" : "refused");
+        if (range > OC_DOCK_ENGAGE_M) {
+            CHECK(get(OC_AUTO) == OC_AUTO_OFF, "from %.1f km the approach is refused: auto %.0f", get(OC_RING_RANGE) / 1000, get(OC_AUTO));
+            continue;
+        }
+        CHECK(get(OC_AUTO) == OC_AUTO_APPROACH, "from %.1f km the approach is taken", get(OC_RING_RANGE) / 1000);
+        const double t0 = get(OC_T);
+        double lowest = 1e30, arrived = -1;
+        while (get(OC_T) - t0 < 4000 && get(OC_CRASHED) == 0) {
+            oc_step(50);
+            lowest = std::fmin(lowest, get(OC_PERI));
+            if (arrived < 0 && get(OC_PORT_RANGE) < 5) arrived = get(OC_T) - t0;
+            if (arrived > 0 && get(OC_T) - t0 > arrived + 60) break;
+        }
+        std::printf("    at the hold point after %.0f s; the periapsis never under %.1f km\n", arrived, lowest / 1000);
+        CHECK(get(OC_CRASHED) == 0, "not crashed");
+        CHECK(arrived > 0, "reached the hold point");
+        CHECK(lowest > 450000, "the periapsis down to %.1f km", lowest / 1000);
+    }
+}
+
 // The same inputs give the same docking, undocking and bounce, step for step; a different input, a
 // different state.
 void deterministic() {
@@ -916,15 +1038,19 @@ const Test tests[] = {
     {"gross_contact_crashes", grossContactCrashes},
     {"off_centre_contact_bounces", offCentreContactBounces},
     {"slow_contact_does_not_latch", slowContactDoesNotLatch},
+    {"sliding_contact_bounces", slidingContactBounces},
+    {"angled_contact_bounces", angledContactBounces},
     {"spin_must_match", spinMustMatch},
     {"roof_is_solid", roofIsSolid},
     {"rim_wall_is_solid", rimWallIsSolid},
     {"spoke_is_solid", spokeIsSolid},
+    {"spoke_reaches_the_roof", spokeReachesTheRoof},
     {"hub_is_solid", hubIsSolid},
     {"open_middle_is_free", openMiddleIsFree},
     {"approach_goes_round", approachGoesRound},
     {"docking_refused", dockingRefused},
     {"judges_speed_in_the_orbit_frame", judgesSpeedInTheOrbitFrame},
+    {"approach_gated_like_docking", approachGatedLikeDocking},
     {"deterministic", deterministic},
 };
 
