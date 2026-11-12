@@ -125,7 +125,7 @@ Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError 
     if (wx.wind > 0) oc_wind(wx.windSeed, wx.wind);
     oc_auto(OC_AUTO_RETURN);
     int phase = (int)ret(OC_RET_PHASE);
-    double propAir = -1;
+    double propAir = -1, stoppedAt = -1;
     while (get(OC_T) < engage + 200000) {
         oc_step(10);
         const int ph = (int)ret(OC_RET_PHASE);
@@ -150,7 +150,10 @@ Run fly(double engage, Start start = IN_ORBIT, double pilotBurn = 0, ModelError 
         }
         if (get(OC_ON_GROUND) < 0.5 && get(OC_G) > r.maxG) r.maxG = get(OC_G);
         if (!finite()) { r.finite = false; break; }
-        if (get(OC_CRASHED) > 0 || ph == OC_RET_PH_STOPPED || get(OC_AUTO) != OC_AUTO_RETURN) break;
+        // done when the craft has stopped (the readout's: at rest over the ground, as it is, not as the crew's
+        // navigation has it, which may say so a step sooner), crashed, or been given up
+        if (ph == OC_RET_PH_STOPPED && stoppedAt < 0) stoppedAt = get(OC_T);
+        if (get(OC_CRASHED) > 0 || ret(OC_RET_STOPPED) > 0 || get(OC_AUTO) != OC_AUTO_RETURN || (stoppedAt > 0 && get(OC_T) > stoppedAt + 60)) break;
     }
     r.tTouch = ret(OC_RET_TOUCHED) > 0 ? ret(OC_RET_TD_T) : -1;
     r.tStop = ret(OC_RET_STOPPED) > 0 ? get(OC_T) : -1;
@@ -556,7 +559,7 @@ int monteCarlo(int argc, char** argv) {
     const Spread sp{arg(5, 0.25), arg(6, 0.15), arg(7, 0.10), arg(8, 0), arg(9, 0), arg(10, 0), arg(11, 0)};
     int good = 0;
     std::printf("run,outcome,engage_s,rho,wave,lift,drag,burn_s,cross_km,sink,along,off,stop_along,stop_off,heat_kW,load_g,qbar_Pa,prop_kg,"
-                "wind,mass,thrust,noise,td_speed,td_head,td_cross,td_gust_up,wait_h,passes,skipped,reach_km,air_prop_kg\n");
+                "wind,mass,thrust,noise,td_speed,td_head,td_cross,td_gust_up,wait_h,passes,skipped,reach_km,air_prop_kg,td_crab_deg,lowered\n");
     for (int i = first; i < first + count; ++i) {
         const Draw d = draw(pool, i, sp);
         const Run r = fly(d.engage, IN_ORBIT, 0, d.err, d.wx);
@@ -570,11 +573,12 @@ int monteCarlo(int argc, char** argv) {
         else if (!(ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M)) why = "overran";
         else if (ret(OC_RET_OVER) != 0 || r.maxG >= OC_RET_LOAD_LIMIT || ret(OC_RET_HEAT_PEAK) >= OC_RET_HEAT_LIMIT) why = "limit";
         good += std::strcmp(why, "landed") == 0;
-        std::printf("%d,%s,%.0f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.0f,%.3f,%.4f,%.4f,%.2f,%.1f,%.2f,%.2f,%.2f,%.2f,%d,%d,%.0f,%.0f\n", i,
+        std::printf("%d,%s,%.0f,%.3f,%.3f,%.3f,%.3f,%.0f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.2f,%.0f,%.0f,%.3f,%.4f,%.4f,%.2f,%.1f,%.2f,%.2f,%.2f,%.2f,%d,%d,%.0f,%.0f,%.1f,%.0f\n", i,
                     why, d.engage, d.err.rho, d.err.wave, d.err.lift, d.err.drag, r.tBurn, r.cross / 1000, ret(OC_RET_TD_SINK), ret(OC_RET_TD_ALONG),
                     ret(OC_RET_TD_OFF), ret(OC_RET_STOP_ALONG), ret(OC_RET_STOP_OFF), ret(OC_RET_HEAT_PEAK) / 1000, ret(OC_RET_LOAD_PEAK), ret(OC_RET_QBAR_PEAK),
                     ret(OC_RET_PROP_USED), d.wx.wind, d.wx.mass, d.wx.thrust, d.wx.noise, ret(OC_RET_TD_SPEED), r.tdHead, r.tdCross, r.tdGust,
-                    r.tBurn > 0 ? (r.tBurn - r.engage) / 3600 : -1.0, r.passes, r.skipped, r.reach / 1000, r.airProp);
+                    r.tBurn > 0 ? (r.tBurn - r.engage) / 3600 : -1.0, r.passes, r.skipped, r.reach / 1000, r.airProp, ret(OC_RET_TD_CRAB_DEG),
+                    ret(OC_RET_LOWERED));
         std::fflush(stdout);
     }
     const double n = count, p = n > 0 ? good / n : 0, z = 1.96, dd = 1 + z * z / n, c = (p + z * z / (2 * n)) / dd;
