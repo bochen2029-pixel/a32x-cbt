@@ -1123,7 +1123,10 @@ void terminal(State& s, const Local& L) {
     flyWind(s, L, R.alphaCmd, bank, 1.5, 0.3, turnRates(L, bank, 0));
 
     R.tEvent = timeOf(s) + R.togo / std::fmax(g.speed, 60.0);
-    const double level = R.togo > FINAL_M ? H_PATTERN : std::fmin(H_PATTERN, glidePath(R.togo));
+    // Handed to the approach where the glide path comes down to meet it, and past the threshold no lower than
+    // the path's height over it: a glide still high there, as a strong tailwind leaves one, is not let dive
+    // on toward the ground unpowered.
+    const double level = R.togo > FINAL_M ? H_PATTERN : std::fmin(H_PATTERN, glidePath(std::fmax(R.togo, 0.0)));
     const double sink = std::fmax(0.0, -L.vs);
     if (L.alt < level + 60.0 + sink * sink / 5.0) { R.phase = OC_RET_PH_APPROACH; R.thrust = 0; }
 }
@@ -1139,7 +1142,7 @@ void approach(State& s, const Local& L, double* throttle) {
 
     // The height to hold and the sink rate that goes with it; in the flare, the sink rate alone.
     double lift;   // m/s2 across the path, upward
-    const double level = R.togo > FINAL_M ? H_PATTERN : std::fmin(H_PATTERN, glidePath(R.togo));
+    const double level = R.togo > FINAL_M ? H_PATTERN : std::fmin(H_PATTERN, glidePath(std::fmax(R.togo, 0.0)));   // past the threshold, its height there
     const bool descending = level < H_PATTERN - 0.5;
     R.glideDev = L.alt - level;
     if (flare) {
@@ -1148,9 +1151,10 @@ void approach(State& s, const Local& L, double* throttle) {
     } else {
         const double sinkRef = descending ? -g.speed * std::tan(GLIDE_SLOPE) : 0.0;
         lift = clampd(0.16 * (level - L.alt) + 0.7 * (sinkRef - L.vs), -3.0, 3.0);
-        // Never sinking faster than 2 m/s2 of pull, from here to the flare's height, could take back to the glide
-        // path's own sink: high above the path, the law would otherwise dive at it.
-        const double sinkMost = std::sqrt(sinkRef * sinkRef + 2 * 2.0 * std::fmax(0.0, wheels - FLARE_M));
+        // Never sinking faster than 1 m/s2 of pull, from here to the flare's height, could take back to the glide
+        // path's own sink (the law pulls up to 3, and catches the curve from below it): high above the path, the
+        // law would otherwise dive at it.
+        const double sinkMost = std::sqrt(sinkRef * sinkRef + 2 * 1.0 * std::fmax(0.0, wheels - FLARE_M));
         lift = std::fmax(lift, std::fmin(3.0, 0.7 * (-sinkMost - L.vs)));
         if (R.leg == 2 && wheels < FLARE_M && g.p.x > -1500.0) R.phase = OC_RET_PH_FLARE;
     }
