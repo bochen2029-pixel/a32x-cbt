@@ -1,0 +1,2 @@
+oc_return_out
+oc_return_out_len

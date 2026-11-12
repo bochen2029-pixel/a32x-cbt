@@ -15,7 +15,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-add_library(orbit_core STATIC core/orbit_core.cpp)
+add_library(orbit_core STATIC core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp)
 target_include_directories(orbit_core PUBLIC core)
 if(MSVC)
   target_compile_options(orbit_core PRIVATE /W4)
@@ -26,13 +26,19 @@ endif()
 add_executable(orbit_run tools/orbit_run.cpp)
 target_link_libraries(orbit_run PRIVATE orbit_core)
 
-add_executable(test_orbit test/test_orbit.cpp)
-target_link_libraries(test_orbit PRIVATE orbit_core)
-
+# One test program for each part of the core; each names its tests in lines of its own that read
+# "// TEST: <name>", and is registered here from them, so a part's tests change with its file.
 enable_testing()
-foreach(t atmosphere ground_settles deterministic crew_reaches_orbit kepler_holds rocket_equation
-          attitude_hold hand_flown_takeoff thrusters_translate approach_holds crew_takes_over)
-  add_test(NAME ${t} COMMAND test_orbit ${t})
+foreach(part orbit return dock walk sky)
+  set(src ${CMAKE_CURRENT_SOURCE_DIR}/test/test_${part}.cpp)
+  add_executable(test_${part} ${src})
+  target_link_libraries(test_${part} PRIVATE orbit_core)
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${src})
+  file(STRINGS ${src} lines REGEX "^// TEST: [a-z0-9_]+$")
+  foreach(line ${lines})
+    string(REGEX REPLACE "^// TEST: " "" t "${line}")
+    add_test(NAME ${part}.${t} COMMAND test_${part} ${t})
+  endforeach()
 endforeach()
 
 # The page's module: the core as WebAssembly inside one JavaScript file (SINGLE_FILE), so the page opens
@@ -42,17 +48,27 @@ endforeach()
 #   cmake --build flight/orbit/build-wasm
 #   ctest --test-dir flight/orbit/build-wasm --output-on-failure    (the same tests, under node)
 if(EMSCRIPTEN)
-  add_executable(orbit_core_js core/orbit_core.cpp)
+  # What the page may call: core/exports/*.txt, one function a line, a file for each part of the core,
+  # so a part's exports change with it.
+  file(GLOB ORBIT_EXPORT_FILES ${CMAKE_CURRENT_SOURCE_DIR}/core/exports/*.txt)
+  set(ORBIT_EXPORTS "_malloc,_free")
+  foreach(f ${ORBIT_EXPORT_FILES})
+    file(STRINGS ${f} names REGEX "^oc_")
+    foreach(n ${names})
+      string(APPEND ORBIT_EXPORTS ",_${n}")
+    endforeach()
+  endforeach()
+  add_executable(orbit_core_js core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp)
   set_target_properties(orbit_core_js PROPERTIES OUTPUT_NAME orbit_core SUFFIX .js)
   target_link_options(orbit_core_js PRIVATE --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createOrbitCore
     -sENVIRONMENT=web,node -sSINGLE_FILE=1 -sFILESYSTEM=0
-    "SHELL:-sEXPORTED_FUNCTIONS=_oc_reset,_oc_controls,_oc_auto,_oc_sas,_oc_step,_oc_out,_oc_out_len,_oc_hash,_oc_eci,_oc_atmosphere,_malloc,_free"
+    "SHELL:-sEXPORTED_FUNCTIONS=${ORBIT_EXPORTS}"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=HEAPF64")
   # The same core as plain JavaScript, for a host that refuses WebAssembly; the page falls back to it.
-  add_executable(orbit_core_plainjs core/orbit_core.cpp)
+  add_executable(orbit_core_plainjs core/orbit_core.cpp core/return.cpp core/dock.cpp core/walk.cpp)
   set_target_properties(orbit_core_plainjs PROPERTIES OUTPUT_NAME orbit_core_plain SUFFIX .js)
   target_link_options(orbit_core_plainjs PRIVATE --no-entry -sMODULARIZE=1 -sEXPORT_NAME=createOrbitCoreJs -sWASM=0
     -sENVIRONMENT=web,node -sFILESYSTEM=0
-    "SHELL:-sEXPORTED_FUNCTIONS=_oc_reset,_oc_controls,_oc_auto,_oc_sas,_oc_step,_oc_out,_oc_out_len,_oc_hash,_oc_eci,_oc_atmosphere,_malloc,_free"
+    "SHELL:-sEXPORTED_FUNCTIONS=${ORBIT_EXPORTS}"
     "SHELL:-sEXPORTED_RUNTIME_METHODS=HEAPF64")
 endif()

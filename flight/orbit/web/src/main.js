@@ -10,6 +10,8 @@ import { origin } from '../../../web/src/scene-math.js';
 import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
 import { AUTO, DT, HUB_PORT_M, PH, SAS, START, loadCore } from './core.js';
 import { Craft } from './craft.js';
+import { FEATURES } from './features.js';
+import * as frames from './frames.js';
 import { Earth, Stars } from './earth.js';
 import {
   RE, add, bodyAxes, cross, dot, ecefToThree, heightOf, inSight, inertialToEcef, length, scale, siteAxes, sub, three, threeToEcef, unit,
@@ -77,8 +79,16 @@ async function main() {
   const sayEl = document.getElementById('say');
   let sayUntil = 0;
   const say = (text, now) => { sayEl.textContent = text; sayUntil = now + 3500; };
-
   const state = { warp: 1, view: 0, skipping: false, debt: 0, last: performance.now(), heading: null };
+  // What the features see (features.js): fixed parts here, the frame's own filled in each frame.
+  const ctx = {
+    frames, core, get s() { return s; }, renderer, camera, near, far, craft, ring, airport, earth, stars, input, hud,
+    state, START, DT, AUTO, PH, SAS, RE, NEAR, VIEWS, say: (text) => say(text, performance.now()),
+    cam: null, rel: null, axes: null, P: null, up: null, alt: 0, sunSite: null, now: 0, dt: 0,
+  };
+  for (const f of FEATURES) if (f.init) f.init(ctx);
+
+
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false);
@@ -98,6 +108,7 @@ async function main() {
   };
 
   function command(c, now) {
+    for (const f of FEATURES) if (f.command && f.command(c, ctx)) { s = core.read(); return; }
     const auto = Math.round(s.auto);
     switch (c) {
       case 'crew':
@@ -179,6 +190,15 @@ async function main() {
     const dt = Math.min(0.25, (now - state.last) / 1000);
     state.last = now;
     for (const c of input.poll(dt)) command(c, now);
+    ctx.now = now;
+    ctx.dt = dt;
+    const owner = FEATURES.find((f) => f.owns && f.owns(ctx));
+    if (owner) {   // a feature that draws the whole frame itself
+      owner.frame(ctx, dt);
+      s = core.s;
+      requestAnimationFrame(frame);
+      return;
+    }
     core.controls(input.hands);
 
     if (state.skipping) {
@@ -251,6 +271,9 @@ async function main() {
       z: ecefToThree(inertialToEcef([0, 0, 1], t), START.lat, START.lon),
     }, Math.max(thin, Math.min(1, Math.max(0, -sunUp * 6 - 0.3))));
 
+    Object.assign(ctx, { cam, rel, axes, P, up, alt, sunSite });
+    for (const f of FEATURES) if (f.update) f.update(ctx);
+
     renderer.clear();
     camera.near = 1e4;
     camera.far = 1e8;
@@ -274,12 +297,15 @@ async function main() {
     hud.draw(s, { warp: state.skipping ? 'MAX' : state.warp, view: VIEWS[state.view] }, {
       velocity: moving ? screenOf(scale(three(unit(vel)), 1e4)) : null,
       ring: screenOf(ringRel),
-    }, now);
+    }, now, {
+      extra: FEATURES.flatMap((f) => (f.hud ? f.hud(ctx) : [])),
+      status: FEATURES.map((f) => (f.status ? f.status(ctx) : null)).find(Boolean) || null,
+    });
     if (now > sayUntil) sayEl.textContent = '';
     requestAnimationFrame(frame);
   }
 
-  window.orbitSketch = { core, renderer, earth, ring, craft, state, command: (c) => command(c, performance.now()) };   // for tests
+  window.orbitSketch = { core, renderer, earth, ring, craft, state, ctx, command: (c) => command(c, performance.now()) };   // for tests
   statusEl.textContent = core.note || '';
   requestAnimationFrame(frame);
 }

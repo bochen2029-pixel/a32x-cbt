@@ -1,0 +1,6 @@
+oc_walk_reset
+oc_walk_controls
+oc_walk_step
+oc_walk_out
+oc_walk_out_len
+oc_walk_hash

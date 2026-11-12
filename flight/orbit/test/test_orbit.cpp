@@ -1,5 +1,17 @@
 // The sketch core's tests. Each states a piece of physics or a promise of the core, not how it is
 // written. Run one by name (test_orbit atmosphere) or all (test_orbit); ctest runs each by name.
+//
+// TEST: atmosphere
+// TEST: ground_settles
+// TEST: deterministic
+// TEST: crew_reaches_orbit
+// TEST: kepler_holds
+// TEST: rocket_equation
+// TEST: attitude_hold
+// TEST: hand_flown_takeoff
+// TEST: thrusters_translate
+// TEST: approach_holds
+// TEST: crew_takes_over
 
 #include "../core/orbit_core.h"
 

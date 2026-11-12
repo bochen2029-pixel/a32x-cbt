@@ -248,6 +248,28 @@ font file ships.
 | R. F. Jaggers, *An explicit solution to the exoatmospheric powered flight guidance and trajectory optimization problem for rocket propelled vehicles*, AIAA Guidance and Control Conference (1977): the Space Shuttle's powered explicit guidance | the paper's method | as a method: steering linear in time, solved again each step for the time still to burn, with the rocket equation's integrals for thrust over a falling mass. Cut down for this sketch, a flat-Earth gravity term falling to nothing at orbital speed; the code is ours |
 | this project | — | the craft (mass, size, the drive, every derivative), the control law, the gear, the crew's take-off, climb and pitch schedule, the Ring's dimensions and where it waits, the Sun's place on 12 November, the land's colours by latitude and its desert boxes, the clouds, and the clear day over Texas |
 
+Each further part of the sketch keeps its own sources here, in the subsection below that names it.
+
+#### Docking
+
+Nothing taken from outside yet.
+
+#### The walk
+
+Nothing taken from outside yet.
+
+#### The flight home
+
+Nothing taken from outside yet.
+
+#### The Sun and the Moon
+
+Nothing taken from outside yet.
+
+#### Graphics
+
+Nothing taken from outside yet.
+
 The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
 and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
 here is fit for navigation, and none of it describes a real vehicle.

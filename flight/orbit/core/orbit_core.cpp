@@ -1,51 +1,27 @@
 // orbit_core.cpp — see orbit_core.h. A sketch: every number marked as chosen is a design choice made to
 // get a craft to orbit on a page, not a measurement of anything. docs/provenance.md, 1h, says where the
-// rest come from.
+// rest come from. What the core's parts share is in internal.h; the flight home is return.cpp, docking
+// dock.cpp, the walk walk.cpp.
 
-#include "orbit_core.h"
+#include "internal.h"
 
 #include <cmath>
 #include <cstdint>
 #include <cstring>
 
-namespace {
+namespace oc {
 
-const double PI = 3.14159265358979323846;
-const double D2R = PI / 180.0, R2D = 180.0 / PI;
-const double MU = 3.986004418e14;   // m3/s2, the Earth's gravitational parameter
-const double RE = 6371000.0;        // m, a sphere of the Earth's mean radius
-const double WE = 7.2921159e-5;     // rad/s, the Earth's turn
-const double G0 = 9.80665;
+State g;
+Site site;
+Ring ring;
+V3 sunEci;
+Controls hands;
+
+namespace {
+double out[OC_COUNT];
+}
 
 // ---- vectors and quaternions ------------------------------------------------------------------
-
-struct V3 { double x, y, z; };
-inline V3 operator+(V3 a, V3 b) { return {a.x + b.x, a.y + b.y, a.z + b.z}; }
-inline V3 operator-(V3 a, V3 b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
-inline V3 operator*(V3 a, double s) { return {a.x * s, a.y * s, a.z * s}; }
-inline V3 operator*(double s, V3 a) { return a * s; }
-inline double dot(V3 a, V3 b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-inline V3 cross(V3 a, V3 b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-inline double norm(V3 a) { return std::sqrt(dot(a, a)); }
-inline V3 unit(V3 a) { const double n = norm(a); return n > 0 ? a * (1.0 / n) : V3{1, 0, 0}; }
-inline double clampd(double v, double lo, double hi) { return v < lo ? lo : (v > hi ? hi : v); }
-inline double wrap(double a) { while (a > PI) a -= 2 * PI; while (a < -PI) a += 2 * PI; return a; }
-
-struct Q { double w, x, y, z; };
-inline Q qmul(Q a, Q b) {
-    return {a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z, a.w * b.x + a.x * b.w + a.y * b.z - a.z * b.y,
-            a.w * b.y - a.x * b.z + a.y * b.w + a.z * b.x, a.w * b.z + a.x * b.y - a.y * b.x + a.z * b.w};
-}
-inline Q qconj(Q q) { return {q.w, -q.x, -q.y, -q.z}; }
-inline Q qunit(Q q) {
-    const double n = std::sqrt(q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z);
-    return {q.w / n, q.x / n, q.y / n, q.z / n};
-}
-inline V3 rot(Q q, V3 v) {   // body -> world for a body->world quaternion
-    const V3 u{q.x, q.y, q.z};
-    return v + 2.0 * cross(u, cross(u, v) + q.w * v);
-}
-inline V3 irot(Q q, V3 v) { return rot(qconj(q), v); }
 
 // The quaternion of the frame whose axes, in the world, are x, y, z (orthonormal, right-handed).
 Q fromAxes(V3 x, V3 y, V3 z) {
@@ -76,8 +52,6 @@ V3 rotateAbout(V3 v, V3 axis, double angle) {   // Rodrigues
 // Seven layers to 84.852 km of geopotential height, as the standard prints them; above 86 km, three
 // exponentials through the standard's densities at 86, 120, 200 and 500 km (an estimate).
 
-struct Air { double rho, p, temp, sound; };
-
 Air atmosphere(double alt) {
     static const double hb[] = {0, 11000, 20000, 32000, 47000, 51000, 71000, 84852};
     static const double lapse[] = {-0.0065, 0, 0.001, 0.0028, 0, -0.0028, -0.002};
@@ -105,25 +79,7 @@ Air atmosphere(double alt) {
     return {rho, rho * R * t, t, a};
 }
 
-// ---- the craft (chosen) -------------------------------------------------------------------------
-// A delta lifting body of sixty tonnes, half of it propellant. Its one fiction is the drive: 2,000 s
-// of specific impulse at a thrust of 1.2 times the take-off weight.
-
-const double M_DRY = 30000, M_PROP0 = 30000;
-const double S_REF = 150, SPAN = 18, CHORD = 12;
-const double IXX = 4.0e5, IYY = 2.5e6, IZZ = 2.8e6;
-const double T_MAX = 1.2 * (M_DRY + M_PROP0) * G0;
-const double ISP = 2000;
-const double RCS_ACC = 0.5;          // m/s2 per axis from the small thrusters
-const double KP_LIFT = 2.4, KV_LIFT = 3.0;   // Polhamus: potential and vortex lift of a slender delta
-const double CY_BETA = -0.6;
-const double CM_ALPHA = -0.30, CM_Q = -2.0, CM_CTRL = 0.25;
-const double CL_BETA = -0.08, CL_P = -0.35, CL_CTRL = 0.08;
-const double CN_BETA = 0.12, CN_R = -0.25, CN_CTRL = 0.04;
-const double RCS_ANG[3] = {0.15, 0.10, 0.10};   // rad/s2 the thrusters can give, about x, y, z
-const double TVC_ANG = 0.35;                    // rad/s2 the gimballed drive gives in pitch and yaw
-const V3 GEAR[3] = {{10.0, 0, 3.0}, {-3.0, -3.5, 3.0}, {-3.0, 3.5, 3.0}};   // nose, left, right
-const double GEAR_K[3] = {1.3e6, 2.0e6, 2.0e6}, GEAR_C[3] = {2.0e5, 3.0e5, 3.0e5};
+// ---- the craft ---------------------------------------------------------------------------------
 
 double cd0(double mach) {
     static const double m[] = {0, 0.8, 1.05, 2, 5, 10}, c[] = {0.020, 0.020, 0.050, 0.035, 0.025, 0.020};
@@ -152,61 +108,7 @@ V3 airMoment(double qbar, double tas, double alpha, double beta, V3 w) {
             qbar * S_REF * SPAN * (CN_BETA * beta + CN_R * w.z * SPAN * k)};
 }
 
-// ---- state --------------------------------------------------------------------------------------
-
-struct Controls { double pitch, roll, yaw, throttle, tx, ty, tz; int gearDown; double brake; };
-
-struct State {
-    long long n;       // steps since the start
-    V3 r, v;           // ECI
-    Q q;               // body -> ECI
-    V3 w;              // body rates
-    double prop;       // kg
-    double thr;        // what the engine gives, 0..1
-    int gear;          // 1 down
-    int onGround, crashed;
-    int autoMode, sas, phase;
-    // the hand-flying law's memory
-    int atmoLaw;
-    double thetaT, phiT;
-    // the crew's insertion guidance: the sine of the thrust's elevation is f0 + f1 (t - pegAt)
-    double pegF0, pegF1, pegT, pegAt;
-    int pegValid;
-    Q hold;
-    int holdValid;
-    // the step's commands, held across it
-    V3 torque;         // N m, body
-    V3 rcs;            // m/s2, body
-    double steer, brake;
-};
-
-struct Site { double lat, lon, hdg; V3 e, n, u, p0; };   // the start point, Earth-fixed
-struct Ring { V3 normal, e1, axis, ref0; double radius, rate, tArr; int valid; };
-
-State g;
-Site site;
-Ring ring;
-V3 sunEci;
-Controls hands;
-double out[OC_COUNT];
-
-const double T_GO = 20.0;              // s: when the crew releases the brakes
-const double H_TARGET = 500000.0;      // m: the orbit, and the ring's
-const double AZIMUTH = 90 * D2R;       // the launch azimuth: due east
-const double RING_AHEAD = 25000.0;     // m: where the ring waits, ahead of the crew's arrival
-const double RING_SPIN = 0.0443;       // rad/s: one g at 5 km
-
-inline double timeOf(const State& s) { return s.n * OC_DT; }
-
 // ---- air data and local angles ------------------------------------------------------------------
-
-struct Local {
-    V3 up, east, north;
-    double alt, heading, pitch, roll;
-    V3 vAirBody;
-    double tas, mach, qbar, alpha, beta, vs;
-    Air air;
-};
 
 Local localOf(const State& s) {
     Local L;
@@ -230,8 +132,6 @@ Local localOf(const State& s) {
     L.vs = dot(s.v, L.up);
     return L;
 }
-
-struct Orbit { double apo, peri, inc, tApo, a, e; };
 
 Orbit orbitOf(const State& s) {
     Orbit o;
@@ -264,11 +164,23 @@ V3 ringVel(double t) {
     return cross(ring.normal, radial) * (ring.rate * ring.radius);
 }
 
+V3 ringRef(double t) { return rotateAbout(ring.ref0, ring.axis, RING_SPIN * t); }
+
+V3 siteDir(V3 x, double t) {   // the Earth has turned WE t since the start
+    const double th = WE * t, c = std::cos(th), sn = std::sin(th);
+    const V3 ef{c * x.x + sn * x.y, -sn * x.x + c * x.y, x.z};
+    return {dot(ef, site.e), dot(ef, site.n), dot(ef, site.u)};
+}
+
+V3 sitePos(V3 x, double t) {
+    const double th = WE * t, c = std::cos(th), sn = std::sin(th);
+    const V3 d = V3{c * x.x + sn * x.y, -sn * x.x + c * x.y, x.z} - site.p0;
+    return {dot(d, site.e), dot(d, site.n), dot(d, site.u)};
+}
+
 // ---- forces -------------------------------------------------------------------------------------
 
 struct Deriv { V3 rd, vd; Q qd; V3 wd; double propd; };
-
-struct GearLoad { V3 force, moment; int contact; };   // force in ECI, moment in the body
 
 GearLoad gearLoad(const State& s, V3 r, V3 v, Q q, V3 w) {
     GearLoad out{{0, 0, 0}, {0, 0, 0}, 0};
@@ -610,11 +522,14 @@ void pilot(State& s, const Local& L, double* throttle) {
 
 void stepOnce(State& s) {
     if (s.crashed) { ++s.n; return; }
+    if (dockRide(s)) { ++s.n; return; }   // docked: the hub carries the craft (dock.cpp)
     const Local L = localOf(s);
     s.rcs = {0, 0, 0};
     double throttle = 0;
     if (s.autoMode == OC_AUTO_CREW) crew(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_APPROACH) approach(s, L, &throttle);
+    else if (s.autoMode == OC_AUTO_RETURN) returnCrew(s, L, &throttle);   // return.cpp
+    else if (s.autoMode == OC_AUTO_DOCK) dockCrew(s, L, &throttle);       // dock.cpp
     else pilot(s, L, &throttle);
     s.thr += (throttle - s.thr) * (OC_DT / 0.4);
     if ((throttle == 0 && s.thr < 1e-3) || s.prop <= 0) s.thr = 0;   // shut down, not idling forever
@@ -626,6 +541,8 @@ void stepOnce(State& s) {
     if (gl.contact && !s.onGround && vsBefore < -8) s.crashed = 1;
     if (alt < 0.4 || (!s.gear && alt < 2.0)) s.crashed = 1;
     s.onGround = gl.contact;
+    returnAfterStep(s);
+    dockAfterStep(s);
 }
 
 // Where the ring waits. The core flies a copy of itself to orbit under the scripted crew and puts
@@ -697,7 +614,7 @@ void writeOut() {
     const V3 rr = ringPos(t), rv = ringVel(t);
     const V3 rp = posSite(rr);
     out[OC_RING_E] = rp.x; out[OC_RING_N] = rp.y; out[OC_RING_U] = rp.z;
-    const V3 ax = toSite(ring.axis), ref = toSite(rotateAbout(ring.ref0, ring.axis, RING_SPIN * t));
+    const V3 ax = toSite(ring.axis), ref = toSite(ringRef(t));
     out[OC_RING_AX_E] = ax.x; out[OC_RING_AX_N] = ax.y; out[OC_RING_AX_U] = ax.z;
     out[OC_RING_REF_E] = ref.x; out[OC_RING_REF_N] = ref.y; out[OC_RING_REF_U] = ref.z;
     const V3 dr = rr - s.r, dv = rv - s.v;
@@ -710,9 +627,13 @@ void writeOut() {
     const V3 vrel = toSite(s.v - rv - cross(ring.normal * ring.rate, s.r - rr));
     out[OC_VREL_E] = vrel.x; out[OC_VREL_N] = vrel.y; out[OC_VREL_U] = vrel.z;
     out[OC_PORT_RANGE] = norm(holdPoint(t) - s.r);
+    returnWriteOut(s);
+    dockWriteOut(s);
 }
 
-}   // namespace
+}   // namespace oc
+
+using namespace oc;
 
 extern "C" {
 
@@ -725,6 +646,8 @@ void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
     site.p0 = site.u * RE;
     std::memset(&g, 0, sizeof g);
     std::memset(&hands, 0, sizeof hands);
+    returnReset(g);
+    dockReset(g);
     hands.gearDown = 1;
     hands.brake = 1;
     const V3 fwd = site.e * std::sin(site.hdg) + site.n * std::cos(site.hdg);
@@ -755,9 +678,12 @@ void oc_controls(double pitch, double roll, double yaw, double throttle, double 
 
 void oc_auto(int mode) {
     if (mode == g.autoMode) return;
-    g.autoMode = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH ? mode : OC_AUTO_OFF;
+    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK;
+    g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
     g.holdValid = 0;
+    if (g.autoMode == OC_AUTO_RETURN) returnEngage(g);
+    if (g.autoMode == OC_AUTO_DOCK) dockEngage(g);
     if (g.autoMode != OC_AUTO_CREW) { writeOut(); return; }
     // The crew picks up where the craft is, not where it last left off.
     const Local L = localOf(g);
@@ -788,12 +714,13 @@ void oc_step(int n) {
 const double* oc_out(void) { return out; }
 int oc_out_len(void) { return OC_COUNT; }
 
-unsigned oc_hash(void) {   // FNV-1a over the doubles that are the state
+unsigned oc_hash(void) {   // FNV-1a over the doubles that are the state, then the features' own
     const double v[] = {(double)g.n, g.r.x, g.r.y, g.r.z, g.v.x, g.v.y, g.v.z, g.q.w, g.q.x, g.q.y, g.q.z,
                         g.w.x, g.w.y, g.w.z, g.prop, g.thr, (double)g.phase, (double)g.crashed};
     unsigned h = 2166136261u;
-    const unsigned char* b = (const unsigned char*)v;
-    for (size_t i = 0; i < sizeof v; ++i) { h ^= b[i]; h *= 16777619u; }
+    hashDoubles(h, v, sizeof v / sizeof v[0]);
+    returnHash(g, h);
+    dockHash(g, h);
     return h;
 }
 
