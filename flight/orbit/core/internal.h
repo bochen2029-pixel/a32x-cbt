@@ -201,8 +201,10 @@ V3 dockSafeAim(const State& s, V3 goal);                       // goal, or the n
 
 void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 
-// sky.cpp: where the Sun and the Moon are, for the flight's date and time; sets sunEci at oc_reset.
+// sky.cpp: where the Sun and the Moon are, for the flight's date and time (orbit_sky.h); sets sunEci
+// at oc_reset and, with its own readouts block, whenever the readouts are written.
 void skyReset(const Site& site);
+void skyWriteOut(const State& s);
 
 // FNV-1a over bytes, for the state hash
 inline void hashBytes(unsigned& h, const void* p, unsigned long n) {
