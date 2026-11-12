@@ -25,7 +25,7 @@ import { Ring } from './ring.js';
 import { depthSlices, ringDepth } from './slices.js';
 
 const NEAR = 3e5;                                   // m: nearer than this is drawn in the near pass
-const EXPOSURE = 1.25;                              // for AgX: where the base's 0.8 under ACES put a sunlit white
+const EXPOSURE = 1.4;                               // for AgX: a sunlit grey card at middle grey
 const WARPS = [0, 1, 2, 5, 10, 25, 50, 100];
 const VIEWS = ['chase', 'cockpit', 'from the Ring'];
 
@@ -101,9 +101,10 @@ async function main() {
   // three scenes: far (past 300 km, the Earth and the stars), near, and mid: the Ring alone, when it lies
   // at depths of its own (slices.js)
   const far = new THREE.Scene(), near = new THREE.Scene(), mid = new THREE.Scene();
+  near.fog = new THREE.FogExp2(0x000000, 0);
   const farLights = lights(far), nearLights = lights(near), midLights = lights(mid);
   const camera = new THREE.PerspectiveCamera(60, 1, 0.5, NEAR * 1.2);
-  const earth = new Earth({ maskWidth: Math.min(quality.settings.earth.mask, 4096), siteUp: siteAxes(START.lat, START.lon).up });
+  const earth = new Earth({ siteUp: siteAxes(START.lat, START.lon).up, quality: quality.settings });
   let stars = new Stars(quality.settings.stars);
   far.add(stars.points, earth.mesh);
   const craft = new Craft(quality.settings), ring = new Ring(quality.settings);
@@ -195,7 +196,7 @@ async function main() {
   // The tier, set: by the address or the saved choice at the start, by the control (F, or GFX), or by
   // the probe below. Everything that depends on it is rebuilt in place, the flight untouched.
   const gfx = document.getElementById('btn-quality');
-  const showQuality = () => { if (gfx) gfx.textContent = `GFX ${quality.settings.label}${quality.choice === 'auto' ? ' · AUTO' : ''}`; };
+  const showQuality = () => { if (gfx) gfx.innerHTML = `GFX ${quality.settings.label}${quality.choice === 'auto' ? '<small> · AUTO</small>' : ''}`; };
   function setQuality(tier, choice, why) {
     const was = quality.settings;
     Object.assign(quality, { tier, choice, why, settings: SETTINGS[tier] });
@@ -381,7 +382,7 @@ async function main() {
     const shadowed = !inSight(add(P, scale(sunSite, 2e7)), P, 0);             // the craft in the Earth's shadow
 
     const craftRel = rel(P);
-    craft.update(craftRel, three(axes.fwd), three(scale(axes.down, -1)), three(axes.right), s, now / 1000, renderer.getPixelRatio());
+    craft.update(craftRel, three(axes.fwd), three(scale(axes.down, -1)), three(axes.right), s, now / 1000, renderer.getPixelRatio(), three(up));
     craft.group.visible = VIEWS[state.view] !== 'cockpit';
     const craftNear = length(craftRel) < NEAR;
     (craftNear ? near : far).add(craft.group);
@@ -392,7 +393,8 @@ async function main() {
     (ringNear ? near : far).add(ring.group);
     ring.group.visible = inSight(cam, R, -10000);
     airport.group.position.set(...rel([0, 0, 0]));
-    airport.group.visible = length(cam) < NEAR && inSight(cam, [0, 0, 0]);
+    // the field, drawn without the air in front of it, gives way to the Earth's own ground well above it
+    airport.group.visible = length(cam) < NEAR && heightOf(cam) < 15000 && inSight(cam, [0, 0, 0]);
     airport.update({ x: cam[0], y: cam[2], z: -cam[1] }, s.t);
 
     // the near slices: the Ring in one of its own where nothing near shares its depths
@@ -429,6 +431,10 @@ async function main() {
       L.sky.groundColor.setRGB(0.3, 0.32, 0.36).multiplyScalar(0.4 + 0.6 * Math.max(0, dot(sunSite, up)));
       L.sky.position.set(...three(up));
     }
+
+    // the near things' haze: the air between the eye and the field, thinning with height
+    near.fog.density = 4.5e-5 * Math.exp(-alt / 8000);
+    near.fog.color.setRGB(0.1, 0.125, 0.16).multiplyScalar(0.3 + 0.7 * daylight);
 
     // the stars: fixed in the sky, which turns over the site
     const t = s.t;

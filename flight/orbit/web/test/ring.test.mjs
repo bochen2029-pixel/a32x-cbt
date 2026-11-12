@@ -101,3 +101,25 @@ test('the radiators and the solar mast keep to the hub', () => {
   for (const r of radiators()) assert.ok(r.r1 === RADIATORS.r1 && r.r1 < RING.rim / 4 && r.y1 <= HUB_PORT_M, 'the radiators on the hub');
   assert.ok(MAST.y1 - MAST.y0 > 300, 'the mast long enough to hold the arrays clear');
 });
+
+test('the flight deck: open between spokes 0 and 1, sealed by its bulkheads, the town clear of it', async () => {
+  const { DECK, DECK_A, DECK_HALF, DECK_WALL, bulkheads, onDeck, standing, fromDeck } = await import('../src/ring-plan.js');
+  assert.ok(Math.abs(DECK_A - (spokeAngle(0) + spokeAngle(1)) / 2) < 1e-9, 'midway between spokes 0 and 1');
+  assert.ok(Math.abs(DECK_HALF * RING.floor * 2 - DECK.arc) < 1e-6, `${DECK.arc} m of floor`);
+  for (let k = 0; k < RING.spokes; k++) assert.ok(!onDeck(spokeAngle(k)), `spoke ${k} clear of it`);
+  const [a, b] = bulkheads();
+  for (const w of [a, b]) {
+    assert.ok(Math.abs(Math.abs(fromDeck(w.face)) - DECK_HALF) < 1e-9, 'each faces the deck at its end');
+    assert.ok(Math.abs(Math.abs(fromDeck(w.a)) - (DECK_HALF + DECK_WALL / 2)) < 1e-9, `${DECK.bulkhead} m thick, outside it`);
+    assert.ok(w.r1 === RING.floor && w.r0 <= RING.roof && w.y >= INNER, 'from the floor to the roof, wall to wall');
+  }
+  for (const s of standing()) for (const u of [s.u0, s.u1]) assert.ok(!onDeck(u / RING.floor), 'no building on the deck or its bulkheads');
+  assert.ok(standing().length > 3 * town().buildings.length, 'the rest of the town stands');
+  // the deck's floor along its centreline, where the pads go, carries none of this module's lights
+  for (const t of TIERS) {
+    for (const l of lights(SETTINGS[t].ring).spin) {
+      const off = Math.abs(fromDeck(Math.atan2(l.p[0], l.p[2]))) * RING.floor;
+      if (off < DECK.arc / 2 - 10 && radius(l.p) > RING.floor - 20) assert.ok(Math.abs(l.p[1]) > DECK.padRadius + 60, `a light at y ${l.p[1].toFixed(0)} on the deck`);
+    }
+  }
+});

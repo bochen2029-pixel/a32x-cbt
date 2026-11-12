@@ -12,8 +12,8 @@ import { HUB_PORT_M } from './core.js';
 import { lightPoints, lightsMaterial } from './glow.js';
 import { Paint, rng } from './paint.js';
 import {
-  ARRAYS, CANAL, COLLAR, FOOT, HALF, INNER, MAST, PORT, QUAY, RING, SQUARE, SQUARES, TILE, TILES,
-  lights as planLights, radiators as planRadiators, spokeAngle, structure, town,
+  ARRAYS, CANAL, COLLAR, DECK, DECK_A, DECK_DOOR, DECK_HALF, DECK_WALL, FOOT, HALF, INNER, MAST, PORT, QUAY, RING, SQUARE, SQUARES,
+  TILE, TILES, bulkheads, lights as planLights, radiators as planRadiators, spokeAngle, standing, structure, town,
 } from './ring-plan.js';
 
 export { RING };
@@ -253,6 +253,54 @@ function paintFloor(T, plan, seed) {
   return p;
 }
 
+// The deck: dark plates in rows, their seams, wear down the middle, a painted line along each side and
+// across each end, small lights set in the plating by the edges; the centreline left plain, where the
+// pads are drawn. u along the deck (its bulkheads included), v across it.
+function paintDeck(T, seed) {
+  const len = DECK.arc + 2 * DECK.bulkhead, w = T / 2, h = T / 4, su = w / len, sv = h / (2 * INNER), r = rng(seed);
+  const p = new Paint(w, h, { base: [0.085, 0.09, 0.1], rough: 0.65, metal: 0.35 });
+  const X = (u) => (u + len / 2) * su, Y = (v) => (v + INNER) * sv;
+  for (let u = -len / 2; u < len / 2; u += 12) {
+    for (let v = -INNER; v < INNER; v += 8) {
+      const k = 0.075 + r() * 0.04;
+      p.rect(X(u), Y(v), X(u + 12), Y(v + 8), { albedo: [k, k * 1.03, k * 1.1], height: 0.2 + r() * 0.1, rough: 0.55 + r() * 0.2 });
+      p.seam(X(u), Y(v), X(u + 12), Y(v + 8), 1, 0.4, 0.7);
+    }
+  }
+  p.rect(X(-len / 2), Y(-180), X(len / 2), Y(180), { tint: 0.85 });              // where the craft come and go, darker
+  const paint = { albedo: [0.55, 0.42, 0.08], rough: 0.5, metal: 0 }, white = { albedo: [0.6, 0.6, 0.58], rough: 0.5, metal: 0 };
+  for (const v of [-(INNER - 55), INNER - 55]) p.rect(X(-len / 2), Y(v - 2.5), X(len / 2), Y(v + 2.5), paint);
+  for (const u of [-(DECK.arc / 2 - 30), DECK.arc / 2 - 30]) p.rect(X(u - 2.5), Y(-INNER + 55), X(u + 2.5), Y(INNER - 55), paint);
+  // lanes toward the bulkheads' doors along each side, kept off the centreline and its pads
+  for (const v of [-(INNER - 140), INNER - 140, -(INNER - 250), INNER - 250]) {
+    for (let u = -DECK.arc / 2 + 40; u < DECK.arc / 2 - 40; u += 30) p.rect(X(u), Y(v - 1.5), X(u + 18), Y(v + 1.5), white);
+  }
+  for (let u = -DECK.arc / 2 + 12; u < DECK.arc / 2; u += 24) for (const v of [-(INNER - 65), INNER - 65]) p.rect(X(u), Y(v - 1), X(u + 2), Y(v + 1), { glow: 1, albedo: [0.4, 0.45, 0.5] });
+  p.grain(r, 0.05, 0.05);
+  return p;
+}
+
+// A bulkhead's face toward the deck: u across the band (y), v from its top (the roof's edge) down to the
+// floor. Panels; the hangar door, its leaves and its lit frame; a row of windows over it.
+function paintBulkhead(T, seed) {
+  const span = 2 * INNER, tall = RING.floor - (RING.roof - 12), w = T / 2, h = T / 4, su = w / span, sv = h / tall, r = rng(seed);
+  const p = new Paint(w, h, { base: grey(0.4), rough: 0.55, metal: 0.3 });
+  const X = (y) => (y + INNER) * su, Y = (radius) => (radius - (RING.roof - 12)) * sv;
+  panelled(p, r, { across: 30, along: 20, base: 0.4, spread: 0.18, scale: su, accents: 0.01, dark: 0.04 });
+  const d = DECK_DOOR;
+  p.rect(X(-d.half - 6), Y(d.top - 6), X(d.half + 6), Y(RING.floor), { albedo: grey(0.22), rough: 0.4, metal: 0.6, height: -1 });
+  for (let y = -d.half; y < d.half; y += 40) {
+    p.rect(X(y), Y(d.top), X(y + 40), Y(RING.floor), { albedo: grey(0.3 + r() * 0.06), height: -0.5, rough: 0.45, metal: 0.5 });
+    p.rect(X(y), Y(d.top), X(y) + 1, Y(RING.floor), { tint: 0.4, raise: -0.5 });
+    for (let v = d.top + 15; v < RING.floor; v += 15) p.rect(X(y + 2), Y(v), X(y + 38), Y(v) + 1, { tint: 0.75 });
+  }
+  p.rect(X(-d.half - 6), Y(d.top - 6), X(d.half + 6), Y(d.top - 3), { glow: 0.9, albedo: grey(0.6) });
+  for (const y of [-d.half - 6, d.half + 3]) p.rect(X(y), Y(d.top - 6), X(y + 3), Y(RING.floor), { glow: 0.9, albedo: grey(0.6) });
+  for (let y = -170; y < 170; y += 7) for (const v of [RING.roof + 24, RING.roof + 36]) p.rect(X(y), Y(v), X(y + 4.5), Y(v + 5), { albedo: [0.04, 0.05, 0.06], glow: r() < 0.7 ? 0.6 + r() * 0.4 : 0.05, rough: 0.1 });
+  p.grain(r, 0.04, 0.04);
+  return p;
+}
+
 // Windows on the buildings' walls: 16 by 16 of them, 4 m apart and 3.5 m a storey; lit at random.
 function paintFacade(seed) {
   const n = 16, c = 8, w = n * c, r = rng(seed);
@@ -276,17 +324,21 @@ function build(pos, nor, uv, idx, col = null) {
   return g;
 }
 
-// An open cylinder round the axis, its normals out (or in); u round in `uTiles` repeats, v along.
-function cylinder({ r, y0, y1, segs, inward = false, uTiles = 1, vTiles = 1 }) {
+// An open cylinder round the axis, its normals out (or in); u round in `uTiles` repeats, v along. From
+// angle a0 to a1 where it is not the whole way round: u keeps the whole way's mapping, so a texture runs
+// on across a gap, unless `local`, where u runs 0 to uTiles over the part.
+function cylinder({ r, y0, y1, segs, inward = false, uTiles = 1, vTiles = 1, a0 = 0, a1 = TAU, local = false }) {
   const pos = [], nor = [], uv = [], idx = [];
-  for (let i = 0; i <= segs; i++) {
-    const a = (i / segs) * TAU, s = Math.sin(a), c = Math.cos(a);
+  const n = Math.max(2, Math.ceil(segs * ((a1 - a0) / TAU)));
+  for (let i = 0; i <= n; i++) {
+    const a = a0 + ((a1 - a0) * i) / n, s = Math.sin(a), c = Math.cos(a);
     for (const [y, v] of [[y0, 0], [y1, vTiles]]) {
       pos.push(r * s, y, r * c);
       nor.push(inward ? -s : s, 0, inward ? -c : c);
-      uv.push((i / segs) * uTiles, v);
+      uv.push(local ? (i / n) * uTiles : (a / TAU) * uTiles, v);
     }
   }
+  segs = n;
   for (let i = 0; i < segs; i++) {
     const a = i * 2, b = a + 1, c = a + 2, d = a + 3;
     if (inward) idx.push(a, b, c, b, d, c); else idx.push(a, c, b, b, c, d);
@@ -359,9 +411,8 @@ export function membersGeometry(list, jitter = 0.08, seed = 5) {
 
 // The buildings of every repeat of the town: boxes standing in from the floor, walls and roofs apart
 // (the walls carry the windows). Heights differ from one repeat to the next.
-function buildingsGeometry(plan) {
+function buildingsGeometry(list) {
   const walls = { pos: [], nor: [], uv: [], idx: [] }, roofs = { pos: [], nor: [], uv: [], idx: [] };
-  const r = rng(77);
   const P = (u, v, lift) => {   // floor point at u (m round), v (y), raised `lift` m toward the axis
     const a = u / RING.floor, rad = RING.floor - lift;
     return [rad * Math.sin(a), v, rad * Math.cos(a)];
@@ -376,9 +427,9 @@ function buildingsGeometry(plan) {
   const norm = (v) => { const l = Math.hypot(...v); return v.map((x) => x / l); };
   const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
   const crossv = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-  for (let t = 0; t < TILES; t++) {
-    for (const b of plan.buildings) {
-      const h = b.h * (0.75 + r() * 0.5), u0 = b.u0 + t * TILE, u1 = b.u1 + t * TILE;
+  {
+    for (const b of list) {
+      const { h, u0, u1 } = b;
       // footprint corners on the floor (sunk a metre) and at the roof
       const f = [P(u0, b.v0, -1), P(u1, b.v0, -1), P(u1, b.v1, -1), P(u0, b.v1, -1)];
       const top = [P(u0, b.v0, h), P(u1, b.v0, h), P(u1, b.v1, h), P(u0, b.v1, h)];
@@ -579,13 +630,38 @@ export class Ring {
       add(annulus({ r0: RING.rim, r1: RING.floor, y: side * INNER, segs, facing: -side, uTiles: 120 }), innerM);
       add(cylinder({ r: RING.rim, y0: side > 0 ? INNER : -HALF, y1: side > 0 ? HALF : -INNER, segs, inward: true, uTiles: 240, vTiles: 0.12 }), hullM);
     }
-    add(cylinder({ r: RING.floor, y0: -INNER, y1: INNER, segs, inward: true, uTiles: TILES }), floorM);
-    const roof = add(cylinder({ r: RING.roof, y0: -INNER, y1: INNER, segs: segs * 2, inward: true, uTiles: Math.round((TAU * RING.roof) / 50), vTiles: (2 * INNER) / 94 }), glassM);
+    // the floor, but for the deck's sector and its bulkheads; the roof, but for the deck
+    const open = DECK_HALF + DECK_WALL;
+    add(cylinder({ r: RING.floor, y0: -INNER, y1: INNER, segs, inward: true, uTiles: TILES, a0: DECK_A + open, a1: DECK_A - open + TAU }), floorM);
+    const roof = add(cylinder({ r: RING.roof, y0: -INNER, y1: INNER, segs: segs * 2, inward: true, uTiles: Math.round((TAU * RING.roof) / 50), vTiles: (2 * INNER) / 94, a0: DECK_A + DECK_HALF, a1: DECK_A - DECK_HALF + TAU }), glassM);
     roof.renderOrder = 1;
+    // the flight deck, open to space, and the bulkheads that seal the town from it
+    const deck = textures(paintDeck(T, 19), q, aniso, { normal: 1.5 });
+    const door = textures(paintBulkhead(T, 20), q, aniso, { normal: 2 });
+    this.textures.push(...[deck, door].flatMap((t) => [t.map, t.normalMap, t.mask]).filter(Boolean));
+    const deckM = surface({ maps: deck, shared: S, floor: true });
+    const doorM = surface({ maps: door, shared: S });
+    this.materials.push(deckM, doorM);
+    add(cylinder({ r: RING.floor, y0: -INNER, y1: INNER, segs: segs * 4, inward: true, a0: DECK_A - open, a1: DECK_A + open, local: true }), deckM);
+    for (const b of bulkheads()) {
+      // the face toward the deck, with its door: a quad standing radially, across the band
+      const f = b.face, n = [-b.side * Math.cos(f), 0, b.side * Math.sin(f)];
+      const P = (radius, y) => [radius * Math.sin(f), y, radius * Math.cos(f)];
+      const pos = [...P(b.r0, -INNER), ...P(b.r0, INNER), ...P(b.r1, INNER), ...P(b.r1, -INNER)];
+      const g = build(pos, [...n, ...n, ...n, ...n], [0, 0, 1, 0, 1, 1, 0, 1], b.side > 0 ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3]);
+      add(g, doorM);
+    }
+    // the bulkheads' bodies, standing a few metres back from the door faces so the two do not fight
+    const bodies = bulkheads().map((b) => {
+      const a = b.face + b.side * (12 / RING.floor), rm = (b.r0 + b.r1) / 2;
+      const radial = [Math.sin(a), 0, Math.cos(a)];
+      return { a: [rm * radial[0], -b.y, rm * radial[2]], b: [rm * radial[0], b.y, rm * radial[2]], w: b.r1 - b.r0, t: DECK.bulkhead - 2, up: radial, shade: 0.8 };
+    });
+    add(membersGeometry(bodies, 0), plain);
 
     // the town's buildings, standing up toward the axis, where the tier builds them
     if (q.city >= 2) {
-      const b = buildingsGeometry(plan);
+      const b = buildingsGeometry(standing(plan));
       const facade = textures(paintFacade(18), { normalMaps: false }, aniso, { glowInAlpha: true });
       this.textures.push(facade.map, facade.mask);
       const facadeM = surface({ maps: { map: facade.map }, shared: S, floor: true, glowInAlpha: true });
