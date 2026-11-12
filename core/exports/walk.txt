@@ -1,6 +1,10 @@
 oc_walk_reset
+oc_walk_put
 oc_walk_controls
+oc_walk_ball
 oc_walk_step
 oc_walk_out
 oc_walk_out_len
+oc_walk_box_count
+oc_walk_boxes
 oc_walk_hash
