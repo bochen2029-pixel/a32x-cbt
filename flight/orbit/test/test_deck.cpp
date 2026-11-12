@@ -21,6 +21,14 @@
 // TEST: landing_refused
 // TEST: deterministic
 // TEST: propellant_budget
+// TEST: crew_takes_back_in_the_final
+// TEST: crew_from_the_deck_hold_high
+// TEST: crew_given_a_pass_it_cannot_stop
+// TEST: touchdown_judged_at_the_touch
+// TEST: hover_holds_its_place
+// TEST: deck_hold_flies_true
+// TEST: drift_and_tilt_limits
+// TEST: struck_where_its_shape_meets
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
@@ -385,7 +393,9 @@ void monteCarlo() {
 }
 
 // On a pad, the drive idle and the brakes on, the craft stays put for ten minutes: the deck carries it round
-// at w r, the gear takes its weight, one g, and nothing in it creeps.
+// at w r, the gear takes its weight, one g less the Earth's tide (here up to 6e-4 g), and nothing in it creeps.
+// What moves it is the tide turning with the Ring, a few millionths of a metre a second; a velocity of 2e-4 m/s
+// read here was RK4's over a step too long for the stuck tyres' damping (the audit of 599e051), and is gone.
 void parkedStaysPut() {
     if (!landed()) return;
     oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 1);   // the pilot's hands: the brakes on, the throttle shut
@@ -404,8 +414,8 @@ void parkedStaysPut() {
     std::printf("  ten minutes on the pad: moved at most %.2e m, %.2e m/s; felt %.6f to %.6f g against w^2 r %.6f g; the gear %.4f m compressed\n", moved, speed, gLow,
                 gHigh, want, 3.0 - h0);
     CHECK(get(OC_CRASHED) == 0 && dk(OC_DECK_ON_DECK) == 1, "crashed %.0f, on deck %.0f", get(OC_CRASHED), dk(OC_DECK_ON_DECK));
-    CHECK(moved < 1e-3 && speed < 1e-3, "moved %.3g m, %.3g m/s", moved, speed);
-    CHECK(std::fabs(gLow - want) < 2e-3 && std::fabs(gHigh - want) < 2e-3, "felt %.5f to %.5f g against %.5f", gLow, gHigh, want);
+    CHECK(moved < 1e-3 && speed < 1e-5, "moved %.3g m, %.3g m/s", moved, speed);
+    CHECK(std::fabs(gLow - want) < 1e-3 && std::fabs(gHigh - want) < 1e-3, "felt %.5f to %.5f g against %.5f", gLow, gHigh, want);
     CHECK(dk(OC_DECK_NOZZLE_DEG) >= 0 && get(OC_THROTTLE) == 0, "the drive at idle: %.3f", get(OC_THROTTLE));
     CHECK(finite(), "finite");
 }
@@ -715,6 +725,210 @@ void propellantBudget() {
     CHECK(used < 0.95 * OC_DECK_PROP_MIN && get(OC_PROP) > 0, "used %.0f kg against the %.0f the landing asks to start", used, OC_DECK_PROP_MIN);
 }
 
+// ---- found by the audit of 599e051 --------------------------------------------------------------------------
+
+// The crew picks a landing up from how the craft moves, not only from where it is. Riding with the deck the
+// craft needs about a g of thrust to stay up; a crew that took it as if it were at rest among the stars would
+// fly it on the small thrusters toward the hold point, and it would fall. Taken from the crew in its final,
+// below the glide's height over the centreline, and given back two seconds later, the crew lands it.
+void crewTakesBackInTheFinal() {
+    if (!toHold()) return;
+    oc_auto(OC_AUTO_DECK);
+    const double t0 = get(OC_T);
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 &&
+           !(dk(OC_DECK_APPARENT_G) > 0.5 && std::fabs(dk(OC_DECK_C)) < 5 && dk(OC_DECK_HEIGHT) < 380 && std::fabs(dk(OC_DECK_SECTOR_S)) < OC_DECK_ARC_M))
+        oc_step(1);
+    const double h0 = dk(OC_DECK_HEIGHT), u0 = dk(OC_DECK_ALONG), g0 = dk(OC_DECK_APPARENT_G);
+    CHECK(get(OC_CRASHED) == 0 && g0 > 0.5, "the crew's final: crashed %.0f, %.2f g", get(OC_CRASHED), g0);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);   // Space: the deck hold, the throttle at its middle
+    oc_auto(OC_AUTO_OFF);
+    oc_sas(OC_SAS_DECK);
+    oc_step(100);
+    const Landing L = crewLands(900, true);      // Space again: the crew
+    std::printf("  taken %.0f m up at %.1f m/s against the deck, %.2f g; given back 2 s later: %s on pad %d in %.0f s, sink %.3f m/s, %.2f m off\n", h0, u0, g0,
+                get(OC_CRASHED) > 0 ? "CRASHED" : L.took > 0 ? "landed" : "not landed", L.pad, L.took, L.sink, L.off);
+    CHECK(get(OC_CRASHED) == 0 && L.took > 0 && inTolerance(L), "crashed %.0f, took %.0f s, verdict %d", get(OC_CRASHED), L.took, L.verdict);
+}
+
+// Lifted in the deck hold to 360 m over the pad, over the sector, the crew lands it; flown on at that height out
+// over the roof, it refuses, since riding with the deck there is no landing it can start, and the pilot keeps the
+// hold. Neither falls.
+void crewFromTheDeckHoldHigh() {
+    if (!hoverByHand()) return;
+    oc_controls(0, 0, 0, 1.0, 0, 0, 0, 1, 0);
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < 358) oc_step(1);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    oc_step(500);
+    const double h = dk(OC_DECK_HEIGHT);
+    const Landing L = crewLands(900, true);
+    std::printf("  from the deck hold %.0f m over the pad: %s on pad %d in %.0f s\n", h, get(OC_CRASHED) > 0 ? "CRASHED" : L.took > 0 ? "landed" : "not landed",
+                L.pad, L.took);
+    CHECK(get(OC_CRASHED) == 0 && L.took > 0 && inTolerance(L), "crashed %.0f, took %.0f s, verdict %d, refused %d", get(OC_CRASHED), L.took, L.verdict,
+          idk(OC_DECK_REFUSED));
+    // again, and spinward at that height until 1.9 km from the sector's centre, over the roof, then held there
+    if (!hoverByHand()) return;
+    oc_controls(0, 0, 0, 1.0, 0, 0, 0, 1, 0);
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < 345) oc_step(1);
+    oc_controls(-1, 0, 0, 0.5, 0, 0, 0, 1, 0);   // spinward at the stop until, let go, the hold would stop it 1.9 km out
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_SECTOR_S) + std::pow(std::fmax(dk(OC_DECK_ALONG) - 10, 0.0), 2) / 4 < 1900) oc_step(1);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    for (int i = 0; i < 3000 && std::fabs(dk(OC_DECK_ALONG)) > 0.05; ++i) oc_step(1);
+    oc_step(250);
+    const double s = dk(OC_DECK_SECTOR_S), h2 = dk(OC_DECK_HEIGHT);
+    oc_auto(OC_AUTO_DECK);
+    const int auto1 = (int)get(OC_AUTO), refused = idk(OC_DECK_REFUSED);
+    oc_step(1000);
+    std::printf("  held %.0f m up over the roof, %.0f m from the sector's centre: the crew %s (refused %d); 20 s on, %s, %.0f m up\n", h2, s,
+                auto1 == OC_AUTO_DECK ? "took it" : "refused", refused, get(OC_CRASHED) > 0 ? "CRASHED" : "flying", dk(OC_DECK_HEIGHT));
+    CHECK(get(OC_CRASHED) == 0 && s > 1500 && h2 > R - OC_RING_ROOF_M, "crashed %.0f at %.0f m along, %.0f m up", get(OC_CRASHED), s, h2);
+    CHECK(auto1 == OC_AUTO_OFF && refused == OC_DECK_NO_RIDING, "over the roof: auto %d, refused %d", auto1, refused);
+}
+
+// A pass along the deck faster than the crew could stop in the room left before a bulkhead is not one it takes:
+// hovering by hand, the stick held forward 22 s (40 m/s, 250 m from the spinward bulkhead, where braking at the
+// crew's 3 m/s2 takes 270 m), the crew asked: either it lands without striking anything, or it refuses and says
+// why, and the pilot still has the craft.
+void crewGivenAPassItCannotStop() {
+    if (!hoverByHand()) return;
+    oc_controls(-1, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    oc_step(1100);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    const double u = dk(OC_DECK_ALONG), s = dk(OC_DECK_SECTOR_S);
+    oc_auto(OC_AUTO_DECK);
+    const int took = get(OC_AUTO) == OC_AUTO_DECK, refused = idk(OC_DECK_REFUSED);
+    std::printf("  %.1f m/s along the deck, %.0f m from the bulkhead: the crew %s (refused %d)\n", u, OC_DECK_ARC_M / 2 - s, took ? "took it" : "refused", refused);
+    if (took) {
+        const Landing L = crewLands(900, true);
+        CHECK(get(OC_CRASHED) == 0 && L.took > 0, "taken, and crashed %.0f (hit %s)", get(OC_CRASHED), hitName((int)dock(OC_DOCK_HIT)));
+    } else {
+        CHECK(refused == OC_DECK_NO_STOP && get(OC_AUTO) == OC_AUTO_OFF && get(OC_SAS) == OC_SAS_DECK, "refused %d, auto %.0f, hold %.0f", refused, get(OC_AUTO),
+              get(OC_SAS));
+    }
+}
+
+// The touchdown is judged at the touch: the sink when the first leg meets the deck, wherever in a step that falls,
+// not the end of the step after the legs have begun to stop it. Let fall from rest under the plain hold, the
+// throttle shut, with the legs higher and higher, the sink judged never falls and the verdict never improves.
+void touchdownJudgedAtTheTouch() {
+    double lastSink = 0;
+    int lastVerdict = OC_DECK_V_NONE, worse = 0;
+    for (int i = 0; i <= 12; ++i) {
+        const double legs = 1.0 + 0.05 * i;
+        if (!hoverByHand()) return;
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 0);   // down in the hold, then held at the height asked
+        while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) > 3.0 + legs + 0.02) oc_step(1);
+        oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+        oc_step(500);
+        const double from = dk(OC_DECK_HEIGHT) - 3.0;
+        oc_sas(OC_SAS_HOLD);
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 0);
+        for (int k = 0; k < 1500 && get(OC_CRASHED) == 0 && dk(OC_DECK_ON_DECK) == 0; ++k) oc_step(1);
+        const double sink = dk(OC_DECK_TD_SINK);
+        const int verdict = idk(OC_DECK_TD_VERDICT);
+        const bool crash = verdict == OC_DECK_V_CRASHED;
+        std::printf("  the legs %.2f m up: judged %.3f m/s, %s\n", from, sink, crash ? "a crash" : verdict == OC_DECK_V_FIRM ? "firm" : "landed");
+        if (i > 0 && (sink < lastSink - 1e-9 || (lastVerdict == OC_DECK_V_CRASHED && !crash))) ++worse;
+        lastSink = sink;
+        lastVerdict = verdict;
+    }
+    CHECK(worse == 0, "%d drops judged softer than a lower one", worse);
+}
+
+// Hovering still in the deck hold for a whole turn of the Ring, 142 s, the craft keeps its place along the deck,
+// across it and in height to a centimetre. The Earth's tide on it, the craft and the Ring's centre falling a
+// little differently, is up to 0.02 m/s2 at the rim and turns with the Ring; fed forward it costs the hold
+// nothing, where left to the place loops (0.09 and 0.3 /s2) it would move the craft by 0.1 to 0.2 m.
+void hoverHoldsItsPlace() {
+    if (!hoverByHand()) return;
+    oc_step(1000);
+    const double s0 = dk(OC_DECK_SECTOR_S), c0 = dk(OC_DECK_C), h0 = dk(OC_DECK_HEIGHT);
+    double ds = 0, dc = 0, dh = 0;
+    for (int i = 0; i < (int)(2 * PI / W / OC_DT); ++i) {
+        oc_step(1);
+        ds = std::fmax(ds, std::fabs(dk(OC_DECK_SECTOR_S) - s0));
+        dc = std::fmax(dc, std::fabs(dk(OC_DECK_C) - c0));
+        dh = std::fmax(dh, std::fabs(dk(OC_DECK_HEIGHT) - h0));
+    }
+    std::printf("  a turn of the Ring hovering %.1f m up: held to %.4f m along, %.4f m across, %.4f m in height\n", h0, ds, dc, dh);
+    CHECK(ds < 0.01 && dc < 0.01 && dh < 0.01, "moved %.4f, %.4f, %.4f m", ds, dc, dh);
+}
+
+// The deck hold flies the velocity it is asked for against the deck at the craft's own height, and asks the drive
+// for the turning frame's pulls rather than leaving them to its loops. Coriolis's 2 w v is 0.7 m/s2 along the
+// deck in a climb at 8 m/s and 0.9 m/s2 up or down in flight along it at 10 m/s; left to the loops it would carry
+// the craft 8 m along in the climb and 3 m in height in the flight. Up from the deck at the throttle's stop, the
+// place along and across held to 0.2 m; at 300 m, the stick at eight tenths forward: 8.00 m/s against the deck
+// there, though the floor under it moves 6 % faster on its arc, and the height held to 0.2 m on the way.
+void deckHoldFliesTrue() {
+    if (!hoverByHand()) return;
+    const double s0 = dk(OC_DECK_SECTOR_S), c0 = dk(OC_DECK_C);
+    oc_controls(0, 0, 0, 1.0, 0, 0, 0, 1, 0);
+    double ds = 0, dc = 0, fastest = 0;
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < 300) {
+        oc_step(1);
+        ds = std::fmax(ds, std::fabs(dk(OC_DECK_SECTOR_S) - s0));
+        dc = std::fmax(dc, std::fabs(dk(OC_DECK_C) - c0));
+        fastest = std::fmax(fastest, dk(OC_DECK_VERTICAL));
+    }
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    oc_step(1000);
+    const double h1 = dk(OC_DECK_HEIGHT);
+    oc_controls(-0.8, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    double dh = 0;
+    for (int i = 0; i < 1500; ++i) { oc_step(1); dh = std::fmax(dh, std::fabs(dk(OC_DECK_HEIGHT) - h1)); }
+    const double along = dk(OC_DECK_ALONG);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    std::printf("  up at %.1f m/s: the place held to %.3f m along, %.3f m across; at %.0f m, the stick at 0.8: %.3f m/s against the deck, the height held to %.3f m\n",
+                fastest, ds, dc, h1, along, dh);
+    CHECK(fastest > 7.5 && ds < 0.2 && dc < 0.2, "climbing at %.1f m/s: %.3f m along, %.3f m across", fastest, ds, dc);
+    CHECK(std::fabs(along - 8.0) < 0.05 && dh < 0.2, "%.3f m/s along, the height to %.3f m", along, dh);
+}
+
+// The gear takes a touchdown inside its limits and folds outside them, each limit alone. Moving across the deck at
+// 8 m/s, level, the throttle shut: the legs meet the deck at an easy sink, level, sliding sideways faster than a
+// tyre takes: a crash. At rest with the legs a metre up, the stick thrown right and the throttle shut: the craft
+// banks to go, and its right leg meets the deck gently and hardly moving, but banked past where a wingtip clears
+// the deck: a crash.
+void driftAndTiltLimits() {
+    for (int leg = 0; leg < 2; ++leg) {
+        if (!hoverByHand()) return;
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 0);
+        while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) > (leg == 0 ? 5.0 : 4.0)) oc_step(1);
+        oc_controls(0, leg == 0 ? 0.85 : 0, 0, 0.5, 0, 0, 0, 1, 0);
+        oc_step(500);
+        const double across = dk(OC_DECK_ACROSS), legs = dk(OC_DECK_HEIGHT) - 3.0, t0 = get(OC_T);
+        oc_controls(0, leg == 0 ? 0.85 : 1.0, 0, 0, 0, 0, 0, 1, 0);
+        for (int i = 0; i < 1500 && get(OC_CRASHED) == 0 && !(dk(OC_DECK_TD_T) > t0); ++i) oc_step(1);
+        const double sink = dk(OC_DECK_TD_SINK), drift = dk(OC_DECK_TD_DRIFT), tilt = dk(OC_DECK_TD_TILT_DEG);
+        std::printf("  %s, the legs %.2f m up, %.1f m/s across: down %.1f s later at %.2f m/s, drifting %.2f m/s, %.1f deg off level: verdict %d\n",
+                    leg == 0 ? "level" : "the stick thrown", legs, across, dk(OC_DECK_TD_T) - t0, sink, drift, tilt, idk(OC_DECK_TD_VERDICT));
+        CHECK(dk(OC_DECK_TD_T) > t0, "no touchdown");
+        CHECK(idk(OC_DECK_TD_VERDICT) == OC_DECK_V_CRASHED && get(OC_CRASHED) == 1, "verdict %d", idk(OC_DECK_TD_VERDICT));
+        if (leg == 0) CHECK(drift > OC_DECK_CRASH_DRIFT && sink < OC_DECK_TOL_SINK && tilt < OC_DECK_TOL_TILT_DEG, "the drift alone: %.2f, %.2f, %.1f", drift, sink, tilt);
+        else CHECK(tilt > OC_DECK_CRASH_TILT_DEG && drift < OC_DECK_CRASH_DRIFT && sink < OC_DECK_TOL_SINK, "the tilt alone: %.1f, %.2f, %.2f", tilt, drift, sink);
+    }
+}
+
+// Over the deck the rim walls and the bulkheads are as solid as the rest of the Ring, and the craft strikes them
+// where its shape meets them: flown across at 8 m/s, the right wingtip (7.6 m out, 1.6 m round) meets the rim
+// wall's face with the centre of mass 9.2 m from it; flown tail first along the deck, the fin (15 m behind,
+// 3.2 m round) meets the bulkhead's face with the centre of mass 18.2 m from it.
+void struckWhereItsShapeMeets() {
+    for (int leg = 0; leg < 2; ++leg) {
+        if (!hoverByHand()) return;
+        oc_controls(leg == 0 ? 0 : 0.8, leg == 0 ? 0.8 : 0, 0, 0.5, 0, 0, 0, 1, 0);
+        double c = 0, s = 0;
+        for (int i = 0; i < 20000 && get(OC_CRASHED) == 0; ++i) { c = dk(OC_DECK_C); s = dk(OC_DECK_SECTOR_S); oc_step(1); }
+        const double gap = leg == 0 ? OC_RING_WIDTH_M / 2 - dk(OC_DECK_C) : OC_DECK_ARC_M / 2 + dk(OC_DECK_SECTOR_S), want = leg == 0 ? 9.2 : 18.2;
+        std::printf("  flown %s: hit %s with %s, the centre of mass %.2f m from the face (its shape reaches %.1f)\n", leg == 0 ? "across" : "tail first",
+                    hitName((int)dock(OC_DOCK_HIT)), partName((int)dock(OC_DOCK_HIT_PART)), gap, want);
+        (void)c;
+        (void)s;
+        CHECK(get(OC_CRASHED) == 1 && dock(OC_DOCK_HIT) == (leg == 0 ? OC_DOCK_HIT_RIM : OC_DOCK_HIT_BULKHEAD), "hit %s", hitName((int)dock(OC_DOCK_HIT)));
+        CHECK(std::fabs(gap - want) < 0.3, "%.2f m from the face, its shape reaches %.1f", gap, want);
+    }
+}
+
 struct Test { const char* name; void (*fn)(); };
 const Test tests[] = {
     {"readouts_block", readoutsBlock},
@@ -735,6 +949,14 @@ const Test tests[] = {
     {"landing_refused", landingRefused},
     {"deterministic", deterministic},
     {"propellant_budget", propellantBudget},
+    {"crew_takes_back_in_the_final", crewTakesBackInTheFinal},
+    {"crew_from_the_deck_hold_high", crewFromTheDeckHoldHigh},
+    {"crew_given_a_pass_it_cannot_stop", crewGivenAPassItCannotStop},
+    {"touchdown_judged_at_the_touch", touchdownJudgedAtTheTouch},
+    {"hover_holds_its_place", hoverHoldsItsPlace},
+    {"deck_hold_flies_true", deckHoldFliesTrue},
+    {"drift_and_tilt_limits", driftAndTiltLimits},
+    {"struck_where_its_shape_meets", struckWhereItsShapeMeets},
 };
 
 }   // namespace

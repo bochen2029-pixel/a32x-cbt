@@ -22,13 +22,14 @@ export const DECK_OUT = [
 ];
 export const DECK_PH = { none: 0, transfer: 1, depart: 2, wait: 3, glide: 4, hover: 5, descend: 6, landed: 7 };
 export const DECK_V = { none: 0, landed: 1, crashed: 2, firm: 3, drifting: 4, tilted: 5, offPad: 6 };
-export const DECK_NO = { none: 0, docked: 1, crashed: 2, low: 3, far: 4, fast: 5, landed: 6, prop: 7 };
+export const DECK_NO = { none: 0, docked: 1, crashed: 2, low: 3, far: 4, fast: 5, landed: 6, prop: 7, riding: 8, stop: 9 };
 
 const PHASE_WORDS = ['', 'to the hold point', 'out into the Ring', 'waiting for the pad to come round', 'on the glide', 'hovering over the pad',
   'descending', 'on the deck'];
 const PHASE_LABELS = ['', 'TO HOLD POINT', 'OUT', 'WAIT', 'GLIDE', 'HOVER', 'DESCEND', 'ON DECK'];
 const REFUSED_WORDS = ['', 'docked at the hub', 'crashed', 'not in orbit', 'more than 50 km from the Ring', 'passing the Ring faster than 50 m/s',
-  'on the deck already', `under ${DECK.propMin.toLocaleString('en')} kg of propellant`];
+  'on the deck already', 'too little propellant for it', 'turning with the Ring but not over the deck: fly over it first',
+  'moving along the deck too fast to stop before the bulkhead'];
 
 const round = (v) => Math.round(v);
 const sign = (v, digits) => { const r = Number(v.toFixed(digits)); return `${r >= 0 ? '+' : '-'}${Math.abs(r).toFixed(digits)}`; };

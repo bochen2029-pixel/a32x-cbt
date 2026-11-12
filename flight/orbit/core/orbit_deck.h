@@ -89,7 +89,9 @@ enum {
     OC_DECK_NO_FAR = 4,      /* more than OC_DOCK_ENGAGE_M from the Ring */
     OC_DECK_NO_FAST = 5,     /* passing it faster than OC_DOCK_ENGAGE_SPEED, in the frame turning with its orbit */
     OC_DECK_NO_LANDED = 6,   /* on the deck already */
-    OC_DECK_NO_PROP = 7      /* under OC_DECK_PROP_MIN of propellant */
+    OC_DECK_NO_PROP = 7,     /* under OC_DECK_PROP_MIN of propellant */
+    OC_DECK_NO_RIDING = 8,   /* turning with the Ring, but over its roof or beside the deck: no landing starts there */
+    OC_DECK_NO_STOP = 9      /* moving along the deck faster than the crew can stop before the bulkhead ahead */
 };
 
 /* indices into oc_deck_out() */
