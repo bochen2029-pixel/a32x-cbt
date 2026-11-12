@@ -488,15 +488,19 @@ double wrapDeg(double d) { while (d > 180) d -= 360; while (d < -180) d += 360; 
 // approach: the site position reported, carried back through the Earth-fixed frame, is the inertial
 // position; latitude, longitude and height are that point's on the sphere; the body-to-site quaternion is
 // a unit one, its axes orthonormal and right-handed, and they give the heading, pitch and roll reported;
-// the Ring's axis and reference are unit and square; the Sun stays fixed among the stars; the core's two
+// the Ring's axis and reference are unit and square; the Sun moves among the stars only at its own pace,
+// a degree a day along the ecliptic, never faster, and does move; the core's two
 // copies of the transform (writeOut's and sitePos's) agree; and the frame comes back to itself after a
 // sidereal day. Each bound is a few unit roundoffs of the quantity. The check can fail: the Earth's turn
 // read one step late misses by metres.
 void framesRoundTrip() {
     const SiteAxes S;
     double worstPos = 0, nearestLate = 1e30, worstLat = 0, worstLon = 0, worstAlt = 0, worstQ = 0, worstAxes = 0, worstAngles = 0, worstRing = 0,
-           worstSun = 0, worstCopy = 0;
+           worstSun = 0, worstCopy = 0, sunGone = 0, sunTime = 0, t0 = 0;
     V3 sun0{0, 0, 0};
+    // The Sun's apparent motion along the ecliptic: 61.2' a day at perihelion in early January, 57.2' at
+    // aphelion in early July (the Earth's orbit, e = 0.0167: the rate goes as 1/r^2). Rad/s.
+    const double SUN_FASTEST = 1.020 * PI / 180 / 86400, SUN_SLOWEST = 0.952 * PI / 180 / 86400;
     long n = 0;
     auto check = [&]() {
         const double t = get(OC_T);
@@ -529,8 +533,11 @@ void framesRoundTrip() {
         const V3 ax{get(OC_RING_AX_E), get(OC_RING_AX_N), get(OC_RING_AX_U)}, ref{get(OC_RING_REF_E), get(OC_RING_REF_N), get(OC_RING_REF_U)};
         worstRing = std::fmax(worstRing, std::fmax(std::fabs(oc::norm(ax) - 1), std::fmax(std::fabs(oc::norm(ref) - 1), std::fabs(oc::dot(ax, ref)))) / (8 * U));
         const V3 sun{get(OC_SUN_E), get(OC_SUN_N), get(OC_SUN_U)}, sunI = S.toInertial(sun, t, false);
-        if (n == 0) sun0 = sunI;
-        worstSun = std::fmax(worstSun, oc::norm(sunI - sun0) / (16 * U));
+        if (n == 0) { sun0 = sunI; t0 = t; }
+        // the angle it has gone since the start, against the most the Sun's apparent motion allows
+        sunGone = std::atan2(oc::norm(oc::cross(sun0, sunI)), oc::dot(sun0, sunI));
+        sunTime = t - t0;
+        worstSun = std::fmax(worstSun, std::fmax(0.0, sunGone - SUN_FASTEST * sunTime) / (16 * U));
         worstCopy = std::fmax(worstCopy, std::fmax(oc::norm(oc::sitePos(oc::g.r, t) - p) / tolPos, oc::norm(oc::siteDir(oc::sunEci, t) - sun) / (8 * U)));
         ++n;
     };
@@ -556,7 +563,9 @@ void framesRoundTrip() {
     CHECK(worstQ <= 1 && worstAxes <= 1, "the site quaternion: |q| %.3g, axes %.3g bounds off", worstQ, worstAxes);
     CHECK(worstAngles <= 1, "heading, pitch and roll %.3g bounds off", worstAngles);
     CHECK(worstRing <= 1, "the Ring's axes %.3g bounds off", worstRing);
-    CHECK(worstSun <= 1, "the Sun moved among the stars: %.3g bounds", worstSun);
+    CHECK(worstSun <= 1, "the Sun outran its own pace among the stars: %.3g bounds", worstSun);
+    std::printf("  the Sun went %.5f deg among the stars in %.1f s: %.4f deg a day\n", sunGone * 180 / PI, sunTime, sunGone * 180 / PI / sunTime * 86400);
+    CHECK(sunGone >= SUN_SLOWEST * sunTime - 16 * U, "the Sun stood still among the stars: %.3g deg in %.0f s", sunGone * 180 / PI, sunTime);
     CHECK(worstCopy <= 1, "the core's two transforms part: %.3g bounds", worstCopy);
     CHECK(worstDay <= 1, "a sidereal day does not bring the frame back: %.3g bounds", worstDay);
     CHECK(nearestLate > 1, "a step late still comes back within %.3g m", nearestLate);

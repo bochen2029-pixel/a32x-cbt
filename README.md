@@ -35,6 +35,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | O | Start | skip ahead to orbit |
 | , . | bumpers | time slower, faster (up to 100×) |
 | V | B | view: chase, cockpit, from the Ring |
+| F | | the Moon through a telescope, and back |
 | drag, wheel | | look round the craft, zoom |
 | H, Backspace | | help, start again |
 | N | | the map: the orbit, the Ring close to, the ground track; shift-N the next of them |
@@ -74,7 +75,7 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | control | a rate loop by dynamic inversion, inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give | ours |
 | the crew | take-off, climb, a pitch schedule through the air, then a cut-down version of the Shuttle's powered explicit guidance: the sine of the thrust's elevation linear in time, solved each step so that the burn ends at the Ring's height with no climb left and a round orbit's speed | ours, after the Shuttle's method |
 | the Ring | 5 km in radius, a 1 km band, spinning at 0.0443 rad/s for 1 g at the floor; a roof 300 m above it, six spokes, a hub with its port 350 m out along the axis. In a round 500 km orbit in the crew's plane, 25 km ahead of where the crew arrives: the core flies the crew once at reset to find that place. Its axis is fixed among the stars, as a spinning wheel's is | ours |
-| the Sun | 12 November at 1 pm local solar time at the start (declination −17.9°), fixed among the stars for the flight | ours |
+| the Sun, the Moon and the stars | where they really are on 12 November 2026 from 19:00 UTC, one in the afternoon at KDFW, or on another date; they move with the flight's clock. The Moon's face painted from the real maria and craters; 8,615 real stars ("The Sun and the Moon", below) | Meeus's methods; the IAU's Gazetteer; Wikidata |
 | the globe | drawn per pixel: each ray meets the sphere exactly, so it is as round from the runway as from orbit; Natural Earth's coastlines and lakes; a single-scattering atmosphere; land coloured by latitude and a few desert boxes, clouds made up, a clear day over Texas | Natural Earth's coastlines; the rest ours |
 | KDFW | `flight/web`'s drawing of the field, unchanged | `docs/provenance.md`, 1f |
 
@@ -221,7 +222,68 @@ To come.
 
 ### The Sun and the Moon
 
-To come.
+The flight has a date: 12 November 2026 at 19:00:00 UTC unless the address says otherwise, as
+`?date=2026-12-24T03:00Z` (UTC unless a zone is written; 1900 to 2100). That is one in the afternoon at
+KDFW, the Sun 38° up in the south-south-west and still 32° up where the crew reaches the Ring; a thin
+Moon, 11 % lit, stands 23° up in the south-south-east, 39° from the Sun. From there the sky moves with
+the flight's clock, so the Moon goes its half a degree an hour among the stars and the Sun its degree a
+day. A date the page cannot take stops it and says why.
+
+The core (`core/sky.cpp`, `orbit_sky.h`) works the sky out from J. Meeus's *Astronomical Algorithms*:
+the Sun to 0.01°, the Moon from the whole of his tables to about 10″, the Earth's sidereal time,
+precession and nutation, and the Moon's attitude by Cassini's laws, which gives its librations. It gives
+them as readouts of their own: where the Sun and the Moon are from the Earth's centre, how far, the Moon's
+pole and the middle of its near side, its phase, and the axes of J2000.0 for the stars. The eye is not at
+the Earth's centre: from the runway the Moon stands 0.83° lower than from there, and the page draws it
+from wherever the eye is. Nothing in the flight depends on the date.
+
+The page (`web/src/sky.js`):
+
+- **The Moon**, a sphere of its true angular size along the true line to it (drawn 80,000 km out, inside
+  the far pass, and scaled to match), turned as the core says, its near side to the Earth, lit by the Sun
+  at its phase, with earthshine on its night side against a dark sky. Its face is painted by code
+  (`moon-face.js`) from the IAU's Gazetteer of Planetary Nomenclature: 44 maria, lacus, sinus and paludes
+  at its outlines (two drawn here, where it gives only a box and a circle), every named crater of 8 km
+  and more on the near side (4,164) at its place and size, as a bowl and rim after Pike's measures of
+  fresh lunar craters, worn by a seeded amount, and rays from Tycho, Copernicus, Kepler, Aristarchus and
+  a dozen more. It is drawn before the Earth and its sky, which
+  hide it below the horizon and behind the Earth and lay the day's blue over it: from the runway by day
+  it is pale, as it is. **F** turns the view to it through a telescope, 1.4° across.
+- **The Sun**: its disc is the sky pass's; above the air the page adds a glare (a core, a halo over a few
+  degrees, four faint spikes and two lens ghosts), dimmed and reddened where its light grazes the air and
+  gone as the Earth covers it.
+- **The stars**, 8,615 of them to magnitude 6.5, from Wikidata, at their places for J2000.0 and turned by
+  the core's sidereal time, precession and nutation: Orion is where Orion is. Sized and tinted by their
+  magnitude and spectral class; seen by night and above the air.
+- Two lines in the readouts: the date and time, UTC, and the Sun's and the Moon's height above the
+  horizon with how much of the Moon is lit.
+
+From the tests (`test/test_sky.cpp`, `web/test/sky.test.mjs`), against the book's worked examples and
+against JPL's Horizons (DE441), which shares nothing with the book:
+
+| | the core or the page | Horizons |
+|---|---|---|
+| the Sun from KDFW, 2026-11-12 19:00 UTC | az 194.453°, el 37.968° | 194.452°, 37.968° |
+| the Moon from KDFW | az 151.806°, el 22.562°, 405,165 km from the Earth's centre | 151.804°, 22.563°, 405,192 km |
+| the Moon seen from KDFW, as the page draws it | 11.478 % lit, phase angle 140.393°, 1779.9″ across, the eye over 0.77° E 6.18° N of its globe, its pole 1.03° east of north | 11.481 %, 140.393°, 1779.9″, 0.79° E 6.21° N, 1.04° |
+| the full Moon of 2026-12-24 03:00 UTC | az 82.527°, el 43.545°, 99.88 % lit, 2034.5″ across | 82.522°, 43.543°, 99.88 %, 2034.5″ |
+| an hour of flight | the Moon 0.4940° among the stars, the Sun 0.0419° | 0.4940°, 0.0420° |
+| 2024-04-08 over KDFW, the eclipse | the centres 0.0114° apart at 18:43:21 UTC | 0.0110° at 18:42:32 |
+| 2018 to 2034 | the Moon within 7″ and 41 km, the Sun within 21″ | |
+
+What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own and
+no tone curve, as an eye adapted to it sees it, the full Moon's highlands at three quarters of white; its
+fall with phase is taken at the power 0.35, so a crescent is brighter than a camera would show it; and
+earthshine is lifted 250 times from its true ten-thousandth of sunlight, and shown only against a dark
+sky. What is not here: the planets; refraction, which lifts the Sun and the Moon half a degree at the
+horizon; the Earth's shadow on the Moon in a lunar eclipse and the Moon's on the Earth in a solar one;
+moonlight on the ground and in the night sky; the Moon's physical libration (0.04°). The plains' tones,
+the craters' wear and the rays' directions are this project's; the maria's outlines and the craters'
+places are the Gazetteer's.
+
+`web/data/moon.js` is made by `node flight/orbit/web/tools/moon.mjs <MOON_nomenclature_center_pts.dbf> <pages>`,
+and `web/data/stars.js` by `node flight/orbit/web/tools/stars.mjs <slice.csv> ...`; each tool says where its
+inputs come from.
 
 ### Graphics, from a phone to a big card
 
