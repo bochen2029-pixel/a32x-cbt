@@ -17,6 +17,8 @@ export const HELP = [
   ['O', 'skip ahead to orbit (crew)'],
   [', .', 'time slower / faster'],
   ['V', 'view: chase, cockpit, from the Ring'],
+  ['N', 'the map: orbit, the Ring close up, the ground track (Shift-N to switch)'],
+  ['Y', 'sound off / on (it starts with your first key or tap)'],
   ['drag, wheel', 'look around the craft, zoom'],
   ['H', 'this help'],
   ['Backspace', 'start again'],
