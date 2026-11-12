@@ -53,5 +53,16 @@ test('the ring\'s shape is the header\'s', () => {
     spin: def('OC_RING_SPIN'), floor: def('OC_RING_FLOOR_M'), width: def('OC_RING_WIDTH_M'), hull: def('OC_RING_HULL_M'),
     roof: def('OC_RING_ROOF_M'), rim: def('OC_RING_RIM_M'), spokes: def('OC_RING_SPOKES'), spoke: def('OC_RING_SPOKE_M'),
     hub: def('OC_HUB_RADIUS_M'), port: def('OC_HUB_PORT_M'),
+    deck: {
+      angle: def('OC_DECK_ANGLE_DEG'), arc: def('OC_DECK_ARC_M'), bulkhead: def('OC_DECK_BULKHEAD_M'), pads: def('OC_DECK_PADS'),
+      padSpacing: def('OC_DECK_PAD_SPACING_M'), padRadius: def('OC_DECK_PAD_RADIUS_M'),
+    },
   });
+  // the deck's pads fit inside its open sector, clear of the bulkheads, and the sector clear of the spokes
+  const d = RING.deck, half = d.arc / 2;
+  assert.ok(((d.pads - 1) / 2) * d.padSpacing + d.padRadius < half - 100, 'the end pads 100 m clear of the bulkheads');
+  const step = 360 / RING.spokes, spokeHalf = ((RING.spoke / 2) / RING.rim) * (180 / Math.PI);
+  const sectorHalf = (half / RING.floor) * (180 / Math.PI);
+  const nearest = Math.min(...Array.from({ length: RING.spokes + 1 }, (_, k) => Math.abs(d.angle - k * step)));
+  assert.ok(nearest > sectorHalf + spokeHalf + 5, `the sector ${nearest.toFixed(1)} deg from a spoke`);
 });

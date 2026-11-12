@@ -16,6 +16,7 @@
 // frame the camera's place (ctx.cam, site frame, doubles), rel(sitePoint) -> three.js offset from it,
 // the body axes (ctx.axes), the craft's place (ctx.P), now and dt.
 
+import { deck } from './deck-view.js';
 import { dock } from './dock-view.js';
 import { map } from './map.js';
 import { ret } from './return-view.js';
@@ -25,4 +26,4 @@ import { tour } from './tour.js';
 import { walk } from './walk-view.js';
 
 // The tour comes first: it sees every command before the others, so anyone's command can end it.
-export const FEATURES = [tour, sky, dock, ret, walk, map, sound];
+export const FEATURES = [tour, sky, dock, ret, walk, map, deck, sound];

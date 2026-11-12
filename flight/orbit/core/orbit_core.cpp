@@ -1,7 +1,7 @@
 // orbit_core.cpp — see orbit_core.h. A sketch: every number marked as chosen is a design choice made to
 // get a craft to orbit on a page, not a measurement of anything. docs/provenance.md, 1h, says where the
 // rest come from. What the core's parts share is in internal.h; the flight home is return.cpp, docking
-// dock.cpp, the walk walk.cpp.
+// dock.cpp, the flight deck deck.cpp, the walk walk.cpp.
 
 #include "internal.h"
 
@@ -191,6 +191,10 @@ V3 sitePos(V3 x, double t) {
 
 struct Deriv { V3 rd, vd; Q qd; V3 wd; double propd; };
 
+// The drive's thrust in the body: along the nose with the swivel aft, toward the craft's top (-z) with it
+// down, and through the centre of mass at every angle between.
+V3 thrustAxis(double nozzle) { return {std::cos(nozzle), 0, -std::sin(nozzle)}; }
+
 GearLoad gearLoad(const State& s, V3 r, V3 v, Q q, V3 w) {
     GearLoad out{{0, 0, 0}, {0, 0, 0}, 0};
     if (!s.gear) return out;
@@ -224,7 +228,8 @@ GearLoad gearLoad(const State& s, V3 r, V3 v, Q q, V3 w) {
     return out;
 }
 
-Deriv deriv(const State& s, V3 r, V3 v, Q q, V3 w, double prop) {
+// t: the time of the stage, for what moves with the ring (the deck).
+Deriv deriv(const State& s, double t, V3 r, V3 v, Q q, V3 w, double prop) {
     Deriv d;
     const double rm = norm(r), mass = M_DRY + prop;
     V3 acc = r * (-MU / (rm * rm * rm));
@@ -250,12 +255,15 @@ Deriv deriv(const State& s, V3 r, V3 v, Q q, V3 w, double prop) {
     }
     // the drive and the small thrusters
     const double thrust = prop > 0 ? s.thr * T_MAX : 0;
-    fBody = fBody + V3{thrust, 0, 0} + s.rcs * mass;
+    fBody = fBody + (s.nozzle != 0 ? thrustAxis(s.nozzle) * thrust : V3{thrust, 0, 0}) + s.rcs * mass;
     acc = acc + rot(q, fBody) * (1.0 / mass);
 
     const GearLoad gl = gearLoad(s, r, v, q, w);
     acc = acc + gl.force * (1.0 / mass);
     mom = mom + gl.moment;
+    const GearLoad dl = deckGearLoad(s, t, r, v, q, w);   // the gear on the ring's deck (deck.cpp)
+    acc = acc + dl.force * (1.0 / mass);
+    mom = mom + dl.moment;
 
     d.rd = v;
     d.vd = acc;
@@ -269,10 +277,11 @@ Deriv deriv(const State& s, V3 r, V3 v, Q q, V3 w, double prop) {
 void integrate(State& s) {
     const double h = OC_DT;
     auto qadd = [](Q a, Q b, double k) { return Q{a.w + b.w * k, a.x + b.x * k, a.y + b.y * k, a.z + b.z * k}; };
-    const Deriv k1 = deriv(s, s.r, s.v, s.q, s.w, s.prop);
-    const Deriv k2 = deriv(s, s.r + k1.rd * (h / 2), s.v + k1.vd * (h / 2), qadd(s.q, k1.qd, h / 2), s.w + k1.wd * (h / 2), s.prop + k1.propd * h / 2);
-    const Deriv k3 = deriv(s, s.r + k2.rd * (h / 2), s.v + k2.vd * (h / 2), qadd(s.q, k2.qd, h / 2), s.w + k2.wd * (h / 2), s.prop + k2.propd * h / 2);
-    const Deriv k4 = deriv(s, s.r + k3.rd * h, s.v + k3.vd * h, qadd(s.q, k3.qd, h), s.w + k3.wd * h, s.prop + k3.propd * h);
+    const double t = timeOf(s);
+    const Deriv k1 = deriv(s, t, s.r, s.v, s.q, s.w, s.prop);
+    const Deriv k2 = deriv(s, t + h / 2, s.r + k1.rd * (h / 2), s.v + k1.vd * (h / 2), qadd(s.q, k1.qd, h / 2), s.w + k1.wd * (h / 2), s.prop + k1.propd * h / 2);
+    const Deriv k3 = deriv(s, t + h / 2, s.r + k2.rd * (h / 2), s.v + k2.vd * (h / 2), qadd(s.q, k2.qd, h / 2), s.w + k2.wd * (h / 2), s.prop + k2.propd * h / 2);
+    const Deriv k4 = deriv(s, t + h, s.r + k3.rd * h, s.v + k3.vd * h, qadd(s.q, k3.qd, h), s.w + k3.wd * h, s.prop + k3.propd * h);
     const double c = h / 6;
     s.r = s.r + (k1.rd + k2.rd * 2 + k3.rd * 2 + k4.rd) * c;
     s.v = s.v + (k1.vd + k2.vd * 2 + k3.vd * 2 + k4.vd) * c;
@@ -310,8 +319,9 @@ void rateLoop(State& s, const Local& L, V3 wc) {
     const double kq = L.qbar * S_REF;
     const double tvc = s.onGround ? 0 : TVC_ANG * s.thr;
     const double rcsOn = s.onGround ? 0 : 1;
-    const double lim[3] = {kq * SPAN * CL_CTRL + IXX * RCS_ANG[0] * rcsOn,
-                           kq * CHORD * CM_CTRL + IYY * (RCS_ANG[1] * rcsOn + tvc),
+    const double jet = s.onGround ? 0 : s.thr * std::sin(s.nozzle);   // jet-borne: the roll posts and the lift jet
+    const double lim[3] = {kq * SPAN * CL_CTRL + IXX * (RCS_ANG[0] * rcsOn + ROLL_POST_ANG * jet),
+                           kq * CHORD * CM_CTRL + IYY * (RCS_ANG[1] * rcsOn + tvc + LIFT_JET_ANG * jet),
                            kq * SPAN * CN_CTRL + IZZ * (RCS_ANG[2] * rcsOn + tvc)};
     // Dynamic inversion: the torque that gives the wanted angular acceleration, less what the air and
     // the spin already give. The law knows the craft exactly; a real one would not.
@@ -499,6 +509,7 @@ void pilot(State& s, const Local& L, double* throttle) {
     s.gear = hands.gearDown ? 1 : 0;
     s.brake = clampd(hands.brake, 0, 1);
     s.steer = clampd(hands.yaw, -1, 1) * 30 * D2R / (1 + L.tas / 15);
+    if (s.sas == OC_SAS_DECK && deckPilot(s, L, throttle)) return;   // jet-borne, on the deck's terms (deck.cpp)
     const bool air = s.onGround || L.qbar > (s.atmoLaw ? 200 : 400);
     V3 wc;
     if (air) {
@@ -536,14 +547,17 @@ void stepOnce(State& s) {
     if (s.crashed) { ++s.n; return; }
     const Local L = localOf(s);
     s.rcs = {0, 0, 0};
+    s.nozzleCmd = 0;   // a law that does not swivel the drive flies with it aft
     double throttle = 0;
     if (s.autoMode == OC_AUTO_CREW) crew(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_APPROACH) approach(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_RETURN) returnCrew(s, L, &throttle);   // return.cpp
     else if (s.autoMode == OC_AUTO_DOCK) dockCrew(s, L, &throttle);       // dock.cpp
+    else if (s.autoMode == OC_AUTO_DECK) deckCrew(s, L, &throttle);       // deck.cpp
     else pilot(s, L, &throttle);
     s.thr += (throttle - s.thr) * (OC_DT / 0.4);
     if ((throttle == 0 && s.thr < 1e-3) || s.prop <= 0) s.thr = 0;   // shut down, not idling forever
+    s.nozzle += clampd(clampd(s.nozzleCmd, 0, NOZZLE_MAX) - s.nozzle, -NOZZLE_RATE * OC_DT, NOZZLE_RATE * OC_DT);   // the swivel at its rate
     const double vsBefore = L.vs;
     integrate(s);
     ++s.n;
@@ -554,6 +568,7 @@ void stepOnce(State& s) {
     s.onGround = gl.contact;
     returnAfterStep(s);
     dockAfterStep(s);
+    deckAfterStep(s);
 }
 
 // Where the ring waits. The core flies a copy of itself to orbit under the scripted crew and puts
@@ -615,7 +630,7 @@ void writeOut() {
     out[OC_ROLL_DEG] = L.roll * R2D;
     out[OC_TAS] = L.tas; out[OC_MACH] = L.mach; out[OC_QBAR] = L.qbar; out[OC_VS] = L.vs;
     out[OC_ALPHA_DEG] = L.alpha * R2D; out[OC_BETA_DEG] = L.beta * R2D;
-    const Deriv d = deriv(s, s.r, s.v, s.q, s.w, s.prop);
+    const Deriv d = deriv(s, t, s.r, s.v, s.q, s.w, s.prop);
     const double rm = norm(s.r);
     out[OC_G] = norm(d.vd - s.r * (-MU / (rm * rm * rm))) / G0;
     out[OC_VORB] = norm(s.v);
@@ -642,6 +657,7 @@ void writeOut() {
     out[OC_AIR_LAW] = s.atmoLaw;
     returnWriteOut(s);
     dockWriteOut(s);
+    deckWriteOut(s);
 }
 
 }   // namespace oc
@@ -662,6 +678,7 @@ void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
     std::memset(&hands, 0, sizeof hands);
     returnReset(g);
     dockReset(g);
+    deckReset(g);
     hands.gearDown = 1;
     hands.brake = 1;
     const V3 fwd = site.e * std::sin(site.hdg) + site.n * std::cos(site.hdg);
@@ -700,12 +717,13 @@ void oc_auto(int mode) {
         const V3 d = g.r - ringPos(t), passing = g.v - ringVel(t) - cross(ring.normal * ring.rate, d);
         if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
     }
-    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK;
+    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK;
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
     g.holdValid = 0;
     if (g.autoMode == OC_AUTO_RETURN) returnEngage(g);
     if (g.autoMode == OC_AUTO_DOCK) dockEngage(g);
+    if (g.autoMode == OC_AUTO_DECK) deckEngage(g);
     if (g.autoMode != OC_AUTO_CREW) { writeOut(); return; }
     // The crew picks up where the craft is, not where it last left off.
     const Local L = localOf(g);
@@ -723,7 +741,8 @@ void oc_auto(int mode) {
 }
 
 void oc_sas(int mode) {
-    g.sas = mode >= OC_SAS_HOLD && mode <= OC_SAS_PORT ? mode : OC_SAS_HOLD;
+    g.sas = mode >= OC_SAS_HOLD && mode <= OC_SAS_DECK ? mode : OC_SAS_HOLD;
+    g.deck.armed = 0;   // the deck hold takes its settings afresh from the craft as it finds it
     g.holdValid = 0;
     writeOut();
 }
@@ -747,6 +766,7 @@ unsigned oc_hash(void) {   // FNV-1a over the doubles that are the state, then t
     hashDoubles(h, v, sizeof v / sizeof v[0]);
     returnHash(g, h);
     dockHash(g, h);
+    deckHash(g, h);
     return h;
 }
 

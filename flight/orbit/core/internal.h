@@ -1,11 +1,12 @@
 // internal.h — what the core's parts share: the maths, the craft's numbers, the state, and the laws a
-// crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h and orbit_walk.h are.
-// orbit_core.cpp owns everything here but the feature hooks at the end, which return.cpp and dock.cpp
-// define. GPLv3.
+// crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h and
+// orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at the end, which return.cpp,
+// dock.cpp and deck.cpp define. GPLv3.
 
 #pragma once
 
 #include "orbit_core.h"
+#include "orbit_deck.h"
 #include "orbit_dock.h"
 #include "orbit_return.h"
 
@@ -75,6 +76,14 @@ const double CL_BETA = -0.08, CL_P = -0.35, CL_CTRL = 0.08;
 const double CN_BETA = 0.12, CN_R = -0.25, CN_CTRL = 0.04;
 const double RCS_ANG[3] = {0.15, 0.10, 0.10};   // rad/s2 the thrusters can give, about x, y, z
 const double TVC_ANG = 0.35;                    // rad/s2 the gimballed drive gives in pitch and yaw
+// Jet-borne (deck.cpp): the drive swivels from aft to straight down through the centre of mass, and in its
+// wings' roll posts and its nose's lift jet it bleeds up to 5 % of its thrust for attitude, in proportion
+// to the thrust through the swivel. A roll post 4.5 m out: 0.05 T_MAX 4.5 m / IXX; the lift jet 10 m ahead
+// of the centre of mass, trading with the aft nozzle: 0.05 T_MAX 10 m / IYY. Each at full thrust.
+const double NOZZLE_MAX = 90 * D2R;
+const double NOZZLE_RATE = OC_DECK_SWIVEL_DPS * D2R;   // rad/s
+const double ROLL_POST_ANG = 0.40;              // rad/s2 about x
+const double LIFT_JET_ANG = 0.14;               // rad/s2 about y
 const V3 GEAR[3] = {{10.0, 0, 3.0}, {-3.0, -3.5, 3.0}, {-3.0, 3.5, 3.0}};   // nose, left, right; body
 const double GEAR_K[3] = {1.3e6, 2.0e6, 2.0e6}, GEAR_C[3] = {2.0e5, 3.0e5, 3.0e5};
 
@@ -95,7 +104,8 @@ struct Controls { double pitch, roll, yaw, throttle, tx, ty, tz; int gearDown; d
 
 }   // namespace oc
 
-#include "dock_state.h"     // oc::DockState: dock.cpp's own, in the state so a run replays
+#include "deck_state.h"     // oc::DeckState: deck.cpp's own, in the state so a run replays
+#include "dock_state.h"     // oc::DockState: dock.cpp's own
 #include "return_state.h"   // oc::ReturnState: return.cpp's own
 
 namespace oc {
@@ -122,9 +132,12 @@ struct State {
     V3 torque;         // N m, body
     V3 rcs;            // m/s2, body
     double steer, brake;
+    double nozzle;     // rad: the drive's swivel, 0 aft to NOZZLE_MAX down; it follows nozzleCmd at NOZZLE_RATE
+    double nozzleCmd;  // rad: what the step's law asks of it; a law that does not ask leaves it aft
     // the features' own
     ReturnState ret;
     DockState dock;
+    DeckState deck;
 };
 
 struct Site { double lat, lon, hdg; V3 e, n, u, p0; };   // the start point, Earth-fixed
@@ -166,6 +179,7 @@ V3 sitePos(V3 eci, double t);
 
 struct GearLoad { V3 force, moment; int contact; };   // force in ECI, moment in the body
 GearLoad gearLoad(const State& s, V3 r, V3 v, Q q, V3 w);
+V3 thrustAxis(double nozzle);   // the drive's thrust, a unit vector in the body, with the swivel at nozzle
 void integrate(State& s);   // one RK4 step of OC_DT
 
 // ---- the laws a crew mode flies through ---------------------------------------------------------
@@ -199,6 +213,20 @@ void dockWriteOut(const State& s);
 void dockHash(const State& s, unsigned& h);
 V3 dockHoldRates(const State& s);                              // OC_SAS_PORT: lined up on the port, turning with it
 V3 dockSafeAim(const State& s, V3 goal);                       // goal, or the next corner of a way to it round the ring
+void dockWreck(State& s, int what, int part, double back);     // a crash on the ring elsewhere: the wreck stays, carried
+
+// deck.cpp: the flight deck (OC_AUTO_DECK, OC_SAS_DECK). Its contact with the gear is part of the force
+// model, beside gearLoad, at the time of each of RK4's stages; the band round its open sector is part of
+// docking's contact with the ring.
+void deckReset(State& s);
+void deckEngage(State& s);                                     // oc_auto(OC_AUTO_DECK)
+void deckCrew(State& s, const Local& L, double* throttle);     // a step's commands, landing on the deck
+bool deckPilot(State& s, const Local& L, double* throttle);    // OC_SAS_DECK: the pilot's hold, true where it applies
+void deckAfterStep(State& s);                                  // the hard points against the deck, the touchdown
+void deckWriteOut(const State& s);
+void deckHash(const State& s, unsigned& h);
+GearLoad deckGearLoad(const State& s, double t, V3 r, V3 v, Q q, V3 w);   // the gear on the deck, at time t
+int deckBand(V3 p, double r);   // the band round the open sector, for a sphere at p in the ring's frame: OC_DOCK_HIT_*, or -1 away from it
 
 void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 

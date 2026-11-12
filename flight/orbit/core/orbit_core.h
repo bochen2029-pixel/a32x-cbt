@@ -18,8 +18,9 @@ extern "C" {
 
 /* who is flying: the pilot; the scripted crew (runway to orbit); the crew's approach, which flies to
    a point on the ring's axis, OC_STANDOFF_M off the hub's port, and holds there; the crew flying home
-   (orbit_return.h); the crew docking at the hub (orbit_dock.h) */
-enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN = 3, OC_AUTO_DOCK = 4 };
+   (orbit_return.h); the crew docking at the hub (orbit_dock.h); the crew landing on the ring's flight
+   deck (orbit_deck.h) */
+enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN = 3, OC_AUTO_DOCK = 4, OC_AUTO_DECK = 5 };
 
 /* The ring's shape, one for the core and the page. Its frame: the axis, fixed among the stars, and ref,
    a unit vector in its plane that turns with it at OC_RING_SPIN about the axis. The floor and the roof
@@ -39,9 +40,26 @@ enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN =
 #define OC_HUB_PORT_M 350.0     /* from the ring's centre to the hub's port, along the axis */
 #define OC_STANDOFF_M 300.0
 
+/* The flight deck (orbit_deck.h), part of the same shape: an open sector of the band, OC_DECK_ARC_M of
+   arc along the floor and the band's whole width across, centred at OC_DECK_ANGLE_DEG in the spokes'
+   convention (along sin(a) ref + cos(a) (ref x axis)), midway between spokes 0 and 1. The roof stops at
+   the sector's ends and the floor is the deck; the rim walls and the hull go on across it. At each end a
+   pressure bulkhead OC_DECK_BULKHEAD_M thick, from the floor to the roof and across the band: its face is
+   the sector's end, a plane through the axis, and its body lies outside the sector, under the roof.
+   OC_DECK_PADS pads on the deck's centreline, OC_DECK_PAD_SPACING_M apart along the floor and centred in
+   the sector, each OC_DECK_PAD_RADIUS_M across its radius. */
+#define OC_DECK_ANGLE_DEG 30.0
+#define OC_DECK_ARC_M 1500.0
+#define OC_DECK_BULKHEAD_M 20.0
+#define OC_DECK_PADS 3
+#define OC_DECK_PAD_SPACING_M 400.0
+#define OC_DECK_PAD_RADIUS_M 25.0
+
 /* what the attitude hold points at, hands off, above the air. OC_SAS_PORT holds the craft lined up on
-   the hub's port and turning with it (orbit_dock.h), so a pilot docking by hand flies translation only */
-enum { OC_SAS_HOLD = 0, OC_SAS_PROGRADE = 1, OC_SAS_RETROGRADE = 2, OC_SAS_TARGET = 3, OC_SAS_PORT = 4 };
+   the hub's port and turning with it (orbit_dock.h), so a pilot docking by hand flies translation only.
+   OC_SAS_DECK flies the craft jet-borne on the deck's terms (orbit_deck.h): the stick sets its velocity
+   against the deck, the throttle its climb or sink, and the attitude and the drive's swivel are the law's */
+enum { OC_SAS_HOLD = 0, OC_SAS_PROGRADE = 1, OC_SAS_RETROGRADE = 2, OC_SAS_TARGET = 3, OC_SAS_PORT = 4, OC_SAS_DECK = 5 };
 
 /* the scripted crew's phases, in order */
 enum {
