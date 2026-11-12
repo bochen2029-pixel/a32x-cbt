@@ -15,6 +15,7 @@
 // frame the camera's place (ctx.cam, site frame, doubles), rel(sitePoint) -> three.js offset from it,
 // the body axes (ctx.axes), the craft's place (ctx.P), now and dt.
 
+import { deck } from './deck-view.js';
 import { dock } from './dock-view.js';
 import { map } from './map.js';
 import { ret } from './return-view.js';
@@ -22,4 +23,4 @@ import { sky } from './sky.js';
 import { sound } from './sound.js';
 import { walk } from './walk-view.js';
 
-export const FEATURES = [sky, dock, ret, walk, map, sound];
+export const FEATURES = [sky, dock, ret, walk, map, deck, sound];
