@@ -84,6 +84,7 @@ async function main() {
   const ctx = {
     frames, core, get s() { return s; }, renderer, camera, near, far, craft, ring, airport, earth, stars, input, hud,
     state, START, DT, AUTO, PH, SAS, RE, NEAR, VIEWS, say: (text) => say(text, performance.now()),
+    command: (c) => command(c, performance.now()),   // a feature giving a command as a button would
     cam: null, rel: null, axes: null, P: null, up: null, alt: 0, sunSite: null, now: 0, dt: 0,
   };
   for (const f of FEATURES) if (f.init) f.init(ctx);
@@ -115,9 +116,10 @@ async function main() {
         if (auto === AUTO.off) { core.auto(AUTO.crew); say('The crew has it', now); }
         else { handOver(); say('Your controls', now); }
         break;
-      case 'approach':
-        if (s.peri > 150000 && s.ringRange < 500000) { core.auto(AUTO.approach); say('The crew flies the approach to the hub', now); }
-        else say('The approach starts in orbit, near the Ring', now);
+      case 'approach':   // the core takes it in orbit within 50 km of the Ring, passing it under 50 m/s, and else refuses
+        core.auto(AUTO.approach);
+        if (Math.round(core.s.auto) === AUTO.approach) say('The crew flies the approach to the hub', now);
+        else say('The approach starts in orbit, within 50 km of the Ring and passing it under 50 m/s', now);
         break;
       case 'orbit':
         if (s.phase < PH.orbit || auto !== AUTO.crew) {

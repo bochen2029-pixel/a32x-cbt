@@ -33,7 +33,7 @@ export function status(s, warp, touch = false) {
     const held = s.portRange < 5;
     return { line: held ? `APPROACH · HOLDING ${STANDOFF_M} m OFF THE HUB PORT` : `APPROACH · ${fmtDistance(s.portRange)} to the hold point`, hint: k.take };
   }
-  const law = s.onGround > 0.5 || s.qbar > 300 ? 'AIR LAW: pitch and bank hold' : `RATE + ${SAS_NAMES[Math.round(s.sas)]}`;
+  const law = s.airLaw > 0.5 ? 'AIR LAW: pitch and bank hold' : `RATE + ${SAS_NAMES[Math.round(s.sas)]}`;   // the core's own law (OC_AIR_LAW)
   return { line: `HAND · ${law}`, hint: '' };
 }
 
