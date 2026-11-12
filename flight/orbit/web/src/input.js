@@ -20,6 +20,7 @@ export const HELP = [
   ['N', 'the map: orbit, the Ring close up, the ground track (Shift-N to switch)'],
   ['F', 'the Moon through a telescope, and back'],
   ['Y', 'sound off / on (it starts with your first key or tap)'],
+  ['0', 'the tour: the whole loop flown by the crew, with words; any key takes over'],
   ['drag, wheel', 'look around the craft, zoom'],
   ['H', 'this help'],
   ['Backspace', 'start again'],

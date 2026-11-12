@@ -40,6 +40,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | H, Backspace | | help, start again |
 | N | | the map: the orbit, the Ring close to, the ground track; shift-N the next of them |
 | Y | | sound off, on (it starts on the first key or tap) |
+| 0 | | the tour: the whole loop flown by the crew, with words; any key or button takes over |
 
 On a touch screen: a stick under the left thumb, a throttle under the right, and the buttons.
 
@@ -468,6 +469,21 @@ Other parts play their moments through `ctx.sound`:
 
 The flight's own moments (the drive lighting and stopping, the gear, a touchdown, the speed of sound,
 docking and undocking, a crash) are found from the readouts and need no call.
+
+### The tour
+
+For whoever has no stick, or wants to see the whole of it first: TOUR (or 0) flies the loop by the crew's
+own modes, as a person pressing the buttons would, with a caption for each part and the time warp and
+the view set for it:
+1. The take-off from 17C at one to one, and the climb through the air.
+2. The guidance above the air, and orbit.
+3. Docking at the hub, seen from the Ring for the last of it.
+4. A look round the hub's lobby, and a moment on the floor.
+5. The way home, skipping the wait for a pass, through entry, to a stop on 17C.
+
+It takes about ten minutes on a desktop. Any command but one that only changes what is shown ends it
+and takes over from there. `tour-plan.js` is the plan, pure and tested on made-up states;
+`tour.js` is the button, the caption and the commands.
 
 ### Rigour
 
