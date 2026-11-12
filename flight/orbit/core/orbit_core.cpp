@@ -140,7 +140,14 @@ Orbit orbitOf(const State& s) {
     const V3 h = cross(s.r, s.v);
     const double h2 = dot(h, h);
     o.inc = std::acos(clampd(h.z / std::sqrt(h2 > 0 ? h2 : 1), -1, 1));
-    if (energy >= 0) { o.a = 0; o.e = 1; o.apo = 1e12; o.peri = h2 / (2 * MU) - RE; o.tApo = 0; return o; }
+    if (energy >= 0) {   // no top: apo reads 1e12 m and tApo 0; the bottom is the hyperbola's (the parabola's at e = 1)
+        o.a = 0;
+        o.e = std::sqrt(1 + 2 * energy * h2 / (MU * MU));
+        o.apo = 1e12;
+        o.peri = h2 / (MU * (1 + o.e)) - RE;
+        o.tApo = 0;
+        return o;
+    }
     o.a = -MU / (2 * energy);
     o.e = std::sqrt(std::fmax(0.0, 1 + 2 * energy * h2 / (MU * MU)));
     o.apo = o.a * (1 + o.e) - RE;
@@ -639,6 +646,7 @@ using namespace oc;
 extern "C" {
 
 void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
+    if (!std::isfinite(lat_deg) || !std::isfinite(lon_deg) || !std::isfinite(heading_deg)) return;   // refused: no such place
     const double la = lat_deg * D2R, lo = lon_deg * D2R;
     site.lat = la; site.lon = lo; site.hdg = heading_deg * D2R;
     site.u = {std::cos(la) * std::cos(lo), std::cos(la) * std::sin(lo), std::sin(la)};
@@ -669,6 +677,9 @@ void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
 }
 
 void oc_controls(double pitch, double roll, double yaw, double throttle, double tx, double ty, double tz, int gear_down, double brake) {
+    if (std::isnan(pitch) || std::isnan(roll) || std::isnan(yaw) || std::isnan(throttle) || std::isnan(tx) || std::isnan(ty) || std::isnan(tz) ||
+        std::isnan(brake))
+        return;   // refused, not clamped: a value that is not a number has no nearest legal one
     hands = {clampd(pitch, -1, 1), clampd(roll, -1, 1), clampd(yaw, -1, 1), clampd(throttle, 0, 1), tx, ty, tz, gear_down, brake};
 }
 
@@ -712,7 +723,11 @@ int oc_out_len(void) { return OC_COUNT; }
 
 unsigned oc_hash(void) {   // FNV-1a over the doubles that are the state, then the features' own
     const double v[] = {(double)g.n, g.r.x, g.r.y, g.r.z, g.v.x, g.v.y, g.v.z, g.q.w, g.q.x, g.q.y, g.q.z,
-                        g.w.x, g.w.y, g.w.z, g.prop, g.thr, (double)g.phase, (double)g.crashed};
+                        g.w.x, g.w.y, g.w.z, g.prop, g.thr, (double)g.phase, (double)g.crashed,
+                        (double)g.gear, (double)g.onGround, (double)g.autoMode, (double)g.sas, (double)g.atmoLaw, g.thetaT, g.phiT,
+                        g.pegF0, g.pegF1, g.pegT, g.pegAt, (double)g.pegValid, g.hold.w, g.hold.x, g.hold.y, g.hold.z, (double)g.holdValid,
+                        g.torque.x, g.torque.y, g.torque.z, g.rcs.x, g.rcs.y, g.rcs.z, g.steer, g.brake,
+                        hands.pitch, hands.roll, hands.yaw, hands.throttle, hands.tx, hands.ty, hands.tz, (double)hands.gearDown, hands.brake};
     unsigned h = 2166136261u;
     hashDoubles(h, v, sizeof v / sizeof v[0]);
     returnHash(g, h);

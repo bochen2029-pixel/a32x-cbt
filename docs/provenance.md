@@ -274,6 +274,25 @@ Nothing taken from outside yet.
 
 Nothing taken from outside yet.
 
+#### Rigour
+
+`flight/orbit/INVARIANTS.md`, `flight/orbit/test/test_invariants.cpp` and `flight/orbit/evidence/` are
+ours, GPLv3. Nothing in them is copied from the sources below; the two of the owner's are read for their
+method, and Abacus is run, not shipped.
+
+| source | licence | what is taken |
+|---|---|---|
+| Subsim, the owner's own submarine simulator (a private repository, read at `ceb0059`): its `INVARIANTS.md`, `GATES.md`, `CONVENTIONS.md`, and ADRs 0008 (determinism and numerics), 0011 (data with receipts) and 0016 (gates with negative controls) | the owner's own | as a doctrine. Each invariant names what enforces it. Each check is shown able to fail. A test that could not set up what it measures fails rather than passes. A tolerance is derived, never fitted. Every quoted number has a receipt. The same binary gives the same hash, and different builds a bounded deviation |
+| Abacus, the owner's catalogue of certified math commands (a private repository; abacus 0.1.0 at `14025b5`, built outside this repository for this work) | MIT, the owner's | used, not shipped: its `check.contains`, `check.equal`, `check.units`, `units.const` and `float.inspect` certify the sketch's numbers. Its 76 requests and answers, each with its SHA-256 receipt, are in `flight/orbit/evidence/`, whose `INDEX.md` says what each backs; `abacus batch` re-runs them. Nothing of Abacus is in this repository or in any build |
+| NIST, CODATA 2022 recommended values, through Abacus's frozen copy of NIST's table | facts | standard gravity, 9.80665 m/s², exact |
+| IERS Conventions (2010), Table 1.1; WGS 84 (NIMA TR8350.2) | facts | the Earth's gravitational parameter, 3.986004418×10¹⁴ m³/s², which the core uses. The Earth's turn among the stars, 7.292115×10⁻⁵ rad/s, against which the core's 7.2921159×10⁻⁵ (2π over the mean sidereal day) was checked |
+| H. Moritz, *Geodetic Reference System 1980* | facts | the Earth's mean radius, 6,371,008.8 m, of which the core's sphere is the kilometre |
+| ISO 2533:1975, *Standard Atmosphere* | facts | the gas constant the core uses, 287.05287 J/(kg K), the 1976 standard's own being 287.05307 |
+| The Astronomical Almanac's low-precision formulas for the Sun; J. Meeus, *Astronomical Algorithms* (2nd ed., 1998), chapter 25 | methods | the Sun's declination on 12 November 2026, worked two ways, against the core's −17.9° |
+| D. Brouwer, "On the accumulation of errors in numerical integration", *Astronomical Journal* 46 (1937), 149–153 | method | rounding over many steps as a random walk, for the invariants' bounds |
+| W. Kahan, "Further remarks on reducing truncation errors", *Communications of the ACM* 8 (1965), 40 | method | compensated summation, so the ledgers add no rounding of their own |
+| E. Hairer, S. P. Nørsett and G. Wanner, *Solving Ordinary Differential Equations I* (2nd ed., 1993) | method | RK4's order, and the difference of a second- and a fourth-order rule as an estimate of error, for the ledgers' bounds |
+
 The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
 and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing
 here is fit for navigation, and none of it describes a real vehicle.
