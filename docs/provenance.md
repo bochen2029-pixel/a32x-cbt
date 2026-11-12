@@ -252,7 +252,11 @@ Each further part of the sketch keeps its own sources here, in the subsection be
 
 #### Docking
 
-Nothing taken from outside yet.
+| source | licence | what is taken |
+|---|---|---|
+| probe-and-drogue docking, the kind Soyuz and Progress use: a probe on the active craft, a cone with a socket on the passive one | general engineering knowledge; no document is copied | the idea of the mechanism only: a probe's head guided by a cone into a socket, where latches catch it and then draw the craft in. No dimension, tolerance, load or procedure of any real system is used |
+| the signed distance of a point from a box | textbook geometry | the Ring's band, hub and spokes as boxes in the Ring's frame, which a sphere touches where its centre is nearer than its radius; each sphere is swept along its step in pieces shorter than half the smallest radius |
+| this project | — | every number: the probe's place and length, the six tolerances of the catch, the probe's spring, damper and stroke, the draw-in, the separation speed, the craft's spheres, the crew's way round the Ring and its closing profile, and the target painted on the hub's face |
 
 #### The walk
 

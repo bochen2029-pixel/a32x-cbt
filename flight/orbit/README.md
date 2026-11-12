@@ -28,9 +28,10 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | Q E | right stick | yaw; the nose wheel on the ground |
 | Shift, Ctrl; Z, X | triggers | throttle up, down; full, cut |
 | I K, J L, U M | d-pad | the small thrusters: fore and aft, left and right, up and down |
-| 1 2 3 4 | X cycles | hold attitude, prograde, retrograde, the Ring |
+| 1 2 3 4 5 | X cycles | hold attitude, prograde, retrograde, the Ring, the hub's port |
 | G, B | Y | gear; brakes |
 | T | | in orbit: the crew flies the approach to the hub |
+| P | | in orbit near the Ring: the crew docks at the hub; docked, let go |
 | O | Start | skip ahead to orbit |
 | , . | bumpers | time slower, faster (up to 100×) |
 | V | B | view: chase, cockpit, from the Ring |
@@ -90,7 +91,70 @@ in `orbit_core.h`, that the core and the drawing both use.
 
 ### Docking
 
-To come.
+The craft's port is a probe on its nose, on the docking axis (body x), its head 18 m ahead of the centre
+of mass and 2 m past the nose. There the pilot looks straight down the axis from the cockpit, the laws
+that point the nose point the port, and the thrusters' fore and aft (I K) close and open; a port on the
+back would want a second view and a pilot flying sideways. The hub's port is a drogue, a cone with a
+socket, at the centre of the hub's face on the Ring's axis, painted round with a target 36 m across: a
+bullseye, an alignment cross, and the key, a broad orange bar toward the Ring's ref, with ticks round the
+edge. The face turns with the Ring, 2.54°/s, once in 142 s.
+
+To dock is to line up on the axis, roll into phase with the key and turn with it, right wing down at the
+Ring's spin, and close slowly. The latches catch the probe's head only if, as it first meets the face:
+
+| | to be caught | why |
+|---|---|---|
+| closing | 0.03 to 0.30 m/s | slower does not trip the latches; faster, the probe's rebound takes the head out before they close. The crew's 0.1 m/s is the middle on a scale of ratios |
+| off the port's centre | under 0.30 m | the drogue's mouth is 0.6 m across, and its cone guides a head in from anywhere inside it |
+| across the face | under 0.10 m/s | a head sliding over the mouth skids past it |
+| the nose off the axis | under 3° | further, the probe binds in the cone |
+| the key out of phase | under 2° | the latches and the hatch's pins must meet |
+| the spin against the port's | under 0.30°/s | in the 6 s the latches take to draw the craft in, the key then drifts under 2° |
+
+Outside them the head bounces off the face on the probe's spring and damper: a period of 1.26 s, three
+tenths of critical damping, and the craft comes away at about half the speed it came in. A contact that
+uses the probe's whole 0.4 m stroke, about 3 m/s, is a crash. Caught, the craft is drawn in over 6 s;
+docked, it is part of the hub: its place, velocity, attitude and rates are worked out from the Ring's at
+every step, never integrated, so nothing drifts. Letting go (P, DOCK) pushes it off at 0.15 m/s along
+the axis, still turning with the port under the hold on the port; 1, the attitude hold, stops the turn.
+
+Every other part of the craft is a few spheres (the probe, the nose, the body, the wingtips, the tail),
+swept along each step against the Ring: the band from the roof out to the hull, the rim walls and their
+lips, the six spokes, the hub. A touch is a crash, the status line says what hit what, and the wreck
+stays where it struck, turning with the Ring. Between the spokes, and out through the rim's opening, the
+way is free.
+
+**The crew's docking** (P, or DOCK, in orbit within 50 km of the Ring and passing it at under 50 m/s in
+the frame turning with its orbit; elsewhere the page says why not): to the hold point, round the outside
+of the Ring when the craft is beyond it or inside it, then on to the axis, into phase with the port, in at
+1 m/s easing to 0.1 m/s from 20 m, and the catch. The approach (T) goes round the Ring the same way.
+
+**By hand**: 5 holds the craft on the port, lined up and turning with it, so the hands fly translation
+only (I K, J L, U M). The cockpit view (V) carries a docking reticle. Its crosshair is the docking axis,
+set where it meets the port's face; the port's alignment cross stands where the port is from the probe's
+head and turns with the key; a ring shows where the port's axis points; an arc shows the port's turn
+against the craft. Offsets and angles are on a soft scale, so a centimetre and a hundred metres both
+fit. Each mark is green inside the catch's tolerance and amber outside it. The HUD carries the same
+numbers, and the status line the crew's progress or the pilot's.
+
+From the tests (`test/test_dock.cpp`):
+
+| | |
+|---|---|
+| the crew, from the hold point | lined up in 9 s, caught at 337 s, docked at 343 s: 1.00 m/s easing to 0.10 m/s at the face, within 1 mm of the axis |
+| the crew, from where it reaches orbit, 24.6 km out | docked in 1,058 s |
+| the crew, from inside the Ring's far end | out of that end, round the hull 5.5 km from the axis, docked in 898 s |
+| docked for 10 minutes | the probe's head within 4e-9 m of the port, the nose and the key within 1e-15 rad, the spin the Ring's |
+| let go | 3.15 m off the face 20 s on, opening at 0.165 m/s, still turning with the port |
+| by hand, on the keys, under the hold on the port | caught 339 s from the hold point, at 0.10 m/s, 0.03 m off the centre |
+| in at 1.5 m/s | a bounce: 0.20 m of the stroke, away at 0.69 m/s; in at 5 m/s, a crash at the port |
+| 1 m off the centre; at 0.015 m/s; not turning with the port | not caught: off the centre; too slow, then caught at 0.1 m/s; the key out of phase |
+| into the roof, a rim wall, a spoke, the hub | a crash, and what hit: the right wing, the probe, the tail, the left wing |
+| along the axis beside the hub, between two spokes and out | nothing touched, 199 m from a spoke's line |
+| 48 km behind, drifting 16 m/s in the orbit's frame | docking engages; by the plain difference of velocities it would read 52 m/s |
+
+Every number here is chosen to make a docking that can be flown from a keyboard and fails where it is
+flown badly. None of them describes a real docking system.
 
 ### The walk
 
@@ -110,7 +174,7 @@ To come.
 
 ## What is not
 
-Re-entry and landing back. Docking, and any contact with the Ring: the craft flies through it. The
+Re-entry and landing back. The
 Ring's inside, its people, anything furnished. Terrain: the globe is smooth and the field flat. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. Sound, VR, failures.
 
