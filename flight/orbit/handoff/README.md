@@ -20,6 +20,7 @@ Android Studio, as you did for the Inspection Simulator; and the session you sta
 | `LICENSING.md` | the licence question, for you to decide before the core moves |
 | `CLAUDE.md.template` | house rules for the new repository |
 | `BOOTSTRAP_PROMPT.md` | the first message for the local session (also below) |
+| `OPEN_RING_AIR.md` | the owner's open Ring that holds its air by its spin: what the physics allows at each size, and what the Unreal version needs for it |
 | `SOURCES.md` | where every claim about Unreal, Cesium, Blender, Claude Code and the licences came from, and how it was read |
 | `tools/package.mjs` | makes the zip you carry (below) |
 

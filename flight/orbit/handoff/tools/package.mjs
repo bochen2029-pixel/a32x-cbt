@@ -33,7 +33,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** The kit's documents, in reading order. Each must exist, or the archive is refused. */
 export const KIT_DOCS = [
   'README.md', 'CANON_DELTA.md', 'UNREAL_PORT.md', 'FIRST_SLICE.md', 'LICENSING.md', 'CLAUDE.md.template',
-  'BOOTSTRAP_PROMPT.md', 'SOURCES.md',
+  'BOOTSTRAP_PROMPT.md', 'SOURCES.md', 'OPEN_RING_AIR.md',
 ];
 const KIT = 'flight/orbit/handoff';
 /** The orbit sketch's parts that travel: everything git tracks under these. */
