@@ -58,7 +58,21 @@ const page = await esbuild.build({
 // Inline, a script ends at the first "</script" in it, wherever that is; in a string it means the same
 // with the slash escaped.
 const inline = (js) => js.replace(/<\/script/gi, '<\\/script');
-const core = readFileSync(corePath, 'utf8');
+
+// Emscripten carries the WebAssembly as a string literal of raw bytes (SINGLE_FILE_BINARY_ENCODE). Inline
+// in HTML, a raw NUL becomes U+FFFD (which Emscripten's decoder maps back to 0), and "<!--" or "<script"
+// can put the HTML parser in a state where the script does not end where it should. Inside that one
+// literal, each is written as an escape that means the same characters.
+function armour(js) {
+  const open = js.indexOf("binaryDecode('");
+  if (open < 0) return js;
+  const from = open + "binaryDecode('".length;
+  let to = from;
+  while (to < js.length && js[to] !== "'") to += js[to] === '\\' ? 2 : 1;
+  const literal = js.slice(from, to).replace(/\0/g, '\\x00').replace(/<(!--|script|\/script)/gi, '\\x3C$1');
+  return js.slice(0, from) + literal + js.slice(to);
+}
+const core = armour(readFileSync(corePath, 'utf8'));
 if (!core.includes('createOrbitCore')) {
   console.error(`${corePath} is not the orbit core's module (no createOrbitCore in it)`);
   process.exit(2);
