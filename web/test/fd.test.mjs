@@ -11,7 +11,9 @@ import { validateAirport } from '../../../web/src/airport-layout.js';
 import { localMetres, origin } from '../../../web/src/scene-math.js';
 import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
 import { AUTO, Core, START } from '../src/core.js';
-import { FD_PH, ILS, SOFT, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, ilsDeviation, ilsGeometry, ilsShown, wrap180 } from '../src/fd-hud.js';
+import {
+  FD_PH, ILS, SOFT, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, glidePathGates, ilsDeviation, ilsGeometry, ilsShown, wrap180,
+} from '../src/fd-hud.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const header = readFileSync(join(here, '..', '..', 'core', 'orbit_fd.h'), 'utf8');
@@ -168,6 +170,23 @@ test('the ILS reads the runway\'s geometry: centred on the path, a dot 0.36 degr
   assert.equal(ilsShown({ ...toward, alt: 300 }, at(-2000, 0, 300), g), false, 'climbing out over the runway');
 });
 
+test('the gates in the world are the ILS\'s path: each centred on the localizer\'s course and the glide slope', () => {
+  const gates = glidePathGates(g);
+  assert.equal(gates.length, 18);
+  assert.deepEqual([gates[0].d, gates[17].d], [1000, 18000]);
+  for (const gate of gates) {
+    const [e, n, u] = gate.centre, r = Math.hypot(e, n);
+    const dev = ilsDeviation(g, [e, n, u], u + (r * r) / (2 * 6371000));   // the height above the sphere, where the site plane has risen off it
+    near(dev.loc.dots, 0, 1e-9, `the localizer at ${gate.d} m`);
+    near(dev.gs.dots, 0, 1e-9, `the glide slope at ${gate.d} m`);
+    near(-dev.along, gate.d, 1e-6, 'its distance short of the threshold');
+    near(Math.hypot(gate.corners[0][0] - gate.corners[1][0], gate.corners[0][1] - gate.corners[1][1]), 120, 1e-9, 'its width across the course');
+    near(gate.corners[2][2] - gate.corners[1][2], 60, 1e-9, 'its height');
+  }
+  // 18 km out the Earth has fallen 25 m under the start point's plane: the gate with it
+  near(onPath(18000) + ILS.wheelsM - gates[17].centre[2], 18000 ** 2 / (2 * 6371000), 0.1, 'the drop at 18 km');
+});
+
 test('the HUD says what the director asks, and where the craft is on the ILS', () => {
   const s = craft({ fdPitch: 28, fdBank: -30, fdHdg: 180.4, fdThrottle: 0.9 });
   const [fdLine] = fdLines(s, true, null);
@@ -178,6 +197,7 @@ test('the HUD says what the director asks, and where the craft is on the ILS', (
   const lines = fdLines(s, false, ils);
   assert.equal(lines.length, 1);
   assert.match(lines[0], /^ILS {2}17C {2}LOC [0-9.]+ dot right {3}GS [0-9.]+ dot low {3}5\.00 km to the threshold/);
+  assert.match(fdLines(s, false, at(5000, 0, onPath(5000)))[0], /LOC on the course {3}GS on the path/);
   assert.deepEqual(fdLines(s, false, null), []);
   assert.deepEqual([fmtBank(-0.2), fmtBank(0.49), fmtBank(-12.4), fmtBank(45)], ['0°', '0°', 'L 12°', 'R 45°']);
   assert.deepEqual([fmtHdg(0.3), fmtHdg(359.7), fmtHdg(-90), fmtHdg(450)], ['000', '000', '270', '090']);
