@@ -81,7 +81,7 @@ puts the core under UBT's flags; if you choose it, check the hash in Development
 `UOrbitSimSubsystem`, a `UTickableWorldSubsystem` created only for game worlds (PIE and the game, not
 the editor's own world), owns the core. Each render frame it adds the frame's time to a debt, runs
 whole steps, and drops debt past a cap rather than stretching a step (the page does the same, and so
-does this repository's own clock: `CLAUDE.md` §2).
+does the a32x-cbt trainer's clock: that repository's `CLAUDE.md` §2).
 
 ```cpp
 // sketch: UOrbitSimSubsystem::Tick
@@ -157,7 +157,7 @@ index.
 | `tools/orbit_run.cpp` | CI's headless run | kept as the core's command-line tool; plus a commandlet for a headless run in the engine | tool |
 | `test/*.cpp` | CI | ctest for the core; Unreal automation tests for the plugin and the View | tests |
 | `main.js`: the fixed step, the debt cap, time warp, skipping to orbit | `kernel`'s clock | the subsystem (§2.2) | plugin |
-| `main.js`: the camera at the origin, a far pass and a near pass | the View | **gone**: double-precision world positions and reversed-Z depth [S5] | engine |
+| `main.js`: the camera at the origin, a far pass and a near pass | the View | **gone**: double-precision world positions [S5] and the engine's reversed depth buffer (known engine behaviour, not re-checked here) | engine |
 | `main.js`, `cameraPose`: chase, cockpit, from the Ring | the View | camera components on the pawns; the cockpit eye 11.6 m forward and 1.85 m up in the body frame, as the page has it | actor |
 | `frames.js`: site to drawing axes, line of sight | `units-frames` (the View's side) | a small C++ mapping library (§5) and Cesium's georeference | plugin |
 | `earth.js`: the ray-cast globe, the land mask, single scattering | `view-unreal`, `planet-data`, `world` | Cesium's globe (§5) and the SkyAtmosphere component [S6, C1] | engine, plugin |
@@ -194,7 +194,7 @@ The canon's modules with no counterpart in the sketch, and where they would live
 | Natural Earth's coastlines on a sphere, land coloured by latitude | **Cesium for Unreal** v2.31.0, which supports UE 5.6 to 5.8 [C1], Apache 2.0 [C3]: a streamed globe, 3D Tiles, terrain, imagery overlays | its free data cannot be stored for offline use [C4, C5], and the canon is offline (L12). The slice's answer: a globe made from the ellipsoid itself, with public-domain imagery tiled locally and loaded from `file:///` [C1] (§5). Terrain later from open elevation data through your own tiler (cesium-terrain-builder's quantized-mesh with a `layer.json`) [C6] |
 | (the walk is being built) | **the Character Movement Component with a custom gravity direction**, since 5.4 [S7] | it moves the person, so the engine owns state (against L1); and it knows no Coriolis, so a 2 m drop lands on the plumb point instead of 3.8 cm off it, and running spinward weighs nothing more. Use the core's walk and drive a kinematic pawn; keep the component for crowds and animation later (Mover, its successor, is still Experimental in 5.8 [S13]) |
 | (sound is being built) | **MetaSounds**, with a Builder API that makes graphs at runtime from C++ [S8] | none for text-as-source: your ASTRA_AUDIO built its whole graph that way on 5.7 with no assets (R1). Custom DSP nodes need `METASOUND_PLUGIN` and `METASOUND_MODULE` defined in their module, or the editor crashes at startup (R1) |
-| keys, a gamepad, a touch stick | **Enhanced Input** | actions and mapping contexts are assets by default; make them in C++ at startup to keep them text. The same mapping then takes OpenXR controllers |
+| keys, a gamepad, a touch stick | **Enhanced Input** | actions and mapping contexts are assets by default; make them in C++ at startup to keep them text (the API allows it as far as this kit knows; not checked here). The same mapping then takes OpenXR controllers |
 | the Ring's lights as coloured points | **MegaLights**, production-ready in 5.8 [S1]; **Lumen**, and Lumen Lite in 5.8 [S1]; **Nanite** | the deferred renderer only: not in a forward-shaded VR build, not on Quest [S11]. The Ring's meshes are large and simple, and the Shuttle a few thousand triangles: Nanite pays only when the city comes |
 | a plume of two additive cones | **Niagara** | its systems are assets; keep the cones for the slice |
 | the page's tests under node | **automation and functional tests**, run headless from the command line; **commandlets**; **Live Coding** | none |
