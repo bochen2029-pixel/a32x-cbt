@@ -21,8 +21,8 @@ enum { HELD_PORT = 1, HELD_WRECK = 2 };
 const V3 PROBE{OC_DOCK_PROBE_M, 0, 0};   // the probe's head, body axes
 
 // The probe's spring and damper, pressed by the port's face. With the craft at 34 t in orbit: a period of
-// 1.26 s, three tenths of critical damping, a rebound at about a third of the closing speed, and 13 cm
-// of stroke for each metre a second of it, so the whole stroke goes at about 3 m/s.
+// 1.26 s, three tenths of critical damping, a rebound at about half the closing speed (the damper only
+// pushes), and 13 cm of stroke for each metre a second of it, so the whole stroke goes at about 3 m/s.
 const double CONTACT_K = 8.6e5;    // N/m
 const double CONTACT_C = 1.03e5;   // N s/m
 
