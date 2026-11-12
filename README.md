@@ -36,6 +36,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | V | B | view: chase, cockpit, from the Ring |
 | drag, wheel | | look round the craft, zoom |
 | H, Backspace | | help, start again |
+| N | | the map: the orbit, the Ring close to, the ground track; shift-N the next of them |
 | Y | | sound off, on (it starts on the first key or tap) |
 
 On a touch screen: a stick under the left thumb, a throttle under the right, and the buttons.
@@ -110,6 +111,29 @@ To come.
 To come.
 
 ### The map and the sound
+
+**The map** (`web/src/map.js`; its arithmetic in `web/src/map-math.js`) shows with **N** or MAP, drawn ten
+times a second and only while shown; shift-N or its tabs change what it shows.
+
+| view | shows |
+|---|---|
+| ORBIT | the orbit seen from above the Ring's plane, north up: the Earth with its coastlines, turned as it has turned; the Ring's round orbit; the craft's conic, dim where it runs under the ground, with its highest and lowest points and their heights; KDFW where the Earth has carried it |
+| RING | the rendezvous in the frame that turns with the Ring's orbit, ahead to the right and up to the top: the Ring's band as it stands to that frame, the hold point off its hub, the craft and its path over the next revolution, the nearest it comes and when. Its scale steps from 1 to 5,000 km across |
+| GROUND | the coastlines on an equirectangular map: the track flown, the next one and a half revolutions with the Earth turning under them, the Ring's track, KDFW |
+
+Beside each view are the numbers a pilot flies by: the time to apoapsis, apoapsis and periapsis, the
+inclination and the period, the Ring's range and closing rate, and how far round its orbit the Ring is
+ahead. Close to, they add where the craft is from the Ring (ahead, above, aside), its velocity in the
+turning frame, and the hold point's range.
+
+The conic comes from the core's own state (`oc_eci`). The core's apoapsis, periapsis, inclination and time
+to apoapsis come back out of it to within a metre, a millionth of a degree and half a second. What is to
+come is Kepler's problem, two bodies only: no air, no thrust. Over a ten-minute coast it stays within 50 m
+of the core's own flight. The Ring's velocity follows from its readouts: the relative velocity the core
+gives in the Ring's turning frame is v − n (n̂ × r), which fixes the Ring's orbit normal n̂. On a desktop
+the panel takes the largest space the page's other parts leave free. On a touch screen where that is too
+small, it covers the readouts and the buttons, since it has its own numbers and a close button, and leaves
+the stick and the throttle free.
 
 **The sound** (`web/src/sound.js`, the instrument; `web/src/sound-mix.js`, what it plays as numbers) is
 made as it plays by the browser's own Web Audio nodes: no sound file, sample or recording anywhere. A
