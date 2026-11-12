@@ -54,8 +54,18 @@ export const tour = {
     });
   },
 
+  // The tour keeps its own frame clock: the page's update hooks are not every frame's (the walk skips them
+  // where the sky cannot be seen, in the hub's lobby), and the tour must not stop for that.
   start(ctx) {
-    Object.assign(this, { on: true, stage: 'runway', memory: {}, wall: 0, userView: false });
+    Object.assign(this, { on: true, stage: 'runway', memory: {}, wall: 0, userView: false, last: null });
+    const loop = (now) => {
+      if (!this.on) return;
+      const dt = this.last === null ? 0 : Math.min(0.25, (now - this.last) / 1000);
+      this.last = now;
+      this.tick(ctx, dt);
+      if (this.on) this.raf = requestAnimationFrame(loop);
+    };
+    this.raf = requestAnimationFrame(loop);
     if (ctx.walk && ctx.walk.v.on) ctx.walk.stop('The tour starts on the runway');
     this.button?.setAttribute('aria-pressed', 'true');
     ctx.say('The tour: the whole loop, flown by the crew. Any key or button takes over');
@@ -63,6 +73,7 @@ export const tour = {
 
   stop(ctx, why) {
     this.on = false;
+    if (this.raf) cancelAnimationFrame(this.raf);
     this.button?.setAttribute('aria-pressed', 'false');
     this.box.classList.remove('shown');
     if (why) ctx.say(why);
@@ -88,9 +99,9 @@ export const tour = {
     try { ctx.command(c); } finally { this.issuing = false; }
   },
 
-  update(ctx) {
+  tick(ctx, dt) {
     if (!this.on) return;
-    this.wall += Math.min(0.25, ctx.dt || 0);
+    this.wall += dt;
     const walking = !!(ctx.walk && ctx.walk.v.on);
     const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall));
     // back aboard before the flight's commands: while walking, the walk holds them
