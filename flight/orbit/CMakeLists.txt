@@ -29,7 +29,7 @@ target_link_libraries(orbit_run PRIVATE orbit_core)
 # One test program for each part of the core; each names its tests in lines of its own that read
 # "// TEST: <name>", and is registered here from them, so a part's tests change with its file.
 enable_testing()
-foreach(part orbit return dock walk sky)
+foreach(part orbit return dock walk sky invariants)
   set(src ${CMAKE_CURRENT_SOURCE_DIR}/test/test_${part}.cpp)
   add_executable(test_${part} ${src})
   target_link_libraries(test_${part} PRIVATE orbit_core)
