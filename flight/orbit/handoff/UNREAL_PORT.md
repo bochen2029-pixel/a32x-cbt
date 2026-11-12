@@ -137,19 +137,21 @@ the canon's L4 in its smallest form; FlatBuffers and the hash chain (ADR 024) ca
 
 ### 2.5 The Snapshot
 
-A `USTRUCT` mirror of the readouts: `oc_out`'s 54 doubles and each part's block (`oc_dock_out`,
-`oc_return_out`, `oc_walk_out`), read after every step. As the page does (`core.js`, `addBlock`), refuse
-loudly when the plugin and the core disagree on a block's length, and hold the field list equal to the
-header with a test that parses `orbit_core.h` (the page's `core.test.mjs` does exactly this). Add to it,
-in the core, what the View now computes itself: the ECI-to-site rotation, for the stars; and the step
-index.
+A `USTRUCT` mirror of the readouts: `oc_out`'s 55 doubles and each part's block (`oc_dock_out`,
+`oc_deck_out`, `oc_return_out`, `oc_sky_out`, `oc_walk_out`), read after every step. As the page does
+(`core.js`, `addBlock`), refuse loudly when the plugin and the core disagree on a block's length, and
+hold the field list equal to the header with a test that parses `orbit_core.h` (the page's
+`core.test.mjs` does exactly this). Add to it, in the core, what the View still computes itself: the
+step index; the inertial-to-site rotation for anything drawn among the stars (the stars themselves now
+take the sky's block, the J2000.0 axes in site terms, `CANON_DELTA.md` §4.4); and the map's future orbit,
+which the page works out by Kepler's problem in the View and the canon would give a Forecast (§4.6).
 
 ## 3. Part by part
 
 | the sketch | the canon's module | in Unreal | kind |
 |---|---|---|---|
 | `core/orbit_core.cpp`: the atmosphere, the craft's forces, gear, RK4, the laws, the crew, the approach, the Ring's placing | `world`, `orbit`, `flight`, `guidance` | the core library, unchanged | static library |
-| `core/return.cpp`, `core/dock.cpp`, `core/walk.cpp`, `core/sky.cpp` | `guidance`, `ring-dynamics`, `world` | the core library | static library |
+| `core/return.cpp`, `core/dock.cpp`, `core/deck.cpp`, `core/walk.cpp`, `core/sky.cpp` | `guidance`, `ring-dynamics`, `world` | the core library | static library |
 | `OC_RING_*`, `OC_HUB_*` in `orbit_core.h` | `station.yaml` (ADR 007) | one header, read by the core, by the Ring's generators and by their tests | constants |
 | `oc_reset`, `oc_controls`, `oc_auto`, `oc_sas` | `bus`: Commands | methods on the subsystem, called from C++ only | plugin |
 | `oc_out` and the parts' blocks | `contracts/snapshot.fbs` | `FOrbitSnapshot` | plugin |
@@ -161,13 +163,15 @@ index.
 | `main.js`, `cameraPose`: chase, cockpit, from the Ring | the View | camera components on the pawns; the cockpit eye 11.6 m forward and 1.85 m up in the body frame, as the page has it | actor |
 | `frames.js`: site to drawing axes, line of sight | `units-frames` (the View's side) | a small C++ mapping library (§5) and Cesium's georeference | plugin |
 | `earth.js`: the ray-cast globe, the land mask, single scattering | `view-unreal`, `planet-data`, `world` | Cesium's globe (§5) and the SkyAtmosphere component [S6, C1] | engine, plugin |
-| `earth.js`, `Stars` | the View | a star sphere turned by the Snapshot's ECI-to-site rotation | actor |
+| `sky.js`: the real stars (8,615, Wikidata's), the Moon at its size and phase, the Sun's glare | the View | a star sphere turned by the sky's J2000.0 axes (`oc_sky_out`); the Moon a lit sphere along the Snapshot's line to it; SkyAtmosphere's Sun from the Snapshot | actor |
 | `ring.js`: the superstructure, painted textures, lights | `station-graph`, then the View | Geometry Script generators in the editor module, baked to Static Meshes [S12]; the Ring's spin from the Snapshot's axis and reference | editor generator, actor |
 | `craft.js`: the lifting body, gear, bells, plumes | `asset-pipeline` | a Blender generator, imported as a Static Mesh; the plume a cone with a dynamic material, as on the page; Niagara later | Blender generator, actor |
 | `hud.js` | the View (debug) | a C++ HUD drawing text on the canvas; the walls listed; Instruments later (`CANON_DELTA.md` §2.6) | actor |
 | `input.js`: keys, gamepad, touch | the View: input to Commands | Enhanced Input, its actions and mapping contexts made in C++ | game module |
 | `land.js`, `data/land.js` | `planet-data` | **gone**: imagery replaces the land mask | — |
-| `features.js` and its hooks | the View's own structure | one actor or subsystem per part (sky, docking, the flight home, the walk); `owns` and `frame` (the walk drawing the whole frame) become possessing another pawn | game module |
+| `features.js` and its hooks | the View's own structure | one actor or subsystem per part (sky, docking, the flight deck, the flight home, the walk, the map, sound, the tour); `owns` and `frame` (the walk drawing the whole frame) become possessing another pawn | game module |
+| `deck-view.js`, `deck-hud.js`: the pads and the deck's markings turning with the Ring, the swivelling ducts, the deck's ILS and the hover's plan, a chase view that rides with the deck, its up toward the axis | the View | an actor on the Ring for the markings; the approach display in the C++ HUD; a camera component whose up is the Ring's inward radius while the deck matters | actor |
+| `tour-plan.js`, `tour.js`: the whole loop flown by the crew's own modes, a caption, a warp and a view for each stage | the scripted autopilot as a client (§3.5) | a director subsystem issuing Commands through the seam the player's hands use; its stages stay pure data with their tests; any input ends it. The slice's walking-skeleton check (`FIRST_SLICE.md` §7) | game module |
 | `tools/build.mjs`, the single-file page | — | **gone**: UBT, and UAT's BuildCookRun. The page stays as the fast debug client (R3) | — |
 | `flight/web`'s KDFW drawing (`airport.js`, `airport-layout.js`, `kdfw.json`) | site detail (ADR 012) | a C++ generator reading `kdfw.json` (licence: `LICENSING.md`) | editor generator |
 
@@ -192,8 +196,8 @@ The canon's modules with no counterpart in the sketch, and where they would live
 | a single-scattering sky ray-cast per pixel, from the runway to orbit | **SkyAtmosphere**: ground, aerial and space views on a spherical planet [S6] | its planet is a sphere: set its radius to the core's 6,371 km. The fast sky LUT shows artefacts at the Earth's shadow from space [S6]: turn it off for space views. Its Sun must be the Snapshot's, not a clock of its own |
 | clouds painted on the ground from above | **Volumetric Clouds**, ray-marched, meant to go from ground to space [S6] | expensive; their ambient light from space is not spatialised [S6]. Cloudy imagery is cheaper for the slice |
 | Natural Earth's coastlines on a sphere, land coloured by latitude | **Cesium for Unreal** v2.31.0, which supports UE 5.6 to 5.8 [C1], Apache 2.0 [C3]: a streamed globe, 3D Tiles, terrain, imagery overlays | its free data cannot be stored for offline use [C4, C5], and the canon is offline (L12). The slice's answer: a globe made from the ellipsoid itself, with public-domain imagery tiled locally and loaded from `file:///` [C1] (§5). Terrain later from open elevation data through your own tiler (cesium-terrain-builder's quantized-mesh with a `layer.json`) [C6] |
-| (the walk is being built) | **the Character Movement Component with a custom gravity direction**, since 5.4 [S7] | it moves the person, so the engine owns state (against L1); and it knows no Coriolis, so a 2 m drop lands on the plumb point instead of 3.8 cm off it, and running spinward weighs nothing more. Use the core's walk and drive a kinematic pawn; keep the component for crowds and animation later (Mover, its successor, is still Experimental in 5.8 [S13]) |
-| (sound is being built) | **MetaSounds**, with a Builder API that makes graphs at runtime from C++ [S8] | none for text-as-source: your ASTRA_AUDIO built its whole graph that way on 5.7 with no assets (R1). Custom DSP nodes need `METASOUND_PLUGIN` and `METASOUND_MODULE` defined in their module, or the editor crashes at startup (R1) |
+| the walk (`core/walk.cpp`: a point in the Ring's turning frame under ω²r and Coriolis, floors and walls holding it) | **the Character Movement Component with a custom gravity direction**, since 5.4 [S7] | it moves the person, so the engine owns state (against L1); and it knows no Coriolis, so a 2 m drop lands on the plumb point instead of 3.8 cm off it, and running spinward weighs nothing more. Use the core's walk and drive a kinematic pawn; keep the component for crowds and animation later (Mover, its successor, is still Experimental in 5.8 [S13]) |
+| sound made as it plays by Web Audio nodes from the readouts (`sound.js`; `sound-mix.js` the levels as numbers, pure and tested) | **MetaSounds**, with a Builder API that makes graphs at runtime from C++ [S8] | none for text-as-source: your ASTRA_AUDIO built its whole graph that way on 5.7 with no assets (R1); `sound-mix.js` is the table of drives the graph reads (`CANON_DELTA.md` §4.6). Custom DSP nodes need `METASOUND_PLUGIN` and `METASOUND_MODULE` defined in their module, or the editor crashes at startup (R1) |
 | keys, a gamepad, a touch stick | **Enhanced Input** | actions and mapping contexts are assets by default; make them in C++ at startup to keep them text (the API allows it as far as this kit knows; not checked here). The same mapping then takes OpenXR controllers |
 | the Ring's lights as coloured points | **MegaLights**, production-ready in 5.8 [S1]; **Lumen**, and Lumen Lite in 5.8 [S1]; **Nanite** | the deferred renderer only: not in a forward-shaded VR build, not on Quest [S11]. The Ring's meshes are large and simple, and the Shuttle a few thousand triangles: Nanite pays only when the city comes |
 | a plume of two additive cones | **Niagara** | its systems are assets; keep the cones for the slice |
@@ -231,6 +235,17 @@ The canon's modules with no counterpart in the sketch, and where they would live
   round it (§3.3). For the slice's 100 m walk, the simpler way is enough: draw the Ring where it is,
   turning, with the camera riding the core's walker. Nothing physical spins in the engine, which is
   what the canon forbids. The canon's way can come with crowds.
+- **Over the flight deck:** the deck turns with the Ring at 221.5 m/s under a craft that matches it as it
+  lands (`CANON_DELTA.md` §4.8). Draw the craft and the deck from the Snapshot as for docking; the page's
+  chase view, riding with the deck and taking the Ring's inward radius for up, is what makes the landing
+  legible, and is worth keeping.
+- **The Ring's size is data.** `OC_RING_*` becomes `station.yaml`, and the generators read it. The owner's
+  open Ring (`OPEN_RING_AIR.md`) would hold its air by spin only at about 1,000 km, a Bishop ring with
+  walls 200 km high, where the deck landing becomes an entry into air turning with the floor at up to
+  3.1 km/s. Large World Coordinates hold that easily (the default world is about 88 million km across
+  [S5]), but thousands of kilometres of floor and walls need streaming and a level of detail from orbit
+  down to a pad, and the core needs the Ring's air (density from height above the floor, turning with it)
+  besides the Earth's. Not in the slice; a decision to make before the Ring's generators are written.
 
 ## 6. What does not translate
 
@@ -270,7 +285,9 @@ claim 5.8 but were built for 5.7.0 [S10]. The desktop renders; Link or Air Link 
 cockpit: the headset's pose added to the cockpit eye. The HUD on a panel in the world, built in C++.
 Controllers through the same Enhanced Input mapping. Comfort: the cockpit is a steady frame, so the
 vehicle's own motion is tolerable; the spin-matched docking turns the universe outside the window at
-2.54°/s; fade out above some time warp; snap turns in the walk.
+2.54°/s; on the deck landing the weight comes on from nothing to one g over the glide's 104 s while the
+deck sweeps past and then stands still: try it seated, early; fade out above some time warp; snap turns
+in the walk.
 
 **Quest standalone (its own wave, after PCVR is comfortable).** What it costs:
 

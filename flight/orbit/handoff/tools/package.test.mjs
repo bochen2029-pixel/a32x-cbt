@@ -30,7 +30,9 @@ const allowOtherCanon = !realCanon;
 // Changed or uncommitted files the packager would take: decides which of the two modes can run here.
 const changed = execFileSync('git', ['-C', root, 'status', '--porcelain', '--untracked-files=all', '--',
   'flight/orbit/handoff', 'flight/orbit/core', 'flight/orbit/test', 'flight/orbit/tools', 'flight/orbit/README.md',
-  'flight/orbit/CMakeLists.txt', 'docs/provenance.md', 'flight/LICENSE'], { encoding: 'utf8' }).trim();
+  'flight/orbit/INVARIANTS.md', 'flight/orbit/evidence', 'flight/orbit/web', 'flight/orbit/CMakeLists.txt', 'docs/provenance.md',
+  'flight/LICENSE'],
+  { encoding: 'utf8' }).trim();
 
 const made = build({ root, canon, page: null, worktree: true, allowOtherCanon });
 
@@ -50,6 +52,7 @@ test('the archive holds the kit, the canon, the core, its tests and CMake, and n
   for (const doc of KIT_DOCS) assert.ok(names.includes(doc), doc);
   for (const path of ['canon/ARCHITECTURE.md', 'orbit/CMakeLists.txt', 'orbit/README.md', 'orbit/core/orbit_core.h',
     'orbit/core/orbit_core.cpp', 'orbit/core/exports/core.txt', 'orbit/test/test_orbit.cpp', 'orbit/tools/orbit_run.cpp',
+    'orbit/INVARIANTS.md', 'orbit/evidence/INDEX.md', 'orbit/web/src/main.js', 'orbit/web/src/tour-plan.js',
     'reference/provenance.md', 'licences/GPL-3.0.txt', 'NOTICE.txt', 'MANIFEST.json', 'SHA256SUMS']) {
     assert.ok(names.includes(path), path);
   }

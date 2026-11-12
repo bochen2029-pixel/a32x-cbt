@@ -32,6 +32,8 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | G, B | Y | gear; brakes |
 | T | | in orbit: the crew flies the approach to the hub |
 | P | | in orbit near the Ring: the crew docks at the hub; docked, let go |
+| Enter | | docked: go aboard the Ring and walk (WALK) |
+| R | | the crew flies home to KDFW 17C (RETURN); again, skip the wait for a pass |
 | C | | in orbit near the Ring: the crew lands on the Ring's flight deck |
 | O | Start | skip ahead to orbit |
 | , . | bumpers | time slower, faster (up to 100×) |
@@ -266,8 +268,8 @@ None of them describes a real aircraft, ship or station.
 Off the craft, through the hatch into the hub, down a spoke in a lift, and out onto a floor that curves up
 ahead and behind until it meets itself overhead. The walk has its own core, `core/walk.cpp` (`orbit_walk.h`),
 on the flight's fixed steps, and its own page, `web/src/walk-view.js`, which draws the whole frame while
-walking. **Enter** (or WALK) starts it when the craft is docked at the hub; until docking is built, add
-`?walk` to the address (`?walk=lift` starts in lift 1's car, `?walk=floor` on the floor by it). At the
+walking. **Enter** (or WALK) starts it when the craft is docked at the hub; to try it without docking,
+add `?walk` to the address (`?walk=lift` starts in lift 1's car, `?walk=floor` on the floor by it). At the
 hatch, **E** goes back aboard and the flight returns.
 
 | keys | gamepad | touch | does |
@@ -315,8 +317,9 @@ Sun's side none. A fill from the roof's lamps lights the rest, and the band's ai
 it. The view leans a quarter of the way toward the felt up, so the lift's sideways push is felt.
 
 Not in the walk: people, furnishing, doors into the blocks (they are solid), water to swim in (the parapets
-keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the Earth's light, the way
-from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g).
+keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the way from the port to
+the hatch, the Earth's tide across the ring (six parts in ten thousand of a g). The Earth's light is in:
+where the Earth stands above the floor's level, the band takes a soft blue light from its sunlit part.
 
 ### The flight home
 
@@ -744,7 +747,7 @@ why it holds and what enforces it. The rules cover conservation in a vacuum, thi
 in orbit, work and energy on the ascent, the propellant's bookkeeping, one frame seen three ways, replay
 bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, and a
 receipt for every number. `test/test_invariants.cpp` holds them as physics, with tolerances derived from
-RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`). Its
+RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`).
 Three defects it found are fixed and their tests run with the rest: the hash missed fields, non-finite
 controls were taken, and an escape path's periapsis was wrong. `INVARIANTS.md` keeps what was found. `evidence/` keeps the receipts. Every constant and
 every number stated here is certified by Abacus, the owner's tool of certified arithmetic, or cited
@@ -787,7 +790,7 @@ node flight/orbit/web/tools/build.mjs --core flight/orbit/build-wasm/orbit_core.
 node --test flight/orbit/web/test/*.test.mjs
 ```
 
-`build-web/index.html` is the whole page in one file, about 1 MB; `build-web/page.html` is the same
+`build-web/index.html` is the whole page in one file, about 2 MB; `build-web/page.html` is the same
 without the document's skeleton, for a host that wraps a page in its own.
 
 Each part's tests are `test/test_<part>.cpp`, and ctest runs each test by the name it declares in a line
@@ -797,3 +800,10 @@ the crew's flight every 10 s for 900 s.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
 state. Native and WebAssembly runs agree to the digits printed above, not bit for bit.
+
+The guide, a PDF for whoever comes to the sketch cold (`guide/`): `node flight/orbit/guide/build-guide.mjs`
+opens the built page in Chrome, Chromium or Edge over the DevTools protocol, takes its screenshots there
+and prints `guide/guide.html` to `guide/out/Runway-to-Ring-guide.pdf`; a quarter to half an hour in
+software GL. `--list` names the screenshots, `--only` retakes some, `--skip-shots` only prints. `guide/out/`
+is not committed. `node --test flight/orbit/guide/build-guide.test.mjs` holds the guide's figures and the
+tool's screenshots to each other.

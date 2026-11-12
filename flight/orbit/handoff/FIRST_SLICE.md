@@ -20,7 +20,8 @@ mechanical gates, and the points where you look. Tags point into `SOURCES.md`.
 
 | walled off | what you meet |
 |---|---|
-| the flight home | the key says "Not built: the flight home", unless the return part (§4.3) is in when wave 2 starts |
+| the flight home | the key says "Not built: the flight home". The core flies it already (`CANON_DELTA.md` §4.3); the View's entry, glide and landing are a later wave |
+| the flight deck | the key says "Not built: the flight deck". The core lands on it already (§4.8); its View (the pads, the swivel, the deck's ILS, the chase view riding the deck) comes after the walk. The deck is a vacuum sector behind bulkheads: the owner's open Ring (`OPEN_RING_AIR.md`) is not in the slice |
 | the Ring past 100 m | a glazed barrier across the floor; the HUD line: "Not built: the city" |
 | the rest of KDFW and every other field | 17C alone is drawn; elsewhere is the bare globe |
 | TALLY, Residents, the arrivals hall | absent; the help panel lists them as not built |
@@ -29,10 +30,13 @@ mechanical gates, and the points where you look. Tags point into `SOURCES.md`.
 
 ## 2. What it is built from
 
-- **The core:** the sketch at 7e9aaea, with docking and the walk when their parts land; the exact
-  commit goes in `PROVENANCE.md`. Its parts already have headers, readout blocks and tests as stubs
-  (`orbit_dock.h`, `orbit_walk.h`, `orbit_return.h`): the View's packets can be written against them
-  before the code behind them exists. Contracts first is already true here.
+- **The core:** the sketch at 599e051, with every part built: docking, the walk, the flight home, the
+  Sun and the Moon, the flight deck (`CANON_DELTA.md` §4); the exact commit goes in `PROVENANCE.md`.
+  Each part has its header, its readout block and its tests (`orbit_dock.h`, `orbit_walk.h`,
+  `orbit_return.h`, `orbit_deck.h`, `orbit_sky.h`), so the View's packets are written against contracts
+  whose code already exists and is tested. The Ring's size comes from `OC_RING_*`, which become
+  `station.yaml`: the generators read it rather than bake 5 km in, since the open-Ring idea would make it
+  1,000 km (`OPEN_RING_AIR.md`).
 - **Engine and tools:** Unreal Engine 5.8.x (5.8.4); Cesium for Unreal 2.31; Blender 5.3 (or 5.2 LTS)
   with Blender Lab's MCP server 1.0.3; Unreal's own MCP server (Experimental); Claude Code on Windows
   with Git for Windows. Pins and traps: `UNREAL_PORT.md` §9.
@@ -90,7 +94,7 @@ with the generator, its version and a hash.
 | the 100 m inside: a floor patch, its path, two walls, the barrier and its sign, a few lamps | Geometry Script | the walk's own numbers (its header) | the core's walker reaches the barrier after 100 m along the floor, and no further |
 | runway 17C/35C: 13,400 × 150 ft, threshold, centreline and edge markings, edge lights | a C++ generator | `kdfw.json` | the start point lies on the centreline at the 17C end; a cockpit screenshot at t = 0 |
 | the Earth | Cesium actors spawned in C++ at startup: a georeference on a 6,371 km sphere, a *From Ellipsoid* tileset, a local imagery overlay from `file:///` [C1] | a tiling step in `tools/` (GDAL's `gdal2tiles` over the imagery) | a screenshot at 500 km with a known field of view: the horizon dips 22.0° (acos(6,371 / 6,871)); Texas under the craft at t = 0 |
-| the sky and the stars | SkyAtmosphere and a directional light; a seeded star mesh as the page has | the Snapshot's Sun and its ECI-to-site rotation (`UNREAL_PORT.md` §2.5) | a star stays still against the Ring's axis, which is fixed among the stars |
+| the sky, the Moon and the stars | SkyAtmosphere and a directional light; the real stars as the page has them (`orbit/web/data/stars.js`, CC0); the Moon a lit sphere | the Snapshot's Sun, Moon and the sky's J2000.0 axes (`oc_sky_out`, `UNREAL_PORT.md` §2.5) | a star stays still against the Ring's axis, which is fixed among the stars; Orion where Orion is on 12 November 2026 |
 | materials: tiles, glass, metal, lights, runway paint | a C++ commandlet using Unreal's material-editing library | its own source | run twice headless, the same parameters both times |
 | sound (wave 2) | MetaSounds built at runtime by the Builder API [S8], ASTRA_AUDIO's way (R1) | the drives the sound part names (§4.6 of the delta) | a WAV of a scripted ascent: loudness rises with throttle; then your ear |
 | input actions and mapping contexts | C++ at startup | the page's key and pad table | an automation test presses keys and finds the Commands on the Tape |
@@ -106,7 +110,7 @@ skeleton and writes wave 1's packets. It writes no View feature itself.
 |---|---|---|
 | W0.1 | reads the machine, changing nothing: the engine's path and `Windows_SDK.json`, MSVC, the Windows SDK, CMake, Git for Windows, Node, Blender's version | a table in the session's log; anything missing is asked about, not installed |
 | W0.2 | scaffolds the repository as text: `CLAUDE.md` from the template, `README.md`, `DECISIONS.md`, `FICTION.md`, `PROVENANCE.md`, `.gitignore` (Binaries, Intermediate, Saved, DerivedDataCache, `Content/Generated`, `build/`), `.gitattributes` | your word before the first commit |
-| W0.3 | **after your licence decision**: imports the kit's `orbit/` as `core/` and builds it with MSVC (`/fp:precise`, `/MD`, C++20) | `ctest` green; `orbit_run 10 800` prints the rows of `CANON_DELTA.md` §1 (orbit at 753 s, 500.4 × 499.7 km, 32.84°, 4,389 kg, 36,568 Pa, 2.09 g); the hash it prints, `143d7cd1` on Linux, is recorded as the Windows baseline |
+| W0.3 | **after your licence decision**: imports the kit's `orbit/` as `core/` and builds it with MSVC (`/fp:precise`, `/MD`, C++20) | `ctest` green, 120 of 120; `orbit_run 10 800` prints the rows of `CANON_DELTA.md` §1 (orbit at 753 s, 500.4 × 499.7 km, 32.84°, 4,389 kg, 36,568 Pa, 2.09 g); the hash it prints, `ea7847fe` on Linux at 599e051, is recorded beside the Windows build's as its baseline |
 | W0.4 | freezes contracts 0.1: the C API as it is (the parts' stub headers included), the Snapshot's field list, the frame mapping (`UNREAL_PORT.md` §5), the Command table, the asset manifest's schema | a test that parses the headers and the Snapshot struct and holds them equal |
 | W0.5 | writes the project as text: `.uproject`, `Config/*.ini`, the game module and targets, `Plugins/OrbitSim` (the External module, the runtime module with the subsystem and the Tape) | UBT builds `<Game>Editor Win64 Development` clean |
 | W0.6 | the walking skeleton: the game mode spawns an engine cube driven by the Snapshot, a chase camera, the HUD's first three lines, time warp | in the editor, a screenshot at t = 0, 60 s and 753 s: the cube on the field, climbing, in orbit |
@@ -137,13 +141,15 @@ checks for the rest, reviewed by someone other than the author.
 
 | packet | makes | depends on |
 |---|---|---|
-| P-2-01 docking | the docking part's core in `core/`, and its View: the port, capture, the roll matched | the docking part (§4.1), P-1-03 |
-| P-2-02 the walk | the walk part's core, the 100 m patch, a kinematic first-person pawn ridden by the core's walker, the barrier | the walk part (§4.2), P-1-03 |
+| P-2-01 docking | docking's View, the core having it (§4.1): the port's target turning with the hub, the probe, the cockpit's reticle, the capture and its sounds | P-1-03 |
+| P-2-02 the walk | the 100 m patch, a kinematic first-person pawn ridden by the core's walker (§4.2), the barrier | P-1-03 |
 | P-2-03 sound | MetaSounds by the Builder API: the drive's rumble with throttle and dynamic pressure, the thrusters' hiss, the dock's clunk, the Ring's hum | the sound part (§4.6) |
 | P-2-04 tiers | the Desk, Desk-Lite and PCVR presets as config (`UNREAL_PORT.md` §7), and frame times at the waypoints | P-1-01 to P-1-03 |
 | P-2-05 dev MCP toolset | an editor-only toolset: step the core, read the Snapshot, set a Command, record and replay a Tape (the canon's `dev-mcp`) | W0 |
+| P-2-06 the tour | the sketch's tour (`web/src/tour-plan.js`, its stages pure and tested) as a director subsystem: the slice's path flown by the crew through the same Commands the player gives, with a caption, a time warp and a view for each stage; any input ends it | P-2-01, P-2-02 |
 
-**Exit:** you dock, go aboard, walk 100 m and meet the barrier.
+**Exit:** you dock, go aboard, walk 100 m and meet the barrier; and the tour flies that path with no
+hands on the controls.
 
 ### Wave 3: PCVR
 
@@ -182,11 +188,13 @@ the owner directories must each fail.
 2. The crew's flight under the subsystem at 1/30, 1/60 and 1/144 s frame times: one hash, and the
    receipts of `CANON_DELTA.md` §1.
 3. A taped hand-flown take-off and climb replays to the same hash.
-4. The crew docks: the docked flag set, the roll rate matched within the docking part's tolerance.
+4. The crew docks: the docked flag set, the spin matched within docking's 0.30°/s (the crew's reads
+   0.00000°/s at the touch, `dock.capture_inside_tolerances`).
 5. The walker goes 100 m along the floor and stops at the barrier.
 6. The frame mapping test, the mesh-bounds tests, the no-binary-source test.
 7. `BuildCookRun` packages a Win64 Development build, with the editor closed [S4], and the packaged
-   game starts and reaches orbit under the crew with no input.
+   game starts and reaches orbit under the crew with no input; from wave 2, the tour flies the slice's
+   whole path in it with no input.
 
 **Waypoints** for screenshots, in every build and tier: on 17C at t = 0; 2 km up; 40 km up; in orbit
 with the Ring ahead; at the hold point; docked; 50 m into the walk; at the barrier.
@@ -211,9 +219,9 @@ own `-help`.
 2. Build and test the core:
    `cmake -S core -B build/core -G "Visual Studio 17 2022" -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`,
    then `cmake --build build/core --config Release`, then
-   `ctest --test-dir build/core -C Release --output-on-failure`. Check: 15 of 15 (more once the parts
-   land). Then `build/core/Release/orbit_run.exe 10 800`. Check: the rows of `CANON_DELTA.md` §1;
-   record the hash.
+   `ctest --test-dir build/core -C Release --output-on-failure`. Check: 120 of 120. Then
+   `build/core/Release/orbit_run.exe 10 800`. Check: the rows of `CANON_DELTA.md` §1; record the hash
+   beside Linux's `ea7847fe`.
 3. Copy the library and headers into `Plugins/OrbitSim/Source/ThirdParty/OrbitCore/` (a script, not by
    hand). Check: the script refuses a library older than its sources.
 4. Build the game:
@@ -238,5 +246,5 @@ own `-help`.
 | Geometry Script crashes a packaged build [S12] | it never runs in one: generate in the editor, bake, ship Static Meshes |
 | the offline imagery fails to load | the bare ellipsoid with a plain material, and a wall: "Not built: imagery" |
 | the Meta XR plugin's 5.8 build [S10] | Epic's OpenXR alone |
-| the docking or walk part is late | the View is built against the stub headers; the wall says "Not built: docking" until the core lands |
+| the Ring's scale changes (the open Ring, `OPEN_RING_AIR.md`) | the generators take the radius from `station.yaml`; a 1,000 km Ring is another wave, with streaming, not a regeneration |
 | the licence is undecided | wave 0 stops at W0.2; everything after W0.3 waits |
