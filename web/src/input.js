@@ -7,14 +7,14 @@ export const HELP = [
   ['W S / ↑ ↓', 'pitch down / up'],
   ['A D / ← →', 'bank left / right'],
   ['Q E', 'yaw (nose wheel on the ground)'],
-  ['Shift Ctrl', 'throttle up / down;  Z full, X cut'],
+  ['= −, Shift Ctrl', 'throttle up / down (= and − leave Ctrl, which the browser shares, alone);  Z full, X cut'],
   ['I K  J L  U M', 'small thrusters: fore/aft, left/right, up/down'],
   ['1 2 3 4 5 6', 'attitude hold, prograde, retrograde, the Ring, the hub\'s port, the deck (hover)'],
   ['G  B', 'gear;  brakes'],
   ['T', 'in orbit: the crew flies the approach'],
   ['P', 'the crew docks at the hub; docked: let go'],
   ['C', 'the crew lands on the Ring\'s flight deck'],
-  ['6, on the deck', 'hover: W S A D fly against the deck, let go to hold; Shift Ctrl climb, sink (the middle holds)'],
+  ['6, on the deck', 'hover: W S A D fly against the deck, let go to hold; = − (or Shift Ctrl) climb, sink (the middle holds)'],
   ['7', 'on the deck: the crew takes off, out through the roof\'s gap to the hold point (then R flies home)'],
   ['R', 'the crew flies home to KDFW'],
   ['Enter', 'docked: go aboard the Ring and walk'],
@@ -162,7 +162,9 @@ export class Input {
     let roll = (on('d', 'ArrowRight') ? 1 : 0) - (on('a', 'ArrowLeft') ? 1 : 0);
     let yaw = (on('e') ? 1 : 0) - (on('q') ? 1 : 0);
     let tx = (on('i') ? 1 : 0) - (on('k') ? 1 : 0), ty = (on('l') ? 1 : 0) - (on('j') ? 1 : 0), tz = (on('m') ? 1 : 0) - (on('u') ? 1 : 0);
-    let throttleRate = (on('Shift') ? 0.6 : 0) - (on('Control') ? 0.6 : 0);
+    // the throttle: = and − (Shift turns = into +), or Shift and Ctrl; held, as the stick is. Ctrl held with the
+    // flying keys gives the browser Ctrl-W, which closes the tab whatever a page asks: = and − give it nothing.
+    let throttleRate = (on('Shift', '=', '+') ? 0.6 : 0) - (on('Control', '-') ? 0.6 : 0);
     if (this.touch.active) { pitch += this.touch.pitch; roll += this.touch.roll; }
     let pads = [];
     try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch { pads = []; }   // a frame may refuse gamepads

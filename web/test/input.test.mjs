@@ -55,3 +55,22 @@ test('the help has a list for a touch screen, by its buttons, with no keyboard\'
   assert.ok(HELP.length > 20);
   assert.equal(helpHtml([['<b>', 'a & b']]), '<div><b>&lt;b&gt;</b><span>a &amp; b</span></div>');
 });
+
+test('the throttle on = and − as well as Shift and Ctrl, held: no Ctrl, so no browser shortcut with the flying keys', () => {
+  const input = new Input(quiet);
+  const hold = (key, seconds) => {
+    input.key({ key, code: '', target: { tagName: 'CANVAS' }, repeat: false, shiftKey: key === '+', ctrlKey: false, metaKey: false, altKey: false, preventDefault() {} }, true);
+    for (let i = 0; i < seconds * 10; i++) input.poll(0.1);
+    input.key({ key, code: '', target: { tagName: 'CANVAS' }, repeat: false, shiftKey: false, ctrlKey: false, metaKey: false, altKey: false, preventDefault() {} }, false);
+    input.commands = [];
+  };
+  input.hands.throttle = 0.5;
+  hold('=', 0.5);
+  assert.ok(Math.abs(input.hands.throttle - 0.8) < 1e-9, `= for half a second: ${input.hands.throttle}`);
+  hold('-', 1);
+  assert.ok(Math.abs(input.hands.throttle - 0.2) < 1e-9, `− for a second: ${input.hands.throttle}`);
+  hold('+', 0.5);   // = with Shift held
+  assert.ok(Math.abs(input.hands.throttle - 0.5) < 1e-9, `+ for half a second: ${input.hands.throttle}`);
+  hold('Control', 1);
+  assert.equal(input.hands.throttle, 0, 'Ctrl as before');
+});
