@@ -24,10 +24,16 @@ test('every figure shows a screenshot the tool takes, and every screenshot is sh
 test('each session is a page address with its options, and each shot says what it shows', () => {
   for (const s of SESSIONS) {
     assert.match(s.query, /^q=(low|medium|high)(&[a-z]+(=[\w.-]+)?)*$/, s.query);
+    // the picture at the tier's own size: else the page shrinks it while software GL's frames come slowly
+    assert.match(s.query, /(^|&)res=fixed(&|$)/, `${s.query} keeps the tier's own size`);
     for (const shot of s.shots) {
       assert.match(shot.name, /^[a-z][a-z-]*$/, shot.name);
       assert.ok(shot.about && shot.about.length > 8, `${shot.name} says what it shows`);
       assert.ok(shot.run || shot.keys, `${shot.name} does something before its picture`);
+      // its lines: page-side JavaScript, or a list of it with the page's own tests to wait for between
+      for (const step of [].concat(shot.run ?? [])) {
+        assert.ok((typeof step === 'string' && step.trim()) || (step && typeof step.wait === 'string' && step.wait.trim()), `${shot.name}: a line or a wait`);
+      }
     }
   }
 });
