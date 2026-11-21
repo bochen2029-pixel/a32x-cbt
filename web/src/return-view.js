@@ -427,8 +427,8 @@ export const ret = {
       ctx.say('Skipping ahead to the de-orbit burn…');
       return true;
     }
-    if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say('Home, stopped on 17C: Backspace starts again'); return true; }
-    if (auto === ctx.AUTO.return) { ctx.say('The crew is flying home: Space takes the controls'); return true; }
+    if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say(`Home, stopped on 17C: ${this.touch ? 'RESTART' : 'Backspace'} starts again`); return true; }
+    if (auto === ctx.AUTO.return) { ctx.say(`The crew is flying home: ${this.touch ? 'CREW' : 'Space'} takes the controls`); return true; }
     const may = canReturn(s, r, ctx.core.deck);
     if (!may.ok) { ctx.say(may.why); return true; }
     let words = 'The crew flies home to KDFW 17C';
