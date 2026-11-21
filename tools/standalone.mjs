@@ -162,8 +162,11 @@ function main() {
     ]);
   }
   const versions = JSON.parse(readFileSync(join(flightWeb, 'package.json'), 'utf8'));
+  // three.js and esbuild as flight/web has them, the one a dependency and the other a tool; and a lockfile cut from
+  // flight/web's, their entries and esbuild's platform packages as they stand there, so that npm ci installs exactly
+  // what a32x-cbt's page is built with (a repository with no lockfile cannot npm ci at all), written offline
   const pick = (name) => (versions.dependencies || {})[name] || (versions.devDependencies || {})[name];
-  writeFileSync(join(out, 'package.json'), JSON.stringify({
+  const pkg = {
     name: 'runway-to-ring', private: true,
     description: "A spaceplane from KDFW 17C to a ring station in orbit and back, the orbit sketch split from a32x-cbt's flight/orbit.",
     license: 'GPL-3.0-only',
@@ -171,8 +174,17 @@ function main() {
       build: 'node web/tools/build.mjs --core build-wasm/orbit_core.js --core-js build-wasm/orbit_core_plain.js',
       test: 'cd web && node --test test/*.test.mjs',
     },
-    devDependencies: { esbuild: pick('esbuild'), three: pick('three') },
-  }, null, 2) + '\n');
+    dependencies: { three: pick('three') },
+    devDependencies: { esbuild: pick('esbuild') },
+  };
+  writeFileSync(join(out, 'package.json'), JSON.stringify(pkg, null, 2) + '\n');
+  const webLock = JSON.parse(readFileSync(join(flightWeb, 'package-lock.json'), 'utf8'));
+  const packages = { '': { name: pkg.name, license: pkg.license, dependencies: pkg.dependencies, devDependencies: pkg.devDependencies } };
+  for (const [key, entry] of Object.entries(webLock.packages || {})) {
+    if (key === 'node_modules/three' || key === 'node_modules/esbuild' || key.startsWith('node_modules/@esbuild/')) packages[key] = entry;
+  }
+  if (!packages['node_modules/three'] || !packages['node_modules/esbuild']) throw new Error(`flight/web's lockfile has no three or esbuild`);
+  writeFileSync(join(out, 'package-lock.json'), JSON.stringify({ name: pkg.name, lockfileVersion: 3, requires: true, packages }, null, 2) + '\n');
   writeFileSync(join(out, 'CLAUDE.md'), CLAUDE_MD);
   writeFileSync(join(out, '.gitignore'), ['build/', 'build-wasm/', 'build-web/', 'node_modules/', 'guide/out/', ''].join('\n'));
   const readme = readFileSync(join(out, 'README.md'), 'utf8');
@@ -182,7 +194,7 @@ function main() {
   // 5. one commit on top
   git(out, ['add', '-A']);
   execFileSync('git', ['-C', out, 'commit', '-q', '-F', '-'], {
-    input: `feat: the orbit sketch as a repository of its own\n\nSplit from a32x-cbt's flight/orbit at ${head} with git subtree, its history kept.\nCopied in what it borrowed from the rest of a32x-cbt:\n- flight/web's modules the page imports, and theirs (${wanted.size} files), under\n  vendor/flight-web;\n- app/tools' zip writer and Chrome driver, under tools/;\n- flight's GPLv3 licence as LICENSE;\n- docs/provenance.md.\nThe paths that reached out of the folder point in (${n} of them). package.json pins\nthree.js and esbuild at flight/web's versions. CLAUDE.md carries the house rules.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01E4nrb6dFnatXPkspSD5nCm\n`,
+    input: `feat: the orbit sketch as a repository of its own\n\nSplit from a32x-cbt's flight/orbit at ${head} with git subtree, its history kept.\nCopied in what it borrowed from the rest of a32x-cbt:\n- flight/web's modules the page imports, and theirs (${wanted.size} files), under\n  vendor/flight-web;\n- app/tools' zip writer and Chrome driver, under tools/;\n- flight's GPLv3 licence as LICENSE;\n- docs/provenance.md.\nThe paths that reached out of the folder point in (${n} of them). package.json and\npackage-lock.json pin three.js and esbuild as flight/web's lockfile has them. CLAUDE.md carries the house rules.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01E4nrb6dFnatXPkspSD5nCm\n`,
     stdio: ['pipe', 'inherit', 'inherit'],
   });
   console.log(`branch ${a.branch}: ${git(out, ['log', '--oneline', '-1'])}, ${git(out, ['rev-list', '--count', 'HEAD'])} commits`);
