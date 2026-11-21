@@ -9,6 +9,7 @@
 // TEST: takes_up_the_flight_home
 // TEST: leaves_the_flight_alone
 // TEST: refused_changes_nothing
+// TEST: an_early_roll_is_cued_as_a_roll
 // TEST: quiet_where_others_show
 // TEST: flown_to_orbit
 // TEST: flown_home
@@ -335,6 +336,28 @@ void refusedChangesNothing() {
     }
 }
 
+// A pilot who lets the brakes go before the crew's window (20 s) and rolls is cued as the crew would fly a rolling
+// craft, its roll's power down the runway and the rotation at 95 m/s, not as one waiting at rest with the brakes
+// on: the crew, handed a craft already rolling, takes it up rolling. (Found playing the page: the director cued
+// HOLD, the thrust at nought, at 96 m/s.) At rest before the window, the cue is still the hold.
+void anEarlyRollIsCuedAsARoll() {
+    oc_reset(LAT, LON, HDG);
+    oc_auto(OC_AUTO_OFF);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 1);
+    oc_step(100);
+    const double heldPhase = get(OC_FD_PHASE), heldThrottle = get(OC_FD_THROTTLE);
+    oc_controls(0, 0, 0, 1, 0, 0, 0, 1, 0);   // the brakes off, full power, at 2 s
+    while (get(OC_T) < 5) oc_step(1);
+    const double rollTas = get(OC_TAS), rollPhase = get(OC_FD_PHASE), rollThrottle = get(OC_FD_THROTTLE);
+    while (get(OC_T) < 12) oc_step(1);
+    std::printf("  at rest at 2 s: phase %.0f, throttle %.2f; rolling at 5 s, %.0f m/s: phase %.0f, throttle %.2f; at 12 s, %.0f m/s: phase %.0f\n", heldPhase,
+                heldThrottle, rollTas, rollPhase, rollThrottle, get(OC_TAS), get(OC_FD_PHASE));
+    CHECK(heldPhase == OC_FD_PH_HOLD && heldThrottle == 0, "at rest before the window: phase %.0f, throttle %.2f", heldPhase, heldThrottle);
+    CHECK(rollTas > 10 && rollTas < 95 && rollPhase == OC_FD_PH_ROLL && rollThrottle > 0.5, "rolling at %.0f m/s: phase %.0f, throttle %.2f", rollTas, rollPhase,
+          rollThrottle);
+    CHECK(get(OC_TAS) > 95 && get(OC_FD_PHASE) == OC_FD_PH_ROTATE, "past 95 m/s at %.0f: phase %.0f", get(OC_TAS), get(OC_FD_PHASE));
+}
+
 // Where the craft has a display of its own the director says nothing: near the Ring, holding on the port or
 // over the deck, docked; and while the approach, docking or the deck landing fly.
 void quietWhereOthersShow() {
@@ -578,6 +601,7 @@ const Test tests[] = {
     {"takes_up_the_flight_home", takesUpTheFlightHome},
     {"leaves_the_flight_alone", leavesTheFlightAlone},
     {"refused_changes_nothing", refusedChangesNothing},
+    {"an_early_roll_is_cued_as_a_roll", anEarlyRollIsCuedAsARoll},
     {"quiet_where_others_show", quietWhereOthersShow},
     {"flown_to_orbit", flownToOrbit},
     {"flown_home", flownHome},

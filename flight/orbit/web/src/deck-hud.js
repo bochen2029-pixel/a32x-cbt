@@ -72,9 +72,10 @@ export function deckHoldMakesSense(s, dock) {
 
 // What LAND DECK does from here, and what the page says: start the crew's landing, or nothing, saying why.
 // The core judges the same things (deckEngage) and refuses on its own as well.
-export function deckCommand(s, d, dock) {
+// touch: a phone's words, its buttons for keys.
+export function deckCommand(s, d, dock, touch = false) {
   if (s.crashed > 0) return { action: 'none', say: 'Crashed: start again' };
-  if (dock && dock.docked > 0.5) return { action: 'none', say: 'Docked at the hub: let go first (P)' };
+  if (dock && dock.docked > 0.5) return { action: 'none', say: touch ? 'Docked at the hub: let go first (DOCK)' : 'Docked at the hub: let go first (P)' };
   if (d.onDeck > 0.5) return { action: 'none', say: 'On the deck already: open the throttle to lift off (6 holds over the deck)' };
   if (round(s.auto) === AUTO.deck) return { action: 'none', say: `The crew is landing: ${PHASE_WORDS[round(d.phase)] || 'on its way'}` };
   const within = s.ringRange < WITHIN_M;
@@ -101,9 +102,9 @@ export function engagedText(s, d) {
 
 // What TAKE OFF does from here, and what the page says: start the crew's take-off, or nothing, saying why. The
 // core judges the same things (deckTakeoff) and refuses on its own as well.
-export function takeoffCommand(s, d, dock) {
+export function takeoffCommand(s, d, dock, touch = false) {
   if (s.crashed > 0) return { action: 'none', say: 'Crashed: start again' };
-  if (dock && dock.docked > 0.5) return { action: 'none', say: 'Docked at the hub: let go first (P)' };
+  if (dock && dock.docked > 0.5) return { action: 'none', say: touch ? 'Docked at the hub: let go first (DOCK)' : 'Docked at the hub: let go first (P)' };
   if (round(s.auto) === AUTO.takeoff) return { action: 'none', say: `The crew is taking off: ${PHASE_WORDS[round(d.phase)] || 'on its way'}` };
   const low = d.height < 100 && Math.abs(d.sectorS) < RING.deck.arc / 2 && Math.abs(d.c) < RING.width / 2 - 30 && s.ringRange < WITHIN_M;
   if (!(d.onDeck > 0.5) && !(low && Math.abs(d.along) < 20)) return { action: 'none', say: 'The take-off is from the deck, or hovering low over it' };

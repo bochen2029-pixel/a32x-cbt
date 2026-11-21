@@ -5,9 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, register } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AUTO, Core, PH, SAS } from '../src/core.js';
 import { DOCK_OUT } from '../src/dock-hud.js';
 import {
@@ -59,6 +59,35 @@ test('the deck\'s numbers and names are the headers\'', () => {
   assert.equal(Number(coreHeader.match(/OC_AUTO_DECK = (\d+)/)[1]), AUTO.deck);
   assert.equal(Number(coreHeader.match(/OC_AUTO_TAKEOFF = (\d+)/)[1]), AUTO.takeoff);
   assert.equal(Number(coreHeader.match(/OC_SAS_DECK = (\d+)/)[1]), SAS.deck);
+});
+
+test('docked, LAND DECK and TAKE OFF say how to let go in the words of the keys or of a phone\'s buttons', () => {
+  const dock = { docked: 1 };
+  assert.equal(deckCommand(S, D, dock).say, 'Docked at the hub: let go first (P)');
+  assert.equal(deckCommand(S, D, dock, true).say, 'Docked at the hub: let go first (DOCK)');
+  assert.equal(takeoffCommand(S, D, dock, true).say, 'Docked at the hub: let go first (DOCK)');
+});
+
+// deck-view.js draws with three.js: from flight/web's packages, as the page's build resolves 'three' (dock.test.mjs)
+const threePath = join(here, '..', '..', '..', 'web', 'node_modules', 'three', 'build', 'three.module.js');
+const noThree = !existsSync(threePath) && `three.js is not at ${threePath}: npm ci in flight/web`;
+
+test('HOLD keeps the deck hold while riding with the deck, whose one g the attitude hold would let the craft fall in', { skip: noThree }, async () => {
+  const url = pathToFileURL(threePath).href;
+  register(`data:text/javascript,export async function resolve(s, c, next) { return s === 'three' ? { url: ${JSON.stringify(url)}, shortCircuit: true } : next(s, c); }`);
+  const { deck } = await import('../src/deck-view.js');
+  const said = [];
+  const riding = { ...S, auto: AUTO.off, sas: SAS.deck, peri: -300000, ringRange: 4990, vrelE: 221 };   // hovering over the deck, moving with it
+  const core = { s: riding, read() { return this.s; }, auto(m) { this.s.auto = m; }, sas(m) { this.s.sas = m; }, dock: { docked: 0 } };
+  const ctx = { core, say: (t) => said.push(t), input: { hands: {} } };
+  Object.assign(deck, { d: { ...D, onDeck: 0, height: 20, pad: 1 }, touch: false });
+  assert.equal(deck.command('sas-next', ctx), true);
+  assert.equal(core.s.sas, SAS.deck, 'the deck hold kept');
+  assert.match(said.at(-1), /^The deck hold keeps the craft up over the deck: C lands it, 7 climbs out$/);
+  // far from the Ring, nothing to fall to: HOLD goes on round to the attitude hold
+  core.s = { ...riding, ringRange: 30000, vrelE: 0.2 };
+  assert.equal(deck.command('sas-next', ctx), true);
+  assert.equal(core.s.sas, SAS.hold);
 });
 
 test('LAND DECK starts the crew where it makes sense, and says why where it does not', () => {

@@ -16,6 +16,7 @@ import {
   DECK, DECK_OUT, DECK_PH, DECK_V, WITHIN_M, approachLayout, deckCommand, deckHoldMakesSense, deckLines, deckStatus, engagedText, padName, takeoffCommand,
   takeoffText, touchdownText,
 } from './deck-hud.js';
+import { ridingDeck } from './dock-hud.js';
 
 const D = RING.deck;
 const D2R = Math.PI / 180;
@@ -321,7 +322,7 @@ export const deck = {
     const s = ctx.core.read(), d = this.d, dock = ctx.core.dock;
     const auto = Math.round(s.auto), sas = Math.round(s.sas);
     if (c === 'deck') {
-      const act = deckCommand(s, d, dock);
+      const act = deckCommand(s, d, dock, this.touch);
       if (act.action !== 'engage') { ctx.say(act.say); return true; }
       ctx.core.auto(AUTO.deck);
       ctx.core.read();
@@ -329,7 +330,7 @@ export const deck = {
       return true;
     }
     if (c === 'takeoff') {
-      const act = takeoffCommand(s, d, dock);
+      const act = takeoffCommand(s, d, dock, this.touch);
       if (act.action !== 'engage') { ctx.say(act.say); return true; }
       ctx.input.hands.brake = 0;
       ctx.core.auto(AUTO.takeoff);
@@ -342,7 +343,18 @@ export const deck = {
       this.toHold(ctx, 'Deck hold: the stick flies against the deck, the throttle climbs and sinks, the middle holds');
       return true;
     }
-    if (c === 'sas-next' && sas === SAS.deck) { ctx.core.sas(SAS.hold); ctx.say('Hold: attitude'); return true; }
+    if (c === 'sas-next' && sas === SAS.deck) {
+      // Riding with the deck, the deck hold is what keeps the craft up: the attitude hold would let it fall to the
+      // floor at the Ring's one g (found playing the page). It stays; the crew lands or climbs out.
+      if (ridingDeck(s, d)) {
+        ctx.say(this.touch ? 'The deck hold keeps the craft up over the deck: LAND DECK lands it, TAKE OFF climbs out'
+          : 'The deck hold keeps the craft up over the deck: C lands it, 7 climbs out');
+        return true;
+      }
+      ctx.core.sas(SAS.hold);
+      ctx.say('Hold: attitude');
+      return true;
+    }
     if (c === 'crew') {
       // over the deck, the pilot's hands go to the deck hold and the crew's to the deck landing
       if (auto === AUTO.deck || auto === AUTO.takeoff) { this.toHold(ctx, 'Your controls: the deck hold, the throttle\'s middle holds the height'); return true; }
@@ -467,7 +479,16 @@ export const deck = {
     this.g.clearRect(0, 0, w, h);
     // on a desk, at the left between the status line and the readouts; on a phone, above the stick and throttle
     const R = Math.max(34, Math.min(56, Math.min(w, h) * 0.08));
-    const x0 = w < 560 ? w / 2 + R * 0.4 : 24 + R * 3.4, y0 = w < 560 ? h - R - 200 : Math.min(h * 0.52, h - 300) + R * 0.2;
+    // between the status line and the readouts as they stand (found playing the page: on windows 450 px tall it
+    // sat under the readouts), where there is room; else where it was
+    const top = document.getElementById('top')?.getBoundingClientRect(), list = document.getElementById('readouts')?.getBoundingClientRect();
+    let y0 = Math.min(h * 0.52, h - 300) + R * 0.2;
+    if (top && list && list.height > 0) {
+      const above = top.bottom + R + 22, below = list.top - R - 10;   // the labels stand R + 14 over the centre
+      if (below >= above) y0 = Math.min(Math.max(y0, above), below);
+    }
+    const x0 = w < 560 ? w / 2 + R * 0.4 : 24 + R * 3.4;
+    if (w < 560) y0 = h - R - 200;
     const live = phase === DECK_PH.glide || (auto === AUTO.off && d.onDeck < 0.5 && Math.hypot(d.s, d.c) > 30 && d.height > DECK.hover + 5);
     drawApproach(this.g, x0, y0, R, d, phase === DECK_PH.glide, live);
     this.drawn = true;
