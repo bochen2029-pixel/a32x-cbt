@@ -217,10 +217,18 @@ plane among the spokes, its thrust not toward the deck in its last 20 s and with
 drive lit at a quarter of its thrust or more through its last 20 s, and its force changing no faster than
 5 m/s³ (the swivel's 15°/s at full thrust); it asks for 85 % of the drive at most, the rest the tracking's,
 and ends at a gate 6 m over the pad's centre, sinking at 1.5 m/s. Its length is chosen by golden section, 13
-plans one a step, for the least delta-v and 0.5 m/s for each second. The crew flies it: the plan's force fed
-forward 0.4 s ahead, the throttle's lag, and a loop on the place and velocity against the plan's; made again
-from where the craft is every 8 s while it coasts (every 3 s with a burn 12 s ahead, so the burn is planned
-finely) and in a burn when the craft is 10 m or 2 m/s off it, with the whole drive and a later end if it must.
+plans one a step, for the least delta-v and 0.5 m/s for each second. On the crew's grid a window holds on whole
+intervals, so that this cost steps as the length moves an interval out of a window: from the hold point it
+falls by 8.7 and 9.5 m/s in the seconds to 101 and 145 s, where it is otherwise nearly level, by 8.7 and 11.4 in
+those to 70 and 74 s, where it falls 2 to 4 m/s a second, and by 1.0 in that to 113 s, beside its least (the
+audit of `60e2582`, a 1 s scan). Golden section assumes one least; from the hold point it finds the least's
+region, 403.52 m/s at 112.4 s against the scan's 403.59 at 113 s, but nothing makes it find it from every
+start. The crew flies the plan: the plan's force fed forward 0.4 s ahead, the throttle's lag, and a loop on the
+place and velocity against the plan's; made again from where the craft is every 8 s while it coasts (every 3 s
+with a burn 12 s ahead, so the burn is planned finely) and in a burn when the craft is 10 m or 2 m/s off it,
+with the whole drive and a later end if it must. A landing's plan made again that would take the craft under its
+gate's height before the gate is refused: the cone may be left at a price, so that a plan is still found from a
+craft outside it, but near the pad outside the cone is under the deck.
 It learns its drive in flight: the acceleration it sees against the one its model expects, along the thrust.
 What that looks like from the hold point: a short burn out, the nose spinward; a weightless coast of a minute
 and a quarter while the pad comes round; and one burn, the airliner's approach become the F-35's slam, that
@@ -268,32 +276,66 @@ bulkheads, and the roof everywhere but over the sector, are docking's solid stru
 | off level | 2° | 10° | at 10° the low wingtip is under a metre from the deck |
 | from a pad's centre | 5 m | | on the deck but off the pad is a landing, and said so |
 
-**The oracle.** The tests ask the same solver for the least propellant any guidance could land with from the
-hold point (`oracle_against_the_crew`): the touch 3 m over the pad's centre sinking at 0.3 m/s, inside the
-same cone and to the same side of the spokes, level for its last 3 s, and nothing else of the crew's: the
-whole drive, no price on time, no limit on how fast the thrust changes, no lit drive, no gate. Its length
-free, by golden section on the delta-v: **304.7 m/s, 530 kg, a plan 311 s long**, at full thrust or shut
-(out, a trim, the braking burn down the cone, a last one at the floor), ‖u‖ within 6 × 10⁻⁹ m/s² of σ. It
-converges: 310.30, 304.66 and 304.59 m/s at 40, 80 and 160 intervals. Kept lit through its last 40 s at a
-quarter of the drive, it is still exact where that floor holds it (12 intervals at the floor). The crew uses
-**705 kg** to the touch from the same start: **33 % over the optimum**, where the first build used 1,794 kg,
-238 % over. Of the 175 kg, the price of time is 52 (the oracle at the crew's own 117 s needs 582 kg); the
-rest is the crew's rules (15 % of the drive kept back to track by, the thrust's rate, the lit final, the gate
-6 m up and the descent from it) and the tracking.
+**The oracle.** The tests ask the same solver for the least propellant a plan of its discretization lands with
+from the hold point (`oracle_against_the_crew`): the touch 3 m over the pad's centre sinking at 0.3 m/s, inside
+the same cone and to the same side of the spokes, level for its last 3 s, and nothing else of the crew's: the
+whole drive, no price on time, no limit on how fast the thrust changes, no lit drive, no gate. It is posed on the
+exact grid of `deck_plan.h`, every window's edge a node, not on the crew's, whose windows round to whole
+intervals; and it is the best plan of that discretization, not a bound on every guidance: holding the thrust
+over each interval and taking the drive's bound by its tangent restrict it, and holding the cone and the spokes'
+side only at the nodes relaxes it. Its cost falls as the plan lengthens, smoothly, across 40 to 400 s
+(`oracle_length_search`: no step anywhere, at every half second), so its least over that bracket is at the
+bracket's end: **301.5 m/s, 525 kg, a plan 400 s long**, at full thrust or shut (out; a burn 600 m over the floor
+that then rides the spokes' side to the last node it holds at; the braking burn down the cone; a last one at the
+floor), ‖u‖ within 7 × 10⁻⁹ m/s² of σ. Longer plans cost less still, at 80 intervals 298.2 m/s at 600 s, 295.9 at
+1,000 s and 293.1 at 1,900 s: the bracket sets the least. It converges: 301.71, 301.51 and 301.48 m/s at 40, 80
+and 160 intervals (329.88, 329.79 and 329.78 at 120 s). Kept lit through its last 40 s at a quarter of the drive,
+it is still exact where that floor holds it (27 intervals at the floor, none under it). The crew uses **705 kg**
+to the touch from the same start: **34 % over the oracle's least over 40 to 400 s**, where the first build used
+1,794 kg. Of the 180 kg, 50 are the length (the oracle at the crew's own 117 s needs 575 kg); the rest is the
+crew's rules (15 % of the drive kept back to track by, the thrust's rate, the lit final, the gate 6 m up and the
+descent from it, its own grid) and the tracking. (Until the audit of `60e2582` this paragraph said 304.7 m/s,
+530 kg, a plan 311 s long, the least any guidance could land with, and the crew 33 % over it: the oracle was
+posed on the crew's grid, its cost fell in steps of 4 to 7 m/s with the length, and golden section stopped on the
+edge of a step.)
 
 **The Monte Carlo.** Each draw starts up to 50 m and 0.5 m/s off the hold point, with the drive's thrust and
 the craft's mass each off by 2 % (one standard deviation, held to three), the swivel lagging its command by up
 to 0.3 s, and the navigation, which every deck law flies by, wrong by 0.3 m and 0.05 m/s an axis (one
 standard deviation, correlated over 2 s: a deck's landing aid, as good as a ship's), while the craft's own
 state stays the truth (`oc_deck_disturb`). Draws are seeded (SplitMix64, the draw's number). The guidance
-was tuned on a development pool of 100 draws (1 to 100); a held-out pool of 100 (9001 to 9100) was flown
-once, after the guidance was settled, and is reported as it came. The rate is stated with its Wilson score
-interval at 95 %.
+was tuned on a development pool of 100 draws (1 to 100). A held-out pool of 100 (9001 to 9100) came in the
+same commit as the guidance it was first flown against, so the history cannot show that it was flown once,
+after that guidance was settled (the audit of `60e2582`). Two pools drawn later, while the crew flew the exact
+grid for a time (below), 20001 to 20100 and 30001 to 30100, were flown once by this crew, its guidance settled,
+and are reported as they came. The rate is stated with its Wilson score interval at 95 %.
 
 | pool | landed inside every tolerance | the envelope (worst of each) | time, propellant |
 |---|---|---|---|
 | development, 1 to 100 | 100 of 100 (96.3 to 100 %), none crashed; pads 1, 2, 3: 39, 24, 37 | sink 0.426 m/s, drift 0.175 m/s, 1.72 m off the centre, 0.29° off level | 105 to 155 s; 632 to 869 kg, mean 713 |
-| held out, 9001 to 9100, flown once | 100 of 100 (96.3 to 100 %), none crashed; pads 1, 2, 3: 34, 30, 36 | sink 0.441 m/s, drift 0.145 m/s, 1.79 m off the centre, 0.24° off level | 106 to 154 s; 623 to 897 kg, mean 719 |
+| held out, 9001 to 9100 | 100 of 100 (96.3 to 100 %), none crashed; pads 1, 2, 3: 34, 30, 36 | sink 0.441 m/s, drift 0.145 m/s, 1.79 m off the centre, 0.24° off level | 106 to 154 s; 623 to 897 kg, mean 719 |
+| held out, 20001 to 20100, flown once | 99 of 100 (94.6 to 99.8 %), none crashed, draw 20019 down at 0.513 m/s; pads 1, 2, 3: 32, 40, 27 | sink 0.442 m/s, drift 0.215 m/s, 1.81 m off the centre, 0.32° off level | 105 to 154 s; 618 to 868 kg, mean 704 |
+| held out, 30001 to 30100, flown once | 100 of 100 (96.3 to 100 %), none crashed; pads 1, 2, 3: 28, 29, 43 | sink 0.457 m/s, drift 0.161 m/s, 1.82 m off the centre, 0.40° off level | 104 to 155 s; 614 to 867 kg, mean 723 |
+
+Draw 20019, the drive 1.4 % weak, the craft 0.7 % light and the swivel lagging 0.15 s, touched down at
+0.513 m/s, 13 mm/s over the tolerance: a firm touchdown, not a crash. So its pool's Wilson interval reaches down
+to 94.6 %, not over 95 %, and its test (`monte_carlo_held_out_20001`) is a defect's, run by name and not by ctest
+(`INVARIANTS.md`, G20). The refusal of a plan under the gate, added since, changes no landing of the four pools.
+
+**The exact grid, flown by the crew and not kept.** For a time the crew's own plans were posed on the oracle's
+exact grid, its length found by a scan of seven before eight plans of golden section, which made its cost
+continuous in the length: from the hold point it used 701 kg to the touch and 707 to rest, in 129 s (705 and
+711 here, in 119 s), and the take-off 726 kg (730 here), once a plan's first change of force was bounded by the
+rate over half its first interval and a climb out's whole-drive try was given the whole drive (it cost 768, then
+804, before; G17). But on exact windows its plans brake later and harder, and it met the gate less closely
+(G18): its development pool landed 97 of 100 until its descent was made to settle a low, drifting craft before
+it commits, and then 100 of 100, in 630 to 1,047 kg (mean 734); the held-out pool 100 of 100 in 649 to 1,436 kg
+(mean 738), the heaviest a go-round at the gate after plans made again carried the craft 265 m past the pad. On
+the two later pools, each flown once, it landed 99 of 100 each: in 20001 to 20100 draw 20060 crashed, kept on a
+plan made again that ran 11 m under the deck (G19: the refusal, kept here), and in 30001 to 30100, after the
+refusal, draw 30043 met its gate a metre low and touched down at 0.507 m/s. On the same 200 draws this crew
+lands 199, and its heaviest uses 868 kg. The crew keeps its grid and its golden section; the exact grid is the
+oracle's.
 
 A plan is made in a step of its own, one at most: through a landing and a take-off, 63 plans, 17 ms on
 average in WebAssembly under node (19 ms at the 95th percentile, 34 ms at the most), 15 ms natively; the
@@ -307,7 +349,13 @@ certified in `evidence/`):
 | the crew, from the hold point | the burn out at once; the coast at 17 s, the final burn at 92 s, the gate at 112 s, at rest on pad 2 at 119 s: sink 0.296 m/s, drift 0.022 m/s, 0.96 m from the centre, 0.05° off level |
 | against the first build, from the hold point | at rest on the pad in 119 s (255 s); 711 kg (1,794); from the roof's height to the touch 18 s and 450 kg (69 s, 1,071 kg); the touchdown 0.30 m/s, 0.02 m/s, 0.96 m off (0.31, 0.00, 0.01, after its 20 m hover) |
 | the final burn | from 192.7 m/s against the deck (ωr at that height 192.8) and 0.0000 g to 0.44 m/s and 0.995 g in 20 s; the swivel from 0.4° to 85.6°; under the roof's height only over the sector, 581 m from its centre; on the plan to 0.2 m across, 5.5 m in height |
-| the coast, and the plan | the craft on the plan's place to 1.6 cm through the coast; each of a plan's 40 intervals carries its node onto the next to 7.5 × 10⁻⁶ m |
+| the coast, and the plan | the craft on the plan's place to 1.6 cm through the coast; each of a plan's 40 intervals carries its node onto the next to 7.5 × 10⁻⁶ m; the crew's first plan, 112 s, flown open loop in the Earth's gravity onto its nodes to 0.039 m (12.4 m with the tide left out of the plan) |
+| the oracle's length | its cost at every half second from 40 to 400 s on the exact grid: no step (each half second's change within 0.001 m/s of lying between its neighbours'), falling all the way; every window's edge a node at every quarter second from 4 to 400 s; the oracle on the crew's grid steps by 7.2 m/s at 311 s |
+| among the spokes | until 15 s before its plan's end the craft is at least 59.68 m off the Ring's plane (the side is 60 m), and 72.5 m outside the nearest spoke's square at the closest; with the side not kept, 24.2 m off the plane and 42.9 m outside a spoke |
+| its drive learnt | the drive 4 % strong and the craft 2 % heavier than the crew takes it: 0.0574 of the true 0.0608 learnt after the burn out, 0.0598 by the gate, and landed 0.73 m off |
+| a plan's rate | from the drive shut, its first force 1.898 m/s² over its first 0.38 s, the rate's reach over that interval, and every change after inside its bound; unbounded, the first force is 20.5 m/s² |
+| the least thrust's floor | the crew's first plans, where the drive is held lit: the mass's reference heavier than the craft by d = −0.0046 (the landing) and −0.012 (the take-off), the floor's expansion short by 1.6 × 10⁻⁸ and 2.8 × 10⁻⁷ of itself |
+| over the deck | no plan the crew keeps takes the craft under its gate's height before the gate (in the pools, 6.13 m at the lowest); placed 15 m up, 25 m from the pad, sinking at 6 m/s and closing at 20 m/s 9 s before its gate, the crew refuses a plan 3.8 m under the deck and lands; with the refusal cut, it keeps that plan and strikes the deck |
 | the crew, from where it reaches orbit, 25.0 km out | at the hold point at 717 s, at rest on the pad at 836 s: 0.30 m/s, 1.00 m off |
 | the crew, the moment it is let go from the hub's port | backs off to the hold point first (from beside the hub a plan, which knows nothing of the hub, carried the right wing into it 9 s on: the tour's first run); out from the hold point at 49 s, at rest on pad 1 at 168 s: 0.30 m/s, 0.99 m off; 696 kg |
 | engaged at six moments of the Ring's turn | 118.2 to 118.8 s, 697 to 712 kg: no window to wait for (the first build's wait cost a whole turn, 142 s, for a delay over 20 s) |
