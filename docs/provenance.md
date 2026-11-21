@@ -287,10 +287,27 @@ craft that lands like this on a turning deck has never been built.
 | Newtonian mechanics in a rotating frame: the centrifugal and Coriolis terms | textbook | as a method: the walker's and a ball's motion in the ring's frame, held by its floors. The tests work each motion out again in the frame that does not turn, where it is a straight line |
 | the classical fourth-order Runge–Kutta method | textbook | as a method: free flight in the ring's frame |
 | C. Schlick, *An Inexpensive BRDF Model for Physically-based Rendering*, Computer Graphics Forum 13(3), 1994 | the paper's method | the Fresnel term of the canal's water and the lifts' glass, as a formula |
-| this project | — | the walker's size, pace, push, friction and jump; the hub's lobby; the lifts and their ride (the sideways push held to 1.5 m/s², the hub's easing at half the riders' weight, the braking); the floor's plan (streets, the canal and its bridges, the plazas, the paths, 1,500 blocks laid out from a seeded hash); the Sun's way into the band; the roof's lattice and lamps; the fill light and the haze; the signs, canvas text in the system's fonts |
+| this project | — | the walker's size, pace, push, friction and jump; the hub's lobby; the lifts and their ride (the sideways push held to 1.5 m/s², the hub's easing at half the riders' weight, the braking); the floor's plan (streets, the canal and its bridges, the plazas, the paths, 1,467 blocks laid out from a seeded hash); the Sun's way into the band; the roof's lattice and lamps; the fill light and the haze; the signs, canvas text in the system's fonts; the flight deck's bulkheads, lock gates and markings, after the page's own drawing of the deck (`ring-plan.js`, `ring.js`); what each graphics tier asks of the walk |
 
 The walk's physics is Newton's; its numbers are chosen, and the place is drawn by code. It describes no real
 station.
+
+#### The wind
+
+`flight/orbit/core/wind.cpp`, `orbit_wind.h`, `wind_state.h` and `test/test_wind.cpp` are ours, GPLv3. Methods
+and published numbers only; no code or data file is taken.
+
+| source | licence | what is taken |
+|---|---|---|
+| US Department of Defense, MIL-F-8785C, *Military specification: flying qualities of piloted airplanes* (5 November 1980), §3.7, "Atmospheric disturbances"; the same models in MIL-HDBK-1797 | public domain, a work of the US government, approved for public release | the mean wind's log law near the ground, W20 ln(h / z₀) / ln(20 ft / z₀), with z₀ = 0.15 ft for the terminal flight phases; the von Kármán turbulence model's intensities and length scales by height (below 1,000 ft σ_w = 0.1 W20, L_w = h, σ_u = σ_w / (0.177 + 0.000823 h)^0.4, L_u = h / (0.177 + 0.000823 h)^1.2, h in feet; from 2,000 ft L = 2,500 ft; straight between), its longitudinal and transverse spectra and their constant 1.339, and the light, moderate and severe days as W20 of 15, 30 and 45 knots. Above 2,000 ft the intensity, 0.1 W20 to 15 km and fading to nothing at 25 km, is ours, not the specification's table |
+| T. von Kármán, "Progress in the statistical theory of turbulence", *Proceedings of the National Academy of Sciences* 34 (1948), 530–539 | the paper's result | the energy spectrum of isotropic turbulence, E(k) ∝ k⁴ / (1 + (kL′)²)^(17/6), from which the gusts are made |
+| R. H. Kraichnan, "Diffusion by a random velocity field", *Physics of Fluids* 13 (1970), 22–31 | the paper's method | a turbulent velocity field as a sum of random Fourier modes, each wavevector drawn evenly over directions and its velocity square to it, their amplitudes from the energy spectrum |
+| J. C. H. Fung, J. C. R. Hunt, N. A. Malik and R. J. Perkins, "Kinematic simulation of homogeneous turbulence by unsteady random Fourier modes", *Journal of Fluid Mechanics* 236 (1992), 281–318 | the paper's method | the modes in shells spaced evenly in ln k, and each turning in time at its eddies' rate, Kolmogorov's k^(2/3); our count (40 shells of 3), range (30 km to 25 m) and rate's size are ours |
+| S. B. Pope, *Turbulent Flows*, Cambridge University Press (2000), §6.5 | textbook | the relations between the energy spectrum and the one-dimensional spectra along a line, by which the test holds the gusts to von Kármán's |
+| V. W. Ekman, "On the influence of the earth's rotation on ocean-currents", *Arkiv för matematik, astronomi och fysik* 2(11) (1905); the atmospheric Ekman layer in any text on dynamic meteorology | the paper's result | that the wind near the ground is turned toward low pressure, to the left of the wind above it north of the equator; the turn's size, 25°, is ours |
+| this project | — | the jet stream (its height, 10 to 12 km, its speed, 30 m/s at strength 1, and its fall above), the upper wind, the wind's wander round the world and through the days, the seed's draws, the strength's scale, and the gusts' fading above 15 km |
+
+The wind is a sketch's: shaped like the specification's and an atmosphere's, it describes no real day.
 
 #### The flight home
 
@@ -306,7 +323,12 @@ these, and the code is ours.
 | T. E. Moore, *Space Shuttle entry terminal area energy management*, NASA TM-104744 (1991) | public domain, a work of the US government | the heading alignment circle: a circle tangent to the extended centreline, flown to and round onto the final, with the energy to spend reckoned over the path to go. Ours spends it by angle of attack and whole turns round the circle, not a speed brake, and the drive is relit for a powered final |
 | radiative equilibrium (Stefan and Boltzmann) | physics | the skin's temperature, the heat flux and the air's own temperature against εσT⁴, emissivity 0.85 (ours) |
 | E. B. Wilson, "Probable inference, the law of succession, and statistical inference", *Journal of the American Statistical Association* 22 (1927) | the paper's method | the 95 % interval on a Monte Carlo's success rate |
-| SplitMix64: G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014; S. Vigna's C version | the published algorithm; Vigna's code is public domain | the Monte Carlo's generator: its increment and its two multipliers |
+| SplitMix64: G. L. Steele, D. Lea and C. H. Flood, "Fast splittable pseudorandom number generators", OOPSLA 2014; S. Vigna's C version | the published algorithm; Vigna's code is public domain | the Monte Carlo's generator: its increment and its two multipliers; the instruments' errors and the wind's draws from their seeds |
+| G. E. P. Box and M. E. Muller, "A note on the generation of random normal deviates", *Annals of Mathematical Statistics* 29 (1958) | the paper's method | the instruments' noise, normal deviates from pairs of uniform ones |
+| a turn coordinator's balance: an aeroplane flown with no side force on it has no sideslip | general aviation knowledge | the guidance takes the sideslip from the side force its accelerometers feel, not from a vane, in working out the wind across the craft |
+| the approach speed's wind additive, as airliners' procedures add a share of the headwind to the approach speed | general aviation knowledge; no document is copied | the idea; our share, a third of the headwind up to 7.5 m/s, is ours |
+| lowering an orbit's top by a burn at its lowest point, tail first, before a de-orbit burn from the round orbit | textbook orbital mechanics | the two-burn way home from an orbit far from round; when it is taken (no pass within a day, the top 200 km over the bottom) is ours |
+| this project | — | the pass's margin (an entry from the planned burn shot with lift over drag a fifth short of the model's, the bank moved as the corrector would), the instruments' errors and their sizes, the wind estimate's memory, the terminal area's rule for a turn more round the circle, the final's stiffening lateral law, and the approach's sink limit |
 | `booster-lander-simulator`, this project's owner's 6-DOF propulsive-landing simulator | MIT | a practice, read and not ported: predictors shoot forward only, never integrating the plant back; a controller is judged by its success rate over many dispersed runs, with an interval, and development pools are kept apart from held-out pools flown once. No code taken |
 | this project | — | the plan (the pass search, the late pass taken with more bank, the burn to a 60 km low point), the entry's angle of attack schedule and its easing, the limits and their margins, the gate, the terminal area's and the approach's laws, the flare and the rollout, the feed-forward of the Earth's turn on the final, the dispersions and their boxes, the glow and the trail |
 
@@ -365,7 +387,27 @@ is taken as ideas, numbers and methods, and the code is this project's.
 | H. D. Curtis, *Orbital Mechanics for Engineering Students*, algorithms 3.3 and 3.4; D. A. Vallado, *Fundamentals of Astrodynamics and Applications* | textbook methods | the map's Kepler's problem by the universal variable: Stumpff's functions, Newton's method on Kepler's equation, the Lagrange coefficients (Curtis), and the starting guess for a hyperbola (Vallado). As methods; the code is ours |
 | W. H. Clohessy and R. S. Wiltshire, *Terminal guidance system for satellite rendezvous*, Journal of the Aerospace Sciences 27 (1960) | the paper's result | the frame that turns with a round orbit (radial, along the track, across it) that the map draws a rendezvous in; and, as a test, that a craft 1 km below drifts ahead at 3/2 n Δh |
 | Natural Earth's coastlines and lakes (above) | public domain | drawn again by the map, on its globe and its ground track, from `web/data/land.js` |
-| this project | — | the sound's instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the Ring's room. The map's views, its layout and the Ring's orbit found from the readouts |
+| ISO 9613-1:1993, *Acoustics — Attenuation of sound during propagation outdoors — Part 1: Calculation of the absorption of sound by the atmosphere* | the standard's formula, as a method; no text of the standard is copied | the air's absorption of sound by frequency, temperature, humidity and pressure (the oxygen's and the nitrogen's relaxation and the classical term), coded in `airAbsorption`; a test holds it to the values ISO 9613-2's table 2 gives at 10 and 20 °C |
+| W. C. Sabine (1900) and C. F. Eyring, *Reverberation time in "dead" rooms*, J. Acoust. Soc. Am. 1 (1930); the critical distance after Hopkins and Stryker (1948) | textbook methods | each room's reverberation time by octave from its volume, its surfaces and the air, −S ln(1 − ᾱ) + 4mV; its diffuse field against a sound's own, √(16π / A) |
+| tables of absorption coefficients by octave, 125 Hz to 4 kHz, for grass and turf, water, heavy glass, concrete and paving, rubber flooring, perforated metal over an absorber, steel panels, as textbooks of architectural acoustics reproduce them | facts, rounded | the coefficients in `MATERIALS`; their ends at 63 Hz and 8 kHz, and which material stands for which surface of the band, the lobby and a car, are this project's |
+| G. B. Whitham, *The flow pattern of a supersonic projectile*, Comm. Pure Appl. Math. 5 (1952); H. W. Carlson, *Simplified sonic-boom prediction*, NASA TP-1122 (1978) | a method; Carlson's is public domain, a work of the US government | the boom heard where the Mach cone's surface passes the ear, an N-wave whose overpressure falls as the distance to the −¾, with the air's pressure where it is made and where it is heard; the N-wave's length from the craft's at the cone's angle. A rule of scale from them, not Carlson's whole method |
+| M. Minnaert, *On musical air-bubbles and the sounds of running water*, Phil. Mag. 16 (1933) | the paper's result | a bubble rings at about 3.26 m/s over its radius in water at a bar: the canal's bubbles |
+| R. McN. Alexander and A. S. Jayes, *A dynamic similarity hypothesis for the gaits of quadrupedal mammals*, J. Zool. 201 (1983) | an idea | the Froude number's similarity: at a given v² / g L the cadence goes as √(g / L), which with the cadence's rise with the speed (to the 0.4, fitted here to 1.87 steps a second at 1.4 m/s and 2.85 running at 4) makes the walk's g to the 0.3 |
+| J. W. Cooley and J. W. Tukey, *An algorithm for the machine calculation of complex Fourier series*, Math. Comp. 19 (1965) | textbook method | the transform the rooms' answers are made with, frame by frame in the frequency domain |
+| this project | — | the sound's instrument and every level and trim; the hull's modes for a 28 m craft; the runway's joints every 6 m; the flight deck's voices (the hover's thrum and its mode, the duct, the lift jet's whine, the roll posts, the actuators, the plating's modes) and how the jets' work is found from the craft's motion; the Ring's rooms' shapes, their echoes and the band's 20 dB lift; the footsteps' surfaces, the canal, the town's hum, the draught, the lifts, the hatch; the tour's tone. The map's views, its layout and the Ring's orbit found from the readouts |
+
+#### The flight director
+
+`core/fd.cpp`, `orbit_fd.h`, `fd_state.h`, `web/src/fd-view.js`, `fd-hud.js` and their tests are ours,
+GPLv3. The guidance it shows is the crews' own (above, and "The flight home"); it runs their functions on a
+copy of the state. What is taken below is taken as ideas and methods; no code is copied.
+
+| source | licence | what is taken |
+|---|---|---|
+| the flight director and the primary flight display: a pitch bar and a bank bar the pilot flies the aircraft symbol onto, a bank scale with a commanded index, a flight path director to fly the velocity onto | general aviation knowledge | the ideas only: the bars, the single cue (here for the nose, since the crews command an attitude), magenta for what is commanded. The layout, the soft scales and the colours are this project's |
+| the ILS's geometry: ICAO Annex 10, Volume I, as in 1f; and the FAA's *Aeronautical Information Manual*, 1-1-9, Instrument Landing System: a localizer course tailored to 700 ft wide at the threshold, a glide slope's coverage | public domain (the AIM, a work of the US government); ICAO as a method | as in 1f: full scale two dots, 350 ft either side of the centreline at the threshold in angle from the antenna; a dot of the glide slope 0.12 of its angle; the localizer received within 18 NM and 35° of the course, the glide slope within 10 NM and 8°. The runway's place, heading and length are `flight/web`'s (1f); the 3° path through 50 ft is the PAPI's there (`GLIDE`) |
+| D. T. McRuer and H. R. Jex, "A review of quasi-linear pilot models", *IEEE Transactions on Human Factors in Electronics* HFE-8(3), 1967 | the paper's method | the test's person: a gain on each cue's error, limited at the stick's stops, a reaction time, 0.3 s, and lead where the craft lags (the flight home's person leads by 0.4 s); and that a gain too high for the delay and the craft's lag oscillates (here the roll in thin air). The gains are this project's |
+| this project | — | which guidance runs in the shadow and when, the margins on its phases, the readouts, the shadow's start from oc_auto's pick and returnEngage, the localizer's antenna 1,000 ft past the far end (1f's typical siting) and the glide slope judged at the wheels, the 8 key's three modes, and the person's gains |
 
 #### Rigour
 
@@ -385,6 +427,15 @@ method, and Abacus is run, not shipped.
 | D. Brouwer, "On the accumulation of errors in numerical integration", *Astronomical Journal* 46 (1937), 149–153 | method | rounding over many steps as a random walk, for the invariants' bounds |
 | W. Kahan, "Further remarks on reducing truncation errors", *Communications of the ACM* 8 (1965), 40 | method | compensated summation, so the ledgers add no rounding of their own |
 | E. Hairer, S. P. Nørsett and G. Wanner, *Solving Ordinary Differential Equations I* (2nd ed., 1993) | method | RK4's order, and the difference of a second- and a fourth-order rule as an estimate of error, for the ledgers' bounds |
+
+#### The guide
+
+`flight/orbit/guide/` (`guide.html`, `build-guide.mjs`) is ours, GPLv3: a guide to the sketch, printed to a
+PDF from screenshots of the built page. Neither the screenshots nor the PDF is committed (`guide/out/`). It
+drives Chrome, Chromium or Edge with this repository's own DevTools driver (`app/tools/chrome.mjs`) and
+fetches nothing. Its type is named, not shipped: Charter or Cambria (Caladea where neither is installed),
+Inter and JetBrains Mono, as the printing machine has them; the PDF embeds subsets of those it finds, each
+under its own licence (Caladea Apache-2.0; Inter and JetBrains Mono the SIL Open Font License).
 
 The drive, 2,000 s of specific impulse at 1.2 times the take-off weight, is the sketch's one fiction,
 and its README says so. The coastlines are real; the land's colours and the clouds are not. Nothing

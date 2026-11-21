@@ -26,8 +26,10 @@ import {
 const MOON_AT = 8e7;          // m: where the Moon is drawn, inside the far pass
 const STARS_AT = 9.5e7;       // m: the stars' sphere
 const SUN_LIGHT = 22.0;       // the Sun's light on the scale earth.js draws the ground with
-// The Moon is shown as an eye adapted to it sees it, with an exposure of its own and no tone curve, so
-// its face keeps its contrast: the full Moon's highlands at three quarters of white, its maria under half.
+// The Moon is shown as an eye adapted to it sees it, with an exposure of its own and, on the low tier, no
+// tone curve, so its face keeps its contrast: the full Moon's highlands at three quarters of white, its
+// maria under half. On medium and high the frame is HDR, tone-mapped once by pipeline.js's AgX pass,
+// which takes the Moon and the glare with it (toneMapped: false only counts when drawing to the canvas).
 const MOON_EXPOSURE = 0.675;
 const PHASE_EYE = 0.35;       // its fall with phase, taken at this power: an eye adapted to a crescent sees it brighter
 const EARTHSHINE_LIFT = 250;  // earthshine, lifted from its true 1e-4 of sunlight so the night side shows, against a dark sky only
@@ -84,7 +86,7 @@ const GLARE_VERTEX = /* glsl */ `
 // The Sun's glare, over the far pass: what a lens and an eye make of a disc a hundred thousand times
 // brighter than anything else in view. A core a little wider than the disc, a glow and a halo that fall
 // off over a few degrees, a faint veil, four faint spikes and two ghosts along the line through the
-// view's middle. Display values, added after the tone curve.
+// view's middle. Display values, added after the tone curve on the low tier (on medium and high the AgX pass takes them too).
 const GLARE_FRAGMENT = /* glsl */ `
   precision highp float;
   uniform mat4 uInvProj;

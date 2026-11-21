@@ -22,7 +22,7 @@ import { HELP, Input } from './input.js';
 import { Pipeline } from './pipeline.js';
 import { PROBE, SETTINGS, nextChoice, pixelRatioFor, probeVerdict, resolveTier } from './quality.js';
 import { Ring } from './ring.js';
-import { depthSlices, ringDepth } from './slices.js';
+import { cornerCos, depthSlices, ringDepth } from './slices.js';
 import { AIR_LAW_PA, inertialVelocity, keepAbove } from './view-math.js';
 
 const NEAR = 3e5;                                   // m: nearer than this is drawn in the near pass
@@ -198,7 +198,7 @@ async function main() {
   window.addEventListener('resize', resize);
   resize();
 
-  // The tier, set: by the address or the saved choice at the start, by the control (F, or GFX), or by
+  // The tier, set: by the address or the saved choice at the start, by the control (9, or GFX), or by
   // the probe below. Everything that depends on it is rebuilt in place, the flight untouched.
   const gfx = document.getElementById('btn-quality');
   const showQuality = () => { if (gfx) gfx.innerHTML = `GFX ${quality.settings.label}${quality.choice === 'auto' ? '<small> · AUTO</small>' : ''}`; };
@@ -414,7 +414,7 @@ async function main() {
       const span = (lo, hi) => { stuff = stuff ? { min: Math.min(stuff.min, lo), max: Math.max(stuff.max, hi) } : { min: lo, max: hi }; };
       if (craft.group.visible && craftNear) span(Math.max(0, length(craftRel) - 30), length(craftRel) + 30);
       if (airport.group.visible) span(0, NEAR);
-      const plan = depthSlices(depth, stuff, { base: baseNear, far: NEAR * 1.2 });
+      const plan = depthSlices(depth, stuff, { base: baseNear, far: NEAR * 1.2, cosEdge: cornerCos(camera.fov, camera.aspect) });
       if (plan.some((p) => p.scene === 'ring')) mid.add(ring.group);
       slices = plan.map((p) => ({ ...p, scene: p.scene === 'ring' ? mid : near }));
     }

@@ -1,13 +1,14 @@
 // internal.h — what the core's parts share: the maths, the craft's numbers, the state, and the laws a
-// crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h and
-// orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at the end, which return.cpp,
-// dock.cpp and deck.cpp define. GPLv3.
+// crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h,
+// orbit_fd.h, orbit_wind.h and orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at
+// the end, which return.cpp, dock.cpp, deck.cpp, fd.cpp and wind.cpp define. GPLv3.
 
 #pragma once
 
 #include "orbit_core.h"
 #include "orbit_deck.h"
 #include "orbit_dock.h"
+#include "orbit_fd.h"
 #include "orbit_return.h"
 
 #include <cmath>
@@ -107,6 +108,8 @@ struct Controls { double pitch, roll, yaw, throttle, tx, ty, tz; int gearDown; d
 #include "deck_state.h"     // oc::DeckState: deck.cpp's own, in the state so a run replays
 #include "dock_state.h"     // oc::DockState: dock.cpp's own
 #include "return_state.h"   // oc::ReturnState: return.cpp's own
+#include "fd_state.h"       // oc::FdState: fd.cpp's own
+#include "wind_state.h"     // oc::WindState: wind.cpp's own
 
 namespace oc {
 
@@ -138,6 +141,8 @@ struct State {
     ReturnState ret;
     DockState dock;
     DeckState deck;
+    FdState fd;
+    WindState wind;
 };
 
 struct Site { double lat, lon, hdg; V3 e, n, u, p0; };   // the start point, Earth-fixed
@@ -191,6 +196,14 @@ V3 airLaw(State& s, const Local& L, double yawRate);      // hold s.thetaT and s
 V3 alongTrack(const State& s, const Local& L);
 V3 point(const State& s, const Local& L, V3 dir, double gain, double limit);
 void pegSolve(State& s, const Local& L);   // the crew's insertion guidance: sets pegF0, pegF1, pegT, pegAt
+void crew(State& s, const Local& L, double* throttle);   // the crew to orbit: a step's commands
+int crewPhaseFor(const State& s, const Local& L);        // the phase the crew picks up from, where the craft is (oc_auto)
+
+// What the step's law last aimed the craft at: an attitude (ratesToward's target), or in the air law a pitch
+// and a bank to hold. Not state: the flight director clears it before it asks a law for a command and reads
+// it straight after (fd.cpp), as return.cpp sets its model from the state at each entry into its guidance.
+struct Aim { int set, air; Q q; double theta, phi; };
+extern Aim aim;
 
 // ---- the features' hooks ------------------------------------------------------------------------
 // return.cpp: the flight home (OC_AUTO_RETURN). dock.cpp: docking at the hub and contact with the ring
@@ -198,6 +211,7 @@ void pegSolve(State& s, const Local& L);   // the crew's insertion guidance: set
 // readouts block and folds its state into the hash.
 
 void returnReset(State& s);                                    // at oc_reset
+int returnRefusal(const State& s);                             // OC_RET_NO_*: why oc_auto(OC_AUTO_RETURN) may not start here; 0 if it may
 void returnEngage(State& s);                                   // oc_auto(OC_AUTO_RETURN)
 void returnCrew(State& s, const Local& L, double* throttle);   // a step's commands, flying home
 void returnAfterStep(State& s);                                // after each step, whoever flies
@@ -221,7 +235,6 @@ void dockWreck(State& s, int what, int part, double back);     // a crash on the
 void deckReset(State& s);
 void deckEngage(State& s);                                     // oc_auto(OC_AUTO_DECK)
 void deckTakeoff(State& s);                                    // oc_auto(OC_AUTO_TAKEOFF)
-bool deckHoldsTheCraft(const State& s);                        // on the deck, or riding with it inside the Ring by it
 void deckCrew(State& s, const Local& L, double* throttle);     // a step's commands, landing on the deck or taking off from it
 bool deckPilot(State& s, const Local& L, double* throttle);    // OC_SAS_DECK: the pilot's hold, true where it applies
 void deckAfterStep(State& s);                                  // the hard points against the deck, the touchdown
@@ -229,6 +242,25 @@ void deckWriteOut(const State& s);
 void deckHash(const State& s, unsigned& h);
 GearLoad deckGearLoad(const State& s, double t, V3 r, V3 v, Q q, V3 w);   // the gear on the deck, at time t
 int deckBand(V3 p, double r);   // the band round the open sector, for a sphere at p in the ring's frame: OC_DOCK_HIT_*, or -1 away from it
+
+// fd.cpp: the flight director (orbit_fd.h). Before the step's law, the crew's guidance runs on a copy of the
+// state, beside the crew to orbit or in the pilot's place; after it, the flight home's own command is read.
+// Nothing of the flight is written: only s.fd.
+void fdReset(State& s);
+void fdHanded(State& s, int from);   // oc_auto changed who flies
+void fdBefore(State& s, const Local& L);
+void fdAfter(State& s, const Local& L, double throttle);
+void fdWriteOut(const State& s, double* out);   // its readouts, the last of oc_out's
+void fdHash(const State& s, unsigned& h);
+// wind.cpp: the wind (orbit_wind.h). windAt is the air's velocity over the turning Earth at r (ECI) and t,
+// in ECI axes, nil with the wind off; orbit_core.cpp takes it off the craft's velocity where the air pushes
+// (localOf, deriv) and nothing else reads it: the crew learns the wind from its instruments. windCalls
+// counts its evaluations, for tests; nothing in flight reads it.
+V3 windAt(const WindState& w, V3 r, double t);
+void windReset(State& s);
+void windWriteOut(const State& s);
+void windHash(const State& s, unsigned& h);   // folds nothing in with the wind off, so the hash is what it was
+extern long long windCalls;
 
 void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 

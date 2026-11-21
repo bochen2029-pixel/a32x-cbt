@@ -32,11 +32,14 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | G, B | Y | gear; brakes |
 | T | | in orbit: the crew flies the approach to the hub |
 | P | | in orbit near the Ring: the crew docks at the hub; docked, let go |
+| Enter | | docked: go aboard the Ring and walk (WALK) |
+| R | | the crew flies home to KDFW 17C (RETURN); again, skip the wait for a pass |
 | C | | in orbit near the Ring: the crew lands on the Ring's flight deck |
 | O | Start | skip ahead to orbit |
 | , . | bumpers | time slower, faster (up to 100×) |
 | V | B | view: chase, cockpit, from the Ring |
 | F | | the Moon through a telescope, and back |
+| 8 | | the flight director: shown while you fly, while the crew flies too, off |
 | 9 | | graphics: auto, low, medium, high (also GFX) |
 | drag, wheel | | look round the craft, zoom |
 | H, Backspace | | help, start again |
@@ -67,14 +70,15 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | the crew's approach | 729 s to the hold point, 300 m off the hub's port, on the small thrusters |
 | one revolution | 5,669 s, Kepler's period for the orbit to 0.02 s |
 | the crew docks, from orbit (`test_return`'s `lands_after_undocking`) | at the hub's port at 1,807 s |
-| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,868 s: 432 m past the threshold, 0.07 m off the centreline, sinking 0.74 m/s |
+| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,652 s: 437 m past the threshold, 0.02 m off the centreline, sinking 0.73 m/s |
 
 ## What is in it
 
 | part | how | from |
 |---|---|---|
 | the Earth | a sphere of 6,371 km, its gravity a point mass's, turning once a sidereal day; the ground level to the local plumb line, so a parked craft stays parked | ours |
-| the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %). No wind | the standard's, to 86 km; ours above |
+| the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %) | the standard's, to 86 km; ours above |
+| the wind | none unless set (`oc_wind`, "The wind" below): a field of height, place and time from a seed, the mean wind of MIL-F-8785C's log law near the ground up to a jet stream 10 to 12 km up, and von Kármán's gusts at that specification's intensities and lengths | MIL-F-8785C; von Kármán; Kraichnan's random Fourier modes |
 | the craft | 60 t, half of it propellant; a delta lifting body, 150 m², 18 m span; Polhamus's lift for a slender delta, blending to Newtonian impact from Mach 1.5 to 5; static and damping derivatives; three gear legs | ours; Polhamus's method |
 | the drive | 1.2 × the take-off weight, 706 kN, at 2,000 s of specific impulse: **the one fiction**. At 450 s, the best of chemical rockets, half the craft's mass in propellant would buy 3 km/s, a third of what orbit takes. Thrust follows the throttle with a 0.4 s lag | ours |
 | control | a rate loop by dynamic inversion, inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give | ours |
@@ -92,8 +96,8 @@ holding off its hub reads about 0.7 m/s there.
 
 The core is one program in parts, each with its own header, readouts and tests: `core/orbit_core.cpp`
 (the flight, the crew to orbit, the approach), `return.cpp` (the flight home), `dock.cpp` (docking and
-contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `walk.cpp` (a person inside
-the Ring); `internal.h` is what they share. The
+contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `fd.cpp` (the flight
+director), `wind.cpp` (the wind), `walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
 page is the same: `web/src/main.js` flies and draws, and each further part is a module of its own
 (`web/src/features.js` lists them and says what each may do). The Ring's shape is one set of numbers,
 in `orbit_core.h`, that the core and the drawing both use.
@@ -266,8 +270,8 @@ None of them describes a real aircraft, ship or station.
 Off the craft, through the hatch into the hub, down a spoke in a lift, and out onto a floor that curves up
 ahead and behind until it meets itself overhead. The walk has its own core, `core/walk.cpp` (`orbit_walk.h`),
 on the flight's fixed steps, and its own page, `web/src/walk-view.js`, which draws the whole frame while
-walking. **Enter** (or WALK) starts it when the craft is docked at the hub; until docking is built, add
-`?walk` to the address (`?walk=lift` starts in lift 1's car, `?walk=floor` on the floor by it). At the
+walking. **Enter** (or WALK) starts it when the craft is docked at the hub; to try it without docking,
+add `?walk` to the address (`?walk=lift` starts in lift 1's car, `?walk=floor` on the floor by it). At the
 hatch, **E** goes back aboard and the flight returns.
 
 | keys | gamepad | touch | does |
@@ -295,7 +299,8 @@ tests (`test/test_walk.cpp`) work each motion out again that way and hold the tw
 | the hub's lobby, 150 m from the axis | 0.03 g. A jump is a leap of 25 m that lasts 21 s and comes down 38.5 m spinward |
 | the legs | push up to 4 m/s² on the rim; where the weight is next to nothing the soles are the limit, μ times it (the lobby's grip floor adds 1 m/s²) |
 | the lift, hub to floor | 334 s: ω²r at each height, 0.19 g at 560 m, 0.82 g at 4 km; pushed sideways at 2ωv, 1.5 m/s²; at rest at the floor at one g; up the same |
-| the floor's plan | 1,824 solid things: 1,500 low blocks, 240 parapets along the canal and across it at the bridges, the spokes' feet, the lifts' shafts |
+| the floor's plan | 1,785 solid things: 1,467 low blocks, 230 parapets along the canal and across it at the bridges, the spokes' feet, the lifts' shafts, the flight deck's two bulkheads and two lock gates |
+| the flight deck | sealed off: walking spinward along the promenade from spoke 1's plaza, the walker stops 0.3 m short of the bulkhead's face, 1.85 km on; a ball thrown at it comes back off it at half its speed |
 
 The lift's ride is chosen for its riders. Coriolis's push 2ωv is sideways and the same at any height, so the
 cruise is the speed that holds it to 1.5 m/s², 16.9 m/s. At the hub the riders weigh three hundredths of a g,
@@ -303,10 +308,20 @@ and a car that left faster than they fall would leave them on its ceiling: it le
 their weight, which makes its distance from the axis a hyperbolic cosine in time. At the floor it starts and
 stops at 1 m/s². While it moves the riders hold its rail.
 
+The flight deck, the open sector between spokes 1 and 2 (the core's 0 and 1; `orbit_core.h`'s OC_DECK_*),
+is no part of the walk. A pressure bulkhead 20 m thick and 300 m tall, from the floor to the roof, seals each end, where `orbit_core.h`,
+`deck.cpp` and `ring-plan.js` put them (the tests hold all three equal); the canal ends at a lock gate in front
+of each; no block stands within 15 m; and the walker cannot be set down between them. From the town a
+bulkhead is a great wall with its hangar door, 560 m wide and 210 m tall, its frame lit, a row of windows
+under the roof's edge and a red beacon at each top corner; it shades the town beside it. Over the deck there
+is no roof, no air and none of the roof's lamps: from a lift, or from across the ring, it lies open between
+its bulkheads with its plating, lanes and pads.
+
 The page draws three passes: the real sky first, the flight's own far scene (the ray-cast Earth, its air,
 the stars), from where the eye is in the site frame as the ring turns once in 142 s; then the ring's inside
 over it, far (40 m to 16 km) and near, in the ring's frame, built from the core's plan so the walker meets
-what is drawn. The floor is painted from where it is (grass, the canal's promenade, streets and bridges, the
+what is drawn. The sky is drawn only in the part of the picture where it can be seen: a coarse grid of rays
+from the eye is traced out over the rim walls as the Sun's light is, and the rest is the ring's inside. The floor is painted from where it is (grass, the canal's promenade, streets and bridges, the
 spokes' plazas, lanes, paths under the walls); the blocks carry storeys and windows; the roof is glass on a
 lattice with lamps along it. The Sun lights the band only where it gets in over a rim wall's top, worked out
 for each pixel, with the lattice's soft shadow: on the 12th of November it stands 23.7° out of the ring's
@@ -314,9 +329,62 @@ plane, so the middle of the band has about 50 s of sunlight in each turn and the
 Sun's side none. A fill from the roof's lamps lights the rest, and the band's air hazes what is seen through
 it. The view leans a quarter of the way toward the felt up, so the lift's sideways push is felt.
 
+The walk follows the graphics tier (`quality.js`): it draws through the page's pipeline, so it has the tier's
+cap on the picture's size and, above low, its multisampling and the glow round what is brighter than white.
+At low it does less: no shadow of the roof's lattice and none of the bulkheads, no light from the Earth, the
+grass in one octave, the blocks' windows as their average, the far side's roof and the small things past
+2.5 km (blocks, parapets, lock gates) left out; medium draws those to 7 km, high to the far side. Timed in
+SwiftShader, software and so relative only, a 1280 × 720 frame looking along the band takes 0.52 s at low,
+1.07 s at medium and 1.22 s at high; looking up through the roof, 0.73, 1.62 and 1.55 s. At low that is 0.63
+and 0.93 of what the walk took before it followed the tiers. Above low it is more than before, since the walk
+now draws through the pipeline's multisampled picture and its glow, which software pays for as dearly as the
+scene and a graphics card hardly at all; before, it drew those tiers with no multisampling.
+
 Not in the walk: people, furnishing, doors into the blocks (they are solid), water to swim in (the parapets
-keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the Earth's light, the way
-from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g).
+keep the walker out), the flight deck itself, shadows of the blocks, the spokes and the hub on the floor, the
+way from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g). The town
+the walk is laid out on is its own (`walk.cpp`'s plan); the Ring drawn from outside paints another
+(`ring-plan.js`), and the two do not match. The Earth's light is in:
+where the Earth stands above the floor's level, the band takes a soft blue light from its sunlit part.
+
+### The wind
+
+The air has its own motion over the turning Earth only when a wind is set: `oc_wind(seed, strength)`
+(`orbit_wind.h`, `core/wind.cpp`), kept through everything but a reset. The seed picks the day; the
+strength scales the whole field, 1 being MIL-F-8785C's light day (15 knots 20 ft up), 2 its moderate (30),
+3 its severe (45). `orbit_core.cpp` takes the wind off the craft's velocity wherever the air's push is
+reckoned, so it moves every aerodynamic force and moment and every readout made from the airspeed; nothing
+else reads it, and the crews learn it from their instruments or not at all.
+
+- **The mean wind.** Up to 1,000 ft, the specification's log law, W20 ln(h / z₀) / ln(20 ft / z₀) with
+  z₀ = 0.15 ft, veering with height through 25° as an Ekman layer does, from the surface wind to the wind
+  above it, which may come from anywhere. Above, a smooth climb to a westerly jet stream's core 10 to 12 km
+  up (30 m/s at strength 1, give or take 30 %), 30 % of it 8 km higher, an upper wind of 15 m/s from 35 to
+  80 km, and nothing from 100 km; its speed and direction wander round the world and through the days, as
+  the westerlies' long waves do.
+- **The gusts.** Von Kármán's isotropic turbulence, at the specification's intensities and lengths by
+  height: near the ground σ_w = 0.1 W20 with L_w the height, and the level gusts stronger and longer by its
+  formulae; from 2,000 ft L = 2,500 ft and σ = 0.1 W20, fading from 15 km to nothing at 25 km. The field
+  is a sum of 120 random Fourier modes (Kraichnan's method) in 40 shells from 30 km to 25 m, each turning
+  slowly in time at its eddies' rate; shorter gusts the craft's own size averages out. Sampled along any
+  straight path it has von Kármán's longitudinal spectrum along the path and the transverse across it.
+
+From the tests (`test/test_wind.cpp`; `invariants.windy_ledger`, `invariants.wind_finite`):
+
+| | |
+|---|---|
+| no wind (the default, or a strength of 0) | the field never evaluated; every hash and readout as before the wind existed, bit for bit, natively and as WebAssembly (`INVARIANTS.md`, O16) |
+| the mean wind near the ground | the log law to 5 × 10⁻¹¹; the veer from 20 to 1,000 ft 11.11°, as the law's share of the 25° says |
+| the jet, 50 seeds over KDFW | the strongest wind from 1 to 30 km between 10.0 and 12.0 km up, 17 to 47 m/s; the steepest shear above 300 m 0.008 s⁻¹ |
+| the gusts 8 km up, 48 seeds, octaves from 1.6 km to 50 m | within 12 % of the field's own spectrum along and across; down to 100 m within 7 % of MIL-F-8785C's von Kármán, and 95 % off Dryden's in the shortest octave; variance 0.97, 1.00, 1.02 of (0.1 W20)² |
+| the gusts 50 ft up, 48 seeds | σ_w 1.006 of 0.1 W20; σ_u 1.853 of it, the specification's 1.839 |
+| parked in a 13 m/s wind | the airspeed reads the air's speed past the craft exactly; the craft rocks on its gear at 1 cm/s |
+| still air at v − w against the wind at v | the same push, to 2 × 10⁻¹⁴ |
+| the crew to orbit through three severe days, 12 to 28 m/s on the runway | 748 to 754 s, 500.4 to 500.5 × 499.6 to 499.7 km: as in still air (753 s, 500.4 × 499.7) within 5 s and 0.1 km |
+| the ascent's work and energy in a severe wind | the ledger closes to 4.4 × 10⁻⁵ J/kg; reckoned on the velocity over the ground instead, it misses by 7 × 10⁵ |
+
+The field's numbers are the specification's where it gives them and this sketch's elsewhere (the jet, the
+upper wind, the Ekman turn's size, the wander); it describes no real day's weather.
 
 ### The flight home
 
@@ -327,6 +395,13 @@ runway can be reached, burns tail first, falls to the air, flies the entry nose 
 round a circle onto a long final from the north, and lands under power. The wait can be most of a day:
 **RETURN** again, or TO ORBIT, skips ahead to a minute before the burn. Space takes the controls at any
 point and gives them back; the crew picks the flight home up from wherever the craft is.
+
+It is refused, and whoever was flying flies on, on the Ring's deck and within 9 km of the Ring's centre
+while the craft moves past it faster than 50 m/s in the frame turning with its orbit, as it does riding
+with the deck: its way out, backing away on the small thrusters, is for a craft at rest by the Ring (from
+the deck it put the belly on the deck in 0.6 s). On the Ring's far side the way out keeps 600 m from the
+axis until 1 km out along it, clear of the hub's solar mast, its arrays and the radiators the page draws
+there, which the core does not collide with.
 
 How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
 throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the
@@ -384,7 +459,12 @@ at 99 to 100 m/s, and stops 2.1 km down the runway on its centreline. Peak dynam
 9.4 kPa. The tests also start it from six times round the day, from a lowered orbit, with the pilot
 taking the controls in the entry, the glide and on final and giving them back, and with the
 guidance's model wrong at the corners of the box below. They check that the same inputs give the same
-flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g).
+flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g). In still air with its
+instruments exact the guidance promises more than a landing, and these tests hold it to that: the wheels
+300 to 600 m past the threshold, sinking 0.5 to 1.0 m/s (the flare's aim and twice it), and within 0.3 m
+of the centreline (the final's lateral law, 0.012 s⁻² stiff, leaves 0.3 m for a side push of 3.6 mm/s²,
+under half the Earth's turn's 8 mm/s² it feeds forward). Looser, they let through an approach that never
+learned its coefficients (264 and 727 m, 1.57 and 0.16 m/s) and one blind to the Earth's turn (0.62 m).
 
 **Robustness.** The guidance's model of the air and the craft made wrong while the craft flies the
 core's own (`oc_return_model_error`): the density off by a factor and a wave of 12 km in height, the
@@ -474,8 +554,10 @@ against JPL's Horizons (DE441), which shares nothing with the book:
 | 2024-04-08 over KDFW, the eclipse | the centres 0.0114° apart at 18:43:21 UTC | 0.0110° at 18:42:32 |
 | 2018 to 2034 | the Moon within 7″ and 41 km, the Sun within 21″ | |
 
-What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own and
-no tone curve, as an eye adapted to it sees it, the full Moon's highlands at three quarters of white; its
+What is drawn as the eye sees it rather than as a camera would: the Moon has an exposure of its own and,
+on the low tier, no tone curve, as an eye adapted to it sees it, the full Moon's highlands at three
+quarters of white (on medium and high the frame is kept in HDR and tone-mapped once, with AgX, and the
+Moon goes through that curve too: its highlands read about 0.77 in sRGB there, against 0.88 on low); its
 fall with phase is taken at the power 0.35, so a crescent is brighter than a camera would show it; and
 earthshine is lifted 250 times from its true ten-thousandth of sunlight, and shown only against a dark
 sky. What is not here: the planets; refraction, which lifts the Sun and the Moon half a degree at the
@@ -616,46 +698,115 @@ cabin: fans and a 400 Hz hum.
 
 | | what is heard |
 |---|---|
-| the air | wind rising with dynamic pressure; a rumble through Mach 1, and a thump crossing it; buffet past 14° of α |
-| an entry | the plasma's roar and crackle as loud as the stagnation heating (Sutton and Graves: as √ρ v³); a boom going subsonic |
-| the gear | tyres and joints, the brakes, a thud and a chirp at touchdown as hard as the sink rate, the legs' motor and lock |
+| the air | wind rising with dynamic pressure; a rumble through Mach 1, and aboard a thump crossing it; buffet past 14° of α |
+| an entry | the plasma's roar and crackle as loud as the stagnation heating (Sutton and Graves: as √ρ v³); aboard, a thump going subsonic |
+| the gear | tyres and joints, the brakes, a thud and a chirp at touchdown as hard as the sink rate (back down within 2 s, a bounce: softer, no chirp), the legs' motor and lock |
+| the drive | a thump and a knock as it lights and as it stops: lit from 1 % of thrust until under 0.3 %, so the approach's throttle, held near 5 %, lights it once |
 | docking | read from `core.dock.docked` when the docking part gives it: a clunk, the latches, a hiss as the pressures meet; a bang on a hard contact, found from a jolt with nothing pushing |
+| the flight deck | in vacuum, so all of it the structure's: below |
+| inside the Ring | the band, the hub's lobby or a lift's car, each its own room: below |
 | a crash | one heavy impact, then silence |
-| inside the Ring | a large airy room, six seconds long, its roof 300 m up; the hub quieter |
+| the tour | a soft tone, two notes a fifth apart at −30 dBFS, as each part's caption first shows; no words spoken |
 
-A camera outside hears only what the air carries to it, late by the time the sound takes (a chase camera
-70 m behind hears the drive 0.2 s late), thinned as 1 / r, its high notes taken by the distance first,
-and from where the drive is, through a head (HRTF). Past the speed of sound only a camera inside the
-drive's Mach cone hears it: in the crew's steep climb the chase camera, trailing level behind, is outside
-it and hears only the structure. Above the air nothing comes through the air at all. Time run
-faster is played 3 dB quieter at each doubling and not at all from 50×, and the moments only near real
-time.
+A camera outside hears only what the air carries to it: the drive, and the hull and the cabin as they sound
+through the skin, late by the time the sound takes (a chase camera 70 m behind hears the drive 0.2 s late),
+thinned as 1 / r, its high notes taken by the distance first, and from where the drive is, through a head
+(HRTF). Past the speed of sound only a camera inside the drive's Mach cone hears it: in the crew's steep
+climb the chase camera, trailing level behind, is outside it. The cone's surface passing the camera is
+the boom, an N-wave (a sharp rise, a fall through nothing to as far below, a sharp return) heard there and
+then, as strong as the distance to the −¾ (Whitham's far field) and the air's density's square root, 1 at
+70 m at sea level: a peak of −8 dBFS. It is found for any camera, still or riding along: `carried()` with
+the craft's velocity is the wait for what a listener hears now wherever it stands, and the cone has passed
+when it first finds one. Flying the crew's return, the chase camera crosses the cone three times between
+Mach 3.3 and 3.1 as the craft banks, a faint boom each in the thin air at 34 km, and a listener at the
+threshold of 17C would hear the cone arrive when the craft is 91 km off at 25 km, at Mach 1.14 (at
+−54 dBFS). Above the air nothing comes through the air at all. Time run faster is played 3 dB quieter at
+each doubling and not at all from 50×, and the moments only near real time.
 
-The mix is set so the drive at full power at sea level is the loudest thing: about −20 dBFS root mean
-square at the default volume (70 %), its peaks under −8 dBFS; max q −22 to −25, an entry's hottest −26,
-full power above the air −30 in the cockpit, the cabin alone −41, a crash's peak −8. Each voice's gain was
-measured by rendering it alone on an `OfflineAudioContext` in Chromium, so that one asked for 1 comes out
-at 0.1 RMS, and the same renders check that no throttle step or mute clicks, that a note swept across the
-hull's modes swells by 6 dB at most, and that the crackle's pressure leans positive outside (the measured
-signature of a rocket's), softened through the cabin's wall.
+**The flight deck.** Over the deck the craft is in vacuum, the deck's roof being open, so a camera outside
+hears nothing and the cockpit hears only what the structure carries; the deck's moments are found from its
+readouts (`orbit_deck.h`), and the jets' work from the craft's own angular acceleration.
+
+| | what is heard aboard |
+|---|---|
+| the hover | a loaded thrum, a mode of its own swelling and falling three or four times a second, as loud as the thrust through the swivel to the 0.8 power: over a pad the drive's thrust there is the craft's weight to 0.1 % |
+| the swivel | the flow turned in its duct roaring as 1 − cos of the turn; the actuators' motor and grind while it turns, as fast as it turns (15°/s at most); a lock when it stops |
+| the lift jet | a whine under the cockpit, 2.1 to 3.3 kHz, rising with its flow |
+| the roll posts | their trim flow's hiss, and a puff from the side that fires when the law asks for roll: the share of what the posts and the thrusters can give together that the roll acceleration takes |
+| the touchdown | the gear on the plating: the struts' thump and the oil in them, the plate's ring, as hard as the sink; no tyre's squeal, which is the air's |
+| the take-off | the three struts topping out as the legs leave the deck |
+
+**Inside the Ring** the air is the sea level's at 20 °C, turning with the Ring, so in its frame it is still
+and sound crosses it at 343.2 m/s. The walk's own readouts drive it: where the walker is, the floor's plan
+under the feet, the lifts, the ball. What happens near the ear comes in dry, late by its distance over the
+speed of sound and thinned as 1 / d, from where it is (through a head), and into its room's answer, which
+does not thin. Each room's answer is made from its size and surfaces: Eyring's reverberation time with the
+air's absorption by ISO 9613-1 (20 °C, 50 %), octave by octave, and noise made in the frequency domain so
+that each octave dies away at its own time; its level against a sound at a metre is the critical distance's,
+√(A / 16π).
+
+| room | volume | reverberation time, 125 Hz, 1 kHz, 4 kHz | critical distance | what else |
+|---|---|---|---|---|
+| the band, floor to roof, wall to wall, but for the deck's sector | 8.7 km³ | 109, 26, 5.3 s | 1,040 m | the roof's glass 298 m over the ear answers 1.74 s after any sound, with more energy than the band's whole diffuse answer, then the floor and the roof again at 3.49 s |
+| the hub's lobby, a drum 300 m across and 80 m long | 5.7 million m³ | 18, 4.5, 3.3 s | 64 m | its far side, a concave mirror, sends a sound back focused, 1.75 s on |
+| a lift's car, 10 m square, 3 m high, its ceiling lined | 300 m³ | 1.0, 0.44, 0.54 s | 1.5 m | boxy |
+
+So a footstep is nearly dry in the band and roomy in a car. At its diffuse field's own level the band's answer
+to a footstep is 56 dB under it, deep under the band's own hum: it is lifted 20 dB (`ROOMS.band.lift`), as
+the Moon's earthshine is lifted, so that the band's size is heard at all; even so it stays the driest. A
+room's answer is made the first time the ear is in it: a tenth of a second's work for the band.
+
+| | what is heard |
+|---|---|
+| the band | its air, all its far sounds together; the air handling; the town's hum far off, swelling and falling |
+| the canal | its water lapping in slow lumps and its bubbles, each ringing at Minnaert's frequency for its size (3.26 m/s over the radius) and rising; a line of sound, so 3 dB less each time the distance doubles, not a point's 6, heard from the nearest open water and muffled where a street or a plaza decks it over |
+| footsteps | one a stride: the cadence 1.87 steps a second at a walk and 2.85 running at one g, and, the Froude number's similarity, as g to the 0.3 at a given speed, so in the lobby's 0.03 g a walk is a slow bound; as hard as the weight's and the speed's square roots; on what the plan says is under the foot: grass (soft, dark), paving (a sharp heel), tarmac, gravel (a crunch), a bridge's hollow deck, the lobby's grip floor, a car's steel |
+| a jump | both feet and the body coming down, as hard as the fall: √(2 a h) |
+| the ball | each bounce from where it is, as hard as the fastest it fell before it turned back |
+| the lifts | the doors sliding and stopping, the brakes setting and letting go, from where they are; aboard a moving car its motor, the air in the tube and the rails' rumble rising with its speed |
+| a draught | at an open lift door: a spoke's tube is a chimney 4.7 km tall, and the least difference of warmth between its air and the band's draws a wind through a door left open in it |
+| the hub's lobby | near-silence: its vents, a low hum, no town |
+| the hatch | its latches, the seal's breath, its weight swinging shut, going in and coming back aboard |
+
+The mix is set so the drive at full power at sea level is the loudest thing: about −20 dBFS root mean square
+at the default volume (70 %), its peaks under −8 dBFS; max q −22 to −25, an entry's hottest −26, full power
+above the air −30 in the cockpit, the cabin alone −41, a crash's peak −8. Over the deck, the crew's hover
+about −40 in the cockpit at its 45 % throttle (a firm touchdown's peak −9) and nothing outside; in the Ring,
+the band −40 (a step on paving peaking at −24, on grass −27), by the canal −38, the lobby −50, a car at its
+cruise −38; a boom at 70 m peaks at −8. Each voice's gain was measured by rendering it alone on an
+`OfflineAudioContext` in Chromium, so that one asked for 1 comes out at 0.1 RMS, and the same renders check
+that no throttle step or mute clicks, that a note swept across the hull's modes swells by 6 dB at most, and
+that the crackle's pressure leans positive outside (the measured signature of a rocket's), softened through
+the cabin's wall. `web/test/sound-render.test.mjs` renders the instrument so in headless Chromium when
+Playwright is there: every cue sounds, peaks under 0 dBFS and makes no NaN; a camera outside the deck hears
+exactly nothing.
 
 Other parts play their moments through `ctx.sound`:
 
 | call | does |
 |---|---|
-| `cue(name, params)` | plays a moment: `strike` {strength, hz}, `thump` {strength, from, to, seconds}, `contact` {speed m/s}, `latch` {n}, `capture`, `release`, `hiss` {seconds, strength}, `boom` {n}, `ignition`, `shutdown`, `gear` {down}, `touchdown` {strength, screech}, `crash`, `step` {surface: grass or paving, side, weight}, `door` {open}; each also takes `delay` (s). An unknown name is refused and said once |
-| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift moving), `walk` m/s (the walker's speed; footsteps follow it), `surface` |
-| `scene(name)` | where the ear is: `flight`, `ring`, `hub`, or null to follow whoever draws the frame (the walk's frames are the Ring's) |
-| `volume(v)`, `mute(on)`, `on`, `state`, `level()` | the master, and what a test reads: whether it sounds and how loud |
+| `cue(name, params)` | plays a moment: `strike` {strength, hz}, `thump` {strength, from, to, seconds}, `contact` {speed m/s}, `latch` {n}, `capture`, `release`, `hiss` {seconds, strength}, `boom` {n}, `nwave` {strength, seconds}, `ignition`, `shutdown`, `gear` {down}, `touchdown` {strength, screech}, `pad` {strength, sink}, `liftoff`, `swivel` {strength}, `puff` {strength, side}, `crash`, `step` {surface, side, weight}, `land` {surface, strength}, `ball` {strength, distance, dir, surface}, `door` {open, distance, dir}, `brake` {aboard, distance, dir}, `hatch` {open}, `bubble` {radius, strength}, `chime`; each also takes `delay` (s). What is not a number in its range gets its default. An unknown name is refused and said once |
+| `set(name, value)` | a standing condition: `heat` 0–1 (the entry's heating, in place of the one derived; NaN derives it again), `lift` 0–1 (a lift's motor, beside the walk's own), `walk` m/s and `surface` (footsteps at that speed, on that, in a frame another part draws where no walk runs: the walk's own come from its readouts) |
+| `scene(name)` | where the ear is: `flight`, `ring` (the band), `hub`, `car`, or null to follow the walk's readouts, or the flight |
+| `volume(v)`, `mute(on)`, `on`, `state`, `level()`, `engine` | the master, and what a test reads: whether it sounds, how loud, the instrument |
 
 The flight's own moments (the drive lighting and stopping, the gear, a touchdown, the speed of sound,
-docking and undocking, a crash) are found from the readouts and need no call.
+docking and undocking, a crash, the cone passing an outside camera), the deck's and the walk's are found
+from the readouts and need no call. While the walk draws the frame its readouts are the sound's, from the
+sound's own frame (the walk calls the other parts' updates for the sky, and the sound leaves those to it).
+
+What is weak. The rooms are statistical (Eyring's diffuse field), not traced: the band's nearer buildings,
+its spokes and the deck's bulkheads give no early reflections of their own, and its low notes ring for a
+minute or two where its answer is cut at 8 s. The materials stand for what the drawing shows. The walk's
+sounds come from the walker's spoke's lift only, and a ball bounces only off floors (not the blocks'
+walls). The boom's strength is a rule of scale, not Carlson's whole method, and no view yet stands on the
+ground to hear the flight home's.
 
 ### The tour
 
 For whoever has no stick, or wants to see the whole of it first: TOUR (or 0) flies the loop by the crew's
-own modes, as a person pressing the buttons would, with a caption for each part and the time warp and
-the view set for it:
+own modes, as a person pressing the buttons would, with a caption for each part (and a soft tone as it
+first shows) and the time warp and the view set for it:
 1. The take-off from 17C at one to one, and the climb through the air.
 2. The guidance above the air, and orbit.
 3. Docking at the hub, seen from the Ring for the last of it.
@@ -666,14 +817,108 @@ It takes about ten minutes on a desktop. Any command but one that only changes w
 and takes over from there. `tour-plan.js` is the plan, pure and tested on made-up states;
 `tour.js` is the button, the caption and the commands.
 
+### The flight director
+
+The crews fly by guidance: a pitch schedule through the air and the Shuttle's powered explicit guidance
+above it on the way up; on the way home the entry's predictor-corrector, the terminal area and the
+approach. The flight director lets a person fly the same paths by hand, on keys or a stick: while the
+pilot has the controls, the crew's guidance for the phase the craft is in runs in the shadow and says what
+it would command, without commanding it, and the page draws it as an airliner's director does.
+
+**In the core** (`core/fd.cpp`, `orbit_fd.h`). Before each step's law, the crew's own functions, `crew()`
+for the climb to orbit and `returnCrew()` for the flight home, run on a copy of the state that carries the
+guidance's memory: its phase, its pitch and bank targets, its insertion plan, the flight home's whole
+state. What the law aimed at is the director's attitude (`ratesToward`'s target, or the air law's pitch and
+bank); the throttle and the gear are what it set. Nothing but the director's own memory is written, and
+that memory is in the state and the hash, so a run replays. Its readouts are the last of `oc_out`'s:
+`OC_FD_VALID`, `OC_FD_PHASE` (the crew's phases, then the flight home's), the pitch, heading and bank it asks
+for, as the craft's own are reckoned (above the air the heading is where it points the nose; in the air its
+laws turn by the bank, and the heading is the craft's), the throttle, the gear, and on the way home its bank
+about the air's velocity and its angle of attack. `oc_fd(0)` switches it off.
+
+Whose guidance. Beside the crew to orbit the same shadow runs, and its command is the crew's own; the
+flight home's command is read after the crew's law (its predictor flies the rest of the entry every two
+seconds, too dear to run twice). Taking the controls from either crew, the shadow carries on from the
+crew's memory as it stands. Taking them from anyone else, or switching the director on, it starts as the
+crew would if handed the craft: the crew to orbit from where the craft is (`oc_auto`'s pick), or the
+flight home if one is under way (its crew has flown and it has not ended). A craft that goes back past the
+crew's phase, down into the air again or back onto the runway, is taken up where the crew would, with a
+margin so that a craft flown along a boundary does not flicker between two phases. Near the Ring, docked,
+on the port or deck holds, and while the approach, docking or the deck landing fly, the director says
+nothing: the docking reticle and the deck's display are drawn there.
+
+**On the page** (`web/src/fd-view.js`; the numbers in `fd-hud.js`).
+
+- **The primary flight display**, at the foot of the screen: the attitude ball, a magenta pitch bar and
+  bank bar to fly the yellow aircraft symbol onto (nose up when the pitch bar is above it, bank toward the
+  bank bar), the bank scale with the director's bank as a magenta index beside the craft's white pointer,
+  the throttle with the hand's setting in cyan and the director's in a magenta caret, and the gear when it
+  should move. Above the air, where the stick turns the craft at rates, the upright bar is dashed and is the
+  heading's: yaw toward it (Q E), roll to the bank index (A D).
+- **In the view**, chase or cockpit, beside the velocity vector the HUD draws: a magenta ring with wings
+  where the director wants the nose, banked as it asks, and a white W where the nose is. Fly the W onto the
+  ring. In the cockpit it is a head-up display's cue; in the chase view it is off the top of the screen
+  while the climb is steep, and the display below is the cue.
+- **The entry**: the director's bank about the air and its angle of attack are written under the ball
+  and in the readouts (`FD ENTRY bank R 50° about the air, α 40.0°`), and its bank index sits on the
+  scale where the attitude that gives them is banked.
+- **The ILS to 17C**, when the craft is on an approach (off the ground, short of the threshold, within 90°
+  of the course and below 8 km): the localizer under the ball, the glide slope at its right, a diamond
+  each, green inside half a dot. From the runway's geometry in `flight/web`'s data, as the A320's
+  runway (`docs/provenance.md`, 1f): the localizer's course is the centreline, 180.3° true, its antenna
+  1,000 ft past the far end, full scale (two dots) 350 ft either side at the threshold, received within
+  18 NM and 35° of the course; the glide slope is the PAPI's 3° through 50 ft over the threshold, a dot
+  0.12 of its angle, received within 10 NM and 8°, judged at the wheels (the centre of mass's height less
+  3 m). The crew's own approach puts its wheels 15 m over the threshold on 3°: the same path.
+- **The path to follow**, in the world on the same approach: magenta gates 120 m wide and 60 m tall down
+  the glide slope and the localizer's course, a kilometre apart from 18 km to 1 km out, each where the
+  craft's centre of mass is on the path, the Earth's curve under the start point's plane allowed for (25 m
+  at 18 km). Fly through them.
+- **8** cycles it: shown while you fly (the default, remembered), shown while the crew flies too (its bars
+  then sit on the craft, as an autopilot's do), and off, when the core stops computing it. It leaves the
+  tour running.
+
+From the tests (`test/test_fd.cpp`, `web/test/fd.test.mjs`; these numbers are the tests' own and are not yet
+certified in `evidence/`):
+
+| | |
+|---|---|
+| beside the crew, to orbit | the director's command is the crew's, bit for bit, at every one of 37,629 steps: the phase, the targets, the plan, the attitude its law aims at, the throttle, the gear. A pitch target spoiled by 0.01° is told apart for 374 steps |
+| taken over | at 10, 25, 35.5, 60, 150, 300 and 760 s of the climb, and in the fall to the air, the entry, the terminal area and on final coming home, the director's first command is the crew's next, bit for bit; 250,029 steps of the crew flying home read out as the director's |
+| on or off | the same controls give the same flight, the state's hash less the director's own and the place and velocity bit for bit, at every mark: a pilot's climb (240), the crew's flight to orbit (753), the flight home with a pilot in the entry for a minute (501). A throttle of 0.999 for a second is told apart |
+| a person flying by the cues alone, 0.3 s late, the stick proportional to each cue's error (full at 10° of pitch, 60° of bank in the air), the throttle toward its cue at the keys' rate or slammed | off the ground at 40.3 s; the cue to shut at 749.4 s, shut at 750.5 s; ten seconds later **504.1 × 500.0 km**, inclined 32.86°, 4,376 kg left. The crew, measured the same way (the engine's tail and all): 501.2 × 500.0 km, 32.84°, 4,388 kg. Max q 35.8 kPa, 2.17 g. The cues flown within 3.0° in pitch and 2.3° in bank where they move smoothly (0.24° and 0.06° on the mean) |
+| the same person, the throttle full until its cue says shut | 572.0 × 499.1 km: the cue's taper is what puts the orbit at the Ring's height |
+| the flight home, the crew's from the insertion orbit until the person takes it, who also leads the cue by 0.4 s and brakes once down | taken waiting for the pass (the burn by hand too), falling to the air, or on final: **down 310 to 311 m past the threshold, 0.10 m off the centreline**, sinking 3.8 to 3.9 m/s at 106 m/s, stopped 2.25 km down the runway 0.2 m off; heat 387 to 438 kW/m², 1.63 to 1.96 g, 9.5 kPa at most. The crew's own: 432 m, 0.07 m, 0.74 m/s |
+| the same, without the lead, taken falling to the air | down 305 m past, 0.10 m off, but 4.87 m/s and 2.70 g: past the load's 2.5 g limit |
+| the crew's own final into 17C | the localizer within 0.008 dot from 12 km to 1 km out; the glide slope met 8.7 km out (within 0.8 dot before it, rolling out of the unpowered turn onto the final) and held within 0.047 dot to 1 km |
+
+The check on the person is 10 km at either end of the orbit, 0.3° of inclination, 5° of each cue where it
+moves smoothly; where a cue steps (a new phase, the turn's bank, the insertion's first pitch) the 5 s after
+are left out. Coming home it is the flight home's own judge of a landing (the first 900 m, 3 m of the
+centreline, stopped on the runway, inside the limits), with the sink under 5 m/s.
+
+What is weak. Where the climb's pitch schedule hands over to the insertion guidance, at 38 km, the pitch cue
+steps 15° up while the hand-flying law is still the air's, down to 200 Pa, in air too thin for its roll: a
+person who grabs the bank, full stick at 30° of bank error, flies a roll oscillation there that rolls the
+craft past 90° before the rate law takes over; the test's person, at 60°, does not. The director's
+throttle and pitch are the crew's, not smoothed for a hand. Coming home they are an attitude, and the
+air law holds an attitude by pitch and bank: in the entry's bank reversals, at 70° of bank, its pitch
+target turns the nose mostly in yaw, and the angle of attack the guidance wants is hard to hold by it; a
+person who does not lead the cue passes 2.5 g. The entry asks for up to 85° of bank about the air, and the
+air law stops its bank at 75°. The flare is 2 s long, from 12 m: a hand 0.3 s late lands at about 4 m/s
+where the crew lands at 0.74. The director follows the crew to orbit unless a flight home is under way, so
+a hand-flown circuit back to 17C from a take-off gets the climb's cues; the ILS is there for it. The
+localizer's antenna and coverage are a textbook ILS's, not KDFW's published one.
+
 ### Rigour
 
 `INVARIANTS.md` writes down what the core promises, in the owner's manner from Subsim: each rule with
 why it holds and what enforces it. The rules cover conservation in a vacuum, thin air as the only loss
 in orbit, work and energy on the ascent, the propellant's bookkeeping, one frame seen three ways, replay
-bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, and a
-receipt for every number. `test/test_invariants.cpp` holds them as physics, with tolerances derived from
-RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`). Its
+bit for bit, readouts that are finite and derived from the state, the Ring's one set of numbers, a
+receipt for every number, and a flight director that is the crew's guidance and changes nothing (O15,
+held by `test/test_fd.cpp`). `test/test_invariants.cpp` holds the rest as physics, with tolerances derived from
+RK4's order and the steps' rounding, and shows each check able to fail (`ctest -R invariants`).
 Three defects it found are fixed and their tests run with the rest: the hash missed fields, non-finite
 controls were taken, and an escape path's periapsis was wrong. `INVARIANTS.md` keeps what was found. `evidence/` keeps the receipts. Every constant and
 every number stated here is certified by Abacus, the owner's tool of certified arithmetic, or cited
@@ -681,7 +926,8 @@ where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists t
 
 ## What is not
 
-The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Wind. The
+The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Weather but the
+wind: no cloud, rain or shear of a front, and the wind does not change the air's density or temperature. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
 
 ## Handoff to Unreal
@@ -716,13 +962,22 @@ node flight/orbit/web/tools/build.mjs --core flight/orbit/build-wasm/orbit_core.
 node --test flight/orbit/web/test/*.test.mjs
 ```
 
-`build-web/index.html` is the whole page in one file, about 1 MB; `build-web/page.html` is the same
+`build-web/index.html` is the whole page in one file, about 2 MB; `build-web/page.html` is the same
 without the document's skeleton, for a host that wraps a page in its own.
 
 Each part's tests are `test/test_<part>.cpp`, and ctest runs each test by the name it declares in a line
 reading `// TEST: <name>` (`ctest -R dock` runs docking's). `flight/orbit/build/orbit_run 10 900` prints
-the crew's flight every 10 s for 900 s.
+the crew's flight every 10 s for 900 s. `flight/orbit/build/orbit_fingerprint` prints the state's hash and
+every readout block's digest at 3,756 marks along twelve flights: built at two commits and diffed, it shows
+whether a change moved anything (`INVARIANTS.md`, O16).
 `web/data/land.js` is made by `node flight/orbit/web/tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>`.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
 state. Native and WebAssembly runs agree to the digits printed above, not bit for bit.
+
+The guide, a PDF for whoever comes to the sketch cold (`guide/`): `node flight/orbit/guide/build-guide.mjs`
+opens the built page in Chrome, Chromium or Edge over the DevTools protocol, takes its screenshots there
+and prints `guide/guide.html` to `guide/out/Runway-to-Ring-guide.pdf`; a quarter to half an hour in
+software GL. `--list` names the screenshots, `--only` retakes some, `--skip-shots` only prints. `guide/out/`
+is not committed. `node --test flight/orbit/guide/build-guide.test.mjs` holds the guide's figures and the
+tool's screenshots to each other.

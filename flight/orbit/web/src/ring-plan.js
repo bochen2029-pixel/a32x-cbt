@@ -51,10 +51,20 @@ export function onDeck(a, walls = true) { return Math.abs(fromDeck(a)) < DECK_HA
 
 // The bulkheads: one at each end of the deck, from the floor up past the roof's edge and from end wall
 // to end wall. a: the middle of its thickness; face: the angle of its face toward the deck.
+// The end walls' inner faces, each over a range of angle: over the deck's open sector they stand at the
+// band's faces (HALF), where the core's deck, its gear and its rim wall end (deck.cpp); round the rest of
+// the band the walls are WALL thick, their inner faces at INNER. Together they go once round.
+export function wallFaces() {
+  return [
+    { y: INNER, a0: DECK_A + DECK_HALF, a1: DECK_A - DECK_HALF + TAU },
+    { y: HALF, a0: DECK_A - DECK_HALF, a1: DECK_A + DECK_HALF },
+  ];
+}
+
 export function bulkheads() {
   return [-1, 1].map((side) => ({
     side, a: DECK_A + side * (DECK_HALF + DECK_WALL / 2), face: DECK_A + side * DECK_HALF,
-    r0: RING.roof - 12, r1: RING.floor, y: HALF - 2,
+    r0: RING.roof, r1: RING.floor, y: HALF - 2,   // from the floor to the roof, as the core's (deck.cpp)
   }));
 }
 

@@ -7,6 +7,7 @@ export const OUT = [
   'vorb', 'apo', 'peri', 'inc', 'tApo', 'throttle', 'prop', 'mass', 'gear', 'onGround',
   'ringE', 'ringN', 'ringU', 'ringAxE', 'ringAxN', 'ringAxU', 'ringRefE', 'ringRefN', 'ringRefU',
   'ringRange', 'ringRate', 'sunE', 'sunN', 'sunU', 'vrelE', 'vrelN', 'vrelU', 'portRange', 'airLaw',
+  'fdValid', 'fdPhase', 'fdPitch', 'fdHdg', 'fdBank', 'fdThrottle', 'fdAlpha', 'fdLiftBank', 'fdGear', 'fdOn',
 ];
 
 export const DT = 0.02;

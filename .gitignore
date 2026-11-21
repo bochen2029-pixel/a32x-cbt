@@ -9,6 +9,7 @@ flight/dist/
 flight/orbit/build/
 flight/orbit/build-wasm/
 flight/orbit/build-web/
+flight/orbit/guide/out/
 
 # deps
 node_modules/

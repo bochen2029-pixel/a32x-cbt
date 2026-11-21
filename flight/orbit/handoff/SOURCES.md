@@ -73,7 +73,7 @@ How each was read:
 
 | tag | source | read | what it supports |
 |---|---|---|---|
-| O1 | this repository, `flight/orbit` at 7e9aaea (README, `core/`, `test/`, `web/src/`) | local | everything the kit says about the sketch |
+| O1 | this repository, `flight/orbit` at 7e9aaea, and at 599e051 for the final pass (README, `INVARIANTS.md`, `evidence/`, `core/`, `test/`, `web/src/`) | local | everything the kit says about the sketch |
 | O2 | this repository, `docs/provenance.md` §1f, §1h, §2, §2a; `CLAUDE.md` §10 | local | what the sketch took from where, and under which licence |
 | R1 | ASTRA-7, `ASTRA_AUDIO/` (`README.md`, `CLAUDE.md`, `BUILD_LOG.md`, `DESIGN_SPEC.md`, `Source/AstraAudio/AstraAudio.Build.cs`) | local | a UE 5.7 project of text only: a MetaSound graph built at runtime by the Builder API, zero `.uasset`; UE 5.7 needs `METASOUND_PLUGIN` and `METASOUND_MODULE` defined in a game module that registers MetaSound nodes, or the editor crashes at startup; UE 5.7 refuses MSVC 14.40 to 14.43, and 14.44.35207 builds |
 | R2 | ASTRA-7, `DISCOVERY_2026-05-16_TECHDIVE_UE5.md` §7 | local | a CMake-built library behind a C API, linked into a UE plugin module through its `Build.cs` |
@@ -94,3 +94,12 @@ clang 18.1.3, CMake, at commit 7e9aaea.
 | M4 | the core includes only `<cmath>`, `<cstdint>`, `<cstring>`; calls no clock, random source, thread or file | `grep` over `core/` |
 | M5 | the crew's flight hashes `143d7cd1` under g++ and clang, C++17 and C++20, `-O0` to `-O3`, x86-64 and x86-64-v3 with `-ffp-contract=off`; fast-math and FMA contraction change the hash | `orbit_run 1000 800`, last line |
 | M6 | periods, eclipses, Δv and spin numbers | computed from the formulas named where each is used |
+
+For the final pass, at 599e051, on the same kind of machine (a 4-core 2.3 GHz Xeon virtual machine, Ubuntu
+24.04, g++ 13.3, clang 18.1.3, Emscripten 6.0.12, Node 22):
+
+| tag | what | how |
+|---|---|---|
+| M7 | the sketch's 120 tests pass natively and 120 as WebAssembly, and the page's 146; the crew's flight prints the rows of `CANON_DELTA.md` §1 unchanged | `ctest` in `build` and `build-wasm`; `node --test flight/orbit/web/test/*.test.mjs`; `orbit_run 10 800` |
+| M8 | the crew's flight to 800 s hashes `ea7847fe` (to 760 s, `b0444540`) under g++ 13.3 at `-O0` and `-O2` with `-ffp-contract=off` and at `-O3` as the CMake Release build, and clang 18 at `-O0` and `-O3` with `-ffp-contract=off`, x86-64; `370241c5` (`74277791`) as WebAssembly | each compiler over `core/*.cpp` and `tools/orbit_run.cpp`; `orbit_run 10 800`, last line |
+| M9 | docking's handover: the catch takes the closing speed (0.100 m/s) in one step; the draw-in and the change into *Docked* are continuous to 8.9 × 10⁻¹⁰ m and 6.4 × 10⁻⁶ m/s a step | a scratch program against `liborbit_core.a` and `internal.h`: the crew docks from the hold point, and each step the craft's place and velocity against the Ring's turning frame are set against the step before |

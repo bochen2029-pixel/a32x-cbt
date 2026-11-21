@@ -16,7 +16,7 @@ export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5
 const km = (m) => (m / 1000).toFixed(m < 100000 ? 1 : 0);
 
 // what the tour reads, from the page's blocks, in one flat record
-export function snapshot(core, walking, wall) {
+export function snapshot(core, walking, wall, extra = {}) {
   const s = core.s, d = core.dock || {}, r = core.ret || {};
   return {
     t: s.t, phase: Math.round(s.phase), auto: Math.round(s.auto), crashed: s.crashed > 0.5, onGround: s.onGround > 0.5,
@@ -24,7 +24,7 @@ export function snapshot(core, walking, wall) {
     docked: d.docked > 0.5, dockPhase: Math.round(d.phase || 0), dockRange: d.range ?? 1e9, closing: d.closing ?? 0,
     retPhase: Math.round(r.phase || 0), dv: r.dv ?? 0, togo: r.togo ?? 0, heat: r.heat ?? 0, heatPeak: r.heatPeak ?? 0,
     load: r.load ?? 0, tdAlong: r.tdAlong ?? 0, tdSink: r.tdSink ?? 0, tdOff: r.tdOff ?? 0, stopAlong: r.stopAlong ?? 0,
-    walking, wall,
+    walking, wall, skipping: !!extra.skipping,   // the flight home skipping ahead to its burn (return-view.js)
   };
 }
 
@@ -115,8 +115,10 @@ export const STAGES = {
         default: return `Falling toward the air, half a world from home: ${km(s.alt)} km.`;
       }
     },
-    act(s, m) {   // once the plan is made, skip the wait, as RETURN pressed again does
-      if (s.retPhase === RET_PH.wait && !m.skipped) { m.skipped = true; return ['return']; }
+    // Once the plan is made, skip the wait, as RETURN pressed again does. If the skip was not taken (the
+    // plan made a frame late), ask again 3 s on; never while it skips, where a second press would stop it.
+    act(s, m) {
+      if (s.retPhase === RET_PH.wait && !s.skipping && (m.skipAt === undefined || m.wall - m.skipAt > 3)) { m.skipAt = m.wall; return ['return']; }
       return [];
     },
     next: (s) => (s.retPhase >= RET_PH.entry ? 'entry' : null),

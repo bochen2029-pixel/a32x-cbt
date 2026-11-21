@@ -52,7 +52,9 @@ extern "C" {
 #define OC_WALK_LIFT_EASE 0.5     /* leaving and reaching the hub, the car falls away from its riders at this part of their weight */
 #define OC_WALK_LIFT_BRAKE 1.0    /* m/s2: starting from and stopping at the rim */
 
-/* ---- the floor's plan (chosen): what the page paints and what the walker meets ---- */
+/* ---- the floor's plan (chosen): what the page paints and what the walker meets. The flight deck's open
+   sector (orbit_core.h's OC_DECK_*) is no part of it: a bulkhead seals each end, the canal ends at a lock
+   gate in front of each, and no block stands within 15 m of them. ---- */
 #define OC_WALK_STREETS 60          /* cross streets round the ring, each over the canal on a bridge; every tenth is a spoke's plaza */
 #define OC_WALK_STREET_M 5.0        /* half a cross street's width */
 #define OC_WALK_CANAL_M 30.0        /* half the canal's width; it runs down the middle of the band */
@@ -104,10 +106,12 @@ enum {
     OC_WALK_BOX_FIELDS
 };
 enum {
-    OC_BOX_BLOCK = 0,   /* a building's block, unfurnished */
-    OC_BOX_PARAPET = 1, /* along the canal and across it at a bridge's sides */
-    OC_BOX_PYLON = 2,   /* a spoke's foot, from the floor through the roof */
-    OC_BOX_SHAFT = 3    /* a lift tube's wall at a station */
+    OC_BOX_BLOCK = 0,    /* a building's block, unfurnished */
+    OC_BOX_PARAPET = 1,  /* along the canal and across it at a bridge's sides */
+    OC_BOX_PYLON = 2,    /* a spoke's foot, from the floor through the roof */
+    OC_BOX_SHAFT = 3,    /* a lift tube's wall at a station */
+    OC_BOX_BULKHEAD = 4, /* a pressure bulkhead at an end of the flight deck (orbit_core.h's OC_DECK_*) */
+    OC_BOX_LOCK = 5      /* a lock gate, where the canal ends at a bulkhead */
 };
 
 /* indices into oc_walk_out() */
@@ -171,8 +175,8 @@ enum {
 void oc_walk_reset(int place);
 
 /* Stand the walker at rest on the rim floor at s (m of arc, any number of turns) and c. Refused, with
-   nothing changed and 0 returned, where the floor is not free: in a block, the canal, a wall. For tests
-   and for looking round. */
+   nothing changed and 0 returned, where the floor is not free: in a block, the canal, a wall, on the flight
+   deck or in its bulkheads. For tests and for looking round. */
 int oc_walk_put(double s_m, double c_m);
 
 /* What the walker means to do: fwd and right, each -1..1, along and across the heading, at a walk or a
