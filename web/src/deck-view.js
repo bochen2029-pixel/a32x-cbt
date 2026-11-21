@@ -272,6 +272,7 @@ export const deck = {
   init(ctx) {
     this.d = ctx.core.addBlock('deck', '_oc_deck_out', '_oc_deck_out_len', DECK_OUT);
     this.seen = { tdT: this.d.tdT, phase: Math.round(this.d.phase), auto: Math.round(ctx.core.s.auto) };
+    this.lastCrew = AUTO.deck;   // the deck crew's job last asked: names the propellant line after it hands the craft on
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.marks = deckMarks();
     ctx.ring.spin.add(this.marks.group);
@@ -368,6 +369,7 @@ export const deck = {
       }
       this.seen.tdT = d.tdT;
     }
+    if (auto === AUTO.deck || auto === AUTO.takeoff) this.lastCrew = auto;
     if (auto !== this.seen.auto) {   // the take-off done: the approach's crew holds the craft at the hold point
       if (this.seen.auto === AUTO.takeoff && auto === AUTO.approach) ctx.say('At the hold point: the approach\'s crew holds the craft there. R flies home');
       this.seen.auto = auto;
@@ -470,7 +472,7 @@ export const deck = {
     this.drawn = true;
   },
 
-  hud(ctx) { return deckLines(ctx.s, this.d, window.innerWidth < 560); },
+  hud(ctx) { return deckLines(ctx.s, this.d, window.innerWidth < 560, this.lastCrew); },
 
   status(ctx) { return deckStatus(ctx.s, this.d, this.touch); },
 };
