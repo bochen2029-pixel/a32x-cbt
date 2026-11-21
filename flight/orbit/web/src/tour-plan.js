@@ -5,6 +5,7 @@
 // through the crew's own modes, as a person pressing the buttons would. Pure (no page, no drawing), so a
 // test can run it on made-up states. GPLv3.
 
+import { DECK_PH } from './deck-hud.js';
 import { DPH } from './dock-hud.js';
 
 // orbit_return.h's OC_RET_PH_*, as return-view.js's RET_PH has them (that module draws, so it is not
@@ -17,13 +18,15 @@ const km = (m) => (m / 1000).toFixed(m < 100000 ? 1 : 0);
 
 // what the tour reads, from the page's blocks, in one flat record
 export function snapshot(core, walking, wall, extra = {}) {
-  const s = core.s, d = core.dock || {}, r = core.ret || {};
+  const s = core.s, d = core.dock || {}, r = core.ret || {}, k = core.deck || {};
   return {
     t: s.t, phase: Math.round(s.phase), auto: Math.round(s.auto), crashed: s.crashed > 0.5, onGround: s.onGround > 0.5,
     alt: s.alt, tas: s.tas, mach: s.mach, qbar: s.qbar, g: s.g, vorb: s.vorb, apo: s.apo, peri: s.peri, ringRange: s.ringRange,
     docked: d.docked > 0.5, dockPhase: Math.round(d.phase || 0), dockRange: d.range ?? 1e9, closing: d.closing ?? 0,
     retPhase: Math.round(r.phase || 0), dv: r.dv ?? 0, togo: r.togo ?? 0, heat: r.heat ?? 0, heatPeak: r.heatPeak ?? 0,
     load: r.load ?? 0, tdAlong: r.tdAlong ?? 0, tdSink: r.tdSink ?? 0, tdOff: r.tdOff ?? 0, stopAlong: r.stopAlong ?? 0,
+    deckPhase: Math.round(k.phase || 0), deckHeight: k.height ?? 0, deckG: k.apparentG ?? 0, nozzle: k.nozzle ?? 0,
+    deckAlong: k.along ?? 0, deckSink: k.tdSink ?? 0, deckOff: k.tdOff ?? 0, deckVerdict: Math.round(k.tdVerdict || 0),
     walking, wall, skipping: !!extra.skipping,   // the flight home skipping ahead to its burn (return-view.js)
   };
 }
@@ -101,7 +104,40 @@ export const STAGES = {
     enter: { walk: 'floor' },
     title: 'The floor, 5 km from the axis',
     text: () => 'One g, from the turn alone, after a lift ride of five and a half minutes (skipped). The floor rises ahead and behind, and meets itself overhead.',
-    next: (s, m) => (m.wall > 15 ? 'home' : null),
+    next: (s, m) => (m.wall > 15 ? 'deck' : null),
+  },
+  // Back aboard and let go of the port, the crew lands on the flight deck: out over the open sector, a coast
+  // while the pad comes round, then the approach the owner pictured from Elysium, an airliner's glide path
+  // down a runway that is the inside of a wheel, the drive swivelling down as the weight comes on, and a
+  // hover onto the pad.
+  deck: {
+    enter: { walk: 'stop', view: 'chase', commands: ['dock', 'deck'], warp: 100 },
+    title: 'The flight deck',
+    warp: (s) => (s.deckPhase === DECK_PH.glide ? 5 : s.deckPhase === DECK_PH.hover || s.deckPhase === DECK_PH.descend ? 2 : s.deckPhase === DECK_PH.landed ? 1 : 100),
+    text(s) {
+      switch (s.deckPhase) {
+        case DECK_PH.glide: return `The approach: an airliner's glide path down a runway that is the inside of a wheel, ${Math.abs(s.deckAlong).toFixed(0)} m/s against the deck, the drive swivelled ${s.nozzle.toFixed(0)}° down as the weight comes on: ${s.deckG.toFixed(2)} g.`;
+        case DECK_PH.hover: return `Zero-zero over the pad, ${s.deckHeight.toFixed(0)} m up, at the Ring's one g.`;
+        case DECK_PH.descend: return `Down onto the pad: ${s.deckHeight.toFixed(1)} m.`;
+        case DECK_PH.landed: return `On the pad. Sinking ${s.deckSink.toFixed(2)} m/s at the touch, ${Math.abs(s.deckOff).toFixed(1)} m from its centre; held down by the spin alone.`;
+        case DECK_PH.wait: return 'Coasting, weightless, while the deck sweeps by at 221 m/s and the pad comes round.';
+        default: return 'Letting go of the port, the crew flies out over the flight deck, the open sector of the band between two spokes.';
+      }
+    },
+    watch(s, m) { if (s.deckPhase === DECK_PH.landed && m.landedAt === undefined) m.landedAt = m.wall; },
+    next: (s, m) => (m.landedAt !== undefined && m.wall > m.landedAt + 8 ? 'liftoff' : null),
+  },
+  liftoff: {
+    enter: { commands: ['takeoff'], warp: 2 },
+    title: 'Off the deck',
+    warp: (s) => (s.deckPhase === DECK_PH.lift || s.deckPhase === DECK_PH.climb ? 2 : 50),
+    text(s) {
+      if (s.deckPhase === DECK_PH.lift) return 'Straight up off the pad.';
+      if (s.deckPhase === DECK_PH.climb) return 'Out through the roof\'s gap, shedding the deck\'s speed.';
+      return 'Coasting in to the hold point off the hub, to fly home from there.';
+    },
+    watch(s, m) { if (s.deckPhase >= DECK_PH.lift) m.seen = true; },
+    next: (s, m) => (m.seen && s.deckPhase !== DECK_PH.lift && s.deckPhase !== DECK_PH.climb && s.deckPhase !== DECK_PH.coast && s.deckPhase !== DECK_PH.arrive && m.wall > 2 ? 'home' : null),
   },
   home: {
     enter: { walk: 'stop', view: 'chase', commands: ['return'], warp: 100 },
@@ -109,7 +145,7 @@ export const STAGES = {
     warp: (s) => (s.retPhase === RET_PH.burn ? 10 : 100),
     text(s) {
       switch (s.retPhase) {
-        case RET_PH.depart: return 'The crew lets go of the port and backs away from the Ring on the small thrusters.';
+        case RET_PH.depart: return 'The crew backs away from the Ring on the small thrusters.';
         case RET_PH.wait: return 'Waiting for a pass that brings it down at KDFW: skipping ahead to the burn.';
         case RET_PH.burn: return `The de-orbit burn, tail first: ${s.dv.toFixed(0)} m/s, to bring the bottom of the orbit down into the air.`;
         default: return `Falling toward the air, half a world from home: ${km(s.alt)} km.`;

@@ -5,6 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { ORDER, RET_PH, STAGES, tourStep } from '../src/tour-plan.js';
+import { DECK_PH } from '../src/deck-hud.js';
 import { DPH } from '../src/dock-hud.js';
 
 const header = readFileSync(new URL('../../core/orbit_return.h', import.meta.url), 'utf8');
@@ -21,6 +22,7 @@ const base = {
   t: 0, phase: 0, auto: 1, crashed: false, onGround: true, alt: 0, tas: 0, mach: 0, qbar: 0, g: 1, vorb: 400, apo: 0, peri: 0,
   ringRange: 25000, docked: false, dockPhase: 0, dockRange: 25000, closing: 0, retPhase: 0, dv: 0, togo: 0, heat: 0,
   heatPeak: 0, load: 0, tdAlong: 0, tdSink: 0, tdOff: 0, stopAlong: 0, walking: false, wall: 0,
+  deckPhase: 0, deckHeight: 0, deckG: 0, nozzle: 0, deckAlong: 0, deckSink: 0, deckOff: 0, deckVerdict: 0,
 };
 
 // A tour driven by a script of states; returns every step's output.
@@ -37,7 +39,7 @@ function drive(script) {
 }
 
 test('the stages run in the order of the loop', () => {
-  assert.deepEqual(ORDER, ['runway', 'climb', 'space', 'orbit', 'dock', 'aboard', 'floor', 'home', 'entry', 'land', 'done']);
+  assert.deepEqual(ORDER, ['runway', 'climb', 'space', 'orbit', 'dock', 'aboard', 'floor', 'deck', 'liftoff', 'home', 'entry', 'land', 'done']);
   for (const k of ORDER) assert.equal(typeof STAGES[k].next, 'function', k);
 });
 
@@ -62,7 +64,18 @@ test('the whole loop, stage by stage, with the commands a person would give', ()
     { ...base, docked: true, walking: true, wall: (w += 1) },                  // aboard: the walk at the hatch
     { ...base, docked: true, walking: true, wall: (w += 10) },                 // -> floor
     { ...base, docked: true, walking: true, wall: (w += 1) },                  // floor
-    { ...base, docked: true, walking: true, wall: (w += 16) },                 // -> home
+    { ...base, docked: true, walking: true, wall: (w += 16) },                 // -> deck
+    at({ onGround: false, deckPhase: DECK_PH.transfer }),                      // deck: back aboard, let go, LAND DECK
+    at({ onGround: false, deckPhase: DECK_PH.wait }),
+    at({ onGround: false, deckPhase: DECK_PH.glide, deckAlong: -120, nozzle: 45, deckG: 0.4 }),
+    at({ onGround: false, deckPhase: DECK_PH.hover, deckHeight: 20 }),
+    at({ onGround: false, deckPhase: DECK_PH.descend, deckHeight: 3 }),
+    at({ deckPhase: DECK_PH.landed, deckSink: 0.3, deckOff: 0.9 }),
+    { ...base, deckPhase: DECK_PH.landed, wall: (w += 9) },                  // -> liftoff
+    at({ onGround: false, deckPhase: DECK_PH.lift }),                          // TAKE OFF
+    at({ onGround: false, deckPhase: DECK_PH.climb }),
+    at({ onGround: false, deckPhase: DECK_PH.coast }),
+    at({ onGround: false, deckPhase: DECK_PH.none }),                          // at the hold point -> home
     at({ onGround: false, retPhase: RET_PH.depart }),                          // home: aboard, RETURN
     at({ onGround: false, retPhase: RET_PH.wait }),                            // the plan made: skip
     at({ onGround: false, retPhase: RET_PH.wait }),                            // not twice
@@ -82,9 +95,10 @@ test('the whole loop, stage by stage, with the commands a person would give', ()
   assert.deepEqual(stages, ORDER);
   assert.equal(outs.at(-1).ended, true);
   const cmds = outs.flatMap((o) => o.commands);
-  assert.deepEqual(cmds, ['reset', 'dock', 'return', 'return'], 'reset (the crew flies from the start), dock, RETURN, and RETURN once more to skip the wait');
+  assert.deepEqual(cmds, ['reset', 'dock', 'dock', 'deck', 'takeoff', 'return', 'return'],
+    'reset (the crew flies from the start), DOCK, P to let go and LAND DECK, TAKE OFF, RETURN, and RETURN once more to skip the wait');
   const walks = outs.map((o) => o.walk).filter(Boolean);
-  assert.deepEqual(walks, ['hatch', 'floor', 'stop']);
+  assert.deepEqual(walks, ['hatch', 'floor', 'stop', 'stop']);
   // time: fast far out, slow at the capture and the touchdown
   const warpAt = (stage, i = 0) => outs.filter((o) => o.stage === stage && o.warp)[i]?.warp;
   assert.equal(outs[0].warp, 1);
@@ -92,13 +106,20 @@ test('the whole loop, stage by stage, with the commands a person would give', ()
   assert.deepEqual(dockWarps, [100, 25, 5, 2, 2]);
   assert.equal(outs[10].view, 'from the Ring', 'the last of the approach seen from the Ring');
   assert.ok(warpAt('land') >= 1);
-  assert.equal(outs[28].warp, 1, 'the touchdown at one to one');
+  assert.equal(outs[39].warp, 1, 'the touchdown at one to one');
+  // the deck: fast while coasting, slow for the glide, one to one on the pad; the glide's caption says it
+  assert.equal(outs[18].warp, 100, 'out over the deck at 100x');
+  assert.equal(outs[20].warp, 5, 'the glide at 5x');
+  assert.match(outs[20].caption.text, /inside of a wheel, 120 m\/s against the deck, the drive swivelled 45° down/);
+  assert.equal(outs[23].warp, 1, 'on the pad at one to one');
+  assert.match(outs[23].caption.text, /0\.30 m\/s at the touch, 0\.9 m from its centre/);
+  assert.equal(outs[25].warp, 2, 'off the deck at 2x');
   // captions say what is happening, with the numbers of the moment
   assert.match(outs[3].caption.text, /Mach 1\.05/);
   assert.match(outs[6].caption.text, /round orbit at 500 km/);
-  assert.match(outs[21].caption.text, /125 m\/s/);
-  assert.match(outs[24].caption.text, /358 kW/);
-  assert.match(outs[28].caption.text, /432 m past the threshold/);
+  assert.match(outs[32].caption.text, /125 m\/s/);
+  assert.match(outs[35].caption.text, /358 kW/);
+  assert.match(outs[39].caption.text, /432 m past the threshold/);
 });
 
 test('if the start leaves no crew flying, the tour asks for it, once: CREW toggles', () => {
