@@ -467,7 +467,10 @@ It is refused, and whoever was flying flies on, on the Ring's deck and within 9 
 while the craft moves past it faster than 50 m/s in the frame turning with its orbit, as it does riding
 with the deck: its way out, backing away on the small thrusters, is for a craft at rest by the Ring (from
 the deck it put the belly on the deck in 0.6 s). The crew to orbit is refused there too: taken on a pad, it
-let go of the deck and struck a rim wall. On the Ring's far side the way out keeps 600 m from the
+let go of the deck and struck a rim wall. While it waits for its pass the crew keeps clear of the Ring: the
+way out leaves the craft on a loop about the Ring's orbit that slides along it a little each turn, and after
+the deck's take-off one such loop came back to 820 m from the Ring's centre two orbits on; within 9 km and
+closing, the crew backs away again. On the Ring's far side the way out keeps 600 m from the
 axis until 1 km out along it, clear of the hub's solar mast, its arrays and its radiators.
 
 How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
@@ -552,6 +555,7 @@ longer; flown again at the third audit (2026-11-21), 2026 lands 200 of 200 and 2
 | 2026, held out | the same | 200 | **200**; again at the audit, **200** | **98.1–100 %**; **98.1–100 %** |
 | 2, while building | density ×0.6 to 1.4 and a wave of up to 25 %; lift and drag each ×0.8 to 1.2 | 64 | 60 | 85.0–97.5 % |
 | 2027, held out | the same | 100 | **91**; again at the audit, **95** | **83.8–95.2 %**; **88.8–97.8 %** |
+| 2030, held out, flown once at the audit | the narrow box, with a wind of strength up to 2 (30 knots at 20 ft, a moderate day), the mass and thrust as the guidance knows them each within 3 %, and the instruments' noise | 100 | **93** | **86.3–96.6 %** |
 
 Flown again, every landing in 2026 touches down 436 to 438 m past the threshold, 0.02 m left of the line,
 sinking 0.73 to 0.74 m/s, with 414 to 471 kg of propellant (peak heat 322 to 456 kW/m², peak load 1.57 to
@@ -573,10 +577,14 @@ prints a line for each run and the rate with a 95 % Wilson interval; shard a poo
 What is weak. The plan's reach (1,200 km off the plane) and its search are for round orbits and
 moderately eccentric ones: an orbit raised to 1,475 km is planned, one to 2,650 km is not. A craft
 dropped into the air beyond the entry's reach glides toward the runway and comes down short; there is
-no landing elsewhere. Every dispersed landing ends almost the same, because the entry delivers the same
-gate and the approach learns the coefficients: winds, a different runway or a failure would test the
-terminal area as the dispersions do not. The predictor knows the craft's mass exactly and has no sensor
-noise. Seen from the chase view, the trail's near end can show as pale bands against a bright limb.
+no landing elsewhere. In still air every dispersed landing ends almost the same, because the entry
+delivers the same gate and the approach learns the coefficients. In wind it does not: pool 2030, with the
+instruments' noise, the mass and thrust as known within 3 % and a wind up to a moderate day's, lands 93 of
+100, 61 of 62 in winds under strength 1 and 32 of 38 above it. Its misses are the landing's own, none the
+entry's: in crosswinds of 4 to 12 m/s the wheels touched 3.0 to 4.6 m off the line (the limit is 3 m), two
+touched at 2.00 and 2.08 m/s (the limit is 2), and one, in a tailwind of 15 m/s, 1.8 km down the runway; its
+landings spread 249 to 797 m past the threshold and 2.9 m either side of the line. A different runway or a failure would test the terminal area as these do
+not. Seen from the chase view, the trail's near end can show as pale bands against a bright limb.
 
 ### The Sun and the Moon
 
