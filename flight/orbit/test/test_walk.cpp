@@ -21,8 +21,12 @@
 // TEST: hatch_to_floor
 // TEST: back_aboard
 // TEST: plan_is_sound
+// TEST: bulkheads_seal_the_deck
+// TEST: walk_to_the_bulkhead
+// TEST: ball_off_the_bulkhead
 // TEST: deterministic
 
+#include "../core/internal.h"   // deck.cpp's own account of the band round the flight deck, to hold the walk's to it
 #include "../core/orbit_core.h"
 #include "../core/orbit_walk.h"
 
@@ -51,6 +55,16 @@ const double CM = OC_WALK_CM_M, RB = OC_WALK_BALL_M;
 const double V_LIFT = OC_WALK_LIFT_PUSH / (2 * W);
 const double STREET = 2 * PI * R / OC_WALK_STREETS;
 const double SPIN = 0, AXIS = PI / 2, ANTI = PI, BACK = -PI / 2;   // headings
+// The flight deck, from orbit_core.h: its middle in the floor's arc from spoke 0, its half-length, and from its
+// middle to a bulkhead's face toward the town
+const double DECK_MID = OC_DECK_ANGLE_DEG * PI / 180 * R, DECK_HALF = OC_DECK_ARC_M / 2, SEALED = DECK_HALF + OC_DECK_BULKHEAD_M;
+// m of floor from the deck's middle to s, either way round
+double fromDeck(double s) {
+    double d = std::fmod(s - DECK_MID, 2 * PI * R);
+    if (d > PI * R) d -= 2 * PI * R;
+    if (d < -PI * R) d += 2 * PI * R;
+    return std::fabs(d);
+}
 
 double get(int i) { return oc_walk_out()[i]; }
 bool finite() {
@@ -578,7 +592,7 @@ void backAboard() {
 void planIsSound() {
     const int n = oc_walk_box_count();
     const double* b = oc_walk_boxes();
-    int blocks = 0, parapets = 0, pylons = 0, shafts = 0, lobby = 0;
+    int blocks = 0, parapets = 0, pylons = 0, shafts = 0, lobby = 0, bulkheads = 0, locks = 0;
     double tallest = 0;
     for (int i = 0; i < n; ++i) {
         const double* k = b + i * OC_WALK_BOX_FIELDS;
@@ -589,6 +603,8 @@ void planIsSound() {
         if (kind == OC_BOX_PARAPET) ++parapets;
         if (kind == OC_BOX_PYLON) ++pylons;
         if (kind == OC_BOX_SHAFT) ++shafts;
+        if (kind == OC_BOX_BULKHEAD) ++bulkheads;
+        if (kind == OC_BOX_LOCK) ++locks;
         if (kind != OC_BOX_BLOCK) continue;
         ++blocks;
         const double s = k[OC_WALK_BOX_S], half = k[OC_WALK_BOX_HALF], c0 = k[OC_WALK_BOX_C0], c1 = k[OC_WALK_BOX_C1];
@@ -609,28 +625,148 @@ void planIsSound() {
             CHECK(apart, "blocks %d and %d touch", i, j);
         }
     }
-    std::printf("  %d solid things: %d blocks (the tallest %.1f m), %d parapets, %d spokes' feet, %d walls of lift tubes, %d of them in the lobby\n", n, blocks, tallest,
-                parapets, pylons, shafts, lobby);
+    std::printf("  %d solid things: %d blocks (the tallest %.1f m), %d parapets, %d spokes' feet, %d walls of lift tubes (%d in the lobby), %d bulkheads, %d lock gates\n",
+                n, blocks, tallest, parapets, pylons, shafts, lobby, bulkheads, locks);
     CHECK(n < 4096, "the plan is full: %d", n);
     CHECK(blocks > 600 && blocks < 2500, "%d blocks", blocks);
-    CHECK(pylons == OC_RING_SPOKES && parapets == 4 * OC_WALK_STREETS && shafts == 13 * OC_RING_SPOKES, "%d spokes' feet, %d parapets, %d walls", pylons, parapets, shafts);
+    // four parapets for each stretch of the canal between two decks: but the deck's sealed stretch takes the two
+    // stretches inside it, and the deck-side parapets of the two it cuts, which end at lock gates instead
+    CHECK(pylons == OC_RING_SPOKES && parapets == 4 * OC_WALK_STREETS - 10 && shafts == 13 * OC_RING_SPOKES, "%d spokes' feet, %d parapets, %d walls", pylons, parapets, shafts);
+    CHECK(bulkheads == 2 && locks == 2, "%d bulkheads, %d lock gates", bulkheads, locks);
     CHECK(tallest < 20, "a block %.1f m tall is not low", tallest);
-    // the promenade runs clear all the way round, on both banks, and so does the path under each wall
+    // the promenade runs clear all the way round, on both banks, and so does the path under each wall, up to
+    // the deck's bulkheads, which stand across all of them
     oc_walk_reset(OC_WALK_AT_FLOOR);
-    int blocked = 0;
+    int blocked = 0, sealed = 0;
     for (int i = 0; i < 6000; ++i) {
         const double s = i * (2 * PI * R / 6000);
-        for (const double c : {OC_WALK_PROMENADE_M, -OC_WALK_PROMENADE_M, OC_WALK_WALLPATH_M, -OC_WALK_WALLPATH_M, OC_WALK_LANE_M, -OC_WALK_LANE_M})
-            if (oc_walk_put(s, c) != 1) ++blocked;
+        for (const double c : {OC_WALK_PROMENADE_M, -OC_WALK_PROMENADE_M, OC_WALK_WALLPATH_M, -OC_WALK_WALLPATH_M, OC_WALK_LANE_M, -OC_WALK_LANE_M}) {
+            const bool free = oc_walk_put(s, c) == 1;
+            if (fromDeck(s) < SEALED + OC_WALK_RADIUS_M) { if (free) ++sealed; }
+            else if (!free) ++blocked;
+        }
     }
     CHECK(blocked == 0, "%d places on the paths round the ring are not free", blocked);
-    // and every cross street, wall to wall
+    CHECK(sealed == 0, "%d places on the deck or in its bulkheads took the walker", sealed);
+    // and every cross street, wall to wall, but those on the deck
     for (int j = 0; j < OC_WALK_STREETS; ++j) {
-        if (j % 10 == 0) continue;   // a spoke stands on its plaza
+        if (j % 10 == 0 || fromDeck(j * STREET) < SEALED + OC_WALK_RADIUS_M) continue;   // a spoke stands on its plaza
         for (double c = -495; c <= 495; c += 5)
             if (oc_walk_put(j * STREET, c) != 1) ++blocked;
     }
     CHECK(blocked == 0, "%d places on the cross streets are not free", blocked);
+}
+
+// The flight deck: an open sector of the band, a vacuum, sealed from the town by a bulkhead at each end. The walk's
+// bulkheads stand where orbit_core.h puts them, and where deck.cpp's account of the band (deckBand, for a craft,
+// which answers within a metre of the sector's ends) has them: a small sphere just inside the walk's bulkhead is
+// in the deck's, and one just on the deck's side of the face is clear of it, to 0.2 m either side. Nothing of the
+// town stands between them; the canal ends at lock gates in front of them; the walker cannot be put there.
+void bulkheadsSealTheDeck() {
+    const int n = oc_walk_box_count();
+    const double* b = oc_walk_boxes();
+    int found = 0, locks = 0;
+    for (int i = 0; i < n; ++i) {
+        const double* k = b + i * OC_WALK_BOX_FIELDS;
+        const int kind = (int)k[OC_WALK_BOX_KIND];
+        const double s = k[OC_WALK_BOX_S], half = k[OC_WALK_BOX_HALF];
+        if ((int)k[OC_WALK_BOX_ZONE] != OC_WALK_ON_FLOOR) continue;
+        if (kind == OC_BOX_BULKHEAD) {
+            ++found;
+            const double side = s > DECK_MID ? 1 : -1, face = DECK_MID + side * DECK_HALF;
+            CHECK(std::fabs((s - side * half) - face) < 1e-9, "a bulkhead's face toward the deck at %.6f, the core's at %.6f", s - side * half, face);
+            CHECK(std::fabs(2 * half - OC_DECK_BULKHEAD_M) < 1e-9, "%.3f m thick", 2 * half);
+            CHECK(k[OC_WALK_BOX_C0] <= -OC_RING_WIDTH_M / 2 && k[OC_WALK_BOX_C1] >= OC_RING_WIDTH_M / 2, "across the band");
+            CHECK(k[OC_WALK_BOX_H0] <= 0 && k[OC_WALK_BOX_H1] >= OC_RING_FLOOR_M - OC_RING_ROOF_M, "from the floor to the roof: %.0f m", k[OC_WALK_BOX_H1]);
+            std::printf("  a bulkhead from %.2f to %.2f m of floor (the deck's end at %.2f), %.0f m tall\n", s - half, s + half, face, k[OC_WALK_BOX_H1]);
+            // deck.cpp's account: inside the walk's bulkhead, at heights and across the band
+            for (const double h : {0.5, 100.0, 290.0}) {
+                for (const double c : {-450.0, 0.0, 450.0}) {
+                    auto at = [&](double ss) {
+                        const double th = ss / R, r = R - h;
+                        return oc::V3{r * std::sin(th), c, r * std::cos(th)};
+                    };
+                    const int inside = oc::deckBand(at(face + side * 0.5), 0.3);
+                    const int deckSide = oc::deckBand(at(face - side * 0.2), 0.1);
+                    const int bodySide = oc::deckBand(at(face + side * 0.2), 0.1);
+                    CHECK(inside == OC_DOCK_HIT_BULKHEAD, "0.5 m inside the walk's bulkhead at h %.1f, c %.0f the deck's model says %d", h, c, inside);
+                    CHECK(deckSide == 0, "0.2 m on the deck's side of the face at h %.1f, c %.0f the deck's model says %d", h, c, deckSide);
+                    CHECK(bodySide == OC_DOCK_HIT_BULKHEAD, "0.2 m past the face at h %.1f, c %.0f the deck's model says %d", h, c, bodySide);
+                }
+            }
+            continue;
+        }
+        if (kind == OC_BOX_LOCK) {
+            ++locks;
+            CHECK(std::fabs(fromDeck(s) - half - SEALED) < 1e-9, "a lock gate against a bulkhead's face: %.6f from it", fromDeck(s) - half - SEALED);
+            CHECK(k[OC_WALK_BOX_C0] <= -OC_WALK_CANAL_M && k[OC_WALK_BOX_C1] >= OC_WALK_CANAL_M, "across the canal");
+            continue;
+        }
+        CHECK(fromDeck(s) - half > SEALED - 1e-9, "a %s %.1f m into the sealed stretch", kind == OC_BOX_BLOCK ? "block" : kind == OC_BOX_PARAPET ? "parapet" : "thing", SEALED - (fromDeck(s) - half));
+        if (kind == OC_BOX_BLOCK) CHECK(fromDeck(s) - half > SEALED + 15, "a block within 15 m of a bulkhead");
+    }
+    CHECK(found == 2 && locks == 2, "%d bulkheads, %d lock gates", found, locks);
+    // and over the deck between them the deck's model finds nothing in the way, as the walk finds nothing there
+    CHECK(oc::deckBand(oc::V3{(R - 50) * std::sin(DECK_MID / R), 0, (R - 50) * std::cos(DECK_MID / R)}, 1) == 0, "over the deck's middle");
+    // the parapets along each bank run on to the lock gates: the last before each gate ends at the bulkhead's face
+    for (const double side : {-1.0, 1.0}) {
+        const double face = DECK_MID + side * SEALED;
+        int ends = 0;
+        for (int i = 0; i < n; ++i) {
+            const double* k = b + i * OC_WALK_BOX_FIELDS;
+            if ((int)k[OC_WALK_BOX_KIND] != OC_BOX_PARAPET || k[OC_WALK_BOX_C1] - k[OC_WALK_BOX_C0] > 1) continue;
+            const double end = k[OC_WALK_BOX_S] - side * k[OC_WALK_BOX_HALF];   // its end toward the deck
+            if (std::fabs(end - face) < 1e-9) ++ends;
+        }
+        CHECK(ends == 2, "%d bank parapets end at the bulkhead's face on the %s side", ends, side > 0 ? "spinward" : "antispinward");
+    }
+    // nobody is put on the deck, or in a bulkhead; just outside, on the promenade, they are
+    oc_walk_reset(OC_WALK_AT_FLOOR);
+    for (double d = -SEALED - 0.2; d <= SEALED + 0.2; d += 7.3)
+        CHECK(oc_walk_put(DECK_MID + d, OC_WALK_PROMENADE_M) == 0, "put on the deck, %.1f m from its middle", d);
+    CHECK(oc_walk_put(DECK_MID - SEALED - 1, OC_WALK_PROMENADE_M) == 1 && oc_walk_put(DECK_MID + SEALED + 1, -OC_WALK_PROMENADE_M) == 1, "a metre from either bulkhead, on the promenade");
+}
+
+// From spoke 1's plaza along the promenade, spinward, at a run: the bulkhead stops the walker at its face. From
+// spoke 2's, antispinward along the other bank, the other bulkhead.
+void walkToTheBulkhead() {
+    for (const double side : {-1.0, 1.0}) {
+        oc_walk_reset(OC_WALK_AT_FLOOR);
+        const double from = side < 0 ? OC_WALK_PLAZA_M + 10 : 2 * PI * R / OC_RING_SPOKES - OC_WALK_PLAZA_M - 10;
+        CHECK(oc_walk_put(from, side * -OC_WALK_PROMENADE_M) == 1, "the promenade by the plaza");
+        go(side < 0 ? SPIN : ANTI, 600, true);
+        const double face = DECK_MID + side * SEALED, at = get(OC_WALK_S);
+        std::printf("  %s from the plaza at %.0f m: stopped at %.3f m, the bulkhead's face at %.3f; %.2f m/s, %.3f g\n", side < 0 ? "spinward" : "antispinward", from, at, face,
+                    get(OC_WALK_SPEED), get(OC_WALK_G));
+        CHECK(std::fabs(at - (face + side * OC_WALK_RADIUS_M)) < 1e-6, "stopped %.6f m from the face, not %.1f", std::fabs(at - face), OC_WALK_RADIUS_M);
+        CHECK(get(OC_WALK_SPEED) < 1e-9 && get(OC_WALK_WHERE) == OC_WALK_ON_FLOOR && get(OC_WALK_GROUND) == 1 && finite(), "standing at it");
+        // and a jump will not take the walker over it
+        oc_walk_controls(1, 0, side < 0 ? SPIN : ANTI, 0, 1, 1, 0);
+        stepFor(3);
+        CHECK(fromDeck(get(OC_WALK_S)) > SEALED, "the jump went over");
+    }
+}
+
+// A ball thrown at the bulkhead from a few metres comes back off it, at half its speed, and lands on the town's
+// side, short of the face.
+void ballOffTheBulkhead() {
+    oc_walk_reset(OC_WALK_AT_FLOOR);
+    const double face = DECK_MID - SEALED;
+    CHECK(oc_walk_put(face - 6, OC_WALK_PROMENADE_M) == 1, "6 m from the bulkhead");
+    oc_walk_controls(0, 0, SPIN, 0.15, 0, 0, 0);
+    oc_walk_ball(1.5, 8);
+    double furthest = -1e9, back = 0;
+    for (int i = 0; i < 500; ++i) {
+        oc_walk_step(1);
+        const double s = std::atan2(get(OC_WALK_BALL_X), get(OC_WALK_BALL_Z)) * R;
+        if (s > furthest) furthest = s;
+        if (i > 5 && s < furthest - 0.5) back = 1;
+    }
+    const double rest = std::atan2(get(OC_WALK_BALL_X), get(OC_WALK_BALL_Z)) * R;
+    std::printf("  thrown at the bulkhead from 6 m: it reached %.3f m (the face at %.3f), and came to rest %.2f m short of it\n", furthest, face, face - rest);
+    CHECK(furthest <= face - OC_WALK_BALL_M + 1e-6, "the ball went %.4f m into the bulkhead", furthest - (face - OC_WALK_BALL_M));
+    CHECK(furthest > face - OC_WALK_BALL_M - 1e-3, "it did not reach the bulkhead: %.3f short", face - OC_WALK_BALL_M - furthest);
+    CHECK(back == 1 && rest < face - 1 && get(OC_WALK_BALL) == OC_BALL_RESTING, "it came back off it and lies %.2f m short", face - rest);
 }
 
 // The same walk twice is the same walk; another is another.
@@ -681,6 +817,9 @@ const Test tests[] = {
     {"hatch_to_floor", hatchToFloor},
     {"back_aboard", backAboard},
     {"plan_is_sound", planIsSound},
+    {"bulkheads_seal_the_deck", bulkheadsSealTheDeck},
+    {"walk_to_the_bulkhead", walkToTheBulkhead},
+    {"ball_off_the_bulkhead", ballOffTheBulkhead},
     {"deterministic", deterministic},
 };
 

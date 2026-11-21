@@ -9,7 +9,8 @@
 import * as THREE from 'three';
 import { RING } from './core.js';
 import { BOX, WALK, WHERE } from './walk-core.js';
-import { HALF, RF, RIM_R, ROOF_R, SECTOR, STREET, outward, spinward } from './walk-math.js';
+import { DECK, DECK_A, DECK_DOOR, DECK_HALF, DECK_WALL } from './ring-plan.js';
+import { BULKHEADS, DECK_LEN, DECK_MID, HALF, RF, RIM_R, ROOF_R, SEALED, SECTOR, STREET, WALK_TIERS, fromDeck, outward, spinward } from './walk-math.js';
 
 const SECTORS = WALK.streets;         // the floor in sixty parts, each centred on its cross street
 const RL = WALK.lobby;
@@ -18,11 +19,15 @@ const HOUSING = WALK.carTall + WALK.shaftWall;
 const SPOKE = RING.spoke / 2;
 const WATER = -1.4;                   // the canal's water: h below the floor (chosen)
 const RIBS = 1200;                    // the roof's ribs round the ring: one every 24.6 m (chosen)
+const DECK_INNER = 470;               // the deck's markings are laid out from here, as ring.js paints them (ring-plan.js's INNER)
 const f = (x) => Number(x).toFixed(4);   // a number as GLSL reads a float
 
 // ---- the light, shared by every surface ---------------------------------------------------------
 
 const COMMON = /* glsl */ `
+  #ifndef DETAIL
+  #define DETAIL 1
+  #endif
   const float RF = ${RF.toFixed(1)};
   const float ROOF = ${ROOF_R.toFixed(1)};
   const float RIM = ${RIM_R.toFixed(1)};
@@ -30,6 +35,10 @@ const COMMON = /* glsl */ `
   const float HUB = ${RING.hub.toFixed(1)};
   const float PORT = ${RING.port.toFixed(1)};
   const float RL = ${RL.toFixed(1)};
+  const float DECK_A = ${f(DECK_A)};          // the flight deck's middle, rad round the axis
+  const float DECK_HALF_A = ${f(DECK_HALF)};  // its half-angle at the floor
+  const float DECK_WALL_A = ${f(DECK_WALL)};  // a bulkhead's thickness, as an angle at the floor
+  const float BULK_R0 = ${f(BULKHEADS[0].r0)};      // the bulkheads' tops, from the axis
   uniform vec3 uSun;          // toward the Sun, ring frame
   uniform vec3 uSunLight;     // its light: colour and strength, nothing in the Earth's shadow
   uniform vec3 uFillSky;      // the roof's lamps and the sky's light, from up
@@ -39,9 +48,33 @@ const COMMON = /* glsl */ `
   uniform vec3 uEarthLight;   // its light: the part of its face the Sun lights, as the ring sees it
   uniform vec3 uHaze;         // the band's air, lit
   uniform float uHazeDist;    // m: the air's thickness, for one part in e
+  uniform float uTime;        // s, for what blinks
+
+  bool crossesFace(vec3 p, vec3 d, float tEnd, vec2 n, vec2 away) {
+    float den = dot(d.xz, n);
+    if (abs(den) < 1e-9) return false;
+    float t = -dot(p.xz, n) / den;
+    if (t <= 0.0 || t >= tEnd) return false;
+    vec3 q = p + t * d;
+    float r = length(q.xz);
+    return dot(q.xz, away) > 0.0 && r >= BULK_R0 && r <= RF && abs(q.y) < HALF;
+  }
+
+  // Whether p is over the flight deck, its ends and a metre past them: its direction from the axis within the
+  // sector's half-angle of the sector's middle
+  bool overDeck(vec3 p) {
+    float r = length(p.xz);
+    return r > 1.0 && dot(p.xz / r, vec2(${f(Math.sin(DECK_A))}, ${f(Math.cos(DECK_A))})) > ${Math.cos(DECK_HALF + 1 / RF).toFixed(9)};
+  }
+  // Whether the line from p along d meets a bulkhead's face before it has gone tEnd (walk-math.js's bulkheadAhead):
+  // each face a half-plane through the axis at angle f, its normal (cos f, -sin f) and its way out (sin f, cos f)
+  bool bulkheadAhead(vec3 p, vec3 d, float tEnd) {
+    ${BULKHEADS.flatMap((k) => [k.face, k.face + k.side * DECK_WALL]).map((a) => `if (crossesFace(p, d, tEnd, vec2(${f(Math.cos(a))}, ${f(-Math.sin(a))}), vec2(${f(Math.sin(a))}, ${f(Math.cos(a))}))) return true;`).join('\n    ')}
+    return false;
+  }
 
   // How much of the Sun reaches p along d: over the rim walls' tops (the roof is glass), not through the
-  // floor and hull, a rim wall or the hub. walk-math.js's sunReach says the same in JavaScript.
+  // floor and hull, a rim wall, the flight deck's bulkheads or the hub. walk-math.js's sunReach says the same.
   float sunReach(vec3 p, vec3 d) {
     float rp = length(p.xz);
     if (rp < HUB + 1.0 && abs(p.y) < PORT) return 0.0;
@@ -50,6 +83,9 @@ const COMMON = /* glsl */ `
     float tHull = a > 1e-9 ? (-b + sqrt(max(0.0, b * b - a * c))) / a : 1e9;
     float tSide = ((d.y > 0.0 ? HALF : -HALF) - p.y) / d.y;
     if (tSide <= 0.0 || tSide >= tHull) return 0.0;
+  #if DETAIL > 0
+    if (bulkheadAhead(p, d, tSide)) return 0.0;   // at low, coarser: the bulkheads cast no shadow
+  #endif
     float r = length(p.xz + tSide * d.xz);
     float soft = 0.00465 * tSide / max(abs(d.y), 0.2);
     return smoothstep(-soft, soft, RIM - r);
@@ -78,23 +114,26 @@ const COMMON = /* glsl */ `
     float t = (-b - sqrt(disc)) / a;
     if (t <= 0.0) return 1.0;
     vec3 q = p + t * d;
-    if (abs(q.y) > HALF) return 1.0;
+    if (abs(q.y) > HALF || overDeck(q)) return 1.0;   // past the roof's ends, or where it is not: over the deck
     return 1.0 - 0.85 * lattice(vec2(atan(q.x, q.z) * ROOF, q.y), 0.0093 * t + 0.2);
   }
-  // The part of the line from a to b that is in the band's air, between the roof and the floor.
+  // The part of the line from a to b that is in the band's air, between the roof and the floor. Over the
+  // flight deck there is none: what is seen there is seen through no air at its end.
   float airPath(vec3 a, vec3 b) {
     vec3 d = b - a;
     float L = length(d), A = dot(d.xz, d.xz), B = dot(a.xz, d.xz), C = dot(a.xz, a.xz) - ROOF * ROOF;
-    float inside = C < 0.0 ? 1.0 : 0.0;
+    float t1 = C < 0.0 ? 0.0 : 1.0, t2 = 1.0;   // the air is [0, t1] at a's end and [t2, 1] at b's
     if (A > 1e-6) {
       float disc = B * B - A * C;
-      inside = 0.0;
       if (disc > 0.0) {
-        float q = sqrt(disc);
-        inside = max(0.0, min((-B + q) / A, 1.0) - max((-B - q) / A, 0.0));
+        float q = sqrt(disc), lo = (-B - q) / A, hi = (-B + q) / A;
+        if (hi > 0.0 && lo < 1.0) { t1 = max(lo, 0.0); t2 = min(hi, 1.0); }
       }
     }
-    return L * (1.0 - inside);
+    if (t1 >= 1.0) t2 = 1.0;
+    float near = t1, far = 1.0 - t2;
+    if (overDeck(b)) far = 0.0;
+    return L * (near + far);
   }
   vec3 upAt(vec3 p) {
     float r = length(p.xz);
@@ -107,12 +146,17 @@ const COMMON = /* glsl */ `
     float ndu = dot(n, up);
     if (inHub(p)) return albedo * (uLobbyLight * (0.55 + 0.45 * ndu) + vec3(0.02));
     vec3 light = mix(uFillGround, uFillSky, 0.5 + 0.5 * ndu);
+    if (overDeck(p)) light *= 0.25;   // no roof over the deck, and none of its lamps: its own lights, and the sky's
+  #if DETAIL > 0
     // the Earth's light, from a disc 136 degrees wide, where it stands above the level of the floor here
     light += uEarthLight * (0.4 + 0.6 * max(dot(n, uEarth), 0.0)) * smoothstep(-0.35, 0.35, dot(up, uEarth));
+  #endif
     float ndl = dot(n, uSun);
     if (ndl > 0.0 && uSunLight.r + uSunLight.g > 0.0) {
       float reach = sunReach(p + n * 0.05, uSun);
+  #if DETAIL > 0
       if (reach > 0.0 && lattice) reach *= roofShade(p, uSun);
+  #endif
       light += uSunLight * ndl * reach;
     }
     return albedo * light;
@@ -197,22 +241,54 @@ const FLOOR_FRAGMENT = /* glsl */ `
     if (abs(a - ${WALK.wallpath.toFixed(1)}) < ${(WALK.wallpathW / 2).toFixed(1)}) return tiles(vec2(s, c), 2.0, STONE * 0.85, fw);
     if (a > ${(WALK.wallpath + WALK.wallpathW / 2).toFixed(1)}) return GRAVEL * (0.7 + 0.3 * noise(q * 1.5) * fine);
     // grass: meadows in patches, mown in stripes, with a finer grain close to
-    float big = noise(q / 47.0), mid = noise(q / 6.3), small = noise(q * 1.7);
+    float big = noise(q / 47.0);
+  #if DETAIL > 0
+    float mid = noise(q / 6.3), small = noise(q * 1.7);
     vec3 g = GRASS * (0.7 + 0.6 * big) * (0.85 + 0.3 * mid) * mix(1.0, 0.8 + 0.4 * small, fine);
+  #else
+    vec3 g = GRASS * (0.7 + 0.6 * big);
+  #endif
     g = mix(g, vec3(0.13, 0.15, 0.05), 0.35 * smoothstep(0.6, 0.85, big));
     g *= 0.94 + 0.06 * step(0.5, fract(c / 9.0));
     return g;
+  }
+
+  // The flight deck (ring.js's paintDeck, as near as a shader comes): s from its middle, c across. Dark plates in
+  // rows and their seams, darker down the middle where the craft come and go; a yellow line along each side and
+  // across each end, white dashes along the lanes to the bulkheads' doors; the pads on the centreline; small
+  // lights set in the plating by the edges, which glow (returned in glow).
+  vec3 flightDeck(float s, float c, float fw, out vec3 glow) {
+    float a = abs(c);
+    vec3 col = vec3(0.075, 0.078, 0.086) * (0.85 + 0.3 * hash(floor(vec2(s / 12.0, c / 8.0)) + 3.0));
+    col *= 1.0 - 0.5 * max(lines(s, 12.0, 0.04, fw), lines(c, 8.0, 0.04, fw));
+    col *= a < 180.0 ? 0.85 : 1.0;
+    float paint = max(lines(a - ${f(DECK_INNER - 55)}, 1000.0, 2.5, fw), lines(abs(s) - ${f(DECK.arc / 2 - 30)}, 1000.0, 2.5, fw) * step(a, ${f(DECK_INNER - 55)}));
+    col = mix(col, vec3(0.55, 0.42, 0.08), paint);
+    float dash = step(fract((s - 40.0) / 30.0), 0.6) * step(abs(s), ${f(DECK.arc / 2 - 40)});
+    float lane = max(lines(a - ${f(DECK_INNER - 140)}, 1000.0, 1.5, fw), lines(a - ${f(DECK_INNER - 250)}, 1000.0, 1.5, fw)) * dash;
+    col = mix(col, vec3(0.6, 0.6, 0.58), lane);
+    float pad = 1e9;
+    for (int k = 0; k < ${DECK.pads}; k++) pad = min(pad, length(vec2(s - (float(k) - ${f((DECK.pads - 1) / 2)}) * ${f(DECK.padSpacing)}, c)));
+    col = mix(col, vec3(0.62, 0.62, 0.6), max(lines(pad - ${f(DECK.padRadius)}, 1000.0, 0.8, fw), lines(pad - ${f(DECK.padRadius * 0.55)}, 1000.0, 0.4, fw)));
+    float light = lines(a - ${f(DECK_INNER - 65)}, 1000.0, 1.0, fw) * lines(s - 12.0, 24.0, 1.0, fw);
+    glow = vec3(0.4, 0.45, 0.5) * 12.0 * light;
+    return col;
   }
 
   void main() {
     float s = vPlan.x, c = vPlan.y, kind = vPlan.z, street = vPlan.w;
     vec3 n = normalize(vNormal);
     float fw = length(vec2(fwidth(s), fwidth(c)));
-    vec3 albedo;
+    vec3 albedo, glow = vec3(0.0);
+  #if DETAIL == 0
+    if (kind < 0.5 && fw > 1.5) albedo = abs(c) < ${f(WALK.canal)} ? vec3(0.11) : abs(c) < ${f(WALK.promenade + WALK.promenadeW / 2)} ? vec3(0.4, 0.37, 0.3) : GRASS * 1.0;
+    else
+  #endif
     if (kind < 0.5) albedo = plan(s, c, street, fw);
     else if (kind < 1.5) albedo = vec3(0.006, 0.03, 0.04);                              // the canal's water
-    else albedo = tiles(vec2(s + c, RF - length(vWorld.xz)), 0.6, vec3(0.22, 0.21, 0.19), fw);   // its walls, a deck's edge
-    vec3 colour = lit(albedo, vWorld, n);
+    else if (kind < 2.5) albedo = tiles(vec2(s + c, RF - length(vWorld.xz)), 0.6, vec3(0.22, 0.21, 0.19), fw);   // its walls, a deck's edge
+    else albedo = flightDeck(s, c, fw, glow);
+    vec3 colour = lit(albedo, vWorld, n) + glow;
     if (kind > 0.5 && kind < 1.5) {   // water: the sky's light and the Sun's glint off it
       vec3 v = normalize(cameraPosition - vWorld);
       float fres = 0.02 + 0.98 * pow(1.0 - max(dot(v, n), 0.0), 5.0);
@@ -249,7 +325,11 @@ const BOX_FRAGMENT = /* glsl */ `
         if (dot(n, upAt(p)) > 0.6) albedo *= 0.55 + 0.25 * noise(vec2(u, p.y) * 0.7);   // the roof
         else {
           float storey = fract(h / 3.5), bay = fract(u / 3.2);
+  #if DETAIL > 0
           float fade = 1.0 - smoothstep(0.3, 1.2, max(fu, fh));
+  #else
+          float fade = 0.0;   // the windows as their average
+  #endif
           float win = smoothstep(0.26, 0.30, storey) * (1.0 - smoothstep(0.80, 0.84, storey)) * smoothstep(0.16, 0.2, bay) * (1.0 - smoothstep(0.8, 0.84, bay));
           albedo = mix(albedo, mix(albedo, vec3(0.05, 0.065, 0.08), 0.42), (1.0 - fade) * 0.9);
           albedo = mix(albedo, vec3(0.04, 0.05, 0.065), win * fade);
@@ -266,8 +346,34 @@ const BOX_FRAGMENT = /* glsl */ `
       albedo *= 1.0 - 0.3 * lines(along, 20.0, 0.3, fa);
       albedo *= 0.92 + 0.08 * noise(vec2(along * 0.05, th * 40.0));
     } else if (kind == 4) {         // a lamp
-      emit = vColour * 2.5;
+      emit = vColour * 5.0;
       albedo = vec3(0.0);
+    } else if (kind == 7) {         // a bulkhead: panels; on its faces the hangar door, its leaves and its lit frame, windows
+      float h = RF - r, c = p.y, fh = fwidth(h), fc = fwidth(c);
+      vec3 sp = vec3(cos(th), 0.0, -sin(th));
+      albedo *= 1.0 - 0.3 * max(lines(c, 30.0, 0.15, fc), lines(h, 20.0, 0.15, fh));
+      if (abs(dot(n, sp)) > 0.5) {
+        if (abs(c) < ${f(DECK_DOOR.half)} && h < ${f(RF - DECK_DOOR.top)}) {
+          albedo = vec3(0.12, 0.125, 0.13) * (0.9 + 0.2 * hash(vec2(floor(c / 40.0), 3.0)));
+          albedo *= 1.0 - 0.6 * max(lines(c, 40.0, 0.25, fc), lines(h, 15.0, 0.12, fh));
+        }
+        // the frame, lit, and lights along it every 20 m
+        float top = ${f(RF - DECK_DOOR.top)};
+        float frame = max(lines(h - top - 1.5, 1000.0, 1.5, fh) * step(abs(c), ${f(DECK_DOOR.half + 3)}), lines(abs(c) - ${f(DECK_DOOR.half + 1.5)}, 1000.0, 1.5, fc) * step(h, top + 3.0));
+        emit += vec3(0.6, 0.6, 0.6) * 3.0 * frame;
+        float dots = max(lines(h - top - 3.0, 1000.0, 0.9, fh) * lines(c, 20.0, 0.9, fc) * step(abs(c), ${f(DECK_DOOR.half)}),
+                         lines(abs(c) - ${f(DECK_DOOR.half)}, 1000.0, 0.9, fc) * lines(h, 20.0, 0.9, fh) * step(h, top));
+        emit += vec3(9.0, 7.0, 3.5) * dots;
+        // two rows of windows under the roof's edge, most of them lit
+        float row = max(step(abs(h - 273.5), 2.5), step(abs(h - 261.5), 2.5)) * step(abs(c), 170.0);
+        float pane = step(abs(fract(c / 7.0) - 0.5), 0.32);
+        float on = step(hash(vec2(floor(c / 7.0), floor(h / 12.0))), 0.7);
+        albedo = mix(albedo, vec3(0.04, 0.05, 0.06), row * pane);
+        emit += vec3(5.0, 4.2, 3.2) * 0.8 * row * pane * on;
+        // a red beacon at each top corner, blinking
+        float beacon = step(length(vec2(abs(c) - 458.0, h - 306.0)), 1.6) * step(fract(uTime / 1.5 + (dot(n, sp) > 0.0 ? 0.0 : 0.5)), 0.3);
+        emit += vec3(10.0, 0.7, 0.35) * beacon;
+      }
     } else if (kind == 5) {         // the lobby's grip floor: rubber tiles and guide lines
       float s = th * RL, fs = fwidth(s), fc = fwidth(p.y);
       albedo *= 0.85 + 0.15 * hash(floor(vec2(s, p.y)));
@@ -280,7 +386,7 @@ const BOX_FRAGMENT = /* glsl */ `
       float off = abs(th - ray * floor(th / ray + 0.5)) * r;
       albedo *= 1.0 - 0.35 * max(lines(r, 15.0, 0.15, fr), lines(off, 1000.0, 0.15, fr) * step(20.0, r));
     }
-    vec3 colour = kind == 4 ? emit : lit(albedo, p, n);
+    vec3 colour = (kind == 4 ? vec3(0.0) : lit(albedo, p, n)) + emit;
     gl_FragColor = vec4(hazed(colour, p), 1.0);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -294,6 +400,9 @@ const ROOF_FRAGMENT = /* glsl */ `
   varying vec3 vNormal;
   void main() {
     vec3 p = vWorld;
+  #if DETAIL == 0
+    if (distance(cameraPosition, p) > 3000.0) discard;   // at low, only the near roof: far off, its lattice is a tint
+  #endif
     vec2 sc = vec2(atan(p.x, p.z) * ROOF, p.y);
     float blur = max(fwidth(sc.x), fwidth(sc.y)) * 1.5;
     float cover = lattice(sc, blur);
@@ -339,12 +448,14 @@ export function makeLight() {
     uEarthLight: { value: new THREE.Vector3(0, 0, 0) },
     uHaze: { value: new THREE.Vector3(0.3, 0.34, 0.4) },
     uHazeDist: { value: 14000 },
+    uTime: { value: 0 },
   };
 }
 
 function material(fragment, light, extra = {}) {
-  return new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: fragment, uniforms: { ...light }, ...extra });
+  return new THREE.ShaderMaterial({ vertexShader: VERTEX, fragmentShader: fragment, uniforms: { ...light }, defines: { DETAIL: 1 }, ...extra });
 }
+
 
 // ---- building: triangles with the attributes the shaders read ----------------------------------
 
@@ -427,77 +538,115 @@ function placeAt(obj, th, r) {
 }
 
 const BLOCK_COLOURS = [[0.50, 0.48, 0.45], [0.58, 0.56, 0.51], [0.46, 0.48, 0.51], [0.62, 0.58, 0.52], [0.54, 0.52, 0.56], [0.42, 0.42, 0.40]];
-const KIND = { plain: 0, block: 1, wall: 2, spoke: 3, lamp: 4, lobbyFloor: 5, lobbyWall: 6 };
+const KIND = { plain: 0, block: 1, wall: 2, spoke: 3, lamp: 4, lobbyFloor: 5, lobbyWall: 6, bulkhead: 7 };
 
 // ---- the band: floor, canal, blocks, walls, roof, sector by sector -------------------------------
 
 function buildSector(j, boxes, mats) {
   const B = bender(RF), mid = j * STREET, plaza = j % (WALK.streets / RING.spokes) === 0;
   const half = STREET / 2, deck = plaza ? WALK.plazaDeck : WALK.street, steps = 96, ds = STREET / steps;
-  const cuts = [...new Set([...Array.from({ length: steps + 1 }, (_, i) => -half + i * ds), -deck, deck])].sort((x, y) => x - y);
-  const floor = new Mesher(), solid = new Mesher(), roof = new Mesher();
+  // what the floor is along this sector: the town, the flight deck, or under a bulkhead (nothing to draw there)
+  const zone = (s) => { const d = Math.abs(fromDeck(mid + s)); return d < DECK_LEN ? 'deck' : d < SEALED ? 'bulkhead' : 'town'; };
+  const edges = [];   // the deck's ends and the bulkheads' faces, where they fall in this sector
+  for (const e of [-SEALED, -DECK_LEN, DECK_LEN, SEALED]) {
+    let rel = DECK_MID + e - mid;
+    rel -= Math.round(rel / (2 * Math.PI * RF)) * 2 * Math.PI * RF;
+    if (rel > -half && rel < half) edges.push(rel);
+  }
+  const cuts = [...new Set([...Array.from({ length: steps + 1 }, (_, i) => -half + i * ds), -deck, deck, ...edges])].sort((x, y) => x - y);
+  const floor = new Mesher(), walls = new Mesher(), small = new Mesher(), roof = new Mesher();
   const up = (s) => B.up(s);
   const P = (s, c, kind) => [s, c, kind, j];
-  // the floor's top, either side of the canal, and over it on the deck
+  const D = (s, c) => [mid + s - DECK_MID, c, 3, j];   // on the flight deck: s from its middle
+  const streetHere = zone(0) === 'town';
   for (let i = 0; i + 1 < cuts.length; i++) {
-    const a = cuts[i], b = cuts[i + 1], n = up((a + b) / 2);
+    const a = cuts[i], b = cuts[i + 1], n = up((a + b) / 2), here = zone((a + b) / 2);
+    if (here === 'deck') {   // the flight deck's plating, across the band
+      floor.quad(B.at(a, -HALF, 0), B.at(b, -HALF, 0), B.at(b, HALF, 0), B.at(a, HALF, 0), n, [1, 1, 1], 0, [D(a, -HALF), D(b, -HALF), D(b, HALF), D(a, HALF)]);
+      continue;
+    }
+    if (here !== 'town') continue;
+    // the floor's top, either side of the canal
     for (const [c0, c1] of [[-HALF, -WALK.canal], [WALK.canal, HALF]]) {
       floor.quad(B.at(a, c0, 0), B.at(b, c0, 0), B.at(b, c1, 0), B.at(a, c1, 0), n, [1, 1, 1], 0, [P(a, c0, 0), P(b, c0, 0), P(b, c1, 0), P(a, c1, 0)]);
     }
-  }
-  for (const [a, b] of [[-deck, 0], [0, deck]]) {
-    floor.quad(B.at(a, -WALK.canal, 0), B.at(b, -WALK.canal, 0), B.at(b, WALK.canal, 0), B.at(a, WALK.canal, 0), up((a + b) / 2), [1, 1, 1], 0,
-      [P(a, -WALK.canal, 0), P(b, -WALK.canal, 0), P(b, WALK.canal, 0), P(a, WALK.canal, 0)]);
-  }
-  // the canal: water, its walls, the decks' edges
-  const h = WATER;
-  for (let i = 0; i + 1 < cuts.length; i++) {
-    const a = cuts[i], b = cuts[i + 1], n = up((a + b) / 2);
+    // the canal: water, and its walls where no deck crosses it
+    const h = WATER;
     floor.quad(B.at(a, -WALK.canal, h), B.at(b, -WALK.canal, h), B.at(b, WALK.canal, h), B.at(a, WALK.canal, h), n, [1, 1, 1], 0,
       [P(a, -WALK.canal, 1), P(b, -WALK.canal, 1), P(b, WALK.canal, 1), P(a, WALK.canal, 1)]);
-    if (b <= -deck || a >= deck) {
+    if (b <= -deck || a >= deck || !streetHere) {
       for (const side of [-1, 1]) {
         const c = side * WALK.canal;
         floor.quad(B.at(a, c, 0), B.at(b, c, 0), B.at(b, c, h), B.at(a, c, h), [0, -side, 0], [1, 1, 1], 0, [P(a, c, 2), P(b, c, 2), P(b, c, 2), P(a, c, 2)]);
       }
     }
   }
-  for (const side of [-1, 1]) {
-    const s = side * deck, sp = B.spin(s);
-    floor.quad(B.at(s, -WALK.canal, 0), B.at(s, WALK.canal, 0), B.at(s, WALK.canal, -0.8), B.at(s, -WALK.canal, -0.8), [side * sp[0], 0, side * sp[2]], [1, 1, 1], 0,
-      [P(s, -WALK.canal, 2), P(s, WALK.canal, 2), P(s, WALK.canal, 2), P(s, -WALK.canal, 2)]);
+  // the cross street's deck over the canal, and its edges; where the canal meets a bulkhead, the bulkhead's foot
+  if (streetHere) {
+    for (const [a, b] of [[-deck, 0], [0, deck]]) {
+      floor.quad(B.at(a, -WALK.canal, 0), B.at(b, -WALK.canal, 0), B.at(b, WALK.canal, 0), B.at(a, WALK.canal, 0), up((a + b) / 2), [1, 1, 1], 0,
+        [P(a, -WALK.canal, 0), P(b, -WALK.canal, 0), P(b, WALK.canal, 0), P(a, WALK.canal, 0)]);
+    }
+    for (const side of [-1, 1]) {
+      const s = side * deck, sp = B.spin(s);
+      floor.quad(B.at(s, -WALK.canal, 0), B.at(s, WALK.canal, 0), B.at(s, WALK.canal, -0.8), B.at(s, -WALK.canal, -0.8), [side * sp[0], 0, side * sp[2]], [1, 1, 1], 0,
+        [P(s, -WALK.canal, 2), P(s, WALK.canal, 2), P(s, WALK.canal, 2), P(s, -WALK.canal, 2)]);
+    }
   }
-  // the solid things whose middle is in this sector
+  for (const e of edges) {
+    if (zone(e - 0.5) === 'town' || zone(e + 0.5) === 'town') {
+      const toTown = zone(e - 0.5) === 'town' ? -1 : 1, sp = B.spin(e);
+      if (zone(e + toTown * 0.5) !== 'town') continue;
+      floor.quad(B.at(e, -WALK.canal, 0), B.at(e, WALK.canal, 0), B.at(e, WALK.canal, WATER), B.at(e, -WALK.canal, WATER), [toTown * sp[0], 0, toTown * sp[2]], [1, 1, 1], 0,
+        [P(e, -WALK.canal, 2), P(e, WALK.canal, 2), P(e, WALK.canal, 2), P(e, -WALK.canal, 2)]);
+    }
+  }
+  // the solid things whose middle is in this sector: the bulkheads with the walls, never left undrawn; the rest
+  // small, which a tier leaves undrawn far away
   let n = 0;
   for (const b of boxes) {
     if (b.zone !== WHERE.floor || b.kind === BOX.pylon || b.kind === BOX.shaft) continue;
     let rel = b.s - mid;
     rel -= Math.round(rel / (2 * Math.PI * RF)) * 2 * Math.PI * RF;
     if (rel < -half || rel >= half) continue;
+    if (b.kind === BOX.bulkhead) {
+      bentBox(walls, B, rel - b.half, rel + b.half, b.c0, b.c1, 0, b.h1, [0.42, 0.43, 0.45], KIND.bulkhead);
+      continue;
+    }
+    if (b.kind === BOX.lock) {   // a lock gate: from the water to its rail, dark, and a lamp along its top
+      bentBox(small, B, rel - b.half, rel + b.half, b.c0, b.c1, WATER, b.h1 - 0.15, [0.1, 0.105, 0.11], KIND.plain);
+      bentBox(small, B, rel - 0.2, rel + 0.2, b.c0, b.c1, b.h1 - 0.15, b.h1, [1, 0.8, 0.45], KIND.lamp);
+      continue;
+    }
     const colour = b.kind === BOX.block ? BLOCK_COLOURS[n++ % BLOCK_COLOURS.length] : [0.5, 0.47, 0.42];
-    bentBox(solid, B, rel - b.half, rel + b.half, b.c0, b.c1, b.h0 - (b.kind === BOX.block ? 0.3 : 0), b.h1, colour, b.kind === BOX.block ? KIND.block : KIND.plain);
+    bentBox(small, B, rel - b.half, rel + b.half, b.c0, b.c1, b.h0 - (b.kind === BOX.block ? 0.3 : 0), b.h1, colour, b.kind === BOX.block ? KIND.block : KIND.plain);
   }
-  // the rim walls, from the floor to their tops
+  // the rim walls, from the floor to their tops, the whole way round
   for (let i = 0; i < steps / 4; i++) {
     const a = -half + i * ds * 4, b = a + ds * 4;
     for (const side of [-1, 1]) {
       const c = side * HALF;
-      solid.quad(B.at(a, c, 0), B.at(b, c, 0), B.at(b, c, RF - RIM_R), B.at(a, c, RF - RIM_R), [0, -side, 0], [0.36, 0.37, 0.39], KIND.wall);
+      walls.quad(B.at(a, c, 0), B.at(b, c, 0), B.at(b, c, RF - RIM_R), B.at(a, c, RF - RIM_R), [0, -side, 0], [0.36, 0.37, 0.39], KIND.wall);
     }
   }
-  // the roof: one piece across, finely round
-  const R = bender(RF);
-  for (let i = 0; i < steps / 2; i++) {
-    const a = -half + i * ds * 2, b = a + ds * 2, rh = RF - ROOF_R;
-    roof.quad(R.at(a, -HALF, rh), R.at(b, -HALF, rh), R.at(b, HALF, rh), R.at(a, HALF, rh), up((a + b) / 2));
+  // the roof: one piece across, finely round; none over the flight deck
+  const roofCuts = [...new Set([...Array.from({ length: steps / 2 + 1 }, (_, i) => -half + i * ds * 2), ...edges])].sort((x, y) => x - y);
+  for (let i = 0; i + 1 < roofCuts.length; i++) {
+    const a = roofCuts[i], b = roofCuts[i + 1], rh = RF - ROOF_R;
+    if (zone((a + b) / 2) === 'deck') continue;
+    roof.quad(B.at(a, -HALF, rh), B.at(b, -HALF, rh), B.at(b, HALF, rh), B.at(a, HALF, rh), up((a + b) / 2));
   }
   const group = placeAt(new THREE.Group(), mid / RF, RF);
   group.add(new THREE.Mesh(floor.geometry(), mats.floor));
-  group.add(new THREE.Mesh(solid.geometry(), mats.box));
-  const r = new THREE.Mesh(roof.geometry(), mats.roof);
-  r.renderOrder = 2;
-  group.add(r);
-  group.userData.plaza = plaza;
+  group.add(new THREE.Mesh(walls.geometry(), mats.box));
+  const smalls = small.empty ? null : new THREE.Mesh(small.geometry(), mats.box);
+  if (smalls) group.add(smalls);
+  if (!roof.empty) {
+    const r = new THREE.Mesh(roof.geometry(), mats.roof);
+    r.renderOrder = 2;
+    group.add(r);
+  }
+  group.userData = { plaza, small: smalls, mid };
   return group;
 }
 
@@ -750,9 +899,16 @@ export class WalkWorld {
       glass: material(GLASS_FRAGMENT, this.light, { transparent: true, depthWrite: false, side: THREE.DoubleSide }),
     };
     this.mats = mats;
+    this.tier = null;
+    this.smallFar = Infinity;
     this.scene = new THREE.Scene();
     this.band = new THREE.Group();          // the rim floor and all that stands in the band
-    for (let j = 0; j < SECTORS; j++) this.band.add(buildSector(j, boxes, mats));
+    this.sectors = [];
+    for (let j = 0; j < SECTORS; j++) {
+      const sector = buildSector(j, boxes, mats);
+      this.sectors.push(sector);
+      this.band.add(sector);
+    }
     this.band.add(buildShafts(boxes, mats));
     this.outside = new THREE.Group();       // what is seen from outside the hub: the spokes and tubes, the hub
     for (let k = 0; k < RING.spokes; k++) this.outside.add(buildSpoke(k, mats));
@@ -787,8 +943,37 @@ export class WalkWorld {
     this.scene.add(this.band, this.outside, this.lobby, this.ball, this.mark);
   }
 
-  // o: the walk's readouts; dt: s since the last frame (for the doors)
-  update(o, dt) {
+  // settings: a graphics tier's (quality.js); the walk takes its name. Rebuilds the shaders when it changes.
+  setQuality(settings) {
+    const name = settings && WALK_TIERS[settings.name] ? settings.name : 'medium';
+    if (name === this.tier) return;
+    this.tier = name;
+    const t = WALK_TIERS[name];
+    this.smallFar = t.smallFar;
+    for (const m of Object.values(this.mats)) {
+      m.defines = { ...m.defines, DETAIL: t.detail };
+      m.needsUpdate = true;
+    }
+  }
+
+  // How many of the small things are drawn, of all of them: for the page's tests and its report.
+  smallsDrawn() {
+    const all = this.sectors.filter((s) => s.userData.small);
+    return { drawn: all.filter((s) => s.userData.small.visible).length, of: all.length };
+  }
+
+  // o: the walk's readouts; dt: s since the last frame (for the doors); eye: the camera, ring frame; t: s, for
+  // what blinks
+  update(o, dt, eye = null, t = 0) {
+    this.light.uTime.value = t;
+    if (eye) {
+      for (const sector of this.sectors) {
+        const small = sector.userData.small;
+        if (!small) continue;
+        const p = sector.position, d = Math.hypot(p.x - eye[0], p.y - eye[1], p.z - eye[2]) - STREET / 2;
+        small.visible = d < this.smallFar;
+      }
+    }
     const where = Math.round(o.where), inLobby = where === WHERE.hub || (where === WHERE.lift && o.liftR < RL + 1);
     this.lobby.visible = where === WHERE.hub || (where === WHERE.lift && o.liftR < RL + 400);
     this.band.visible = !inLobby;

@@ -12,9 +12,12 @@ import { Core, RING } from '../src/core.js';
 import { cross, dot, length, sub } from '../src/frames.js';
 import { BALL, BOX, LIFT, PLACE, USE, WALK, WALK_OUT, WHERE, WalkCore } from '../src/walk-core.js';
 import {
-  HALF, RF, RIM_R, S_RIM, STREET, W, between, bearingName, decked, feltUp, floorPlace, outward, ringDirToSite, ringFrame, ringToSite,
-  siteDirToRing, spinward, sunFor, sunReach, sunReachMarched, surfaceAt, turnAboutAxis, viewAxes, walkLines, walkStatus,
+  DECK_LEN, DECK_MID, HALF, bulkheadAhead, RF, RIM_R, SEALED, S_RIM, STREET, W, WALK_TIERS, between, bearingName, decked, feltUp, floorPlace, fromDeck, outward,
+  ringDirToSite, ringFrame, ringToSite, siteDirToRing, skyWindow, spinward, sunFor, sunReach, sunReachMarched, surfaceAt, turnAboutAxis, viewAxes,
+  walkLines, walkStatus,
 } from '../src/walk-math.js';
+import { DECK, DECK_A, DECK_HALF, DECK_WALL, bulkheads } from '../src/ring-plan.js';
+import { SETTINGS, TIERS } from '../src/quality.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const header = readFileSync(join(here, '..', '..', 'core', 'orbit_walk.h'), 'utf8');
@@ -41,7 +44,7 @@ test('the walk\'s numbers and names for things are the header\'s', () => {
   holds('OC_LIFT_', LIFT, ['AT_HUB', 'DOWN', 'AT_FLOOR', 'UP']);
   holds('OC_USE_', USE, ['NOTHING', 'HATCH', 'CALL', 'RIDE']);
   holds('OC_BALL_', BALL, ['NONE', 'FLYING', 'RESTING']);
-  holds('OC_BOX_', BOX, ['BLOCK', 'PARAPET', 'PYLON', 'SHAFT']);
+  holds('OC_BOX_', BOX, ['BLOCK', 'PARAPET', 'PYLON', 'SHAFT', 'BULKHEAD', 'LOCK']);
 });
 
 // A ring frame from readouts as the flight core gives them: some centre, an axis and a ref square to it.
@@ -91,6 +94,8 @@ test('the Sun\'s reach, worked out from the band\'s shape and found again by a r
   const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   for (let k = 0; k < 400; k++) {
     const th = 2 * Math.PI * r(), c = (r() * 2 - 1) * (HALF - 5), h = 0.2 + r() * 250, R = RF - h;
+    const off = Math.abs(fromDeck(th * RF));
+    if (off > DECK_LEN - 1 && off < SEALED + 1) continue;   // in a bulkhead, where nothing is lit
     const p = [R * Math.sin(th), c, R * Math.cos(th)];
     const d = [r() * 2 - 1, r() * 2 - 1, r() * 2 - 1], dn = length(d);
     const u = d.map((x) => x / dn);
@@ -102,6 +107,22 @@ test('the Sun\'s reach, worked out from the band\'s shape and found again by a r
   }
   assert.equal(agree, n, `${n - agree} of ${n} points disagree`);
   assert.ok(lit > n * 0.1 && lit < n * 0.6, `${lit} of ${n} lit`);
+});
+
+test('the flight deck\'s bulkheads shade the town beside them: worked out, and found again by a marched ray', () => {
+  let seed = 5, shaded = 0;
+  const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let k = 0; k < 3000; k++) {
+    const side = r() < 0.5 ? -1 : 1, s = DECK_MID + side * (SEALED + 1 + r() * 120), c = (r() * 2 - 1) * (HALF - 20), h = 0.5 + r() * 40;
+    const th = s / RF, R = RF - h, p = [R * Math.sin(th), c, R * Math.cos(th)];
+    const d = [r() * 2 - 1, r() * 2 - 1, r() * 2 - 1], n = Math.hypot(...d), u = d.map((x) => x / n);
+    if (!bulkheadAhead(p, u, 1e5)) continue;
+    const analytic = sunReach(p, u), marched = sunReachMarched(p, u, 0.25);
+    if (analytic > 0.02 && analytic < 0.98) continue;
+    assert.equal(analytic > 0.5, marched > 0.5, `beside a bulkhead at s ${s.toFixed(1)}, c ${c.toFixed(1)}, h ${h.toFixed(1)}`);
+    if (analytic === 0) shaded++;
+  }
+  assert.ok(shaded > 100, `${shaded} rays a bulkhead stood in`);
 });
 
 test('the Sun 23.7 degrees out of the ring\'s plane lights the middle of the band about a third of each turn', () => {
@@ -174,8 +195,8 @@ test('the plan the page paints is the one the walker walks in', { skip: !existsS
     const s = (i * 15.7) % S_RIM, c = ((i * 7.3) % 58) - 29;   // across the canal
     if (!free(s, c)) continue;
     checked++;
-    const water = surfaceAt(s, c) === 'water';
-    assert.equal(walk.put(s, c), !water, `at s ${s.toFixed(1)}, c ${c.toFixed(1)} the page paints ${surfaceAt(s, c)}`);
+    const closed = ['water', 'flightdeck', 'bulkhead'].includes(surfaceAt(s, c));
+    assert.equal(walk.put(s, c), !closed, `at s ${s.toFixed(1)}, c ${c.toFixed(1)} the page paints ${surfaceAt(s, c)}`);
   }
   assert.ok(checked > 1000, `${checked} places checked`);
   // the parapets stand along the painted banks and across the canal at the painted decks' edges
@@ -223,6 +244,68 @@ test('the core through the page\'s wrapper: weight, a jump, the lift, and the sa
     hashes.push(walk.hash());
   }
   assert.equal(hashes[0], hashes[1], 'the same walk twice');
+});
+
+test('the walk\'s bulkheads are where the page draws the flight deck\'s, and the town keeps off the deck', { skip: !existsSync(built) && `no module at ${built}: build it first` }, async () => {
+  const walk = new WalkCore(new Core(await createRequire(import.meta.url)(built)()).m);
+  walk.reset(PLACE.floor);
+  const boxes = walk.boxes(), mine = boxes.filter((b) => b.kind === BOX.bulkhead).sort((a, b) => a.s - b.s);
+  const drawn = bulkheads().sort((a, b) => a.a - b.a);
+  assert.equal(mine.length, 2);
+  mine.forEach((b, i) => {
+    const k = drawn[i];
+    near(b.s / RF, k.a, 1e-12, 'its middle, as an angle');
+    near((b.s - k.side * b.half) / RF, k.face, 1e-12, 'its face toward the deck');
+    near(2 * b.half, DECK.bulkhead, 1e-9, 'its thickness');
+    near(b.h1, RF - k.r0, 1e-9, 'its top, at the roof, as in the core and on the page');
+    assert.ok(b.c0 <= -k.y && b.c1 >= k.y, 'across the band');
+  });
+  near(DECK_MID, DECK_A * RF, 1e-9, 'the deck\'s middle');
+  near(DECK_LEN / RF, DECK_HALF, 1e-12, 'its half-length');
+  near((SEALED - DECK_LEN) / RF, DECK_WALL, 1e-12, 'the bulkheads\' thickness');
+  for (const b of boxes) {
+    if (b.zone !== WHERE.floor || b.kind === BOX.bulkhead) continue;
+    assert.ok(Math.abs(fromDeck(b.s)) - b.half > SEALED - 1e-9, `a ${b.kind === BOX.lock ? 'lock gate' : 'thing'} of the town on the deck, at ${b.s.toFixed(1)}`);
+  }
+  assert.equal(boxes.filter((b) => b.kind === BOX.lock).length, 2, 'a lock gate where the canal meets each bulkhead');
+  assert.equal(surfaceAt(DECK_MID, 0), 'flightdeck');
+  assert.equal(surfaceAt(DECK_MID + DECK_LEN + 10, 37), 'bulkhead');
+  assert.match(floorPlace(DECK_MID - SEALED - 6, 37), /6 m from the flight deck's bulkhead$/);
+});
+
+test('the sky is drawn only where it can be seen: from the floor, out over the rim walls', () => {
+  const eye = [0, 37, RF - 1.7], level = viewAxes(0, 0, 0);
+  const down = viewAxes(0, 0, -1.2), up = viewAxes(0, Math.PI / 2, 1.2);
+  const axes = (a) => ({ fwd: a.fwd, up: a.up, right: a.right });
+  assert.equal(skyWindow(eye, axes(down), 60, 16 / 9), null, 'looking down at the floor: no sky');
+  const high = skyWindow(eye, axes(up), 60, 16 / 9);
+  assert.ok(high && high.y1 - high.y0 > 0.3, 'looking up toward the +c wall\'s top: sky');
+  const ahead = skyWindow(eye, axes(level), 60, 16 / 9);
+  assert.ok(!ahead || ahead.y0 > 0.4, 'looking along the floor, the sky only in the top of the picture');
+  // a ray the window leaves out does not get out: every grid ray between its cells, traced, is blocked
+  const fine = 64, ty = Math.tan(Math.PI / 6), tx = ty * 16 / 9;
+  for (const a of [level, up, viewAxes(0.3, 0.4, 0.6)]) {
+    const win = skyWindow(eye, axes(a), 60, 16 / 9);
+    for (let i = 0; i <= fine; i++) {
+      for (let j = 0; j <= fine; j++) {
+        const x = i / fine, y = j / fine;
+        if (win && x >= win.x0 && x <= win.x1 && y >= win.y0 && y <= win.y1) continue;
+        const d = [0, 1, 2].map((k) => a.fwd[k] + a.right[k] * (2 * x - 1) * tx + a.up[k] * (2 * y - 1) * ty);
+        const n = Math.hypot(...d);
+        assert.equal(sunReach(eye, d.map((v) => v / n)), 0, `sky left out at ${x.toFixed(2)}, ${y.toFixed(2)}`);
+      }
+    }
+  }
+});
+
+test('every graphics tier asks the walk for something, and no more of it at a lower tier', () => {
+  assert.deepEqual(Object.keys(WALK_TIERS).sort(), [...TIERS].sort());
+  for (let i = 1; i < TIERS.length; i++) {
+    const lo = WALK_TIERS[TIERS[i - 1]], hi = WALK_TIERS[TIERS[i]];
+    assert.ok(hi.detail >= lo.detail && hi.smallFar >= lo.smallFar, `${TIERS[i]} draws no less than ${TIERS[i - 1]}`);
+    assert.equal(SETTINGS[TIERS[i]].name, TIERS[i]);
+  }
+  assert.equal(WALK_TIERS.low.detail, 0, 'low: the cheaper shading');
 });
 
 test('the ring\'s shape the walk is drawn in is the core\'s', () => {
