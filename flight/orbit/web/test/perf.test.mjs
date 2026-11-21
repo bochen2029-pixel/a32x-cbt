@@ -30,3 +30,13 @@ test('the lines say the rate, the tier, the picture and the draws', () => {
   assert.match(perfLines(frameStats([3233.2]))[0], /^0\.3 fps · 3233\.2 ms a frame/);
   assert.match(perfLines(frameStats([200, 200]))[0], /^5\.0 fps/);
 });
+
+test('the fourth line says how the frame rate is held: the picture\'s share of the tier\'s, the Earth\'s, the GPU\'s time', () => {
+  const st = frameStats([20, 20, 20]);
+  const at = (held) => perfLines(st, { tier: 'medium', held });
+  assert.equal(at(null).length, 3, 'without the controller, three lines');
+  assert.equal(at({ fixed: false, scale: 1, rung: 0, target: 1000 / 60, gpu: null, earth: 1 })[3], 'held at 60 fps: the tier\'s full picture');
+  assert.equal(at({ fixed: false, scale: 0.8, rung: 2, target: 1000 / 30, gpu: 12.34, earth: 0.5 })[3], 'held at 30 fps: the picture 0.80 of the tier\'s, 2 rungs down, the Earth at half its size');
+  assert.match(at({ fixed: false, scale: 0.8, rung: 2, target: 1000 / 30, gpu: 12.34, earth: 0.5 })[0], / · GPU 12\.3$/);
+  assert.equal(at({ fixed: true, scale: 1, rung: 0, target: 1000 / 60, gpu: null, earth: 1 })[3], 'the picture\'s size fixed');
+});

@@ -59,7 +59,7 @@ export const perf = {
     let t = 0, k = this.intervals.length;
     while (k > 0 && t < 2000) t += this.intervals[--k];
     const st = frameStats(this.intervals.slice(k));
-    const r = this.ctx.renderer, q = (window.orbitSketch && window.orbitSketch.quality) || {};
+    const r = this.ctx.renderer, o = window.orbitSketch || {}, q = o.quality || {};
     const v2 = { x: 0, y: 0, set(x, y) { this.x = x; this.y = y; return this; }, floor() { this.x = Math.floor(this.x); this.y = Math.floor(this.y); return this; } };   // as a Vector2 is used there
     const size = r.getDrawingBufferSize ? r.getDrawingBufferSize(v2) : v2;
     return {
@@ -68,6 +68,7 @@ export const perf = {
       calls: r.info.render.calls, triangles: r.info.render.triangles,
       width: size.x, height: size.y, ratio: r.getPixelRatio ? r.getPixelRatio() : 1,
       slices: (this.ctx.state && this.ctx.state.slices) || 1,
+      held: o.governor ? { ...o.governor.describe(), gpu: o.gpuTime ? o.gpuTime.ms : null, earth: o.earth ? o.earth.resolution : 1 } : null,
     };
   },
 

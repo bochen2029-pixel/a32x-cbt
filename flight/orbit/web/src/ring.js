@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HUB_PORT_M } from './core.js';
 import { lightPoints, lightsMaterial } from './glow.js';
+import { mergeStatic } from './merge.js';
 import { Paint, rng } from './paint.js';
 import {
   ARRAYS, CANAL, COLLAR, DECK, DECK_A, DECK_DOOR, DECK_HALF, DECK_WALL, FOOT, HALF, INNER, MAST, PORT, QUAY, RING, SQUARE, SQUARES,
@@ -732,16 +733,17 @@ export class Ring {
     }
     add(mergeGeometries(tubes.map(strip)), dark);
     add(mergeGeometries(towers.map(strip)), plain);
-    // the lift cars, two a spoke, one going each way
+    // the lift cars, two a spoke, one going each way: one mesh drawn twelve times, each where update() puts it
     this.cars = [];
     const carG = new THREE.BoxGeometry(14, 14, 22);
     const carM = new THREE.MeshStandardMaterial({ color: 0xd0d4da, roughness: 0.4, metalness: 0.3, emissive: 0xffd9a0, emissiveIntensity: 0.6 });
     this.materials.push(carM);
-    for (let k = 0; k < RING.spokes; k++) for (const j of [0, 1]) {
-      const car = add(carG, carM);
-      car.rotation.y = spokeAngle(k);
-      this.cars.push({ car, a: spokeAngle(k), phase: k * 0.37 + j * 0.5, dir: j ? 1 : -1 });
-    }
+    for (let k = 0; k < RING.spokes; k++) for (const j of [0, 1]) this.cars.push({ a: spokeAngle(k), phase: k * 0.37 + j * 0.5, dir: j ? 1 : -1 });
+    this.carMesh = new THREE.InstancedMesh(carG, carM, this.cars.length);
+    this.carMesh.frustumCulled = false;   // they run the spokes' length: no one bound holds them still
+    this.body.add(this.carMesh);
+    this.owned.push(this.carMesh);
+    this.placeCars(0);
 
     // the hub: barrel, collar, the two faces, hoops, the port as the sketch has always drawn it
     add(cylinder({ r: RING.hub, y0: -HUB_PORT_M, y1: HUB_PORT_M, segs: 96, uTiles: 8, vTiles: 4 }), hubM);
@@ -776,20 +778,26 @@ export class Ring {
     // the mast and its arrays, held still and turned to the Sun (update)
     add(new THREE.CylinderGeometry(MAST.r, MAST.r, MAST.y1 - MAST.y0, 16).translate(0, (MAST.y0 + MAST.y1) / 2, 0), plain, this.mast);
     add(new THREE.CylinderGeometry(MAST.r * 3, MAST.r * 3, 30, 24).translate(0, MAST.y0 + 15, 0), dark, this.mast);
-    this.wings = [];
-    for (const y of ARRAYS.at) {
-      const pair = new THREE.Group();
-      pair.position.y = y;
-      this.mast.add(pair);
-      for (const s of [-1, 1]) {
-        const g = new THREE.BoxGeometry(ARRAYS.span, ARRAYS.chord, 1.2).translate(s * (ARRAYS.root + ARRAYS.span / 2), 0, 0);
-        const uv = g.attributes.uv;
-        for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (ARRAYS.span / 40), uv.getY(i) * (ARRAYS.chord / 40));
-        add(g, cellM, pair);
-        add(new THREE.BoxGeometry(ARRAYS.span + ARRAYS.root, 3, 3).translate(s * (ARRAYS.span + ARRAYS.root) / 2, 0, 0), dark, pair);
-      }
-      this.wings.push(pair);
+    // its wings, a pair at each of three heights, each pair turned about its own spar to the Sun (update):
+    // the cells and the spars each one mesh drawn three times
+    const cellsG = [], sparsG = [];
+    for (const s of [-1, 1]) {
+      const g = new THREE.BoxGeometry(ARRAYS.span, ARRAYS.chord, 1.2).translate(s * (ARRAYS.root + ARRAYS.span / 2), 0, 0);
+      const uv = g.attributes.uv;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (ARRAYS.span / 40), uv.getY(i) * (ARRAYS.chord / 40));
+      cellsG.push(g);
+      sparsG.push(new THREE.BoxGeometry(ARRAYS.span + ARRAYS.root, 3, 3).translate(s * (ARRAYS.span + ARRAYS.root) / 2, 0, 0));
     }
+    this.wings = [cellM, dark].map((m, i) => {
+      const parts = i ? sparsG : cellsG, wing = new THREE.InstancedMesh(mergeGeometries(parts, false), m, ARRAYS.at.length);
+      for (const g of parts) g.dispose();
+      wing.frustumCulled = false;   // they turn: no one bound holds them
+      this.mast.add(wing);
+      this.owned.push(wing);
+      return wing;
+    });
+    this.wingTilt = null;
+    this.tiltWings(0);
 
     // the lights
     const L = planLights(q);
@@ -804,7 +812,37 @@ export class Ring {
     // the hub, its port and its collar take the craft's shadow, where the tier casts one (docked there)
     for (const m of this.owned) if (m.material === hubM || m.material === portM || m.material === mouthM) m.receiveShadow = true;
 
+    // fewer draw calls: the parts that stand still in the Ring's frame and share a material, one mesh each
+    const { merged, removed } = mergeStatic(this.owned);
+    const gone = new Set(removed);
+    for (const m of removed) m.geometry.dispose();
+    this.owned = [...this.owned.filter((m) => !gone.has(m)), ...merged];
+
     if (this.envMap) this.setEnvMap(this.envMap);
+  }
+
+  // The lift cars at time t, s: up and down their tubes, a few minutes a trip.
+  placeCars(t) {
+    const m = this.carMatrix || (this.carMatrix = new THREE.Matrix4());
+    this.cars.forEach((c, i) => {
+      const f = 0.5 + 0.5 * Math.sin(t * 0.012 * c.dir + c.phase * TAU);
+      const r = COLLAR.r + 40 + f * (RING.roof - COLLAR.r - 80);
+      m.makeRotationY(c.a).setPosition(Math.sin(c.a) * r, 0, Math.cos(c.a) * r);
+      this.carMesh.setMatrixAt(i, m);
+    });
+    this.carMesh.instanceMatrix.needsUpdate = true;
+  }
+
+  // The solar arrays turned to the Sun's elevation el (rad) above the mast's plane, about their spars.
+  tiltWings(el) {
+    if (this.wingTilt === el) return;
+    this.wingTilt = el;
+    const m = new THREE.Matrix4();
+    ARRAYS.at.forEach((y, i) => {
+      m.makeRotationX(-el).setPosition(0, y, 0);
+      for (const w of this.wings) w.setMatrixAt(i, m);
+    });
+    for (const w of this.wings) w.instanceMatrix.needsUpdate = true;
   }
 
   // The reflected sky, for the metal and the glass: a cube texture (main.js renders it), or null.
@@ -839,18 +877,12 @@ export class Ring {
     // the mast turns against the spin to keep its arrays square to the Sun
     const sl = this.sunLocal;
     this.mast.rotation.set(0, Math.atan2(sl.x, sl.z), 0);
-    const el = Math.atan2(sl.y, Math.hypot(sl.x, sl.z));
-    for (const w of this.wings) w.rotation.x = -el;
-    // the lift cars, up and down their tubes, a few minutes a trip
-    for (const c of this.cars) {
-      const f = 0.5 + 0.5 * Math.sin(t * 0.012 * c.dir + c.phase * TAU);
-      const r = COLLAR.r + 40 + f * (RING.roof - COLLAR.r - 80);
-      c.car.position.set(Math.sin(c.a) * r, 0, Math.cos(c.a) * r);
-    }
+    this.tiltWings(Math.atan2(sl.y, Math.hypot(sl.x, sl.z)));
+    this.placeCars(t);
   }
 
   dispose() {
-    for (const o of this.owned || []) { o.parent?.remove(o); o.geometry?.dispose(); }
+    for (const o of this.owned || []) { o.parent?.remove(o); o.geometry?.dispose(); if (o.isInstancedMesh) o.dispose(); }
     for (const m of this.materials || []) m.dispose();
     for (const t of this.textures || []) t.dispose();
     if (this.body) this.spin.remove(this.body);
