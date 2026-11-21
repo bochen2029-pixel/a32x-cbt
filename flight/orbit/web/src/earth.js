@@ -628,17 +628,25 @@ export class Earth {
   }
 
   // Shows, for each draw of the scene the Earth is in, the meshes it wants: at a fraction of the size the
-  // composite and the band, but the full one for a cube's face, which has no picture of its own at a fraction.
+  // composite and the band, but the full one for a cube's face, which has no picture of its own at a
+  // fraction, and for a view so narrow that the band would fill much of it (the Moon's telescope at the limb).
   hook(scene) {
     if (!scene || !scene.isScene || scene.userData.earthHooked) return;
     scene.userData.earthHooked = true;
     const before = scene.onBeforeRender;
     scene.onBeforeRender = (renderer, sc, camera, target) => {
       before.call(scene, renderer, sc, camera, target);
-      const half = this.resolution < 1 && !(target && target.isWebGLCubeRenderTarget);
+      const half = this.resolution < 1 && !(target && target.isWebGLCubeRenderTarget) && !this.bandFills(camera);
       this.full.visible = !half;
       this.comp.visible = this.strip.visible = half;
     };
+  }
+
+  // Whether the band would be wider than a third of the view's height: then it is cheaper drawn in full.
+  bandFills(camera) {
+    const fov = ((camera.fov || 60) * Math.PI) / 180;
+    const { inner, outer } = bandAngles(this.uniforms.uEarthC.value.length(), fov / Math.max(1, this.viewportHeight) / this.resolution);
+    return outer - inner > fov / 3;
   }
 
   // The share of the picture's size, each way, at which the light is worked out: 1, every pixel, as every
