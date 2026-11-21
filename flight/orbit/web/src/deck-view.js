@@ -49,66 +49,110 @@ function paintPad(g, n, number) {
   g.restore();
 }
 
+// A flat thing laid on the deck, in the Ring's frame: its own x and y in the floor (y spinward), its z to the axis,
+// its centre at angle a, r from the axis, c across.
+function laid(a, r, c) {
+  const z = new THREE.Vector3(-Math.sin(a), 0, -Math.cos(a)), y = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a));
+  return { o: at(a, r, c), x: new THREE.Vector3().crossVectors(y, z), y, z };
+}
+
+// Many flat quads in one geometry, each as a PlaneGeometry w by h laid at (a, r, c) would be, with its uvs over
+// [u0, u1] by [v0, v1] (a part of a texture shared by them all): one draw for all of them.
+function quads(list) {
+  const pos = new Float32Array(list.length * 12), nor = new Float32Array(list.length * 12), uv = new Float32Array(list.length * 8);
+  const idx = new Uint32Array(list.length * 6);
+  list.forEach((q, i) => {
+    const L = laid(q.a, q.r, q.c), [u0, v0, u1, v1] = q.uv || [0, 0, 1, 1];
+    const corners = [[-q.w / 2, q.h / 2, u0, v1], [q.w / 2, q.h / 2, u1, v1], [-q.w / 2, -q.h / 2, u0, v0], [q.w / 2, -q.h / 2, u1, v0]];   // PlaneGeometry's order
+    corners.forEach(([px, py, u, v], j) => {
+      const at3 = L.o.clone().addScaledVector(L.x, px).addScaledVector(L.y, py);
+      pos.set([at3.x, at3.y, at3.z], (i * 4 + j) * 3);
+      nor.set([L.z.x, L.z.y, L.z.z], (i * 4 + j) * 3);
+      uv.set([u, v], (i * 4 + j) * 2);
+    });
+    idx.set([0, 2, 1, 2, 3, 1].map((k) => i * 4 + k), i * 6);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setIndex(new THREE.BufferAttribute(idx, 1));
+  g.computeBoundingSphere();
+  return g;
+}
+
 // The deck's markings, in the Ring's turning frame: the pads with lights round them, the centreline dashed
 // from end to end, the edges along the rim walls, hazard stripes at the bulkheads' feet, and a row of lead-in
-// lights from the spinward end to the pads that flash in sequence toward them, the way the craft comes in.
+// lights from the spinward end to the pads that flash in sequence toward them, the way the craft comes in. Drawn
+// in seven draws (2026-11-21: 456 before, one a quad or a lamp): the pads painted side by side on one texture and
+// laid as one geometry; the white marks, the yellow stripes and the black as one geometry each; the pads' edge
+// lights as one instanced sphere, their colours each its own; the lead-in lights as one instanced sphere, dim, and
+// the one lit drawn over its place.
 function deckMarks() {
   const group = new THREE.Group();
-  const inward = (a) => new THREE.Vector3(-Math.sin(a), 0, -Math.cos(a));
-  const lay = (mesh, a, r, c) => {   // a flat thing in its own xy plane, its +z to the axis, its +y spinward
-    mesh.position.copy(at(a, r, c));
-    const z = inward(a), y = new THREE.Vector3(Math.cos(a), 0, -Math.sin(a)), x = new THREE.Vector3().crossVectors(y, z);
-    mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
-    return mesh;
-  };
-  const lights = [];
+  group.name = 'deck-marks';
+  const N = 512, atlas = document.createElement('canvas');
+  atlas.width = N * D.pads;
+  atlas.height = N;
+  const g2 = atlas.getContext('2d');
+  const pads = [];
   for (let k = 0; k < D.pads; k++) {
-    const canvas = document.createElement('canvas');
-    canvas.width = canvas.height = 512;
-    paintPad(canvas.getContext('2d'), 512, k + 1);
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.anisotropy = 4;
-    const paint = new THREE.MeshStandardMaterial({
-      map: tex, transparent: true, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.25, roughness: 0.8, metalness: 0.05,
-      polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8,
-    });
-    group.add(lay(new THREE.Mesh(new THREE.PlaneGeometry(PAD_R * 2, PAD_R * 2), paint), padAngle(k), FLOOR, 0));
-    for (let j = 0; j < 16; j++) {   // edge lights: green, the one toward the craft's coming white
-      const b = (j / 16) * Math.PI * 2, along = Math.cos(b) * (PAD_R + 0.8), across = Math.sin(b) * (PAD_R + 0.8);
-      const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 6), new THREE.MeshBasicMaterial({ color: j === 0 ? 0xffffff : 0x5dff8a }));
-      lamp.position.copy(at(padAngle(k) + along / RING.floor, FLOOR - 0.2, across));
-      group.add(lamp);
-      lights.push({ mesh: lamp, pad: k, kind: 'edge' });
+    g2.save();
+    g2.translate(k * N, 0);
+    paintPad(g2, N, k + 1);
+    g2.restore();
+    pads.push({ w: PAD_R * 2, h: PAD_R * 2, a: padAngle(k), r: FLOOR, c: 0, uv: [k / D.pads, 0, (k + 1) / D.pads, 1] });
+  }
+  const tex = new THREE.CanvasTexture(atlas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  const paint = new THREE.MeshStandardMaterial({
+    map: tex, transparent: true, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.25, roughness: 0.8, metalness: 0.05,
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -8,
+  });
+  group.add(new THREE.Mesh(quads(pads), paint));
+  // the pads' edge lights, sixteen a pad: green, the one toward the craft's coming white
+  const EDGE = 16, place = new THREE.Matrix4(), colour = new THREE.Color();
+  const edges = new THREE.InstancedMesh(new THREE.SphereGeometry(0.35, 10, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }), D.pads * EDGE);
+  for (let k = 0; k < D.pads; k++) {
+    for (let j = 0; j < EDGE; j++) {
+      const b = (j / EDGE) * Math.PI * 2, along = Math.cos(b) * (PAD_R + 0.8), across = Math.sin(b) * (PAD_R + 0.8);
+      edges.setMatrixAt(k * EDGE + j, place.makeTranslation(at(padAngle(k) + along / RING.floor, FLOOR - 0.2, across)));
+      edges.setColorAt(k * EDGE + j, colour.setHex(j === 0 ? 0xffffff : 0x5dff8a));
     }
   }
-  const white = new THREE.MeshBasicMaterial({ color: 0xe9edf1 }), yellow = new THREE.MeshBasicMaterial({ color: 0xffd23f }), black = new THREE.MeshBasicMaterial({ color: 0x15181c });
+  edges.computeBoundingSphere();
+  group.add(edges);
+  const white = [], yellow = [], black = [];
   const half = D.arc / 2;
   for (let s = -half + 15; s < half - 10; s += 30) {   // the centreline, dashed, clear of the pads
     let onPad = false;
     for (let k = 0; k < D.pads; k++) if (Math.abs(s - (k - (D.pads - 1) / 2) * D.padSpacing) < PAD_R + 8) onPad = true;
-    if (onPad) continue;
-    group.add(lay(new THREE.Mesh(new THREE.PlaneGeometry(1.2, 14), white), D.angle * D2R + s / RING.floor, FLOOR, 0));
+    if (!onPad) white.push({ w: 1.2, h: 14, a: D.angle * D2R + s / RING.floor, r: FLOOR, c: 0 });
   }
   for (const c of [-RING.width / 2 + 25, RING.width / 2 - 25]) {   // the deck's edges along the rim walls
-    for (let s = -half + 10; s < half - 5; s += 20) group.add(lay(new THREE.Mesh(new THREE.PlaneGeometry(0.8, 18), white), D.angle * D2R + s / RING.floor, FLOOR, c));
+    for (let s = -half + 10; s < half - 5; s += 20) white.push({ w: 0.8, h: 18, a: D.angle * D2R + s / RING.floor, r: FLOOR, c });
   }
   for (const end of [-1, 1]) {   // hazard stripes at the bulkheads' feet
     const a = D.angle * D2R + (end * (half - 6)) / RING.floor;
-    for (let c = -RING.width / 2 + 10; c < RING.width / 2 - 5; c += 10) {
-      group.add(lay(new THREE.Mesh(new THREE.PlaneGeometry(5, 8), (Math.round(c / 10) % 2 ? yellow : black)), a, FLOOR, c));
-    }
+    for (let c = -RING.width / 2 + 10; c < RING.width / 2 - 5; c += 10) (Math.round(c / 10) % 2 ? yellow : black).push({ w: 5, h: 8, a, r: FLOOR, c });
   }
+  group.add(new THREE.Mesh(quads(white), new THREE.MeshBasicMaterial({ color: 0xe9edf1 })));
+  group.add(new THREE.Mesh(quads(yellow), new THREE.MeshBasicMaterial({ color: 0xffd23f })));
+  group.add(new THREE.Mesh(quads(black), new THREE.MeshBasicMaterial({ color: 0x15181c })));
   const lead = [];   // lead-in lights: from the spinward end toward the pads
   for (let i = 0; i < 14; i++) {
     const s = half - 30 - i * 25;
     if (s < (D.pads - 1) / 2 * D.padSpacing + PAD_R + 20) break;
-    const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 6), new THREE.MeshBasicMaterial({ color: 0xfff1c2, transparent: true }));
-    lamp.position.copy(at(D.angle * D2R + s / RING.floor, FLOOR - 0.4, 0));
-    group.add(lamp);
-    lead.push(lamp);
+    lead.push(at(D.angle * D2R + s / RING.floor, FLOOR - 0.4, 0));
   }
-  return { group, lights, lead };
+  const dim = new THREE.InstancedMesh(new THREE.SphereGeometry(0.6, 10, 6), new THREE.MeshBasicMaterial({ color: 0xfff1c2, transparent: true, opacity: 0.25 }), lead.length);
+  lead.forEach((p, i) => dim.setMatrixAt(i, place.makeTranslation(p)));
+  dim.computeBoundingSphere();
+  const lit = new THREE.Mesh(new THREE.SphereGeometry(0.61, 10, 6), new THREE.MeshBasicMaterial({ color: 0xfff1c2, transparent: true }));   // over the dim one
+  lit.visible = false;
+  group.add(dim, lit);
+  return { group, edges, edgesPerPad: EDGE, chosen: null, lead, lit };
 }
 
 // The craft's jet-borne parts, in its drawing's frame (x forward, y up, z right): a swivelling duct behind
@@ -362,9 +406,16 @@ export const deck = {
     glow(this.jet.liftJet, 1);
     for (const post of this.jet.posts) glow(post, 0.5);
     // the deck's lights: the pads' steady, the chosen pad's brighter; the lead-in lights running toward the pads
-    for (const L of this.marks.lights) L.mesh.material.color.setHex(L.pad === Math.round(d.pad) ? 0x9dffb8 : 0x3fbf63);
-    const run = Math.floor(now * 8) % (this.marks.lead.length + 4);
-    this.marks.lead.forEach((lamp, i) => { lamp.material.opacity = i === run ? 1 : 0.25; });
+    const m = this.marks, chosen = Math.round(d.pad);
+    if (chosen !== m.chosen) {
+      const c = new THREE.Color();
+      for (let i = 0; i < m.edges.count; i++) m.edges.setColorAt(i, c.setHex(Math.floor(i / m.edgesPerPad) === chosen ? 0x9dffb8 : 0x3fbf63));
+      m.edges.instanceColor.needsUpdate = true;
+      m.chosen = chosen;
+    }
+    const run = Math.floor(now * 8) % (m.lead.length + 4);
+    m.lit.visible = run < m.lead.length;
+    if (m.lit.visible) m.lit.position.copy(m.lead[run]);
     this.view(ctx);
     this.display(ctx);
   },
