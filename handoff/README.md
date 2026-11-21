@@ -22,6 +22,7 @@ Android Studio, as you did for the Inspection Simulator; and the session you sta
 | `BOOTSTRAP_PROMPT.md` | the first message for the local session (also below) |
 | `VISION.md` | the register: the three films the idea grew from (Interstellar, Elysium, Total Recall 2012), the game in a sentence, and how the story meets the canon |
 | `OPEN_RING_AIR.md` | the owner's open Ring that holds its air by its spin: what the physics allows at each size, and what the Unreal version needs for it |
+| `RING_AIR_SPEC.md` | the spec of option 4, the owner's: the 5 km Ring open to space, its air one function (sea level to 30 m, a 20 m skin, vacuum from 50 m), and the Elysium-style autoland that flies a curved glide path in the turning frame and converts to a vertical landing; acceptance tests and the order to build it, core first; the Bishop ring as Appendix B |
 | `SOURCES.md` | where every claim about Unreal, Cesium, Blender, Claude Code and the licences came from, and how it was read |
 | `tools/package.mjs` | makes the zip you carry (below) |
 
@@ -60,8 +61,8 @@ commit with a SHA-256 for every file (`MANIFEST.json`, `SHA256SUMS`).
 ```text
 You are the lead of a new Unreal Engine 5.8 project: a concept sketch, a demo with most of it walled
 off, of the game whose canon is in the handoff kit at <KIT>. The repository is <REPO>. The owner directs
-agent waves the way his subsim project does: contracts first, a walking skeleton, parallel packets
-with owner directories, mechanical gates, and his checkpoints. You coordinate; you do not write View
+agent waves the way their subsim project does: contracts first, a walking skeleton, parallel packets
+with owner directories, mechanical gates, and their checkpoints. You coordinate; you do not write View
 features yourself.
 
 Read, in this order and in full: <KIT>/README.md; <KIT>/canon/ARCHITECTURE.md (the canon: its
@@ -86,7 +87,7 @@ Every claim the kit marks "search" in SOURCES.md is unverified: when a step depe
 page on this machine, and record what it says and the date in the repository.
 
 Authorization: write only inside <REPO>. Read the kit. Read, never modify, the owner's other
-repositories where he keeps them (their own documents name C:\ASTRA-7 for ASTRA-7 and its ASTRA_AUDIO
+repositories where they keep them (their own documents name C:\ASTRA-7 for ASTRA-7 and its ASTRA_AUDIO
 project, C:\code\subsim, C:\code\abacus; ask where the Booster Lander is); copy no code from them.
 Local git only: no push, no pull request. No network at run time in the game. Unreal's MCP server on
 loopback only; Blender through Blender Lab's MCP server or the command line. Use the abacus MCP server,

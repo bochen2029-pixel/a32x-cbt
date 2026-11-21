@@ -647,7 +647,7 @@ the flight's clock, so the Moon goes its half a degree an hour among the stars a
 day. A date the page cannot take stops it and says why.
 
 The core (`core/sky.cpp`, `orbit_sky.h`) works the sky out from J. Meeus's *Astronomical Algorithms*:
-the Sun to 0.01°, the Moon from the whole of his tables to about 10″, the Earth's sidereal time,
+the Sun to 0.01°, the Moon from the whole of the book's tables to about 10″, the Earth's sidereal time,
 precession and nutation, and the Moon's attitude by Cassini's laws, which gives its librations. It gives
 them as readouts of their own: where the Sun and the Moon are from the Earth's centre, how far, the Moon's
 pole and the middle of its near side, its phase, and the axes of J2000.0 for the stars. The eye is not at
@@ -1188,7 +1188,7 @@ Ring's orbit decaying, the Earth's oblateness. Propellant for the small thruster
 
 ## Handoff to Unreal
 
-`handoff/README.md` starts a kit for building this sketch in Unreal Engine 5.8 from cold on another machine: what it settles against the canon, the port part by part, the first slice, the licence (settled: MIT), and the zip to carry.
+`handoff/README.md` starts a kit for building this sketch in Unreal Engine 5.8 from cold on another machine: what it settles against the canon, the port part by part, the first slice, the licence (settled: MIT), the open Ring's air and the autoland into it, specified (`handoff/RING_AIR_SPEC.md`), and the zip to carry.
 
 ## Build and test
 
