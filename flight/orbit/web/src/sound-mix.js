@@ -1,6 +1,6 @@
 // sound-mix.js — what the flight sounds like, as numbers. The pure half of sound.js: no browser, no audio,
 // nothing kept between calls but what the caller hands back in. The sound is an observer of the core's
-// readouts and of nothing else, and it writes nothing back. GPLv3.
+// readouts and of nothing else, and it writes nothing back. MIT.
 //
 // The ear is aboard. What reaches it comes three ways, and the mix keeps them apart:
 //   through the structure   the drive's vibration, the gear, the thrusters' valves, anything that strikes the

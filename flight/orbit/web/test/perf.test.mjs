@@ -1,5 +1,5 @@
 // The frame meter's sums: the rate from the mean interval, the 95th percentile and the worst, and lines
-// that say them. GPLv3.
+// that say them. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { frameStats, perfLines } from '../src/perf-math.js';

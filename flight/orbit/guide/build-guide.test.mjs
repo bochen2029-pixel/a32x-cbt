@@ -1,6 +1,6 @@
 // The guide's tool and its source agree: every figure names a screenshot the tool takes, and every
 // screenshot taken is shown; the page fetches nothing; the PDF's pages are counted right. No browser is
-// started here: the screenshots and the print are build-guide.mjs's own run. GPLv3.
+// started here: the screenshots and the print are build-guide.mjs's own run. MIT.
 //
 //   node --test flight/orbit/guide/build-guide.test.mjs
 

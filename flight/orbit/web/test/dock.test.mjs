@@ -1,6 +1,6 @@
 // Docking on the page: its names and numbers are orbit_dock.h's, DOCK does what makes sense from where
 // the craft is and says why when it does nothing, the HUD and status lines say what the readouts say,
-// the reticle's layout follows the errors, and the page's block reads the core's docking. GPLv3.
+// the reticle's layout follows the errors, and the page's block reads the core's docking. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

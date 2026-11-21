@@ -3,7 +3,7 @@
 // for the one fictional drive and its plume; the small thrusters in four quads; red, green and white
 // lights. The shape is craft-shape.js's; every texture is painted by code (paint.js); how much is
 // drawn is the tier's (quality.js). Built in its own frame: x forward, y up, z to the right wing; the
-// gear's wheels touch where the core's contact points are (orbit_core.cpp, GEAR). GPLv3.
+// gear's wheels touch where the core's contact points are (orbit_core.cpp, GEAR). MIT.
 
 import * as THREE from 'three';
 import {

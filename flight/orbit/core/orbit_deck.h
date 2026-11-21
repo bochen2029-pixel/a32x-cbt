@@ -40,7 +40,7 @@
 // The gear meets the floor as it meets the runway: a spring, a damper and the tyres' friction, against
 // the deck's motion. A touchdown inside the tolerances below is a landing; past the crash limits, or with
 // anything but the gear on the deck, a crash. Every number is chosen for the sketch. None describes a
-// real aircraft, ship or station. GPLv3.
+// real aircraft, ship or station. MIT.
 #pragma once
 
 #ifdef __cplusplus

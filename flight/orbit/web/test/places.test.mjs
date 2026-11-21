@@ -1,5 +1,5 @@
 // The night side's lights, from Natural Earth's populated places: the data decodes into real places,
-// the large cities are lit and the seas and deserts dark, and a city's light grows with it. GPLv3.
+// the large cities are lit and the seas and deserts dark, and a city's light grows with it. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PLACES } from '../data/places.js';

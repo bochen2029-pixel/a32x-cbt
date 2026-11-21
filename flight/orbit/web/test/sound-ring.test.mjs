@@ -2,7 +2,7 @@
 // crosses it at 343 m/s; each room answers as its size and surfaces say; the canal is a line of sound; a
 // walker's footsteps come at the cadence a pendulum's legs keep at the weight they feel, and sound like what
 // they land on. Stated as physics or as what the ear should meet, against made-up readouts and against the
-// walk's own core (the WebAssembly build's; ORBIT_CORE names another). GPLv3.
+// walk's own core (the WebAssembly build's; ORBIT_CORE names another). MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

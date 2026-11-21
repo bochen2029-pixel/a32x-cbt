@@ -1,6 +1,6 @@
 // The flight home on the page (return-view.js): its readouts are the header's, its lines say what the
 // crew is doing, and the core's block reads through the page's Core. return-view.js draws with three.js,
-// which this test takes from flight/web's packages (npm ci there first). GPLv3.
+// which this test takes from flight/web's packages (npm ci there first). MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

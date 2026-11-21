@@ -10,7 +10,7 @@
   screenshots it shows and prints it to a PDF; opened in a browser it shows the same pages, with the
   screenshots from out/shots/ when they have been taken. Every page is a fixed box: the script at the end
   numbers the pages, the figures and the contents, and says (window.guideFaults) which page overflows or
-  which screenshot is missing, so that the build refuses them. No font, image or script is fetched. GPLv3.
+  which screenshot is missing, so that the build refuses them. No font, image or script is fetched. MIT.
 -->
 <style>
   @page { size: 8.5in 11in; margin: 0; }
@@ -187,7 +187,8 @@
   <h2>Where everything lives</h2>
   <table class="tight">
     <tr><th style="width:1.25in">what</th><th>where</th></tr>
-    <tr><td class="k">the code</td><td>GitHub, <b>bochen2029-pixel/a32x-cbt</b>, branch <b>orbit-sketch</b>, under <code>flight/orbit/</code>; GPLv3, as all of <code>flight/</code> is</td></tr>
+    <tr><td class="k">the code</td><td>GitHub, <b>bochen2029-pixel/a32x-cbt</b>, branch <b>orbit-sketch</b>, under <code>flight/orbit/</code>; MIT, unlike the rest of <code>flight/</code></td></tr>
+    <tr><td class="k">on its own</td><td>GitHub, <b>bochen2029-pixel/runway-to-ring</b>, public: the sketch split out with its history, MIT</td></tr>
     <tr><td class="k">the review</td><td>draft pull request 1, <span class="url">https://github.com/bochen2029-pixel/a32x-cbt/pull/1</span>, from orbit-sketch</td></tr>
     <tr><td class="k">the page, hosted</td><td><span class="url">https://claude.ai/artifact/PB6pcca87oqNiikJSXQRbo</span>, private to the owner until shared</td></tr>
     <tr><td class="k">the page, local</td><td><code>flight/orbit/build-web/index.html</code> once built (section 7): one file, run from <code>file://</code></td></tr>
@@ -896,7 +897,7 @@
     <tr><td class="k">CANON_DELTA.md</td><td>what the sketch settles against the canon, each number with the test that shows it; where it departs; what it never touched; a section for each part, docking to the tour</td></tr>
     <tr><td class="k">UNREAL_PORT.md</td><td>part by part: what becomes a plugin around the existing core, what becomes actors, what Unreal gives for free and what it costs, the frames and units, performance tiers, VR</td></tr>
     <tr><td class="k">FIRST_SLICE.md</td><td>the walled-off first demo: who makes which asset, how MCP is used, the waves and gates, the exit tests, the step list for the local harness</td></tr>
-    <tr><td class="k">LICENSING.md</td><td>the licence question, for the owner to decide before the core moves</td></tr>
+    <tr><td class="k">LICENSING.md</td><td>the licence, decided by the owner on 2026-11-21: MIT, and why that lets the core into an Unreal game</td></tr>
     <tr><td class="k">CLAUDE.md.template</td><td>house rules for the new repository</td></tr>
     <tr><td class="k">BOOTSTRAP_PROMPT.md</td><td>the first message for the local session, and why it is written as it is</td></tr>
     <tr><td class="k">VISION.md</td><td>the register, from the owner (21 November): the three films the idea grew from, the game in a sentence, and how its story meets the canon. The films are inspiration only; nothing is lifted from them</td></tr>
@@ -906,18 +907,14 @@
   <h3>The zip, and the first message</h3>
   <pre>node flight/orbit/handoff/tools/package.mjs --canon &lt;ARCHITECTURE.md&gt; --page flight/orbit/build-web/index.html
 node --test flight/orbit/handoff/tools/package.test.mjs</pre>
-  <p>The packager takes the kit, the canon, the core's sources, tests, tools and CMake, its invariants and receipts, the page's sources and the built page, the GPLv3's text and a manifest with a SHA-256 for every file, from git's objects at HEAD, and refuses a file that differs from the commit or a canon other than the draft the kit was written against. It finds the sketch nested in a32x-cbt or at the root of a repository of its own. It writes <code>flight/orbit/build/handoff/orbit-handoff-&lt;commit&gt;.zip</code> and reads it back. Carry the zip to the Windows machine, unzip it, start Claude Code in an empty folder with Git for Windows installed, and paste the first message from the kit's README with its two paths filled in. The message tells the session to check every file's hash first, read the kit in order, read the machine without changing it, scaffold the repository as text, and stop to ask the licence question before it copies any core.</p>
+  <p>The packager takes the kit, the canon, the core's sources, tests, tools and CMake, its invariants and receipts, the page's sources and the built page, the MIT licence and the notices, and a manifest with a SHA-256 for every file, from git's objects at HEAD, and refuses a file that differs from the commit or a canon other than the draft the kit was written against. It finds the sketch nested in a32x-cbt or at the root of a repository of its own. It writes <code>flight/orbit/build/handoff/orbit-handoff-&lt;commit&gt;.zip</code> and reads it back. Carry the zip to the Windows machine, unzip it, start Claude Code in an empty folder with Git for Windows installed, and paste the first message from the kit's README with its two paths filled in. The message tells the session to check every file's hash first, read the kit in order, read the machine without changing it, scaffold the repository as text, and record the licence, MIT, before it copies any core.</p>
 </section>
 
 <section class="page" data-part="6 · The Unreal Engine plan">
-  <h2 id="licence" data-toc>The decision to make first: the licence</h2>
-  <p>The sketch is GPLv3, because everything in <code>flight/</code> is, by this repository's rule. Unreal Engine's EULA forbids combining the engine with GPL code, and the GPL wants the whole of a combined work under the GPL, which Epic's code cannot be. So the core, as licensed today, cannot go into a shipped Unreal game. But it is the owner's to relicense: it links no third-party GPL code (only <code>&lt;cmath&gt;</code>, <code>&lt;cstdint&gt;</code>, <code>&lt;cstring&gt;</code>), takes nothing from A32NX or JSBSim, and what it took from outside is method or public domain. <code>LICENSING.md</code> sets out three options and recommends the first:</p>
-  <ol>
-    <li><b>Relicense the sketch's own code</b> (MIT or Apache-2.0) before it goes into the Unreal project; the copy here can stay GPLv3 or be dual-licensed, written down in both repositories.</li>
-    <li><b>Keep it GPLv3 and out of the game's binary</b>: the core as its own program, Unreal talking to it over a local socket. A grey zone; take advice before shipping on it.</li>
-    <li><b>Write a new core from the canon</b>: possible, and wasteful.</li>
-  </ol>
-  <p class="small soft">The kit says plainly that it is not legal advice. Nothing has been relicensed.</p>
+  <h2 id="licence" data-toc>The licence, decided: MIT</h2>
+  <p>The sketch was GPLv3, because everything in <code>flight/</code> is, by this repository's rule. Unreal Engine's EULA forbids combining the engine with GPL code, and the GPL wants the whole of a combined work under the GPL, which Epic's code cannot be. So the core, as GPLv3, could not go into a shipped Unreal game. But it was the owner's to relicense: it links no third-party GPL code (only <code>&lt;cmath&gt;</code>, <code>&lt;cstdint&gt;</code>, <code>&lt;cstring&gt;</code>), takes nothing from A32NX or JSBSim, and what it took from outside is method, public domain or CC0.</p>
+  <p>On 2026-11-21 the owner did: <b>MIT</b>, "and be done with it". <code>flight/orbit/LICENSE</code> carries it, <code>NOTICE.md</code> names what a built page carries of others' (three.js, Emscripten's runtime, musl, LLVM's libraries, dlmalloc), and every built page carries both at the top of its body. The standalone repository, <b>runway-to-ring</b>, has the same two files. <code>LICENSING.md</code> records the decision, the options that were open, and what was done.</p>
+  <p class="small soft">The kit says plainly that it is not legal advice.</p>
   <h2 id="slice" data-toc>The first slice</h2>
   <p>The smallest Unreal build in which you sit in the Shuttle (the canon's word for the craft) on 17C, take off, reach orbit, see the Ring, dock, and walk 100 m inside it, everything else walled off and saying so. It is built in waves, the owner's way from subsim: contracts first, a walking skeleton, parallel packets each with owner directories, mechanical gates (G0 to G9: clean builds, the contracts' hash, determinism at three frame rates, no binary asset in git outside an allow-list, budgets, screenshots looked at by someone other than the author, an independent reviewer), and the points where the owner looks.</p>
   <table>

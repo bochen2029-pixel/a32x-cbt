@@ -130,7 +130,8 @@ Neither needs an installer. Unzip, then open the trainer's `index.html`, or run 
 
 Everything outside `flight/` is MIT (`LICENSE`). `flight/` is GPLv3 (`flight/LICENSE`): it compiles
 FlyByWire A32NX, GPLv3, and JSBSim, LGPL-2.1. MIT code may travel inside the GPLv3 simulator; nothing
-from `flight/` goes into `app/`.
+from `flight/` goes into `app/`. `flight/orbit`, the spaceplane sketch, links neither and is MIT
+(`flight/orbit/LICENSE`); it also lives on its own as `runway-to-ring` (`docs/provenance.md` §1h).
 
 No third-party source is vendored. `app/` is original TypeScript; the behaviour in it was worked out
 by study. `docs/provenance.md` names every source and the position taken on each.

@@ -1,7 +1,7 @@
 // The sky's arithmetic, without a browser or three.js, so the tests can read it: the core's sky readouts
 // by name (orbit_sky.h), the flight's date, where and how large the Moon is drawn and how it is turned,
 // how much of the Sun clears the Earth, the Moon's brightness with its phase, and the stars' packing.
-// GPLv3.
+// MIT.
 
 import { RE, cross, dot, length, scale, sub } from './frames.js';
 

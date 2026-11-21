@@ -1,5 +1,5 @@
 // The Ring's plan: its shape is RING's, its port face is left clear for docking, its spokes run where
-// the core says, its town stands on its floor, and a dearer tier draws more of it. GPLv3.
+// the core says, its town stands on its floor, and a dearer tier draws more of it. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HUB_PORT_M } from '../src/core.js';

@@ -96,6 +96,9 @@ variable is a startup error, not something to find in play. Silent success is th
 - `app/` links **no** A32NX code. Keep it free of GPL obligations.
 - `flight/` is GPLv3 and does. Do not move code across that line casually. The flyable artefact may
   carry `app/`'s MIT code; `app/` never imports from `flight/` (`ROADMAP.md` §4, P7: packaging).
+- `flight/orbit`, the spaceplane sketch, is the exception: it links neither A32NX nor JSBSim, and its
+  owner relicensed it MIT on 2026-11-21 (`flight/orbit/LICENSE`, `docs/provenance.md` §1h). Nothing
+  GPL goes into it.
 - Phases start on the operator's word, in `ROADMAP.md`'s order, and finish at their gates: half-built
   is not a product. Until 2026-11-01 this rule read "P5 ships before P6 starts"; the operator started
   P6 and P7 before P5's reference-laptop box closed, and made the flyable simulator the product

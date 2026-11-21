@@ -1,5 +1,5 @@
 // The spaceplane's shape: its size, its wheels where the core's contact points are and lowest of all,
-// its skin wound outward, its lights on the right sides, and its plume as the air says. GPLv3.
+// its skin wound outward, its lights on the right sides, and its plume as the air says. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

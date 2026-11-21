@@ -1,5 +1,5 @@
 // How the near things share the depth buffer: a rib 10 m off a wall must keep its place at 25 km and at
-// 5 km, and the craft and the Ring share a slice only when they are among each other. GPLv3.
+// 5 km, and the craft and the Ring share a slice only when they are among each other. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HUB_PORT_M } from '../src/core.js';

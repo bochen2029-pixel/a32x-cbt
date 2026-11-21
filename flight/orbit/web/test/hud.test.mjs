@@ -1,4 +1,4 @@
-// What the readouts say. GPLv3.
+// What the readouts say. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { AUTO, PH } from '../src/core.js';

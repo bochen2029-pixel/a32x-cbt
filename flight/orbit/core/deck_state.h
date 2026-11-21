@@ -1,4 +1,4 @@
-// deck_state.h — deck.cpp's state, kept in oc::State so a run replays. Owned by deck.cpp. GPLv3.
+// deck_state.h — deck.cpp's state, kept in oc::State so a run replays. Owned by deck.cpp. MIT.
 #pragma once
 
 namespace oc {

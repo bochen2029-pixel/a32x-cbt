@@ -1,4 +1,4 @@
-// The frames the page draws in, stated as geometry. GPLv3.
+// The frames the page draws in, stated as geometry. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

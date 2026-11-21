@@ -1,6 +1,6 @@
 // Fewer draw calls, the same picture (merge.js): merged meshes draw exactly the triangles they drew before,
 // in the same places and materials; only meshes that share a material, a parent and the way they are drawn
-// merge; what moves, mirrors or is kept stays as it was. Runs with flight/web's three.js. GPLv3.
+// merge; what moves, mirrors or is kept stays as it was. Runs with flight/web's three.js. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

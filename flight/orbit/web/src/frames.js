@@ -1,7 +1,7 @@
 // The sketch's frames, without a browser. The core reports in the site frame: east, north and up at
 // the start point, metres, fixed to the Earth. three.js draws as flight/web does: x east, y up, z south.
 // Everything is drawn relative to the camera, whose place is kept here in doubles, so nothing near the
-// eye loses precision to a large coordinate. GPLv3.
+// eye loses precision to a large coordinate. MIT.
 
 export const RE = 6371000;           // m, the core's sphere
 export const WE = 7.2921159e-5;      // rad/s, the Earth's turn

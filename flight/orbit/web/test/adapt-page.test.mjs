@@ -1,7 +1,7 @@
 // The frame rate's controller in the built page (adapt.js, through main.js): drawn in software, the frames
 // come far slower than the target, so after its warm-up the page draws fewer pixels; the canvas's buffer
 // shrinks, the meter says so, and nothing fails. The flight goes on by its own clock all the while. Build
-// first (tools/build.mjs). Skipped without a built page or without Playwright and its Chromium. GPLv3.
+// first (tools/build.mjs). Skipped without a built page or without Playwright and its Chromium. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

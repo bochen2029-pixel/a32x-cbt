@@ -7,7 +7,7 @@
 // chase view that rides with the deck, its up the Ring's axis-ward, so that the floor rises ahead like a ramp.
 // The deck itself is the core's (core/deck.cpp, orbit_deck.h); the words and the display's layout are
 // deck-hud.js's; its sounds are found from its readouts by sound.js. The deck's structure (the roof's gap,
-// the bulkheads, the deck's surface) is the Ring's drawing's. GPLv3.
+// the bulkheads, the deck's surface) is the Ring's drawing's. MIT.
 
 import * as THREE from 'three';
 import { AUTO, RING, SAS } from './core.js';

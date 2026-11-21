@@ -1,7 +1,7 @@
 // The sketch's invariants (flight/orbit/INVARIANTS.md), each stated as physics or as a promise of the
 // core, with the tolerance it is held to and where that tolerance comes from. Run one by name
 // (test_invariants vacuum_conserves) or all (test_invariants); ctest runs each line below that reads
-// "// TEST: <name>". GPLv3.
+// "// TEST: <name>". MIT.
 //
 // Unlike the parts' own tests, this program reads the core's state and its force laws through
 // internal.h: the ledgers have to see the commands a step held and the forces the model says act, and

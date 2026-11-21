@@ -1,7 +1,7 @@
 // orbit_walk.h — a person inside the ring, in its turning frame: the hub's lobby, a spoke's lift, the
 // floor. Its own state and its own fixed step (OC_DT), apart from the flight's; the same inputs give the
 // same walk. SI units, radians. Every number marked chosen is this sketch's choice, not a measurement of
-// anyone. GPLv3.
+// anyone. MIT.
 //
 // The ring's frame turns with the ring at OC_RING_SPIN about its axis, and in it nothing of the ring
 // moves but the lift cars. A place in it is given unrolled: theta, the angle round the ring counted as

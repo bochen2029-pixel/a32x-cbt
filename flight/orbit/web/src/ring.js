@@ -4,7 +4,7 @@
 // windows, a triangular girder round each rim, trusses for spokes with their lift tubes, a glazed roof
 // on frames, the town under it with its canal, and at the hub radiators and a mast of solar arrays held
 // still to face the Sun. Thousands of small lights, for the size. Every texture is painted by code
-// (paint.js); how much is drawn is the tier's (quality.js). GPLv3.
+// (paint.js); how much is drawn is the tier's (quality.js). MIT.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';

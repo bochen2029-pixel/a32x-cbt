@@ -1,6 +1,6 @@
 // The walk's core (orbit_walk.h), from the page: its readouts by name, its numbers, and a thin wrapper over
 // the module's oc_walk_* functions. The readouts' order is the header's enum and the numbers are its
-// #defines; a test reads the header to hold the two equal. No three.js and no DOM here. GPLv3.
+// #defines; a test reads the header to hold the two equal. No three.js and no DOM here. MIT.
 
 // The readouts of oc_walk_out(), in the header's order.
 export const WALK_OUT = [

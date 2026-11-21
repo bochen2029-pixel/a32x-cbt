@@ -1,5 +1,5 @@
 // fd_state.h — fd.cpp's state, kept in oc::State so a run replays. Owned by fd.cpp: all the flight director
-// remembers from one step to the next is here, and all of it is in the hash. GPLv3.
+// remembers from one step to the next is here, and all of it is in the hash. MIT.
 #pragma once
 
 namespace oc {

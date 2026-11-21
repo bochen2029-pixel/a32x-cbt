@@ -2,7 +2,7 @@
 // runs in the shadow and says what it would command, without commanding it: the attitude (pitch, heading,
 // bank), the throttle and the gear; above the air, where the crew's insertion guidance points the nose; on
 // the way home, the entry's bank and angle of attack and the approach's. fd.cpp computes it; its readouts
-// are the last of orbit_core.h's (OC_FD_*). Angles in the readouts are degrees. GPLv3.
+// are the last of orbit_core.h's (OC_FD_*). Angles in the readouts are degrees. MIT.
 //
 // Whose guidance. While the crew to orbit flies, the same shadow runs beside it, and its command is the
 // crew's own. Taking the controls from the crew, or from the crew flying home, the shadow carries on from

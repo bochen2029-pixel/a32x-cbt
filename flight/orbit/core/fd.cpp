@@ -12,7 +12,7 @@
 // carries on from the crew's memory as it stands; from anyone else, or with the director switched on, it
 // starts as the crew would if handed the craft (oc_auto, returnEngage).
 //
-// GPLv3.
+// MIT.
 
 #include "internal.h"
 

@@ -32,7 +32,7 @@
 // its instruments alone (sense, below): navigation, the accelerometers, air data below Mach 4, the mass as
 // known. It cannot see the wind; where it has air data it works the wind out from them and navigation.
 //
-// Every number marked chosen is this sketch's; docs/provenance.md, 1h, names the methods. GPLv3.
+// Every number marked chosen is this sketch's; docs/provenance.md, 1h, names the methods. MIT.
 
 #include "internal.h"
 

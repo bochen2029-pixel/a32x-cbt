@@ -10,7 +10,7 @@
 // with A'y + G'z + c = 0 at a solution, and the gap s'z. The linear algebra is a banded LDL' of the reduced
 // KKT system, quasi-definite by a small regularization and polished by iterative refinement; a problem made
 // of stages, as a trajectory is, gives the order of its unknowns that keeps the band narrow. Deterministic:
-// the same problem gives the same iterates, bit for bit. GPLv3.
+// the same problem gives the same iterates, bit for bit. MIT.
 #pragma once
 
 #include <vector>

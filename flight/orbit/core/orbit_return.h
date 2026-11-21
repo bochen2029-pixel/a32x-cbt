@@ -1,7 +1,7 @@
 // orbit_return.h — the flight home: from orbit to a stop on the start point's runway, KDFW 17C. The
 // crew waits in orbit for a pass from which the runway can be reached, burns tail first, falls to the
 // air, flies the entry nose high and banked, glides to a turn onto a long final from the north and
-// lands under power. return.cpp flies it; this is what it reports. Angles here are degrees. GPLv3.
+// lands under power. return.cpp flies it; this is what it reports. Angles here are degrees. MIT.
 #pragma once
 
 #ifdef __cplusplus

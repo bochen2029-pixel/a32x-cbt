@@ -1,5 +1,5 @@
 // What the frame times say: the rate, the mean, the 95th percentile and the worst, from the intervals
-// between frames in milliseconds. Pure, for perf.js and its test. GPLv3.
+// between frames in milliseconds. Pure, for perf.js and its test. MIT.
 
 export function frameStats(intervals) {
   const xs = intervals.filter((x) => Number.isFinite(x) && x > 0);

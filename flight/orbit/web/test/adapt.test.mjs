@@ -2,7 +2,7 @@
 // whose frames take a time in proportion to the pixels drawn and show at the display's next refresh, as a
 // browser's frames do. It settles under the target, does not oscillate, comes back up when the load
 // drops, keeps out of the way of a fast machine and of one whose time goes elsewhere; and the tiers
-// step down and up. GPLv3.
+// step down and up. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Governor, LAW, RUNG, RUNGS, Resolution, STEPS, TARGET, TierSteps, rungScale, windowMs } from '../src/adapt.js';

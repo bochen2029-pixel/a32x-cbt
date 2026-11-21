@@ -1,7 +1,7 @@
 // The cone solver's tests (core/socp.h): each a problem whose answer is known without the solver, in closed
 // form, by construction, or from the problem's own physics worked out another way, and each holding the solver's
 // answer to it, its duality gap and its KKT residuals (socp::check, computed afresh from the problem) to stated
-// tolerances. Run one by name or all; ctest runs each line below that reads "// TEST: <name>". GPLv3.
+// tolerances. Run one by name or all; ctest runs each line below that reads "// TEST: <name>". MIT.
 //
 // TEST: lp_vertex
 // TEST: projection_onto_a_plane

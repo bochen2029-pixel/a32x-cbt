@@ -1,7 +1,7 @@
 // The inside of the ring, drawn in its own frame at a person's scale: the rim floor and its plan (grass, paths,
 // the canal and its bridges, the spokes' plazas), the low blocks, the rim walls, the roof's lattice, the spokes
 // and the hub, the lifts, and the hub's lobby. Built once from the core's plan (oc_walk_boxes); each frame the
-// view moves the cars, the doors and the light. Everything is painted by code. GPLv3.
+// view moves the cars, the doors and the light. Everything is painted by code. MIT.
 //
 // The scene's world axes are the ring's frame (walk-math.js). Each part of the floor is built about its own
 // middle and placed there, so near the walker the numbers the GPU sees are small.

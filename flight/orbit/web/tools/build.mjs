@@ -1,7 +1,7 @@
 // Builds the orbit sketch into one HTML file that opens from file:// and fetches nothing: the core's
 // WebAssembly module (Emscripten's SINGLE_FILE build) and the page, three.js bundled in, both inline.
 // Uses flight/web's esbuild and three.js (npm ci there first); the page reuses flight/web's airport
-// drawing. GPLv3.
+// drawing. The page carries the sketch's licence and its notices (notice.mjs). MIT.
 //
 //   node tools/build.mjs --core <orbit_core.js from the WebAssembly build> [--core-js <orbit_core_plain.js>] [--out <folder>]
 //
@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readNotice } from './notice.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const web = resolve(here, '..');
@@ -92,7 +93,9 @@ if (body === undefined || !body.includes('<!--SCRIPTS-->')) {
   process.exit(2);
 }
 const filled = body.replace('<!--SCRIPTS-->', () => scripts);
-writeFileSync(join(out, 'index.html'), `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n${head}</head>\n<body>\n${filled}</body>\n</html>\n`);
-writeFileSync(join(out, 'page.html'), `${head.replace(/<meta name="viewport"[^>]*>\n/, '')}${filled}`);
+// the licence and the notices at the top of the body, after the head, so that the title stays near the start
+const notice = readNotice(resolve(web, '..'));
+writeFileSync(join(out, 'index.html'), `<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n${head}</head>\n<body>\n${notice}${filled}</body>\n</html>\n`);
+writeFileSync(join(out, 'page.html'), `${head.replace(/<meta name="viewport"[^>]*>\n/, '')}${notice}${filled}`);
 const size = (n) => `${(n / 1e6).toFixed(2)} MB`;
 console.log(`built ${out}/index.html: ${size(readFileSync(join(out, 'index.html')).length)} (core ${size(core.length)}${plain ? `, core as JavaScript ${size(plain.length)}` : ''}, page ${size(page.outputFiles[0].text.length)})`);

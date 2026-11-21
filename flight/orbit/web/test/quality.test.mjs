@@ -1,6 +1,6 @@
 // The graphics tiers: which one a device gets from what it reports, that each tier says everything, and
 // the drawing buffer's and the Earth's sizes under them. (How a slow page draws fewer pixels and steps
-// down, and a quick one up: adapt.test.mjs.) GPLv3.
+// down, and a quick one up: adapt.test.mjs.) MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

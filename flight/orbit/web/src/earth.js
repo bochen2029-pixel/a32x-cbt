@@ -1,7 +1,7 @@
 // The Earth and its sky, drawn as one full-screen pass: each pixel's ray is intersected with the sphere
 // exactly (no mesh, so it is as round at 3 m as at 3,000 km), coloured from Natural Earth's coastlines
 // (data/land.js) and towns (data/places.js), and shaded through a single-scattering atmosphere. And the
-// stars behind it. GPLv3.
+// stars behind it. MIT.
 //
 // The Sun lights the ground, the clouds and the air with the irradiance three.js's own Sun has for the
 // craft and the Ring, so a white cloud and the craft's white paint are as bright as each other, as they

@@ -1,7 +1,8 @@
 # flight/ — the aeroplane that flies
 
 GPLv3. This tree links the FlyByWire A32NX flight computers, which forces the licence on everything
-here. `app/` stays clear of it.
+here but `orbit/`, the spaceplane sketch, which links none of it and is MIT by its own `LICENSE`.
+`app/` stays clear of it.
 
 **P6 passed; P7 has started.** The A32NX flight control computers — ELAC 1–2, SEC 1–3, FAC 1–2,
 FCDC 1–2, unmodified — run at 50 Hz in a world whose airframe is JSBSim, flying one of two aircraft:
@@ -2018,6 +2019,7 @@ JSBSim pin means measuring the airframe again.
 
 ## Licence
 
-Everything here is GPLv3, including the derived `bus.h`, the harness and `jsbsim/`. JSBSim is
+Everything here is GPLv3, including the derived `bus.h`, the harness and `jsbsim/`, but `orbit/`, which
+is MIT (`orbit/LICENSE`). JSBSim is
 LGPL-2.1 and linked statically; shipping this source meets its relinking condition. The 737 data it
 reads is GPL. The upstream notices are in the clones, not here; keep them when you redistribute.

@@ -1,5 +1,5 @@
 // The Earth's air as its shader samples it, against a fine reference of the same model: from orbit the
-// samples must find the air near the ground, where it is, and from the runway near the eye. GPLv3.
+// samples must find the air near the ground, where it is, and from the runway near the eye. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RE, opticalDepth, viewSpan } from '../src/air.js';

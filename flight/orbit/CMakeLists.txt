@@ -1,5 +1,5 @@
 # The orbit sketch: a spaceplane, a round Earth and a ring in orbit. Standalone: it links nothing from
-# A32NX or JSBSim and builds without their clones. GPLv3, like everything in flight/.
+# A32NX or JSBSim and builds without their clones. MIT (LICENSE), unlike the rest of flight/.
 #
 #   cmake -S flight/orbit -B flight/orbit/build
 #   cmake --build flight/orbit/build

@@ -1,4 +1,4 @@
-// The coastlines the globe is painted from: real places on the right side of them. GPLv3.
+// The coastlines the globe is painted from: real places on the right side of them. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { LAKES, LAND } from '../data/land.js';

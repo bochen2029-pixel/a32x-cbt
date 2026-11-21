@@ -2,7 +2,7 @@
 // texture whose channels are glow (lit windows), roughness and metalness, in the order three.js reads
 // roughness (green) and metalness (blue) from one map. No canvas and no image; everything tiles, so a
 // rectangle that runs off one edge comes back on the other. No three.js here, so the tests can read
-// it; ring.js and craft.js make the textures. GPLv3.
+// it; ring.js and craft.js make the textures. MIT.
 
 export function rng(seed) {
   let s = seed >>> 0;

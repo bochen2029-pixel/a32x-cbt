@@ -234,10 +234,24 @@ visual system's register. Nothing here is fit for navigation.
 
 ### 1h · The orbit sketch: a spaceplane, a round Earth, a ring
 
-`flight/orbit` is ours, GPLv3: a sketch made on the operator's word of 2026-11-12, outside the roadmap's
+`flight/orbit` is ours, MIT: a sketch made on the operator's word of 2026-11-12, outside the roadmap's
 phases (`flight/orbit/README.md`). Its core links nothing from A32NX or JSBSim; its page reads
 `flight/web`'s KDFW drawing (1f, 1g) unchanged. Every texture is painted by code; no image, model or
 font file ships.
+
+**Its licence, 2026-11-21.** It was GPLv3, as everything in `flight/` is (`CLAUDE.md` §10). The owner,
+who holds every part of it, relicensed it MIT that day: "as close to MIT as possible, where feasible. If
+it was up to me, it would be MIT and be done with it." Nothing in it is anyone else's: the rows below
+are methods, facts, public-domain data, CC0 data, or the owner's own MIT work, and none of it links or
+copies GPL code. `flight/orbit/LICENSE` carries the MIT licence with the root `LICENSE`'s copyright
+line; `flight/orbit/NOTICE.md` names what a built page carries of others' (three.js, Emscripten's
+runtime and the libraries it links, 2 and 2b), and every built page carries both. The `flight/web`
+modules the page uses (`airport.js`, `airport-layout.js`, `scene-math.js`, `atmosphere.js`, `haze.js`,
+`lights.js`, `data/kdfw.json`) stay GPLv3 in `flight/web` and are MIT as well, as the sketch uses them.
+The sketch split out on its own, with its history, is `bochen2029-pixel/runway-to-ring`
+(`flight/orbit/tools/standalone.mjs`), MIT. This is the deliberate crossing of the GPL line, by the
+copyright holder and in writing, that `CLAUDE.md` §10 asks for in place of a casual one; the rule that
+keeps it clean is the other way round now: nothing GPL goes into `flight/orbit`.
 
 | source | licence | what is taken |
 |---|---|---|
@@ -261,7 +275,7 @@ Each further part of the sketch keeps its own sources here, in the subsection be
 #### The flight deck
 
 `flight/orbit/core/deck.cpp`, `orbit_deck.h`, `deck_state.h`, `deck_plan.h`, `deck_plan.cpp`, `socp.h`,
-`socp.cpp`, `web/src/deck-view.js`, `deck-hud.js` and their tests are ours, GPLv3. What is taken below is
+`socp.cpp`, `web/src/deck-view.js`, `deck-hud.js` and their tests are ours, MIT. What is taken below is
 taken as ideas and methods; no code is copied, and no number of a real aircraft, ship or station is used.
 
 | source | licence | what is taken |
@@ -290,7 +304,7 @@ craft that lands like this on a turning deck has never been built.
 
 #### The walk
 
-`flight/orbit/core/walk.cpp` and `orbit_walk.h`, `flight/orbit/web/src/walk-*.js` are ours, GPLv3.
+`flight/orbit/core/walk.cpp` and `orbit_walk.h`, `flight/orbit/web/src/walk-*.js` are ours, MIT.
 
 | source | licence | what is taken |
 |---|---|---|
@@ -304,7 +318,7 @@ station.
 
 #### The wind
 
-`flight/orbit/core/wind.cpp`, `orbit_wind.h`, `wind_state.h` and `test/test_wind.cpp` are ours, GPLv3. Methods
+`flight/orbit/core/wind.cpp`, `orbit_wind.h`, `wind_state.h` and `test/test_wind.cpp` are ours, MIT. Methods
 and published numbers only; no code or data file is taken.
 
 | source | licence | what is taken |
@@ -412,7 +426,7 @@ is taken as ideas, numbers and methods, and the code is this project's.
 #### The flight director
 
 `core/fd.cpp`, `orbit_fd.h`, `fd_state.h`, `web/src/fd-view.js`, `fd-hud.js` and their tests are ours,
-GPLv3. The guidance it shows is the crews' own (above, and "The flight home"); it runs their functions on a
+MIT. The guidance it shows is the crews' own (above, and "The flight home"); it runs their functions on a
 copy of the state. What is taken below is taken as ideas and methods; no code is copied.
 
 | source | licence | what is taken |
@@ -425,7 +439,7 @@ copy of the state. What is taken below is taken as ideas and methods; no code is
 #### Rigour
 
 `flight/orbit/INVARIANTS.md`, `flight/orbit/test/test_invariants.cpp` and `flight/orbit/evidence/` are
-ours, GPLv3. Nothing in them is copied from the sources below; the two of the owner's are read for their
+ours, MIT. Nothing in them is copied from the sources below; the two of the owner's are read for their
 method, and Abacus is run, not shipped.
 
 | source | licence | what is taken |
@@ -443,7 +457,7 @@ method, and Abacus is run, not shipped.
 
 #### The guide
 
-`flight/orbit/guide/` (`guide.html`, `build-guide.mjs`) is ours, GPLv3: a guide to the sketch, printed to a
+`flight/orbit/guide/` (`guide.html`, `build-guide.mjs`) is ours, MIT: a guide to the sketch, printed to a
 PDF from screenshots of the built page. Neither the screenshots nor the PDF is committed (`guide/out/`). It
 drives Chrome, Chromium or Edge with this repository's own DevTools driver (`app/tools/chrome.mjs`) and
 fetches nothing. Its type is named, not shipped: Charter or Cambria (Caladea where neither is installed),
@@ -480,7 +494,9 @@ Runtime dependencies in `app/`: **none.** It is Node built-ins and a browser.
 JSBSim and our harness — to WebAssembly (P7, step 6). It is a build tool, but not only that: the module
 it links carries Emscripten's JavaScript runtime and system libraries, musl libc and LLVM's libc++
 beside our code. Their licences — MIT, NCSA, Apache-2.0 with the LLVM exception — sit with the module's
-GPLv3, and their notices go with any distributed build (§2a).
+GPLv3, and their notices go with any distributed build (§2a). The orbit sketch's module (1h) links
+Emscripten's own libraries, musl, libc++ and libc++abi without exceptions, compiler-rt's builtins and
+dlmalloc, and sits with the sketch's MIT; its built page carries their notices (`flight/orbit/NOTICE.md`).
 
 Installed outside the repository, fetched by hash (exercised 2026-11-01, in WSL's Ubuntu 24.04):
 

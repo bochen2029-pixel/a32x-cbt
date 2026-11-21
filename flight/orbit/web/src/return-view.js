@@ -3,7 +3,7 @@
 // waits in orbit for its pass, skips ahead to the de-orbit burn, as TO ORBIT skips the climb. The
 // readouts say where the craft is on the way down and how hot it is; the entry looks like one: the air
 // glowing round the nose and the belly as brightly as the core's heat flux says, and a glowing trail.
-// Everything shown comes from the core's readouts; nothing here flies. GPLv3.
+// Everything shown comes from the core's readouts; nothing here flies. MIT.
 
 import * as THREE from 'three';
 import { DOCK } from './dock-hud.js';

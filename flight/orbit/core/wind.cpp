@@ -23,7 +23,7 @@
 // components take the horizontal scale and intensity, the vertical the vertical. Sampled along any straight
 // path the field has von Karman's longitudinal spectrum along the path and the transverse across it.
 //
-// Every number not named for a source above is this sketch's. GPLv3.
+// Every number not named for a source above is this sketch's. MIT.
 
 #include "internal.h"
 #include "orbit_wind.h"

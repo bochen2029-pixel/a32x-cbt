@@ -2,9 +2,10 @@
 // package.mjs: the handoff kit's zip, the one a person carries to the other machine. In it: the kit's
 // documents; the canon; the orbit core's sources, headers, tests, tools and CMake, with its README, its
 // invariants and their receipts (evidence/); the page's sources (web/), and the built page if there is
-// one; the GPLv3's text; this repository's provenance; a notice; and a manifest naming the commit, with a
+// one; the sketch's licence (MIT) and its notices; this repository's provenance; a notice; and a manifest
+// naming the commit, with a
 // SHA-256 for every file (also as SHA256SUMS, for `sha256sum -c` or Get-FileHash).
-// Node built-ins and this repository's own zip writer (app/tools/zip.mjs). GPLv3.
+// Node built-ins and this repository's own zip writer (app/tools/zip.mjs). MIT.
 //
 //   node flight/orbit/handoff/tools/package.mjs --canon <ARCHITECTURE.md> [--page <index.html>]
 //        [--out <folder>] [--worktree] [--allow-other-canon]
@@ -55,9 +56,9 @@ export function layout(root) {
     kit: at('handoff'),
     page: at('build-web/index.html'),
     out: at('build/handoff'),
-    extra: [['docs/provenance.md', 'reference/provenance.md'], [nested ? 'flight/LICENSE' : 'LICENSE', 'licences/GPL-3.0.txt']],
+    extra: [['docs/provenance.md', 'reference/provenance.md'], [at('LICENSE'), 'licences/MIT.txt'], [at('NOTICE.md'), 'licences/NOTICE.md']],
     place: nested ? `${repository}'s flight/orbit` : `${repository}, the sketch's own repository,`,
-    licensed: nested ? `${repository}'s flight/ and so are GPLv3 by that repository's rule` : `${repository} and so are GPLv3 by its licence`,
+    licensed: nested ? `${repository}'s flight/orbit and so are MIT, by its own licence` : `${repository} and so are MIT, by its licence`,
   };
 }
 
@@ -113,19 +114,19 @@ function notice(short, commit, page, L) {
     "canon/ARCHITECTURE.md: the canon, the owner's own document.",
     '',
     `orbit/: the orbit sketch's core, tests, tools, CMake, README, invariants, receipts and the page's sources, from ${L.place} at`,
-    `${commit}. GPLv3: licences/GPL-3.0.txt.`,
+    `${commit}. MIT: licences/MIT.txt.`,
     '',
     page
-      ? 'page/index.html: the sketch\'s page as built, GPLv3. Inside it are three.js (MIT; its notice is in\n' +
-        'the page) and Emscripten\'s runtime and the C and C++ libraries it links (MIT, NCSA, and Apache-2.0\n' +
-        'with the LLVM exception; reference/provenance.md, section 2b). Its full source is the repository\n' +
-        'at the commit above.'
+      ? 'page/index.html: the sketch\'s page as built, MIT, carrying its licence and notices at the top of\n' +
+        'its body. Inside it are three.js (MIT) and Emscripten\'s runtime and the C and C++ libraries it\n' +
+        'links (MIT, NCSA, Apache-2.0 with the LLVM exception, and the public domain): licences/NOTICE.md.\n' +
+        'Its source is the repository at the commit above.'
       : 'page/: absent. No built page was given to the packager.',
     '',
     `reference/provenance.md: ${L.repository}'s record of where everything in it came from.`,
     '',
-    "This archive is for its owner's own use. Passing the core or the page to anyone else is a GPLv3",
-    'distribution: give them the source with it.',
+    "This archive is for its owner's own use. The sketch is MIT: passing it on, keep licences/MIT.txt",
+    'and licences/NOTICE.md with it.',
     '',
   ].join('\n');
 }

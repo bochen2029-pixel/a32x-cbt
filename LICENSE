@@ -25,4 +25,5 @@ SOFTWARE.
 This licence covers `app/`, `docs/`, `tools/` and `reference/`.
 
 `flight/` is GPLv3 — see `flight/LICENSE` — because it links the GPLv3 FlyByWire
-A32NX flight computers.
+A32NX flight computers. `flight/orbit/`, which links none of them, is the exception:
+MIT, by its own `flight/orbit/LICENSE` (2026-11-21).

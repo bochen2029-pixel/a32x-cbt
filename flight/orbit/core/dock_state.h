@@ -1,4 +1,4 @@
-// dock_state.h — dock.cpp's state, kept in oc::State so a run replays. Owned by dock.cpp. GPLv3.
+// dock_state.h — dock.cpp's state, kept in oc::State so a run replays. Owned by dock.cpp. MIT.
 #pragma once
 
 namespace oc {

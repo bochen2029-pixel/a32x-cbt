@@ -1,7 +1,7 @@
 // The tour on the page: a TOUR button (and the 0 key) that flies the whole loop by tour-plan.js's stages,
 // with a caption for each, setting the time warp and the view as it goes. It gives commands the way the
 // buttons do, through the page's own dispatcher; any command from anyone else ends it, so whoever is
-// watching can take over at any moment. GPLv3.
+// watching can take over at any moment. MIT.
 
 import { ret } from './return-view.js';
 import { snapshot, tourStep } from './tour-plan.js';

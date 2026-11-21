@@ -2,7 +2,7 @@
 // KDFW drawn round them. Two passes: the far one (sky, Earth, stars, anything past 300 km) and, over
 // it after the depth is cleared, the near one, so a centimetre at the wheels and the Earth's whole
 // disc are both drawn with depth to spare. How much is drawn is a tier's (quality.js), and how the
-// frame reaches the screen is the pipeline's (pipeline.js). GPLv3.
+// frame reaches the screen is the pipeline's (pipeline.js). MIT.
 
 import * as THREE from 'three';
 import { Airport } from '../../../web/src/airport.js';

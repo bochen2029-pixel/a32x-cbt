@@ -1,5 +1,5 @@
 // The core, from the page: the WebAssembly module (orbit_core.h) behind names. The readouts' order is
-// the header's enum, and a test reads the header to hold the two equal. GPLv3.
+// the header's enum, and a test reads the header to hold the two equal. MIT.
 
 export const OUT = [
   't', 'phase', 'auto', 'sas', 'crashed', 'window', 'siteE', 'siteN', 'siteU', 'qw', 'qx', 'qy', 'qz',

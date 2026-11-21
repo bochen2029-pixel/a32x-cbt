@@ -1,5 +1,5 @@
 // The view's own reckoning: the chase eye never under the ground; above the air, the velocity marker
-// shows the velocity in space, as the PROGRADE hold flies it. GPLv3.
+// shows the velocity in space, as the PROGRADE hold flies it. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { START } from '../src/core.js';

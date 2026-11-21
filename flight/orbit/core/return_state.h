@@ -1,5 +1,5 @@
 // return_state.h — return.cpp's state, kept in oc::State so a run replays. Owned by return.cpp: all the
-// flight home remembers from one step to the next is here, and all of it is in the hash. GPLv3.
+// flight home remembers from one step to the next is here, and all of it is in the hash. MIT.
 #pragma once
 
 namespace oc {

@@ -2,7 +2,7 @@
 // and how the Moon is placed, turned and lit as seen from KDFW, held to JPL Horizons (DE441, queried
 // 2026-11-12 for KDFW 17C's threshold, airless; the values copied here). Then the Moon's painted face
 // against the Gazetteer's places, and the stars. The module is the WebAssembly build's
-// (flight/orbit/README.md); ORBIT_CORE names another. GPLv3.
+// (flight/orbit/README.md); ORBIT_CORE names another. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

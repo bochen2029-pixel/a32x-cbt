@@ -1,7 +1,7 @@
 // deck-hud.js — what the flight deck says on the page, without a browser: the core's deck readouts by name,
 // what LAND DECK and the deck hold do from where the craft is, the HUD's and the status line's words, and the
 // layout of the approach display (the deck's ILS needles, the flight director and the hover's plan).
-// deck-view.js draws it; test/deck.test.mjs holds it to orbit_deck.h. GPLv3.
+// deck-view.js draws it; test/deck.test.mjs holds it to orbit_deck.h. MIT.
 
 import { AUTO, RING, SAS } from './core.js';
 import { fmtDistance } from './hud.js';

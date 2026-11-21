@@ -1,5 +1,5 @@
 // What the view works out from the core's readouts, without a browser: where the eye may go, and which
-// way the craft is going as the PROGRADE hold reckons it. The tests read it. GPLv3.
+// way the craft is going as the PROGRADE hold reckons it. The tests read it. MIT.
 
 import { RE, WE, add, cross, heightOf, scale } from './frames.js';
 

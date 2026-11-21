@@ -1,7 +1,7 @@
 // The flight deck's tests (orbit_deck.h). Each states a piece of physics or a promise of the core, not how
 // it is written, and reaches its situation through the controls a pilot or the page has: nothing is placed.
 // Where a test can, it checks the deck's own readouts against the flight's (orbit_core.h), which do not come
-// from deck.cpp. Run one by name or all; ctest runs each line below that reads "// TEST: <name>". GPLv3.
+// from deck.cpp. Run one by name or all; ctest runs each line below that reads "// TEST: <name>". MIT.
 //
 // A line reading "// DEFECT: <name>" names a test of a promise the crew does not keep today (as in test_invariants):
 // ctest does not run it, nor does a run of all, so the suite stays green; run it by name, or "defects", to see it fail.
