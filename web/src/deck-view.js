@@ -84,7 +84,7 @@ function quads(list) {
 // The deck's markings, in the Ring's turning frame: the pads with lights round them, the centreline dashed
 // from end to end, the edges along the rim walls, hazard stripes at the bulkheads' feet, and a row of lead-in
 // lights from the spinward end to the pads that flash in sequence toward them, the way the craft comes in. Drawn
-// in seven draws (2026-11-21: 456 before, one a quad or a lamp): the pads painted side by side on one texture and
+// in seven draws (2026-11-21: 455 before, one a quad or a lamp): the pads painted side by side on one texture and
 // laid as one geometry; the white marks, the yellow stripes and the black as one geometry each; the pads' edge
 // lights as one instanced sphere, their colours each its own; the lead-in lights as one instanced sphere, dim, and
 // the one lit drawn over its place.

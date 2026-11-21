@@ -1,4 +1,4 @@
-// The deck's markings and lamps are a handful of draws, not one a quad or a lamp (on 2026-11-21 they were 456 of
+// The deck's markings and lamps are a handful of draws, not one a quad or a lamp (on 2026-11-21 they were 455 of
 // the low tier's 576 draws a frame by the Ring): in the built page in Chromium, by the Ring at 775 s on the low tier,
 // the deck's marks are seven meshes, two of them instanced spheres holding the pads' 48 edge lights and the lead-in
 // lights, and the pads, the white marks, the yellow and the black stripes one geometry each. Build first
