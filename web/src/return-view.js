@@ -409,7 +409,7 @@ export const ret = {
     if (c === 'orbit' && waiting) c = 'return';   // TO ORBIT, in orbit flying home: the same skip ahead
     // the controls handed back on the way home go to the crew flying home (homewardNext); refused there (the
     // deck, riding with the Ring), the page's own CREW goes on as before
-    if ((c === 'crew' || c === 'return') && auto === ctx.AUTO.off && this.homeward) {
+    if ((c === 'crew' || c === 'return') && auto === ctx.AUTO.off && this.homeward && !docked(ctx.core)) {   // docked: RETURN lets go first, below
       ctx.core.auto(ctx.AUTO.return);
       ctx.core.read();
       if (Math.round(ctx.core.s.auto) === ctx.AUTO.return) {

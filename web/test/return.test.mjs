@@ -147,7 +147,7 @@ test('riding with the deck is the flight home\'s 9 km, as the page\'s TO ORBIT j
 
 test('Space on the way home hands back to the crew flying home; the crew to orbit climbed away from final', { skip: noThree }, () => {
   const said = [];
-  const core = { s: { auto: AUTO.off, t: 80700, alt: 445, onGround: 0 }, read() { return this.s; }, auto(m) { this.s.auto = m; } };
+  const core = { s: { auto: AUTO.off, t: 80700, alt: 445, onGround: 0 }, dock: { docked: 0 }, read() { return this.s; }, auto(m) { this.s.auto = m; } };
   const ctx = { core, AUTO, say: (t) => said.push(t) };
   const ret = view.ret;
   Object.assign(ret, { r: { phase: 0 }, homeward: true, skipping: false });
@@ -162,6 +162,10 @@ test('Space on the way home hands back to the crew flying home; the crew to orbi
   const stubborn = { ...core, s: { ...core.s, auto: AUTO.off }, auto() {} };
   ret.homeward = true;
   assert.equal(ret.command('crew', { ...ctx, core: stubborn }), false);
+  // docked again on the way home: not handed over docked (RETURN lets go of the port first, CREW is docking's)
+  const moored = { ...core, s: { ...core.s, auto: AUTO.off }, dock: { docked: 1 } };
+  assert.equal(ret.command('crew', { ...ctx, core: moored }), false);
+  assert.equal(moored.s.auto, AUTO.off);
 });
 
 test('the controls handed back on the way home go to the crew flying home, as the flight director keeps it', { skip: noThree }, () => {
