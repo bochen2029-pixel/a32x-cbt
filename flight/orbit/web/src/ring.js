@@ -767,7 +767,7 @@ export class Ring {
     mouth.position.y = -HUB_PORT_M - 0.5;
     // radiators between the spokes, beyond the collar
     for (const r of planRadiators()) {
-      const panel = new THREE.BoxGeometry(r.r1 - r.r0, r.y1 - r.y0, 2);
+      const panel = new THREE.BoxGeometry(r.r1 - r.r0, r.y1 - r.y0, r.thick);
       // the box's x is out along the panel, y along the axis, z its thickness: turn x to the angle
       panel.translate((r.r0 + r.r1) / 2, (r.y0 + r.y1) / 2, 0).rotateY(r.a - Math.PI / 2);
       const uv = panel.attributes.uv;
@@ -777,16 +777,16 @@ export class Ring {
 
     // the mast and its arrays, held still and turned to the Sun (update)
     add(new THREE.CylinderGeometry(MAST.r, MAST.r, MAST.y1 - MAST.y0, 16).translate(0, (MAST.y0 + MAST.y1) / 2, 0), plain, this.mast);
-    add(new THREE.CylinderGeometry(MAST.r * 3, MAST.r * 3, 30, 24).translate(0, MAST.y0 + 15, 0), dark, this.mast);
+    add(new THREE.CylinderGeometry(MAST.footR, MAST.footR, MAST.foot, 24).translate(0, MAST.y0 + MAST.foot / 2, 0), dark, this.mast);
     // its wings, a pair at each of three heights, each pair turned about its own spar to the Sun (update):
     // the cells and the spars each one mesh drawn three times
     const cellsG = [], sparsG = [];
     for (const s of [-1, 1]) {
-      const g = new THREE.BoxGeometry(ARRAYS.span, ARRAYS.chord, 1.2).translate(s * (ARRAYS.root + ARRAYS.span / 2), 0, 0);
+      const g = new THREE.BoxGeometry(ARRAYS.span, ARRAYS.chord, ARRAYS.thick).translate(s * (ARRAYS.root + ARRAYS.span / 2), 0, 0);
       const uv = g.attributes.uv;
       for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * (ARRAYS.span / 40), uv.getY(i) * (ARRAYS.chord / 40));
       cellsG.push(g);
-      sparsG.push(new THREE.BoxGeometry(ARRAYS.span + ARRAYS.root, 3, 3).translate(s * (ARRAYS.span + ARRAYS.root) / 2, 0, 0));
+      sparsG.push(new THREE.BoxGeometry(ARRAYS.span + ARRAYS.root, ARRAYS.spar, ARRAYS.spar).translate(s * (ARRAYS.span + ARRAYS.root) / 2, 0, 0));
     }
     this.wings = [cellM, dark].map((m, i) => {
       const parts = i ? sparsG : cellsG, wing = new THREE.InstancedMesh(mergeGeometries(parts, false), m, ARRAYS.at.length);

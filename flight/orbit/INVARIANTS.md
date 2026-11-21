@@ -145,8 +145,10 @@ From the audit of `60e2582` (the third), fixed 2026-11-21, each with a test that
 
 ## Not yet enforced
 
-- **G1.** The page's spokes are 70 m square by a literal in `web/src/ring.js`, not by `RING.spoke`; the
-  header's `OC_RING_SPOKE_M` could change and the drawing would not (O9). Fix: `new THREE.BoxGeometry(R.spoke, R.spoke, spokeLength)`.
+- **G1.** Settled. The page's spokes were 70 m square by a literal in `web/src/ring.js`, not by `RING.spoke`.
+  They are now trusses laid out by `ring-plan.js`'s `structure()` from `RING.spoke` (held equal to
+  `OC_RING_SPOKE_M` by `core.test.mjs`), and `ring.test.mjs` holds every member inside the spoke's section
+  and the spokes from the collar to the roof. The hub's fittings are the header's too (G12).
 - **G2.** A session on the page cannot be replayed. It steps a wall-clock number of steps per frame and
   logs neither them nor the controls. Replay is the core's promise (O6); a log of (controls, steps) per
   frame would make it the page's.
