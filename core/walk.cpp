@@ -39,6 +39,16 @@ const double SECTOR = 2 * PI / SPOKES;
 const double S_RIM = 2 * PI * RF;                        // once round the rim floor
 const double STREET = S_RIM / OC_WALK_STREETS;           // from one cross street to the next
 
+// The flight deck (orbit_core.h's OC_DECK_*), in the floor's arc: an open sector of the band, a vacuum, centred
+// at OC_DECK_ANGLE_DEG in the spokes' convention, with a pressure bulkhead just outside each end, from the floor
+// up past the roof's edge (as web/src/ring-plan.js draws it) and across the band. Between the bulkheads' faces
+// toward the town nothing of the town stands, and no one walks.
+const double DECK_A = OC_DECK_ANGLE_DEG * D2R;
+const double DECK_HALF = OC_DECK_ARC_M / 2;                       // m of floor from the deck's middle to its end
+const double BULK = OC_DECK_BULKHEAD_M;
+const double SEALED = DECK_HALF + BULK;                           // ... and to a bulkhead's face toward the town
+const double BULK_TOP = OC_RING_FLOOR_M - (OC_RING_ROOF_M - 12);   // 312 m: past the roof's edge
+
 inline double sq(double v) { return v * v; }
 inline double easing() { return W * std::sqrt(OC_WALK_LIFT_EASE); }   // 1/s: the rate of the hub's easing
 inline double wrapPi(double a) {                                      // into [-pi, pi)
@@ -56,6 +66,8 @@ inline int nearestSpoke(double th) {
     return k < 0 ? k + SPOKES : k;
 }
 inline double floorOf(int zone) { return zone == OC_WALK_IN_HUB ? RL : RF; }
+// m of floor from the deck's middle to the arc s (any number of turns), spinward positive, within half a turn
+inline double fromDeck(double s) { return RF * wrapPi(s / RF - DECK_A); }
 inline void limit(double* a, double* b, double most) {
     const double m = std::hypot(*a, *b);
     if (m > most) { *a *= most / m; *b *= most / m; }
@@ -162,17 +174,33 @@ void plan() {
     // the spokes' feet
     for (int k = 0; k < SPOKES; ++k)
         addBox(OC_WALK_ON_FLOOR, OC_BOX_PYLON, spokeAngle(k) * RF, OC_RING_SPOKE_M / 2, -OC_RING_SPOKE_M / 2, OC_RING_SPOKE_M / 2, 0, ROOF);
-    // the canal's parapets: along both banks from deck to deck, and across the canal at each deck's sides
+    // the flight deck's bulkheads, one at each end of its open sector, their bodies outside it
+    const double sealLo = DECK_A * RF - SEALED, sealHi = DECK_A * RF + SEALED;   // the sealed stretch, in [0, S_RIM)
+    for (int side = -1; side <= 1; side += 2)
+        addBox(OC_WALK_ON_FLOOR, OC_BOX_BULKHEAD, DECK_A * RF + side * (DECK_HALF + BULK / 2), BULK / 2, -OC_RING_WIDTH_M / 2, OC_RING_WIDTH_M / 2, 0, BULK_TOP);
+    // the canal's parapets: along both banks from deck to deck, and across the canal at each deck's sides; the
+    // canal ends at the bulkheads, at a lock gate in front of each, and nothing of it runs on between them
     const double bank = OC_WALK_CANAL_M, thick = OC_WALK_PARAPET_M, tall = OC_WALK_PARAPET_TALL_M;
+    auto banks = [&](double a, double b) {
+        if (b <= a) return;
+        addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, (a + b) / 2, (b - a) / 2, bank, bank + thick, 0, tall);
+        addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, (a + b) / 2, (b - a) / 2, -bank - thick, -bank, 0, tall);
+    };
     for (int j = 0; j < OC_WALK_STREETS; ++j) {
         const double deck0 = isPlaza(j) ? OC_WALK_PLAZA_DECK_M : OC_WALK_STREET_M;
         const double deck1 = isPlaza((j + 1) % OC_WALK_STREETS) ? OC_WALK_PLAZA_DECK_M : OC_WALK_STREET_M;
         const double a = j * STREET + deck0, b = (j + 1) * STREET - deck1;
-        addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, (a + b) / 2, (b - a) / 2, bank, bank + thick, 0, tall);
-        addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, (a + b) / 2, (b - a) / 2, -bank - thick, -bank, 0, tall);
-        addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, a + thick / 2, thick / 2, -bank, bank, 0, tall);
-        addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, b - thick / 2, thick / 2, -bank, bank, 0, tall);
+        if (b <= sealLo || a >= sealHi) banks(a, b);
+        else {
+            banks(a, std::fmin(b, sealLo));
+            banks(std::fmax(a, sealHi), b);
+        }
+        if (std::fabs(fromDeck(a)) > SEALED) addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, a + thick / 2, thick / 2, -bank, bank, 0, tall);
+        if (std::fabs(fromDeck(b)) > SEALED) addBox(OC_WALK_ON_FLOOR, OC_BOX_PARAPET, b - thick / 2, thick / 2, -bank, bank, 0, tall);
     }
+    const double gate = 2;   // m: a lock gate's thickness (chosen)
+    addBox(OC_WALK_ON_FLOOR, OC_BOX_LOCK, sealLo - gate / 2, gate / 2, -bank, bank, 0, tall);
+    addBox(OC_WALK_ON_FLOOR, OC_BOX_LOCK, sealHi + gate / 2, gate / 2, -bank, bank, 0, tall);
     // the blocks: lots in rows between the cross streets, built on more often near a spoke and near the
     // canal; parkland where they are not. Low, plain, unfurnished.
     const int ALONG = 8, ACROSS = 5;
@@ -195,6 +223,8 @@ void plan() {
                     // none on a plaza
                     const double fromPlaza = std::fabs(s - std::floor(s / (S_RIM / SPOKES) + 0.5) * (S_RIM / SPOKES));
                     if (fromPlaza - len / 2 < OC_WALK_PLAZA_M + 10 && c - wid / 2 < OC_WALK_PLAZA_M + 10) continue;
+                    // none on the flight deck, nor within 15 m of its bulkheads
+                    if (std::fabs(fromDeck(s)) < SEALED + 15 + len / 2) continue;
                     const double c0 = c - wid / 2, c1 = c + wid / 2;
                     addBox(OC_WALK_ON_FLOOR, OC_BOX_BLOCK, s, len / 2, side ? -c1 : c0, side ? -c0 : c1, 0, high);
                 }
@@ -666,7 +696,10 @@ void ballStep() {
     const double R = floorOf(b.zone), hWas = R - (radiusOf(a.p) + RB), re = radiusOf(e.p);
     double th = angleOf(e.p), c = e.p.y;
     double us = dot(e.v, spinward(th)), uc = e.v.y, fall = dot(e.v, outward(th));
+    const double us0 = us, uc0 = uc;
     const double top = solids(b.zone, th, c, R - (re + RB), hWas, RB, 2 * RB, us, uc);
+    if (us != us0) us = -0.5 * us0;   // off a wall it comes back at half its speed, as off the floor
+    if (uc != uc0) uc = -0.5 * uc0;
     double r = re;
     if (r + RB >= R - top) {
         if (!b.fell) {
@@ -792,6 +825,7 @@ int oc_walk_put(double s_m, double c_m) {
     if (!w.started || w.aboard || !std::isfinite(s_m) || !std::isfinite(c_m)) return 0;
     double th = wrapPi(s_m / RF), c = c_m, us = 0, uc = 0;
     const double th0 = th;
+    if (std::fabs(fromDeck(th * RF)) < SEALED + RAD) return 0;   // the flight deck, a vacuum, and its bulkheads
     if (std::fabs(c) < OC_WALK_CANAL_M && !decked((th < 0 ? th + 2 * PI : th) * RF)) return 0;   // the canal's water
     const double top = solids(OC_WALK_ON_FLOOR, th, c, 0, 0, RAD, TALL, us, uc);
     if (th != th0 || c != c_m || top != 0) return 0;

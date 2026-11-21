@@ -8,9 +8,10 @@
 import * as THREE from 'three';
 import { DT } from './core.js';
 import { FEATURES } from './features.js';
-import { PLACE, WALK, WHERE, WalkCore } from './walk-core.js';
+import { PLACE, WALK, WALK_OUT, WHERE, WalkCore } from './walk-core.js';
 import {
-  W, between, clamp, feltUp, outward, ringDirToSite, ringFrame, ringToSite, siteDirToRing, sunFor, viewAxes, walkLines, walkStatus,
+  W, between, clamp, feltUp, moving, outward, ringDirToSite, ringFrame, ringToSite, siteDirToRing, skyWindow, sunFor, surfaceAt, viewAxes, walkLines,
+  walkStatus,
 } from './walk-math.js';
 import { WalkWorld } from './walk-world.js';
 
@@ -66,7 +67,7 @@ const v = {
   on: false, core: null, world: null, cam: null, warp: 1, debt: 0, look: { heading: 0, pitch: 0 },
   prev: null, cur: null, drag: null, was: {}, usePulse: false, touchJump: false, touchRun: false, touchBall: false,
   pressed: new Set(),   // keys pressed since the last frame: a tap shorter than a frame still counts
-  hudNext: 0, sayUntil: 0, saved: null, lean: null, toEcef: null, sun: null, ballMark: null,
+  hudNext: 0, sayUntil: 0, saved: null, lean: null, toEcef: null, sun: null, ballMark: null, quality: null,
 };
 
 function say(ctx, text) {
@@ -79,7 +80,11 @@ function canWalk(ctx) {
 }
 
 function start(ctx, place) {
-  if (!v.core) v.core = new WalkCore(ctx.core.m);
+  if (!v.core) {
+    v.core = new WalkCore(ctx.core.m);
+    // what the walk says of itself, read with the flight's readouts after every step: ctx.core.walk (sound's footsteps)
+    if (!ctx.core.walk && ctx.core.addBlock) ctx.core.addBlock('walk', '_oc_walk_out', '_oc_walk_out_len', WALK_OUT);
+  }
   if (!v.world) {
     v.world = new WalkWorld(v.core.boxes());
     v.cam = new THREE.PerspectiveCamera(60, 1, 0.05, NEAR_SPLIT);
@@ -104,6 +109,10 @@ function start(ctx, place) {
 
 function stop(ctx, text) {
   v.on = false;
+  if (ctx.sound && ctx.sound.set) {   // the sound is the flight's again
+    ctx.sound.set('lift', 0);
+    ctx.sound.set('walk', NaN);
+  }
   document.body.classList.remove('walking');
   if (document.pointerLockElement) document.exitPointerLock();
   if (v.saved) {
@@ -253,13 +262,12 @@ function draw(ctx, o, f) {
   const toEarth = fr.unit(fr.sub([0, 0, -fr.RE], eyeSite)), litPart = 0.5 * (1 - fr.dot(sunSite, toEarth));
   L.uEarth.value.set(...siteDirToRing(F, toEarth));
   L.uEarthLight.value.set(...[0.10, 0.13, 0.19].map((x) => x * litPart));
-  v.world.update(o, ctx.dt);
+  v.world.update(o, ctx.dt, eye, ctx.now / 1000);
 
   const where = Math.round(o.where), enclosed = where === WHERE.hub || (where === WHERE.lift && o.liftR < WALK.lobby + 1);
-  renderer.clear();
-  // the sky, from the eye's place in the site frame
-  const camera = ctx.camera, rel = (p) => fr.three(fr.sub(p, eyeSite));
-  if (!enclosed) {
+  const camera = ctx.camera, rel = (p) => fr.three(fr.sub(p, eyeSite)), alt = fr.heightOf(eyeSite);
+  // the sky's camera: the page's own, at the eye's place in the site frame, looking where the walker looks
+  const aimSky = () => {
     camera.position.set(0, 0, 0);
     camera.up.set(...fr.three(ringDirToSite(F, lean)));
     camera.lookAt(new THREE.Vector3(...fr.three(ringDirToSite(F, ax.fwd))));
@@ -268,29 +276,76 @@ function draw(ctx, o, f) {
     camera.far = 1e8;
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
-    const alt = fr.heightOf(eyeSite), t = s.t, ll = [ctx.START.lat, ctx.START.lon];
-    ctx.stars.update({
-      x: fr.ecefToThree(fr.inertialToEcef([1, 0, 0], t), ...ll),
-      y: fr.ecefToThree(fr.inertialToEcef([0, 1, 0], t), ...ll),
-      z: fr.ecefToThree(fr.inertialToEcef([0, 0, 1], t), ...ll),
-    }, 1);
-    // what the other features keep in the sky (the Sun and the Moon) is placed for this eye
-    const P = [s.siteE, s.siteN, s.siteU];
-    Object.assign(ctx, { cam: eyeSite, rel, up: fr.unit(fr.add(eyeSite, [0, 0, fr.RE])), alt, sunSite, P, axes: fr.bodyAxes([s.qw, s.qx, s.qy, s.qz]) });
-    for (const feature of FEATURES) if (feature !== walk && feature.update) feature.update(ctx);
-    ctx.earth.update(camera, canvas.height, rel([0, 0, -fr.RE]), alt, fr.three(sunSite), v.toEcef);
-    const hidden = [ctx.ring && ctx.ring.group, ctx.craft && ctx.craft.group].filter((g) => g && g.visible);   // seen from outside, not from in
-    for (const g of hidden) g.visible = false;
-    renderer.render(ctx.far, camera);
-    for (const g of hidden) g.visible = true;
+  };
+  aimSky();
+  // What the sky keeps in the far scene (the Moon, its stars, the Sun's glare) is placed for this eye and this
+  // view. The other features' update hooks are the flight's, and wait while the walk draws the frame
+  // (features.js): sound, for one, plays the walk's own sound only while its update is not called.
+  const P = [s.siteE, s.siteN, s.siteU];
+  Object.assign(ctx, { cam: eyeSite, rel, up: fr.unit(fr.add(eyeSite, [0, 0, fr.RE])), alt, sunSite, P, axes: fr.bodyAxes([s.qw, s.qx, s.qy, s.qz]) });
+  if (!enclosed) {
+    for (const feature of FEATURES) if (feature.name === 'sky' && feature.update) feature.update(ctx);
+    aimSky();   // as it was, should the sky have turned it (its telescope is the flight's)
   }
-  // the ring's inside: far, then near
+  // the passes, through the page's pipeline: at low straight to the canvas, above it into a multisampled
+  // half-float picture that glows where it is brighter than white and is tone-mapped once (pipeline.js)
+  const passes = () => { drawPasses(ctx, { enclosed, camera, rel, alt, eye, eyeSite, sunSite, F, ax, lean, fov, aspect }); };
+  if (ctx.pipeline) ctx.pipeline.render(passes);
+  else {
+    renderer.setRenderTarget(null);
+    renderer.clear();
+    passes();
+  }
+}
+
+// Draw fn with the picture cut to win (skyWindow's), into the target in hand: the pipeline's, or the canvas.
+function scissored(renderer, win, fn) {
+  const rt = renderer.getRenderTarget();
+  if (rt) {
+    const W = rt.width, H = rt.height;
+    rt.scissor.set(Math.floor(win.x0 * W), Math.floor(win.y0 * H), Math.ceil((win.x1 - win.x0) * W) + 1, Math.ceil((win.y1 - win.y0) * H) + 1);
+    rt.scissorTest = true;
+    renderer.setRenderTarget(rt);
+    fn();
+    rt.scissorTest = false;
+    renderer.setRenderTarget(rt);
+  } else {
+    const c = renderer.domElement, pr = renderer.getPixelRatio(), W = c.width / pr, H = c.height / pr;
+    renderer.setScissor(win.x0 * W, win.y0 * H, (win.x1 - win.x0) * W + 1, (win.y1 - win.y0) * H + 1);
+    renderer.setScissorTest(true);
+    fn();
+    renderer.setScissorTest(false);
+  }
+}
+
+function drawPasses(ctx, { enclosed, camera, rel, alt, eye, eyeSite, sunSite, F, ax, lean, fov, aspect }) {
+  const renderer = ctx.renderer, canvas = renderer.domElement, fr = ctx.frames, s = ctx.core.s;
+  // the ring's inside, its camera first: where in the picture the sky can be seen is worked out along its axes
   const cam = v.cam;
   cam.position.set(...eye);
   cam.up.set(...lean);
   cam.lookAt(eye[0] + ax.fwd[0], eye[1] + ax.fwd[1], eye[2] + ax.fwd[2]);
   cam.fov = fov;
   cam.aspect = aspect;
+  cam.updateMatrixWorld();
+  const m = cam.matrixWorld.elements;
+  const win = enclosed ? null : skyWindow(eye, { right: [m[0], m[1], m[2]], up: [m[4], m[5], m[6]], fwd: [-m[8], -m[9], -m[10]] }, fov, aspect);
+  v.skyWindow = win;
+  // the sky, from the eye's place in the site frame, where it can be seen
+  if (win) {
+    const t = s.t, ll = [ctx.START.lat, ctx.START.lon];
+    ctx.stars.update({
+      x: fr.ecefToThree(fr.inertialToEcef([1, 0, 0], t), ...ll),
+      y: fr.ecefToThree(fr.inertialToEcef([0, 1, 0], t), ...ll),
+      z: fr.ecefToThree(fr.inertialToEcef([0, 0, 1], t), ...ll),
+    }, 1);
+    ctx.earth.update(camera, canvas.height, rel([0, 0, -fr.RE]), alt, fr.three(sunSite), v.toEcef);
+    const hidden = [ctx.ring && ctx.ring.group, ctx.craft && ctx.craft.group].filter((g) => g && g.visible);   // seen from outside, not from in
+    for (const g of hidden) g.visible = false;
+    scissored(renderer, win, () => renderer.render(ctx.far, camera));
+    for (const g of hidden) g.visible = true;
+  }
+  // the ring's inside: far, then near
   renderer.clearDepth();
   cam.near = NEAR_SPLIT;
   cam.far = 16000;
@@ -323,7 +378,8 @@ export const walk = {
     bindTouch();
     bindKeys();
     bindPointer(ctx.renderer.domElement);
-    ctx.walk = { v, start: (place) => start(ctx, place), stop: (text) => stop(ctx, text) };   // for the page's tests
+    // for the page's tests and its timing: the state, start and stop, and one frame of the walk on demand
+    ctx.walk = { v, start: (place) => start(ctx, place), stop: (text) => stop(ctx, text), frame: (dt) => walk.frame(ctx, dt) };
     const place = urlPlace();
     if (place !== null) start(ctx, place);
   },
@@ -350,6 +406,10 @@ export const walk = {
 
   frame(ctx, dt) {
     const now = performance.now(), wc = v.core;
+    if (ctx.quality && v.quality !== ctx.quality) {   // the graphics tier, set or changed
+      v.quality = ctx.quality;
+      v.world.setQuality(ctx.quality);
+    }
     const c = hands(ctx, dt);
     wc.controls(c);
     if (c.drop || c.toss) {
@@ -376,6 +436,12 @@ export const walk = {
     if (wc.o.aboard > 0.5) {
       stop(ctx, 'Back aboard the craft');
       return;
+    }
+    if (ctx.sound && ctx.sound.set) {   // the walk's sound: its lift, its footsteps and what they fall on
+      const o = wc.o, onFloor = Math.round(o.where) === WHERE.floor;
+      ctx.sound.set('lift', moving(o) ? 1 : 0);
+      ctx.sound.set('walk', o.ground > 0.5 ? o.speed : 0);
+      ctx.sound.set('surface', onFloor && surfaceAt(o.s, o.c) === 'grass' ? 'grass' : 'paving');
     }
     const drawn = between(v.prev, v.cur, Math.min(1, v.debt / DT));
     draw(ctx, drawn, Math.min(1, v.debt / DT));
