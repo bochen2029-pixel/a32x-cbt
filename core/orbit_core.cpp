@@ -257,7 +257,7 @@ Deriv deriv(const State& s, double t, V3 r, V3 v, Q q, V3 w, double prop) {
         }
     }
     // the drive and the small thrusters
-    const double thrust = prop > 0 ? s.thr * T_MAX : 0;
+    const double thrust = prop > 0 ? s.thr * T_MAX * (1 + s.deck.dThrust) : 0;   // the drive as it is, not as asked (oc_deck_disturb; 0 unless a test says)
     fBody = fBody + (s.nozzle != 0 ? thrustAxis(s.nozzle) * thrust : V3{thrust, 0, 0}) + s.rcs * mass;
     acc = acc + rot(q, fBody) * (1.0 / mass);
 
@@ -277,10 +277,9 @@ Deriv deriv(const State& s, double t, V3 r, V3 v, Q q, V3 w, double prop) {
     return d;
 }
 
-void integrate(State& s) {
-    const double h = OC_DT;
+// One RK4 step of h from time t.
+static void rk4(State& s, double h, double t) {
     auto qadd = [](Q a, Q b, double k) { return Q{a.w + b.w * k, a.x + b.x * k, a.y + b.y * k, a.z + b.z * k}; };
-    const double t = timeOf(s);
     const Deriv k1 = deriv(s, t, s.r, s.v, s.q, s.w, s.prop);
     const Deriv k2 = deriv(s, t + h / 2, s.r + k1.rd * (h / 2), s.v + k1.vd * (h / 2), qadd(s.q, k1.qd, h / 2), s.w + k1.wd * (h / 2), s.prop + k1.propd * h / 2);
     const Deriv k3 = deriv(s, t + h / 2, s.r + k2.rd * (h / 2), s.v + k2.vd * (h / 2), qadd(s.q, k2.qd, h / 2), s.w + k2.wd * (h / 2), s.prop + k2.propd * h / 2);
@@ -292,6 +291,17 @@ void integrate(State& s) {
                   s.q.y + (k1.qd.y + 2 * k2.qd.y + 2 * k3.qd.y + k4.qd.y) * c, s.q.z + (k1.qd.z + 2 * k2.qd.z + 2 * k3.qd.z + k4.qd.z) * c});
     s.w = s.w + (k1.wd + k2.wd * 2 + k3.wd * 2 + k4.wd) * c;
     s.prop = std::fmax(0.0, s.prop + (k1.propd + 2 * k2.propd + 2 * k3.propd + k4.propd) * c);
+}
+
+// The step, OC_DT, in one RK4 step; where the gear can reach the Ring's deck, in ten. There the legs and the tyres
+// stuck to their spots damp the craft at about 26/s, and RK4 over a whole step (lambda h = 0.5) leaves a false
+// velocity of 2e-4 m/s in a craft parked at rest; in tenths, lambda h is 0.05 and it goes. The step itself stays
+// the step: the controls and the commands are held across it, and the deck's spots are fixed through it.
+// (Found by the audit of 599e051. The owner's booster lander sub-steps its contact the same way.)
+void integrate(State& s) {
+    const int pieces = s.gear && s.deck.near ? 10 : 1;
+    const double t = timeOf(s);
+    for (int i = 0; i < pieces; ++i) rk4(s, OC_DT / pieces, t + i * (OC_DT / pieces));
 }
 
 // ---- the stability plane: rates in, torque out --------------------------------------------------
@@ -569,12 +579,13 @@ void stepOnce(State& s) {
     else if (s.autoMode == OC_AUTO_APPROACH) approach(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_RETURN) returnCrew(s, L, &throttle);   // return.cpp
     else if (s.autoMode == OC_AUTO_DOCK) dockCrew(s, L, &throttle);       // dock.cpp
-    else if (s.autoMode == OC_AUTO_DECK) deckCrew(s, L, &throttle);       // deck.cpp
+    else if (s.autoMode == OC_AUTO_DECK || s.autoMode == OC_AUTO_TAKEOFF) deckCrew(s, L, &throttle);   // deck.cpp
     else pilot(s, L, &throttle);
     fdAfter(s, L, throttle);
     s.thr += (throttle - s.thr) * (OC_DT / 0.4);
     if ((throttle == 0 && s.thr < 1e-3) || s.prop <= 0) s.thr = 0;   // shut down, not idling forever
-    s.nozzle += clampd(clampd(s.nozzleCmd, 0, NOZZLE_MAX) - s.nozzle, -NOZZLE_RATE * OC_DT, NOZZLE_RATE * OC_DT);   // the swivel at its rate
+    const double swivelTo = s.deck.dLag > 0 ? (s.deck.lagged += (clampd(s.nozzleCmd, 0, NOZZLE_MAX) - s.deck.lagged) * std::fmin(1.0, OC_DT / s.deck.dLag)) : s.nozzleCmd;
+    s.nozzle += clampd(clampd(swivelTo, 0, NOZZLE_MAX) - s.nozzle, -NOZZLE_RATE * OC_DT, NOZZLE_RATE * OC_DT);   // the swivel at its rate, after its lag if a test gives it one
     const double vsBefore = L.vs;
     integrate(s);
     ++s.n;
@@ -756,12 +767,13 @@ void oc_auto(int mode) {
         const V3 d = g.r - ringPos(t), passing = g.v - ringVel(t) - cross(ring.normal * ring.rate, d);
         if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
     }
-    // The flight home is refused on the Ring's deck and riding with it (return.cpp): who was flying flies on.
+    // The flight home is refused on the Ring's deck and riding with it (return.cpp): who was flying flies on. From
+    // the deck the crew's take-off goes first (OC_AUTO_TAKEOFF), to the hold point, from which RETURN flies home.
     if (mode == OC_AUTO_RETURN) {
         g.ret.refused = returnRefusal(g);
         if (g.ret.refused) { writeOut(); return; }
     }
-    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK;
+    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK || mode == OC_AUTO_TAKEOFF;
     fdHanded(g, g.autoMode);   // the flight director takes up the guidance afresh (fd.cpp)
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
@@ -769,6 +781,7 @@ void oc_auto(int mode) {
     if (g.autoMode == OC_AUTO_RETURN) returnEngage(g);
     if (g.autoMode == OC_AUTO_DOCK) dockEngage(g);
     if (g.autoMode == OC_AUTO_DECK) deckEngage(g);
+    if (g.autoMode == OC_AUTO_TAKEOFF) deckTakeoff(g);
     if (g.autoMode != OC_AUTO_CREW) { writeOut(); return; }
     // The crew picks up where the craft is, not where it last left off.
     const Local L = localOf(g);

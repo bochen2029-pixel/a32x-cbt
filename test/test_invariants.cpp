@@ -27,6 +27,8 @@
 // TEST: escape_periapsis
 // TEST: lift_from_the_windward_face
 // TEST: peg_plan_is_its_own
+// TEST: hash_covers_the_deck
+// TEST: deck_flight_finite
 // TEST: windy_ledger
 // TEST: wind_finite
 
@@ -125,12 +127,13 @@ bool raiseAboveTheAir() {
 }
 
 // ---- the ledger: the work done on each kilogram, step by step --------------------------------------
-// The non-gravitational acceleration the model says acts on the craft in state s with the commands it
-// holds for the step: the drive along the nose, the air (README.md: lift across the wind in the plane
-// of symmetry, drag along it, a side force with sideslip), the small thrusters and the gear. Restated
-// here, through the core's own atmosphere and coefficients, so that a force the integrator applies and
-// this list does not know shows as a residual. A new force in the core's deriv() belongs here too. The air's
-// velocity is the craft's less the Earth's turn and the wind (wind.cpp), at time t.
+// The non-gravitational acceleration the model says acts on the craft in state s, at time t, with the commands
+// it holds for the step: the drive along its swivelled axis (along the nose with the swivel aft), the air
+// (README.md: lift across the wind in the plane of symmetry, drag along it, a side force with sideslip), the
+// small thrusters, and the gear on the runway and on the Ring's deck. Restated here, through the core's own
+// atmosphere and coefficients, so that a force the integrator applies and this list does not know shows as a
+// residual. A new force in the core's deriv() belongs here too. The air's velocity is the craft's less the
+// Earth's turn and the wind (wind.cpp), at time t; the drive's thrust is what a test's oc_deck_disturb makes it.
 
 struct Forces {
     V3 thrust, air, rcs, gear;
@@ -156,9 +159,10 @@ Forces forcesOn(const oc::State& s, double t) {
             f.air = oc::rot(s.q, (along * (-cd) + across * cl + V3{0, oc::CY_BETA * beta, 0}) * (qbar * oc::S_REF)) * (1.0 / mass);
         }
     }
-    f.thrust = oc::rot(s.q, V3{s.prop > 0 ? s.thr * oc::T_MAX : 0, 0, 0}) * (1.0 / mass);
+    const double thrust = s.prop > 0 ? s.thr * oc::T_MAX * (1 + s.deck.dThrust) : 0;
+    f.thrust = oc::rot(s.q, s.nozzle != 0 ? oc::thrustAxis(s.nozzle) * thrust : V3{thrust, 0, 0}) * (1.0 / mass);
     f.rcs = oc::rot(s.q, s.rcs);
-    f.gear = oc::gearLoad(s, s.r, s.v, s.q, s.w).force * (1.0 / mass);
+    f.gear = (oc::gearLoad(s, s.r, s.v, s.q, s.w).force + oc::deckGearLoad(s, t, s.r, s.v, s.q, s.w).force) * (1.0 / mass);
     return f;
 }
 
@@ -199,11 +203,14 @@ struct Ledger {
 };
 
 void ledgerStep(Ledger& L, const oc::State& before, const oc::State& after) {
-    // the step's commands are set before it is integrated, and held: take them from after
+    // the step's commands are set before it is integrated, and held: take them from after; the swivel moves to its
+    // step's angle before the step too. The deck's tyres' spots are fixed through the step: take them from before.
     oc::State A = before;
-    A.thr = after.thr; A.rcs = after.rcs; A.steer = after.steer; A.brake = after.brake; A.gear = after.gear;
-    const oc::State& B = after;
-    const Forces fa = forcesOn(A, A.n * H), fb = forcesOn(B, B.n * H);
+    A.thr = after.thr; A.rcs = after.rcs; A.steer = after.steer; A.brake = after.brake; A.gear = after.gear; A.nozzle = after.nozzle;
+    oc::State B = after;
+    B.deck = before.deck;
+    const double tA = oc::timeOf(before);
+    const Forces fa = forcesOn(A, tA), fb = forcesOn(B, tA + H);
     auto gravity = [](V3 r) { const double rm = oc::norm(r); return r * (-MU / (rm * rm * rm)); };
     // the midpoint: cubic Hermite in r and v (with the accelerations at the ends) and in q (with q'),
     // the mass flow being constant over a step
@@ -216,7 +223,7 @@ void ledgerStep(Ledger& L, const oc::State& before, const oc::State& after) {
                           (A.q.y + B.q.y) / 2 + (qa.y - qb.y) * H / 8, (A.q.z + B.q.z) / 2 + (qa.z - qb.z) * H / 8});
     M.w = (A.w + B.w) * 0.5;
     M.prop = (A.prop + B.prop) / 2;
-    const Forces fm = forcesOn(M, (A.n + 0.5) * H);
+    const Forces fm = forcesOn(M, tA + H / 2);
     auto simpson = [&](V3 Forces::*k) { return H / 6 * (oc::dot(fa.*k, A.v) + 4 * oc::dot(fm.*k, M.v) + oc::dot(fb.*k, B.v)); };
     const double pa = oc::dot(fa.total(), A.v), pm = oc::dot(fm.total(), M.v), pb = oc::dot(fb.total(), B.v);
     const double S = H / 6 * (pa + 4 * pm + pb), T = H / 2 * (pa + pb);
@@ -975,6 +982,7 @@ struct Abuse {
     }
 };
 
+void overTheDeckForAbuse(Scan& scan);   // below, with the deck's tests
 void onTheRunway(Scan& scan) { oc_reset(LAT, LON, HDG); oc_auto(OC_AUTO_OFF); scan(); }
 void inTheAir(Scan& scan) { oc_reset(LAT, LON, HDG); while (get(OC_T) < 60) { oc_step(1); scan(); } oc_auto(OC_AUTO_OFF); }
 void highAndFast(Scan& scan) { oc_reset(LAT, LON, HDG); while (get(OC_PHASE) < OC_PH_INSERT) { oc_step(1); scan(); } oc_auto(OC_AUTO_OFF); }
@@ -998,6 +1006,7 @@ void abuseFinite() {
     a.run(overThePole, 10000);
     a.run(overTheSouthPole, 10000);
     a.run(onTheEquator, 10000);
+    a.run(overTheDeckForAbuse, 6000);   // the deck hold, riding with the Ring over a pad, and the crew's modes from there
     oc_reset(LAT, LON, HDG);   // leaving: the pilot takes it at 350 s and burns everything prograde
     while (get(OC_T) < 350) { oc_step(1); a.scan(); }
     oc_auto(OC_AUTO_OFF);
@@ -1213,6 +1222,141 @@ void escapePeriapsis() {
     CHECK(std::fabs(get(OC_PERI) - peri) <= 1, "the periapsis reads %.3f km, the hyperbola's is %.3f km", get(OC_PERI) / 1000, peri / 1000);
 }
 
+// To the approach's hold point by the crew, from the runway, every step scanned.
+bool crewToTheHoldPoint(Scan& scan) {
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_PHASE) != OC_PH_ORBIT) { oc_step(1); scan(); if (get(OC_CRASHED) > 0 || get(OC_T) > 1500) return false; }
+    oc_step(250);
+    oc_auto(OC_AUTO_APPROACH);
+    double last = 1e30;
+    for (const double t0 = get(OC_T); get(OC_T) - t0 < 3600 && get(OC_CRASHED) == 0;) {
+        for (int i = 0; i < 50; ++i) { oc_step(1); scan(); }
+        if (get(OC_PORT_RANGE) < 5 && std::fabs(get(OC_PORT_RANGE) - last) < 0.2) return true;
+        last = get(OC_PORT_RANGE);
+    }
+    return false;
+}
+
+// Over the deck: the crew's landing from the hold point, until the craft hovers riding with the deck over its pad
+// (the deck's apparent weight near one g, under 60 m up), every step scanned; then the pilot's deck hold.
+bool overTheDeck(Scan& scan) {
+    if (!crewToTheHoldPoint(scan)) return false;
+    oc_auto(OC_AUTO_DECK);
+    for (const double t0 = get(OC_T); get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0;) {
+        oc_step(1);
+        scan();
+        if (oc_deck_out()[OC_DECK_APPARENT_G] > 0.95 && oc_deck_out()[OC_DECK_HEIGHT] < 60) {
+            oc_auto(OC_AUTO_OFF);
+            oc_sas(OC_SAS_DECK);
+            return true;
+        }
+    }
+    return false;
+}
+void overTheDeckForAbuse(Scan& scan) { overTheDeck(scan); }
+
+// The hash covers the deck's state as it covers the flight's (O6): the drive's swivel and what the law asks of it,
+// and every field the deck keeps (deck_state.h), the crew's plan node by node and the disturbances a test sets
+// among them. Over the deck, each changed alone by the least that changes it changes the hash. (Found by the audit
+// of 599e051: the swivel could be dropped from the hash and no test saw it.)
+void hashCoversTheDeck() {
+    static_assert(sizeof(oc::DeckState) == 4672, "deck_state.h has changed: list its fields below");
+    Scan scan;
+    if (!overTheDeck(scan)) { CHECK(false, "not over the deck"); return; }
+    oc_step(100);
+    oc::State& g = oc::g;
+    oc::DeckState& k = g.deck;
+    struct F { const char* name; double* d; int* i; unsigned long long* u; };
+    std::vector<F> fields = {
+        {"nozzle", &g.nozzle, nullptr, nullptr}, {"nozzleCmd", &g.nozzleCmd, nullptr, nullptr},
+        {"phase", nullptr, &k.phase, nullptr}, {"pad", nullptr, &k.pad, nullptr}, {"refused", nullptr, &k.refused, nullptr},
+        {"autoBefore", nullptr, &k.autoBefore, nullptr}, {"near", nullptr, &k.near, nullptr}, {"onDeck", nullptr, &k.onDeck, nullptr},
+        {"stuck0", nullptr, &k.stuck[0], nullptr}, {"stuck1", nullptr, &k.stuck[1], nullptr}, {"stuck2", nullptr, &k.stuck[2], nullptr},
+        {"anchor0x", &k.anchor[0].x, nullptr, nullptr}, {"anchor0y", &k.anchor[0].y, nullptr, nullptr}, {"anchor0z", &k.anchor[0].z, nullptr, nullptr},
+        {"anchor1x", &k.anchor[1].x, nullptr, nullptr}, {"anchor1y", &k.anchor[1].y, nullptr, nullptr}, {"anchor1z", &k.anchor[1].z, nullptr, nullptr},
+        {"anchor2x", &k.anchor[2].x, nullptr, nullptr}, {"anchor2y", &k.anchor[2].y, nullptr, nullptr}, {"anchor2z", &k.anchor[2].z, nullptr, nullptr},
+        {"still", nullptr, &k.still, nullptr}, {"calm", nullptr, &k.calm, nullptr}, {"side", nullptr, &k.side, nullptr},
+        {"prop0", &k.prop0, nullptr, nullptr},
+        {"plan.n", nullptr, &k.plan.n, nullptr}, {"plan.t0", &k.plan.t0, nullptr, nullptr}, {"plan.tf", &k.plan.tf, nullptr, nullptr},
+        {"plan.cost", &k.plan.cost, nullptr, nullptr},
+        {"planKind", nullptr, &k.planKind, nullptr}, {"planEnd", &k.planEnd, nullptr, nullptr}, {"planNext", &k.planNext, nullptr, nullptr},
+        {"planSolves", nullptr, &k.planSolves, nullptr}, {"planFails", nullptr, &k.planFails, nullptr},
+        {"planIters", nullptr, &k.planIters, nullptr}, {"planStatus", nullptr, &k.planStatus, nullptr},
+        {"burnt", nullptr, &k.burnt, nullptr}, {"v1", &k.v1, nullptr, nullptr},
+        {"holding", nullptr, &k.holding, nullptr}, {"holdingC", nullptr, &k.holdingC, nullptr},
+        {"holdPosx", &k.holdPos.x, nullptr, nullptr}, {"holdPosy", &k.holdPos.y, nullptr, nullptr}, {"holdPosz", &k.holdPos.z, nullptr, nullptr},
+        {"holdingH", nullptr, &k.holdingH, nullptr}, {"holdH", &k.holdH, nullptr, nullptr}, {"setS", &k.setS, nullptr, nullptr},
+        {"setC", &k.setC, nullptr, nullptr}, {"cmdS", &k.cmdS, nullptr, nullptr}, {"cmdC", &k.cmdC, nullptr, nullptr},
+        {"setH", &k.setH, nullptr, nullptr}, {"heading", &k.heading, nullptr, nullptr}, {"armed", nullptr, &k.armed, nullptr},
+        {"verdict", nullptr, &k.verdict, nullptr}, {"tdPad", nullptr, &k.tdPad, nullptr}, {"tdT", &k.tdT, nullptr, nullptr},
+        {"tdSink", &k.tdSink, nullptr, nullptr}, {"tdDrift", &k.tdDrift, nullptr, nullptr}, {"tdOff", &k.tdOff, nullptr, nullptr},
+        {"tdTilt", &k.tdTilt, nullptr, nullptr}, {"lastValid", nullptr, &k.lastValid, nullptr}, {"sinkLast", &k.sinkLast, nullptr, nullptr},
+        {"sinkRate", &k.sinkRate, nullptr, nullptr}, {"legLast", &k.legLast, nullptr, nullptr}, {"driftLast", &k.driftLast, nullptr, nullptr},
+        {"dThrust", &k.dThrust, nullptr, nullptr}, {"dMass", &k.dMass, nullptr, nullptr}, {"dLag", &k.dLag, nullptr, nullptr},
+        {"dPos", &k.dPos, nullptr, nullptr}, {"dVel", &k.dVel, nullptr, nullptr}, {"noiseSeed", nullptr, nullptr, &k.noiseSeed},
+        {"lagged", &k.lagged, nullptr, nullptr},
+        {"search", nullptr, &k.search, nullptr}, {"gsA", &k.gsA, nullptr, nullptr}, {"gsB", &k.gsB, nullptr, nullptr},
+        {"gsC", &k.gsC, nullptr, nullptr}, {"gsD", &k.gsD, nullptr, nullptr}, {"gsJc", &k.gsJc, nullptr, nullptr},
+        {"gsJd", &k.gsJd, nullptr, nullptr}, {"gsBest", &k.gsBest, nullptr, nullptr}, {"st0", &k.st0, nullptr, nullptr},
+        {"sr0x", &k.sr0.x, nullptr, nullptr}, {"sr0y", &k.sr0.y, nullptr, nullptr}, {"sr0z", &k.sr0.z, nullptr, nullptr},
+        {"sv0x", &k.sv0.x, nullptr, nullptr}, {"sv0y", &k.sv0.y, nullptr, nullptr}, {"sv0z", &k.sv0.z, nullptr, nullptr},
+        {"sm0", &k.sm0, nullptr, nullptr}, {"su0x", &k.su0.x, nullptr, nullptr}, {"su0y", &k.su0.y, nullptr, nullptr},
+        {"su0z", &k.su0.z, nullptr, nullptr}, {"tryNext", nullptr, &k.tryNext, nullptr},
+        {"kT", &k.kT, nullptr, nullptr}, {"uPrevx", &k.uPrev.x, nullptr, nullptr}, {"uPrevy", &k.uPrev.y, nullptr, nullptr},
+        {"uPrevz", &k.uPrev.z, nullptr, nullptr}, {"aPrevx", &k.aPrev.x, nullptr, nullptr}, {"aPrevy", &k.aPrev.y, nullptr, nullptr},
+        {"aPrevz", &k.aPrev.z, nullptr, nullptr}, {"dPrevx", &k.dPrev.x, nullptr, nullptr}, {"dPrevy", &k.dPrev.y, nullptr, nullptr},
+        {"dPrevz", &k.dPrev.z, nullptr, nullptr}, {"estValid", nullptr, &k.estValid, nullptr},
+    };
+    for (int i = 0; i < 6; ++i) fields.push_back({"noise", &k.noise[i], nullptr, nullptr});
+    for (int i = 0; i <= oc::PLAN_MAX; ++i) {   // the plan, node by node
+        for (int j = 0; j < 3; ++j) {
+            fields.push_back({"plan.r", &k.plan.r[i][j], nullptr, nullptr});
+            fields.push_back({"plan.v", &k.plan.v[i][j], nullptr, nullptr});
+            if (i < oc::PLAN_MAX) fields.push_back({"plan.u", &k.plan.u[i][j], nullptr, nullptr});
+        }
+        fields.push_back({"plan.z", &k.plan.z[i], nullptr, nullptr});
+        fields.push_back({"plan.t", &k.plan.t[i], nullptr, nullptr});
+        if (i < oc::PLAN_MAX) fields.push_back({"plan.sigma", &k.plan.sigma[i], nullptr, nullptr});
+    }
+    const unsigned h0 = oc_hash();
+    int missed = 0;
+    for (const F& f : fields) {
+        unsigned h;
+        if (f.d) { const double v = *f.d; *f.d = std::nextafter(v, 1e300); h = oc_hash(); *f.d = v; }
+        else if (f.i) { const int v = *f.i; *f.i = v ^ 1; h = oc_hash(); *f.i = v; }
+        else { const unsigned long long v = *f.u; *f.u = v ^ 1; h = oc_hash(); *f.u = v; }
+        if (h == h0) { std::printf("  %s is not in the hash\n", f.name); ++missed; }
+    }
+    // and the seed's high half, which a double's 53 bits would round away if it were hashed as one number
+    {
+        const unsigned long long v = k.noiseSeed;
+        k.noiseSeed = v ^ (1ULL << 62);
+        if (oc_hash() == h0) { std::printf("  noiseSeed's high bits are not in the hash\n"); ++missed; }
+        k.noiseSeed = v;
+    }
+    std::printf("  %d of the deck's fields changed alone, each by its least step: %d left the hash as it was\n", (int)fields.size() + 1, missed);
+    CHECK(missed == 0 && oc_hash() == h0, "%d fields not in the hash", missed);
+}
+
+// No readout of any block is NaN or infinite over the deck (O7): the crew's landing from the hold point to the
+// deck and ten minutes parked there, every step scanned. (abuse_finite flies the deck hold hard as well.)
+void deckFlightFinite() {
+    Scan scan;
+    if (!crewToTheHoldPoint(scan)) { CHECK(false, "no hold point"); return; }
+    const long before = scan.steps;
+    oc_auto(OC_AUTO_DECK);
+    for (const double t0 = get(OC_T); get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0;) {
+        oc_step(1);
+        scan();
+        if (oc_deck_out()[OC_DECK_PHASE] == OC_DECK_PH_LANDED && get(OC_AUTO) == OC_AUTO_OFF) break;
+    }
+    const bool landed = oc_deck_out()[OC_DECK_PHASE] == OC_DECK_PH_LANDED;
+    for (int i = 0; i < 30000; ++i) { oc_step(1); scan(); }
+    std::printf("  %ld steps over the deck, %s, then parked ten minutes; %ld with a readout not finite\n", scan.steps - before, landed ? "landed" : "NOT LANDED", scan.bad);
+    CHECK(landed && get(OC_CRASHED) == 0, "landed %d, crashed %.0f", landed, get(OC_CRASHED));
+    CHECK(scan.bad == 0, "%s[%d] not finite at %.2f s, and %ld steps in all", scan.where, scan.index, scan.at, scan.bad);
+}
+
 }   // namespace
 
 namespace {
@@ -1235,6 +1379,8 @@ const Test tests[] = {
     {"escape_periapsis", escapePeriapsis, false},
     {"lift_from_the_windward_face", liftFromTheWindwardFace, false},
     {"peg_plan_is_its_own", pegPlanIsItsOwn, false},
+    {"hash_covers_the_deck", hashCoversTheDeck, false},          // found by the audit of 599e051
+    {"deck_flight_finite", deckFlightFinite, false},
     {"windy_ledger", windyLedger, false},
     {"wind_finite", windFinite, false},
 };

@@ -402,28 +402,30 @@ void planSaysWhen() {
 // RETURN on the Ring's deck, or riding with it, is refused and leaves whoever was flying in charge: the way out,
 // backing away on the small thrusters with the gear up, is for a craft at rest by the Ring, and from the deck
 // it put the belly on the deck in 0.6 s (the audit of 599e051). Parked on a pad the craft's own orbit swings
-// with the Ring's turn, so RETURN is asked when its lowest point reads over 150 km; hovering over the pad it
-// rides with the deck at 200 m/s past the Ring. A craft clear of the Ring, or slow by it, is not refused
-// (lands_after_leaving_the_hub, lands_after_undocking).
+// with the Ring's turn, so RETURN is asked when its lowest point reads over 150 km; coming down onto the pad from
+// the crew's gate it rides with the deck at 200 m/s past the Ring. A craft clear of the Ring, or slow by it, is not
+// refused
+// (lands_after_leaving_the_hub, lands_after_undocking; and from the hold point after the crew's take-off from the
+// pad, test_deck's pad_to_the_runway).
 void returnRefusedOnTheDeck() {
     oc_reset(LAT, LON, HDG);
     while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
     oc_auto(OC_AUTO_APPROACH);
     while (get(OC_PORT_RANGE) > 5 && get(OC_T) < 3000) oc_step(50);
     oc_auto(OC_AUTO_DECK);
-    bool askedHovering = false;
+    bool askedRiding = false;
     while (oc_deck_out()[OC_DECK_PHASE] != OC_DECK_PH_LANDED && get(OC_CRASHED) == 0 && get(OC_T) < 4000) {
         oc_step(10);
-        if (!askedHovering && oc_deck_out()[OC_DECK_PHASE] == OC_DECK_PH_HOVER) {
-            askedHovering = true;
+        if (!askedRiding && oc_deck_out()[OC_DECK_PHASE] == OC_DECK_PH_DESCEND) {
+            askedRiding = true;
             const double past = std::sqrt(get(OC_VREL_E) * get(OC_VREL_E) + get(OC_VREL_N) * get(OC_VREL_N) + get(OC_VREL_U) * get(OC_VREL_U));
             oc_auto(OC_AUTO_RETURN);
-            std::printf("  hovering %.0f m over the pad, %.0f m/s past the Ring: RETURN refused %.0f, the deck's crew still flying (%.0f)\n",
+            std::printf("  coming down %.0f m over the pad, %.0f m/s past the Ring: RETURN refused %.0f, the deck's crew still flying (%.0f)\n",
                         oc_deck_out()[OC_DECK_HEIGHT], past, ret(OC_RET_REFUSED), get(OC_AUTO));
-            CHECK(ret(OC_RET_REFUSED) == OC_RET_NO_RIDING && get(OC_AUTO) == OC_AUTO_DECK, "hovering: refused %.0f, auto %.0f", ret(OC_RET_REFUSED), get(OC_AUTO));
+            CHECK(ret(OC_RET_REFUSED) == OC_RET_NO_RIDING && get(OC_AUTO) == OC_AUTO_DECK, "coming down: refused %.0f, auto %.0f", ret(OC_RET_REFUSED), get(OC_AUTO));
         }
     }
-    CHECK(askedHovering, "the crew's deck landing never hovered");
+    CHECK(askedRiding, "the crew's deck landing never came down from its gate");
     CHECK(oc_deck_out()[OC_DECK_ON_DECK] > 0 && get(OC_CRASHED) == 0, "on the deck: %.0f, crashed %.0f", oc_deck_out()[OC_DECK_ON_DECK], get(OC_CRASHED));
     while (get(OC_PERI) < 150000 && get(OC_T) < 5000) oc_step(5);
     const double auto0 = get(OC_AUTO), peri = get(OC_PERI);

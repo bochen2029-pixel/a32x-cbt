@@ -126,16 +126,20 @@ test('the crew\'s landing, heard from its readouts: the thrum holds the weight, 
   core.auto(AUTO.deck);
   s = core.read();
   const mem = newDeckMemory(), ev = newDeckEvents(), counts = { pad: 0, liftoff: 0, swivel: 0 }, t0 = s.t;
-  let hoverChecked = 0, glided = false;
+  let hoverChecked = 0, glided = false, vLast = 0, tLast = 0;
   while (!(d.phase === DECK_PH.landed && s.auto === AUTO.off) && s.t - t0 < 2400 && !s.crashed) {
     s = core.step(d.phase >= DECK_PH.wait ? 5 : 250);
     detectDeck(mem, d, s, 0, 0, ev);
     for (const k of Object.keys(counts)) if (ev[k]) counts[k]++;
     if (ev.pad) near(ev.sink, d.tdSink, 1e-12, 'the touchdown\'s sink');
     if (d.phase === DECK_PH.glide) glided = true;
-    // over the pad, neither climbing nor sinking, the thrust through the swivel is what holds the craft's weight
-    // (the drive's 706 kN at full throttle): so the thrum, which follows that thrust, follows the weight
-    if (d.phase === DECK_PH.hover && Math.abs(d.vertical) < 0.05) {
+    // over the pad, coming down at a steady sink (the crew's last 0.75 m at 0.3 m/s) or holding its height, the
+    // thrust through the swivel is what holds the craft's weight (the drive's 706 kN at full throttle): so the
+    // thrum, which follows that thrust, follows the weight
+    const steady = Math.abs(d.vertical - vLast) < 0.05 * (s.t - tLast);
+    vLast = d.vertical;
+    tLast = s.t;
+    if ((d.phase === DECK_PH.hover || d.phase === DECK_PH.descend) && d.onDeck === 0 && steady && Math.abs(d.vertical) < 0.35) {
       const weight = (s.mass * 9.80665 * d.apparentG) / 706e3, jet = jetBorne(s.throttle, d.nozzle);
       near(jet, weight, 0.03 * weight, `the thrust through the swivel at ${s.t.toFixed(1)} s against the weight`);
       near(run({ thr: s.throttle, nozzle: d.nozzle }).hover, LEVEL.hover * Math.pow(weight, 0.8), 0.03 * LEVEL.hover, 'the thrum');
@@ -143,7 +147,7 @@ test('the crew\'s landing, heard from its readouts: the thrum holds the weight, 
     }
   }
   assert.ok(glided && d.phase === DECK_PH.landed && s.crashed === 0, `landed: phase ${d.phase}`);
-  assert.ok(hoverChecked > 10, `the hover looked at ${hoverChecked} times`);
+  assert.ok(hoverChecked > 10, `the steady descent looked at ${hoverChecked} times`);
   assert.equal(counts.pad, 1, 'one touchdown');
   assert.ok(counts.swivel >= 1, `the swivel locked ${counts.swivel} times`);
   assert.equal(counts.liftoff, 0, 'still on the deck');
