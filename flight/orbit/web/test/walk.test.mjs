@@ -14,7 +14,7 @@ import { BALL, BOX, LIFT, PLACE, USE, WALK, WALK_OUT, WHERE, WalkCore } from '..
 import {
   DECK_LEN, DECK_MID, HALF, bulkheadAhead, RF, RIM_R, SEALED, S_RIM, STREET, W, WALK_TIERS, between, bearingName, decked, feltUp, floorPlace, fromDeck, outward,
   ringDirToSite, ringFrame, ringToSite, siteDirToRing, skyWindow, spinward, sunFor, sunReach, sunReachMarched, surfaceAt, turnAboutAxis, viewAxes,
-  walkLines, walkStatus,
+  walkLines, walkLinesNarrow, walkStatus,
 } from '../src/walk-math.js';
 import { DECK, DECK_A, DECK_HALF, DECK_WALL, bulkheads } from '../src/ring-plan.js';
 import { SETTINGS, TIERS } from '../src/quality.js';
@@ -181,6 +181,15 @@ test('words for where the walker is and what the Sun does', () => {
   const sun = sunFor({ ...o, upTheta: 0, eyeX: 0, eyeY: 0, eyeZ: RF - 1.7 }, [0, -0.4, -0.9165]);
   assert.ok(sun.el > 1 && sun.reach > 0.5, 'high over the band and shining in');
   assert.match(walkLines(o, 1, sun).join('\n'), /SUN .* up, toward .*: shining in · sets in \d+ s/);
+  // on a phone: what was just tried (the jump, the ball, the lift) is kept, where the first five lines alone
+  // left it off the screen (2026-11-21's play-test); six lines, the spaces closed up
+  const narrow = walkLinesNarrow(walkLines(o, 1, sun));
+  assert.ok(narrow.length <= 6);
+  assert.match(narrow[0], /^WALK T\+01:01 TIME 1× /);
+  assert.ok(narrow.some((l) => /^JUMP .* came down 53 mm spinward/.test(l)), narrow.join('\n'));
+  assert.ok(narrow.some((l) => /^BALL .* came down 38 mm antispinward/.test(l)), narrow.join('\n'));
+  assert.ok(walkLinesNarrow(walkLines(ride, 1, null)).some((l) => /^LIFT 1: going down/.test(l)));
+  assert.deepEqual(walkLinesNarrow(walkLines({ ...o, jumps: 0, ballFalls: 0 }, 1, null)).map((l) => l.split(' ')[0]), ['WALK', 'PLACE', 'WEIGHT', 'SPEED', 'CORIOLIS']);
 });
 
 test('the plan the page paints is the one the walker walks in', { skip: !existsSync(built) && `no module at ${built}: build it first` }, async () => {
