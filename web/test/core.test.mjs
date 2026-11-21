@@ -1,5 +1,5 @@
 // The page's core: its readouts are the header's, and the module it loads flies the crew to the Ring.
-// The module is the WebAssembly build's (flight/orbit/README.md); ORBIT_CORE names another. GPLv3.
+// The module is the WebAssembly build's (flight/orbit/README.md); ORBIT_CORE names another. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

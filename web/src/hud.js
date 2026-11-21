@@ -1,5 +1,5 @@
 // The heads-up readouts: what the core says, in a pilot's units, and two markers on the view — where
-// the craft is going and where the Ring is. Text only, drawn by the page; no instruments. GPLv3.
+// the craft is going and where the Ring is. Text only, drawn by the page; no instruments. MIT.
 
 import { AUTO, PHASES, PH, SAS_NAMES, STANDOFF_M } from './core.js';
 

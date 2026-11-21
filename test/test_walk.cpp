@@ -2,7 +2,7 @@
 // the walk's core. Where the frame's two forces are at work, the test works the same motion out again
 // from outside the ring, where there are no such forces and a body let go moves in a straight line, and
 // holds the two equal. Run one by name (test_walk dropped_ball) or all; ctest runs each line below that
-// reads "// TEST: <name>". GPLv3.
+// reads "// TEST: <name>". MIT.
 //
 // TEST: readouts_block
 // TEST: one_g_on_the_floor

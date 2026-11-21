@@ -1,7 +1,7 @@
 // Makes data/land.js, the coastlines the globe is painted from, out of Natural Earth's 1:50m land and
 // lakes (public domain; docs/provenance.md, 1h). Each ring is simplified (Douglas-Peucker, 0.03 deg,
 // finer than the globe's texture), rings smaller than a few texels are dropped, and every point is kept
-// as hundredths of a degree in a 16-bit integer. GPLv3.
+// as hundredths of a degree in a 16-bit integer. MIT.
 //
 //   node tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>
 //

@@ -3,7 +3,7 @@
 // into its copy of the geometry. A Ring of sixty-odd parts in a dozen materials becomes a mesh a material;
 // the craft's quads of nozzles, its gear's wheels and struts, the same. Points, lines, instanced meshes,
 // meshes with morphs or a part of their geometry drawn, and any mesh asked to be kept (one that moves on
-// its own) are left as they are. GPLv3.
+// its own) are left as they are. MIT.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';

@@ -1,6 +1,6 @@
 // The keys as a person presses them: a focused button keeps its own Enter, Shift held for the throttle does
 // not stop the time keys, Ctrl held for it does not open the browser's dialogs, and the help has a list for a
-// touch screen. GPLv3.
+// touch screen. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HELP, HELP_TOUCH, Input, helpHtml } from '../src/input.js';

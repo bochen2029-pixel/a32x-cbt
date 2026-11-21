@@ -1,6 +1,6 @@
 // The flight director on the page (fd-hud.js): its phases are the header's, its cues lean the way a pilot
 // must move, its ILS is the runway's geometry, and the crew's own approach to 17C flies down the middle of
-// it. The last flies the WebAssembly build's core (flight/orbit/README.md); ORBIT_CORE names another. GPLv3.
+// it. The last flies the WebAssembly build's core (flight/orbit/README.md); ORBIT_CORE names another. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

@@ -1,82 +1,73 @@
-# Licensing: the question, stated plainly, for you to decide
+# Licensing: decided, MIT
 
-Nothing here relicenses anything. It sets out the facts and the options; the decision is yours, and
-the new repository's wave 0 stops before copying the core until you have made it. This is not legal
-advice; where money or a release depends on it, ask a lawyer. Tags point into `SOURCES.md`.
+**Decided 2026-11-21, by the owner: the orbit sketch is MIT.** "As close to MIT as possible, where
+feasible. If it was up to me, it would be MIT and be done with it." Everything in it is the owner's, so
+all of it could be, and is: `LICENSE` at the sketch's root, `NOTICE.md` beside it for what a built page
+carries of others'. This is not legal advice; where money or a release depends on it, ask a lawyer.
+Tags point into `SOURCES.md`.
 
-## The question
+## Why it had to be decided
 
-The orbit sketch is GPLv3, because everything in `flight/` is, by this repository's rule (`CLAUDE.md`
-§10; `docs/provenance.md` §1h; `flight/LICENSE`). Unreal Engine's EULA forbids combining the engine
-with code under the GPL, the LGPL (unless merely dynamically linking a shared library) or CC BY-SA
-[S16; read the current EULA yourself, this session could not open it]. And the GPL, for its part,
-wants the whole of a combined work it covers to be under the GPL, which Epic's code cannot be. So the
-sketch's core, as licensed today, cannot go into a shipped Unreal game.
+The sketch was GPLv3, because everything in a32x-cbt's `flight/` is, by that repository's rule
+(`CLAUDE.md` §10; `docs/provenance.md` §1h; `flight/LICENSE`). Unreal Engine's EULA forbids combining
+the engine with code under the GPL, the LGPL (unless merely dynamically linking a shared library) or
+CC BY-SA [S16; read the current EULA yourself, this session could not open it]. And the GPL, for its
+part, wants the whole of a combined work it covers to be under the GPL, which Epic's code cannot be. So
+the core, as GPLv3, could not go into a shipped Unreal game. As MIT, it can: MIT is on Epic's list of
+allowed licences [S16].
 
-But the sketch is yours to relicense:
+## Why it could be decided by the owner alone
 
 - **It links no third-party GPL code.** Its core includes only `<cmath>`, `<cstdint>` and `<cstring>`
   (M4); its CMake links nothing; it takes nothing from A32NX or JSBSim (`docs/provenance.md` §1h). The
-  A320 side of `flight/` links A32NX and is GPLv3 by obligation; the orbit sketch is GPLv3 only by the
+  A320 side of `flight/` links A32NX and is GPLv3 by obligation; the orbit sketch was GPLv3 only by the
   repository's rule.
-- **No one else has a claim on it.** All four commits under `flight/orbit` were made by Claude sessions
-  working on your word (git records Claude as their author; the README says the sketch was "made on
-  the operator's word of 2026-11-12"), and the KDFW drawing it reads was committed by you. Whether
-  code an AI agent writes under your direction carries copyright at all is unsettled in some places.
-  If it carries yours, relicensing is yours to do; if it carries none, the GPL label on it binds no
-  one and relicensing is a formality. Either way no third party's permission is needed.
-- **What it took from outside is method or public domain:** the 1976 US Standard Atmosphere (a US
-  government work), Polhamus's slender-delta lift (NASA TN D-3767, a US government work), Newtonian
-  impact theory (a textbook method), the Shuttle's powered explicit guidance (Jaggers, 1977: a
-  method; the code is the sketch's own), Natural Earth's coastlines (public domain).
+- **No one else has a claim on it.** Its commits were made by Claude sessions working on the owner's
+  word, and the KDFW drawing it reads was committed by the owner. Whether code an AI agent writes under
+  someone's direction carries copyright at all is unsettled in some places. If it carries the owner's,
+  relicensing was the owner's to do; if it carries none, the GPL label on it bound no one. Either way no
+  third party's permission was needed.
+- **What it took from outside is method, public domain or CC0:** the 1976 US Standard Atmosphere and
+  Polhamus's slender-delta lift (US government works), Newtonian impact theory and the Shuttle's powered
+  explicit guidance (methods; the code is the sketch's own), Natural Earth (public domain), the IAU and
+  USGS Gazetteer (public domain), Wikidata's stars (CC0). Every row is in `docs/provenance.md` §1h.
 
-## What is yours, and what is not
+## What is what now
 
-| part | licence now | whose | relicensable by you |
-|---|---|---|---|
-| `flight/orbit/core/`, `test/`, `tools/orbit_run.cpp`, `CMakeLists.txt` | GPLv3 | yours | yes |
-| `flight/orbit/web/src/` (the page) | GPLv3 | yours | yes |
-| `flight/orbit/web/data/land.js` | GPLv3, over public-domain data (Natural Earth 1:50m, simplified) | the data is public domain; the file is yours | yes |
-| `flight/web`'s KDFW drawing (`airport.js`, `airport-layout.js`, `scene-math.js`) and `flight/web/data/kdfw.json`, which the page reads | GPLv3 | yours; `kdfw.json`'s numbers come from OurAirports and the FAA's airport diagram, both public domain (`docs/provenance.md` §1f) | yes |
-| the built page, `build-web/index.html` | GPLv3 with others' code inside: three.js (MIT), Emscripten's runtime and the C and C++ libraries it links (MIT, NCSA, musl's MIT, libc++'s Apache-2.0 with the LLVM exception) (`docs/provenance.md` §2b) | partly not yours | only your parts; keep their notices |
-| these kit documents | under `flight/`, so GPLv3 by this repository's rule | yours | yes: decide with the rest |
-| the canon, `ARCHITECTURE.md` | none stated | yours | yes |
-| A32NX, JSBSim and its aircraft data, the PSX notes | GPLv3, LGPL-2.1, GPL; PSX is design notes only | **not yours** | **no**. None of it is in the orbit sketch; do not carry anything else from `flight/` into the Unreal project without checking it against `docs/provenance.md` |
+| part | licence | whose |
+|---|---|---|
+| `flight/orbit/`: the core, its tests and tools, the page, its data, the guide, these kit documents | MIT (`flight/orbit/LICENSE`) | the owner's |
+| `flight/web`'s KDFW drawing and sky, which the page reads (`airport.js`, `airport-layout.js`, `scene-math.js`, `atmosphere.js`, `haze.js`, `lights.js`, `data/kdfw.json`) | GPLv3 in `flight/web`, and MIT as well, as the sketch uses them (`NOTICE.md`) | the owner's; `kdfw.json`'s numbers come from OurAirports and the FAA, both public domain (`docs/provenance.md` §1f) |
+| the built page, `build-web/index.html` | MIT, with others' code inside: three.js (MIT), Emscripten's runtime and the libraries it links (MIT, musl's MIT, libc++'s Apache-2.0 with the LLVM exception, dlmalloc's public domain). The page carries `LICENSE` and `NOTICE.md` at its top | partly not the owner's: keep their notices |
+| the standalone repository, `runway-to-ring`, split from `flight/orbit` with its history | MIT, the same `LICENSE` and `NOTICE.md`; its `vendor/flight-web` is the drawing above, MIT there | the owner's |
+| the canon, `ARCHITECTURE.md` | none stated | the owner's |
+| A32NX, JSBSim and its aircraft data, the PSX notes | GPLv3, LGPL-2.1, GPL; PSX is design notes only | **not the owner's**. None of it is in the orbit sketch; do not carry anything else from `flight/` into the Unreal project without checking it against `docs/provenance.md` |
 
-## The options
+## What was done
 
-**A. Relicense the orbit sketch's own code before it goes into the Unreal project** (recommended, if you
-want the core in the game). MIT, as ASTRA-7 and the Booster Lander are; or Apache-2.0, which adds a
-patent grant; both are on Epic's list of allowed licences [S16]. The copy in this repository can stay
-GPLv3, or be dual-licensed. Nothing legal stands in the way; it is your word, written down. If you
-choose it:
+1. a32x-cbt: `flight/orbit/LICENSE` (the MIT text, the same copyright line as the repository's root
+   `LICENSE`) and `NOTICE.md`; every file's licence marker changed from GPLv3 to MIT; the decision
+   recorded in `docs/provenance.md` §1h, in `CLAUDE.md` §10 (`flight/orbit` is the exception to
+   "`flight/` is GPLv3"), and in the root and `flight/` READMEs. A deliberate crossing of the GPL line, by
+   the copyright holder, in writing, which is what §10 asks for in place of a casual one.
+2. The page build puts `LICENSE` and `NOTICE.md` at the top of every built page (`web/tools/notice.mjs`,
+   held by `web/test/notice.test.mjs`).
+3. The standalone repository carries the same `LICENSE` and `NOTICE.md` at its root, and
+   `package.json` says `"license": "MIT"` (`tools/standalone.mjs`).
+4. In the Unreal project: `PROVENANCE.md` gets the row "from runway-to-ring (or a32x-cbt `flight/orbit`)
+   at <commit>, MIT", and the decision goes into its `DECISIONS.md`.
 
-1. In the new repository, give `core/` its licence file and copyright line, and add a row to
-   `PROVENANCE.md`: "from a32x-cbt `flight/orbit` at <commit>, relicensed under <licence> by the
-   copyright holder on <date>".
-2. Record the decision in the new repository's `DECISIONS.md`.
-3. If you dual-license the copy here, say so in this repository's `docs/provenance.md` §1h, since its
-   `CLAUDE.md` §10 asks that code not cross the GPL line "casually": this would be a deliberate
-   crossing, by the copyright holder, in writing.
-
-**B. Keep it GPLv3, and keep it out of the game's binary.** Run the core as its own program and let
-Unreal talk to it over a local socket (`UNREAL_PORT.md` §1; the Booster Lander's way, R3). The FSF's
-view [F1]: "pipes, sockets and command-line arguments are communication mechanisms normally used
-between two separate programs. So when they are used for communication, the modules normally are
-separate programs. But if the semantics of the communication are intimate enough, exchanging complex
-internal data structures, that too could be a basis to consider the two parts as combined into a
-larger program." A stream of the whole world's state every step could be argued either way, and
-Epic's word is "combine". A grey zone: take advice before shipping on it.
-
-**C. Write a new core for the Unreal project from the canon, not from the sketch** (implement, do not
-port, as this repository did with PSX's design). Possible, and wasteful: the sketch is already yours.
+The options that were open, for the record: **A**, relicense (taken); **B**, keep GPLv3 and run the
+core as its own program, Unreal talking to it over a local socket, which the FSF's view [F1] leaves a
+grey zone for an exchange as intimate as the whole world's state every step; **C**, write a new core
+from the canon, possible and wasteful.
 
 ## The canon's own line on this
 
-The canon's Appendix D leaves the game's licence undecided: "MIT like ASTRA-7, which keeps A32X as an
+The canon's Appendix D left the game's licence undecided: "MIT like ASTRA-7, which keeps A32X as an
 Oracle only; or GPLv3, which lets its control laws ship". With Unreal as the View, the GPLv3 option is
-closed by the EULA [S16]: a GPLv3 game could only ship with a View that is not Unreal. MIT, with A32X
-kept as an offline Oracle, is the option that fits ADR 002.
+closed by the EULA [S16]. MIT, with A32X kept as an offline Oracle, is the option that fits ADR 002, and
+now the sketch's licence matches it.
 
 ## The tools and data the slice would use
 

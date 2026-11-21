@@ -2,7 +2,7 @@
 // and measured. Every cue plays without a fault, sounds, peaks under full scale and makes no NaN; over the
 // deck in vacuum a camera outside hears nothing while the cockpit hears the structure; the hover's level
 // follows the thrust; footsteps on paving are brighter than on grass. Needs Chromium through Playwright and
-// the page's esbuild (flight/web, npm ci); without them it is skipped, and says so. GPLv3.
+// the page's esbuild (flight/web, npm ci); without them it is skipped, and says so. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

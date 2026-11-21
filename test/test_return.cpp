@@ -2,7 +2,7 @@
 // a stop on KDFW 17C, and states what a landing must be: on the runway's touchdown zone, near its
 // centreline, a gentle sink, stopped on the runway, inside the heat, load and dynamic-pressure limits.
 // Run one by name (test_return lands_from_insertion) or all; ctest runs each line below that reads
-// "// TEST: <name>". GPLv3.
+// "// TEST: <name>". MIT.
 //
 // TEST: readouts_block
 // TEST: lands_from_insertion

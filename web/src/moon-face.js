@@ -4,7 +4,7 @@
 // where its outlines put them, and every named crater of 8 km and more at its centre and diameter. The
 // rest is this project's: the tone of each plain, the highlands' mottling, the craters' shapes after
 // Pike's measures of fresh lunar craters, how worn each is, and the rays of the young ones. No three.js
-// here, so the tests can read it. GPLv3.
+// here, so the tests can read it. MIT.
 
 import { CRATERS, NAMED, PLAINS } from '../data/moon.js';
 import { MOON_PACK } from './sky-model.js';

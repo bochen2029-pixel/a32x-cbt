@@ -3,7 +3,7 @@
 // Sun, the lights and the plume keep their true brightness; what is brighter than white is blurred
 // into a glow (three.js's UnrealBloomPass), and the whole is tone-mapped once on its way to the canvas.
 // The idea of an HDR picture with AgX's roll-off and the plume blooming above it is from the owner's
-// booster-lander-simulator (docs/provenance.md, 1h, Graphics); the code is this file's. GPLv3.
+// booster-lander-simulator (docs/provenance.md, 1h, Graphics); the code is this file's. MIT.
 
 import * as THREE from 'three';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';

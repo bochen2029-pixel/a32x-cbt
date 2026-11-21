@@ -1,7 +1,7 @@
 // The walk on the page: its names and numbers are the header's, its frames are the ring's, the Sun it lights
 // the band with is the one a ray traced through the band finds, the plan it paints is the one the walker walks
 // in, and the core it drives, through the page's own wrapper, keeps the physics the core's tests state. The
-// module is the WebAssembly build's (flight/orbit/README.md); ORBIT_CORE names another. GPLv3.
+// module is the WebAssembly build's (flight/orbit/README.md); ORBIT_CORE names another. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

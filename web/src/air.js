@@ -1,5 +1,5 @@
 // The Earth's air as its shader (earth.js) samples it, without a browser, so the tests can hold the
-// shader's quadrature to a fine reference of the same model. GPLv3.
+// shader's quadrature to a fine reference of the same model. MIT.
 //
 // Along a view ray the air is sampled at points packed toward where it is densest. Looking up or along
 // from low down, that is near the eye; looking down from above most of the air (higher than a scale

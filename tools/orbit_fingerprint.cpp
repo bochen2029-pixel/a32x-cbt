@@ -1,7 +1,7 @@
 // orbit_fingerprint — the state's hash and every readout block's digest at 3,756 marks along twelve flights
 // (the crew to orbit and on, three flights home, docking and home from the port, the deck, a pilot's climb
 // and rolls), to show that a change to the core leaves them bit for bit as they were: build it at two
-// commits, run both, and diff (INVARIANTS.md, O15). Not part of the page. GPLv3.
+// commits, run both, and diff (INVARIANTS.md, O15). Not part of the page. MIT.
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"

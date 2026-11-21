@@ -10,7 +10,7 @@
 //   - on an approach to 17C, the path to follow in the world: gates down the glide slope, a kilometre apart.
 // 8 cycles it: shown while you fly (the default), shown while the crew flies too, off. The deck's own
 // display and the docking reticle draw near the Ring, where the core's director says nothing, so two are
-// never drawn at once. The numbers are fd-hud.js's. GPLv3.
+// never drawn at once. The numbers are fd-hud.js's. MIT.
 
 import * as THREE from 'three';
 import { validateAirport } from '../../../web/src/airport-layout.js';

@@ -1,6 +1,6 @@
 // dock-hud.js — what the docking says on the page, without a browser: the core's docking readouts by
 // name, what DOCK does from where the craft is, the HUD's and the status line's words, and the docking
-// reticle's layout. dock-view.js draws it; test/dock.test.mjs holds it to orbit_dock.h. GPLv3.
+// reticle's layout. dock-view.js draws it; test/dock.test.mjs holds it to orbit_dock.h. MIT.
 
 import { AUTO, SAS } from './core.js';
 import { fmtDistance } from './hud.js';

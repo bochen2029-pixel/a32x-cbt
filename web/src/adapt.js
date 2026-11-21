@@ -1,7 +1,7 @@
 // Holding the frame rate: the drawing buffer's size, set from the frame times the page sees, and the
 // tiers stepped down and up while the page chooses them itself. No three.js and no browser here, so
 // the tests can drive it with made-up frame times. It never touches the flight: the core steps by its
-// fixed clock whatever the frame rate, and all this changes is how many pixels are drawn. GPLv3.
+// fixed clock whatever the frame rate, and all this changes is how many pixels are drawn. MIT.
 //
 // The picture's size goes down a ladder of rungs, each 0.8 of the pixels of the one above (the pixel
 // ratio times 0.894), from the tier's cap at rung 0 to about a quarter of its pixels. Every half second

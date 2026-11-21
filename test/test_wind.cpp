@@ -1,6 +1,6 @@
 // The wind's tests (orbit_wind.h), each stated as physics or as a promise of the core. Run one by name
 // (test_wind von_karman_gusts) or all; ctest runs each line below that reads "// TEST: <name>". Like the
-// invariants' tests this program reads the state through internal.h, to set up states the page cannot. GPLv3.
+// invariants' tests this program reads the state through internal.h, to set up states the page cannot. MIT.
 //
 // TEST: off_changes_nothing
 // TEST: refused_outside_its_range

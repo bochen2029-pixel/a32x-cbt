@@ -3,7 +3,7 @@
 // nebulae, galaxies, novae, supernovae, planets and entries with no spectral class are left out; entries
 // less than 0.02 deg apart, a star and its system, are one star, the brighter; a variable keeps the middle
 // of its magnitudes. Each star keeps its place, its V magnitude and a B-V colour read from its spectral
-// class. GPLv3.
+// class. MIT.
 //
 //   node tools/stars.mjs <slice.csv> [<slice.csv> ...]
 //

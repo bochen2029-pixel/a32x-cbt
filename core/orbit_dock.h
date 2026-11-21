@@ -13,7 +13,7 @@
 // ring (hull, roof, rim walls, spokes, hub) is a crash, and the wreck stays where it struck, turning
 // with the ring.
 //
-// Every number here is chosen for the sketch. None describes a real docking system. GPLv3.
+// Every number here is chosen for the sketch. None describes a real docking system. MIT.
 #pragma once
 
 #ifdef __cplusplus

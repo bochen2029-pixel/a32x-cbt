@@ -2,7 +2,7 @@
 // the craft as a jet whose swivelled drive is turned into the force a law asks for, the crew's deck landing and
 // take-off by plans of the least propellant (deck_plan.h), the pilot's deck hold, and the touchdown with its
 // verdict. Every number marked as chosen is a design choice for the sketch, not a measurement of any aircraft,
-// ship or station. GPLv3.
+// ship or station. MIT.
 //
 // The frame. The Ring's own (dock.cpp's): x its ref, which turns with it, y its axis, z = x cross y; a point's
 // angle about the axis in the spokes' convention is atan2(x, z), and spinward is the way it grows. Over the

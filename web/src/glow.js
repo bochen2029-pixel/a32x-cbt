@@ -1,6 +1,6 @@
 // Light points: a few pixels across whatever the distance, brighter than white so that where the tier
 // has a glow pass they bloom; pulled a little toward the eye so that one mounted on a surface is not
-// lost in it; blinking where they are given a period. The Ring's thousands and the craft's few. GPLv3.
+// lost in it; blinking where they are given a period. The Ring's thousands and the craft's few. MIT.
 
 import * as THREE from 'three';
 

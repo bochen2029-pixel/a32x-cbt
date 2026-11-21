@@ -1,7 +1,7 @@
 // The handoff kit's packager: the archive holds what the kit says it holds, reads back against its own
 // manifest, is the same bytes twice, refuses what it should, and opens in the system's own unzip.
 // HANDOFF_CANON=<ARCHITECTURE.md> also checks the real canon; HANDOFF_BUILD=1 also builds and tests the
-// core from the archive with CMake. GPLv3.
+// core from the archive with CMake. MIT.
 //
 //   node --test flight/orbit/handoff/tools/package.test.mjs
 
@@ -31,7 +31,7 @@ const allowOtherCanon = !realCanon;
 const changed = execFileSync('git', ['-C', root, 'status', '--porcelain', '--untracked-files=all', '--',
   'flight/orbit/handoff', 'flight/orbit/core', 'flight/orbit/test', 'flight/orbit/tools', 'flight/orbit/README.md',
   'flight/orbit/INVARIANTS.md', 'flight/orbit/evidence', 'flight/orbit/web', 'flight/orbit/CMakeLists.txt', 'docs/provenance.md',
-  'flight/LICENSE'],
+  'flight/orbit/LICENSE', 'flight/orbit/NOTICE.md'],
   { encoding: 'utf8' }).trim();
 
 const made = build({ root, canon, page: null, worktree: true, allowOtherCanon });
@@ -53,7 +53,7 @@ test('the archive holds the kit, the canon, the core, its tests and CMake, and n
   for (const path of ['canon/ARCHITECTURE.md', 'orbit/CMakeLists.txt', 'orbit/README.md', 'orbit/core/orbit_core.h',
     'orbit/core/orbit_core.cpp', 'orbit/core/exports/core.txt', 'orbit/test/test_orbit.cpp', 'orbit/tools/orbit_run.cpp',
     'orbit/INVARIANTS.md', 'orbit/evidence/INDEX.md', 'orbit/web/src/main.js', 'orbit/web/src/tour-plan.js',
-    'reference/provenance.md', 'licences/GPL-3.0.txt', 'NOTICE.txt', 'MANIFEST.json', 'SHA256SUMS']) {
+    'reference/provenance.md', 'licences/MIT.txt', 'licences/NOTICE.md', 'NOTICE.txt', 'MANIFEST.json', 'SHA256SUMS']) {
     assert.ok(names.includes(path), path);
   }
   for (const name of names) assert.doesNotMatch(name, /(^|\/)build[^/]*\/|node_modules|\.(o|a|obj|lib|exe|wasm)$/, name);

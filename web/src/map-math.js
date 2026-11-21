@@ -1,7 +1,7 @@
 // map-math.js — the map's arithmetic, without a browser: the conic a position and a velocity give, Kepler's
 // problem to carry a state forward, the ground under it with the Earth turning, and the frame that turns with
 // the Ring's orbit, where a rendezvous is drawn. ECI as the core's (orbit_core.h): z along the pole, the
-// Earth-fixed frame at t = 0, the Earth turning at WE about +z. Two-body only: no air, no thrust. GPLv3.
+// Earth-fixed frame at t = 0, the Earth turning at WE about +z. Two-body only: no air, no thrust. MIT.
 
 import { RE, WE, add, cross, dot, inertialToEcef, length, scale, siteAxes, sub, unit } from './frames.js';
 

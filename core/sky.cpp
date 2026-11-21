@@ -1,5 +1,5 @@
 // sky.cpp — the Sun and the Moon where they really are, for the flight's date and time, and the
-// Earth's place under the stars (orbit_sky.h). GPLv3.
+// Earth's place under the stars (orbit_sky.h). MIT.
 //
 // The flight has an epoch, a date and time in UTC at t = 0; the sky is worked out for the epoch plus
 // the flight's time, so the Moon moves its half a degree an hour and the Sun its degree a day. The

@@ -3,7 +3,7 @@
 // home to a stop on 17C. Each stage says what to command on the way in, how fast time runs and from
 // where to look, what to say, and when it is done. The tour is a director, not a pilot: it flies only
 // through the crew's own modes, as a person pressing the buttons would. Pure (no page, no drawing), so a
-// test can run it on made-up states. GPLv3.
+// test can run it on made-up states. MIT.
 
 import { DECK_PH } from './deck-hud.js';
 import { DPH } from './dock-hud.js';

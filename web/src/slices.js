@@ -4,7 +4,7 @@
 // Ring and the near things (the craft, the field) lie at depths of their own, each is drawn in a slice
 // of its own, the farther first, with the depth cleared between; where they overlap (the craft at the
 // hub) they share one slice, its near plane as far out as the nearest of them allows. No three.js
-// here. GPLv3.
+// here. MIT.
 
 import { HUB_PORT_M } from './core.js';
 import { HALF, MAST, PORT, RADIATORS, RING } from './ring-plan.js';

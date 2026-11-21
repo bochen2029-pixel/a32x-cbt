@@ -13,7 +13,7 @@
 //                  height (low down, from W20), synthesised as a sum of random Fourier modes (Kraichnan
 //                  1970), each turning slowly in time; nothing above 25 km.
 // The whole field is the strength times the field at strength 1: 1 is the specification's light day (W20 of
-// 15 knots), 2 moderate (30), 3 severe (45). docs/provenance.md, 1h, cites the sources. GPLv3.
+// 15 knots), 2 moderate (30), 3 severe (45). docs/provenance.md, 1h, cites the sources. MIT.
 #pragma once
 
 #ifdef __cplusplus

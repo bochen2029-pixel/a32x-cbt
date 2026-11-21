@@ -2,7 +2,7 @@
 // its own frame (x forward, y up, z to the right wing). The body and the wing are one surface: a flat
 // belly, and over it a thickness that is the fuselage's near the middle and a thin wing's out to the
 // leading edge, which is rounded. craft.js makes it into meshes; the tests read it. No three.js here.
-// GPLv3.
+// MIT.
 
 export const NOSE = 16, TAIL = -16;             // m, the body's ends; the bells reach 2 m past the tail
 export const SPAN = 18;                          // m, wingtip to wingtip

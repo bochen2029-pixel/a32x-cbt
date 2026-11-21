@@ -19,7 +19,7 @@
 // solved once for the direction itself and once, per iteration, for (c, -b, -h), which carries tau. It is
 // reduced to [G'W^-2 G, A'; A, 0] in (ux, uy), regularized by +-reg on the diagonal so that it is
 // quasi-definite and factors without pivoting, factored as a band in the order the problem gives, and each
-// solve is refined against the unregularized system. GPLv3.
+// solve is refined against the unregularized system. MIT.
 
 #include "socp.h"
 

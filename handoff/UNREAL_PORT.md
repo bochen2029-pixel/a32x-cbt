@@ -28,8 +28,8 @@ Booster Lander's rule, "precompute in, telemetry out, always" (R3).
 | | in-process (recommended for the slice) | a separate process (Booster Lander's way, R3) |
 |---|---|---|
 | how | the core linked into the plugin as a static library, stepped on the game thread | the core runs as its own program and streams Snapshots over a local socket; Unreal is one more client |
-| for | simplest; nothing to keep in step; the C API the page already uses | the View stays disposable; the web page and Unreal can watch the same run; a GPL core stays out of the game's binary (`LICENSING.md`, path B) |
-| against | the core is in the game binary, so its licence must be compatible with Unreal's EULA (`LICENSING.md`) | a protocol to version, a second process to supervise, a frame of latency |
+| for | simplest; nothing to keep in step; the C API the page already uses | the View stays disposable; the web page and Unreal can watch the same run; a core under any licence stays out of the game's binary (`LICENSING.md`, path B, not needed now the core is MIT) |
+| against | the core is in the game binary, so its licence must be compatible with Unreal's EULA: it is, as MIT (`LICENSING.md`) | a protocol to version, a second process to supervise, a frame of latency |
 
 Either way, write the plugin against the Snapshot and the Commands (§2.5), not against the layout of
 `oc_out`, so the choice can be changed later without touching the actors.

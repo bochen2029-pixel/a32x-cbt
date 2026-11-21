@@ -2,7 +2,7 @@
 // written, and reaches its situation through the controls a pilot or the page has: nothing is placed.
 // Where a test can, it checks docking's own readouts against the flight's (orbit_core.h), which do not
 // come from dock.cpp. Run one by name or all; ctest runs each line below that reads "// TEST: <name>".
-// GPLv3.
+// MIT.
 //
 // TEST: readouts_block
 // TEST: crew_docks_from_hold

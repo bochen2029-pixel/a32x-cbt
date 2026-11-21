@@ -1,7 +1,7 @@
 // map.js — a map to fly by: the orbit seen from above the Ring's plane, the rendezvous seen from the Ring in
 // the frame that turns with its orbit, and the ground track. A 2D canvas over the view, drawn ten times a
 // second and only while shown; N or MAP shows and hides it, shift-N or its tabs change what it shows. The
-// arithmetic is map-math.js's. It reads the core and writes nothing to it. GPLv3.
+// arithmetic is map-math.js's. It reads the core and writes nothing to it. MIT.
 
 import { LAKES, LAND, SCALE } from '../data/land.js';
 import { HUB_PORT_M, RING, START, STANDOFF_M } from './core.js';

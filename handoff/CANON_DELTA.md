@@ -462,4 +462,4 @@ mission.
 | Replay on any hardware | §2.3 | the core's own maths functions, as subsim did; or Tapes that replay exactly on their own build only, and within tolerance elsewhere |
 | Truth on the slice's HUD | §2.6 | allowed for the slice, written in `FICTION.md`; or Instruments from the start |
 | Where the scripted autopilot lives | §2.7 | inside the core, as now; or outside it, as a Control-plane client like TALLY |
-| The game's licence (Appendix D) | Unreal's EULA forbids combining the engine with GPL code [S16], which closes Appendix D's GPLv3 option for an Unreal View | MIT or Apache-2.0, with A32X an offline Oracle only (`LICENSING.md`, option A) |
+| The game's licence (Appendix D) | Unreal's EULA forbids combining the engine with GPL code [S16], which closes Appendix D's GPLv3 option for an Unreal View | MIT, with A32X an offline Oracle only: decided 2026-11-21, the sketch relicensed MIT (`LICENSING.md`) |

@@ -2,7 +2,7 @@
 // - the native and WebAssembly builds fly the crew's 900 s to the same printed table, row for row (their
 //   hashes differ: the C libraries' last bits do, O12);
 // - the core reads no clock and draws no unseeded random number: time is the step count (O11).
-// GPLv3.
+// MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

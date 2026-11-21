@@ -1,7 +1,7 @@
 // deck_plan.cpp — see deck_plan.h. The problem is posed in scaled units, a kilometre and ten seconds (so a
 // hectometre a second and ten metres a second squared), in which every number in it is of order one, and handed
 // to socp.h with its unknowns in time order: each state beside the dynamics row that defines it, each interval's
-// controls between, which keeps the KKT system a band about thirty wide. GPLv3.
+// controls between, which keeps the KKT system a band about thirty wide. MIT.
 
 #include "deck_plan.h"
 

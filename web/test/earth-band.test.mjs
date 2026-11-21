@@ -1,7 +1,7 @@
 // The band round the limb that the Earth at half the size works out in full (earth.js, bandAngles): it holds
 // the limb with its margin, reaches the air's top from orbit, and its inner edge is where the ground's
 // distance changes by the threshold across a sample, checked here by differences of the geometry itself.
-// Runs with flight/web's three.js. GPLv3.
+// Runs with flight/web's three.js. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

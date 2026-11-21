@@ -1,4 +1,4 @@
-// The orbit sketch as a repository of its own, its history kept, ready to push. GPLv3.
+// The orbit sketch as a repository of its own, its history kept, ready to push. MIT.
 //
 //   node flight/orbit/tools/standalone.mjs [--branch orbit-standalone] [--out <folder>] [--force]
 //
@@ -8,8 +8,9 @@
 //    - flight/web's modules the page imports, and theirs, found by reading the imports, under
 //      vendor/flight-web (the KDFW drawing and its data);
 //    - app/tools' zip writer and Chrome driver, under tools/;
-//    - flight's GPLv3 licence as LICENSE;
 //    - docs/provenance.md, whole.
+//    The sketch's own LICENSE (MIT) and NOTICE.md come with the split; the vendored files' licence markers
+//    are set to MIT, as NOTICE.md says their owner licenses them.
 // 4. The paths that reached out of the folder pointed in. A package.json pins three.js and esbuild at
 //    flight/web's versions, and a CLAUDE.md carries the house rules that apply to the sketch.
 // 5. One commit on top. Nothing is pushed: the owner names the repository and says where it lives, then
@@ -79,8 +80,10 @@ to, kept.
    built page on every tier.
 5. **Every texture is painted by code.** No image, model or font file ships.
 6. **Never claim a real vehicle's fidelity.** It is a sketch with one fiction, the drive.
-7. **GPLv3** (\`LICENSE\`): this code once linked GPL flight software in a32x-cbt's \`flight/\`, and keeps
-   that licence until its owner decides otherwise (\`handoff/LICENSING.md\`).
+7. **MIT** (\`LICENSE\`; \`NOTICE.md\` for others' code in a built page). The sketch was GPLv3 in a32x-cbt's
+   \`flight/\` until its owner relicensed it on 2026-11-21 (\`handoff/LICENSING.md\`). Keep it MIT: nothing
+   under the GPL, the LGPL or CC BY-SA comes in, and every outside source gets its row in
+   \`docs/provenance.md\`.
 
 ## Build and test
 
@@ -98,7 +101,7 @@ function main() {
   const root = git(here, ['rev-parse', '--show-toplevel']);
   if (!existsSync(join(root, 'flight', 'orbit', 'CMakeLists.txt'))) throw new Error(`${root} has no flight/orbit: run this from a32x-cbt`);
   const out = resolve(a.out ?? join(root, '..', a.branch));   // beside the repository, not inside it
-  const dirty = git(root, ['status', '--porcelain', '--', 'flight/orbit', 'flight/web', 'app/tools', 'flight/LICENSE', 'docs/provenance.md']);
+  const dirty = git(root, ['status', '--porcelain', '--', 'flight/orbit', 'flight/web', 'app/tools', 'docs/provenance.md']);
   if (dirty) console.warn(`note: uncommitted changes are not carried (the split takes HEAD):\n${dirty}`);
   const head = git(root, ['rev-parse', '--short', 'HEAD']);
 
@@ -130,14 +133,18 @@ function main() {
       if (!wanted.has(next)) { wanted.add(next); queue.push(next); }
     }
   }
+  let relabelled = 0;
   for (const rel of [...wanted].sort()) {
     const to = join(out, 'vendor', 'flight-web', rel);
     mkdirSync(dirname(to), { recursive: true });
     copyFileSync(join(flightWeb, rel), to);
+    if (/\.m?js$/.test(rel)) relabelled += rewrite(to, [['. GPLv3.\n', '. MIT.\n']]);   // NOTICE.md: MIT as the sketch uses them
   }
+  if (relabelled !== [...wanted].filter((r) => /\.m?js$/.test(r)).length) throw new Error(`${relabelled} vendored modules relabelled MIT, not one each: read their headers`);
+  writeFileSync(join(out, 'vendor', 'flight-web', 'README.md'),
+    `# vendor/flight-web\n\na32x-cbt's own \`flight/web\` files that the page imports, at ${head}: the KDFW drawing (\`airport.js\`, \`airport-layout.js\`, \`scene-math.js\`, \`lights.js\`, \`data/kdfw.json\`) and the sky's air (\`atmosphere.js\`, \`haze.js\`). By the same owner as the sketch: GPLv3 in a32x-cbt's \`flight/web\`, MIT here (\`../../NOTICE.md\`). Changed only by \`tools/standalone.mjs\`, which copied them and set their licence markers; their sources are in \`docs/provenance.md\`, 1f and 1g.\n`);
   mkdirSync(join(out, 'tools'), { recursive: true });
   for (const t of ['zip.mjs', 'chrome.mjs']) copyFileSync(join(root, 'app', 'tools', t), join(out, 'tools', t));
-  copyFileSync(join(root, 'flight', 'LICENSE'), join(out, 'LICENSE'));
   mkdirSync(join(out, 'docs'), { recursive: true });
   writeFileSync(join(out, 'docs', 'provenance.md'),
     `<!-- a32x-cbt's docs/provenance.md, carried whole at ${head}. The orbit sketch's own sections are 1f (the runways and KDFW drawn), 1h (the orbit sketch: every part), 2a and 2b (what ships, Emscripten) and 3 (the words it may use of itself). -->\n\n` +
@@ -169,7 +176,7 @@ function main() {
   const pkg = {
     name: 'runway-to-ring', private: true,
     description: "A spaceplane from KDFW 17C to a ring station in orbit and back, the orbit sketch split from a32x-cbt's flight/orbit.",
-    license: 'GPL-3.0-only',
+    license: 'MIT',
     scripts: {
       build: 'node web/tools/build.mjs --core build-wasm/orbit_core.js --core-js build-wasm/orbit_core_plain.js',
       test: 'cd web && node --test test/*.test.mjs',
@@ -189,12 +196,12 @@ function main() {
   writeFileSync(join(out, '.gitignore'), ['build/', 'build-wasm/', 'build-web/', 'node_modules/', 'guide/out/', ''].join('\n'));
   const readme = readFileSync(join(out, 'README.md'), 'utf8');
   writeFileSync(join(out, 'README.md'),
-    `> Split from a32x-cbt's \`flight/orbit\` at ${head}, with its history (${split.slice(0, 7)} is the last commit of it). \`vendor/flight-web\` is a32x-cbt's KDFW drawing, which the page reuses; \`tools/zip.mjs\` and \`tools/chrome.mjs\` are a32x-cbt's own. Build and test: \`CLAUDE.md\`.\n\n` + readme);
+    `> Split from a32x-cbt's \`flight/orbit\` at ${head}, with its history (${split.slice(0, 7)} is the last commit of it). MIT (\`LICENSE\`; others' code in a built page: \`NOTICE.md\`). \`vendor/flight-web\` is a32x-cbt's KDFW drawing, which the page reuses; \`tools/zip.mjs\` and \`tools/chrome.mjs\` are a32x-cbt's own. Build and test: \`CLAUDE.md\`.\n\n` + readme);
 
   // 5. one commit on top
   git(out, ['add', '-A']);
   execFileSync('git', ['-C', out, 'commit', '-q', '-F', '-'], {
-    input: `feat: the orbit sketch as a repository of its own\n\nSplit from a32x-cbt's flight/orbit at ${head} with git subtree, its history kept.\nCopied in what it borrowed from the rest of a32x-cbt:\n- flight/web's modules the page imports, and theirs (${wanted.size} files), under\n  vendor/flight-web;\n- app/tools' zip writer and Chrome driver, under tools/;\n- flight's GPLv3 licence as LICENSE;\n- docs/provenance.md.\nThe paths that reached out of the folder point in (${n} of them). package.json and\npackage-lock.json pin three.js and esbuild as flight/web's lockfile has them. CLAUDE.md carries the house rules.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01E4nrb6dFnatXPkspSD5nCm\n`,
+    input: `feat: the orbit sketch as a repository of its own\n\nSplit from a32x-cbt's flight/orbit at ${head} with git subtree, its history kept.\nCopied in what it borrowed from the rest of a32x-cbt:\n- flight/web's modules the page imports, and theirs (${wanted.size} files), under\n  vendor/flight-web;\n- app/tools' zip writer and Chrome driver, under tools/;\n- docs/provenance.md.\nLICENSE (MIT) and NOTICE.md are the sketch's own, from the split; the vendored files are\nMIT here, as NOTICE.md says.\nThe paths that reached out of the folder point in (${n} of them). package.json and\npackage-lock.json pin three.js and esbuild as flight/web's lockfile has them. CLAUDE.md carries the house rules.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01E4nrb6dFnatXPkspSD5nCm\n`,
     stdio: ['pipe', 'inherit', 'inherit'],
   });
   console.log(`branch ${a.branch}: ${git(out, ['log', '--oneline', '-1'])}, ${git(out, ['rev-list', '--count', 'HEAD'])} commits`);

@@ -3,7 +3,7 @@
 // and keeps its orbit. While walking this feature draws the whole frame, first person from the walker's eye:
 // the real sky first (the flight's far scene, the ray-cast Earth and the stars, from where the eye is in the
 // site frame), then the ring's inside over it in two passes, far and near. Keyboard, mouse, gamepad and touch.
-// GPLv3.
+// MIT.
 
 import * as THREE from 'three';
 import { DT } from './core.js';

@@ -1,5 +1,5 @@
 // The pilot's hands: keyboard, a gamepad, or the screen's own stick and buttons. Every source ends in
-// one set of controls for the core and a few commands for the page. GPLv3.
+// one set of controls for the core and a few commands for the page. MIT.
 
 export const HELP = [
   ['0, TOUR', 'the tour: the whole loop flown by the crew, with words; any key takes over'],

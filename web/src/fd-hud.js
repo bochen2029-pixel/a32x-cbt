@@ -1,7 +1,7 @@
 // fd-hud.js — the flight director on the page, without a browser (orbit_fd.h): what its readouts mean, how
 // far each cue stands from where the craft is, the HUD's words, and the ILS to KDFW 17C from the runway's
 // own geometry (flight/web's drawing of the field, unchanged). fd-view.js draws it; test/fd.test.mjs holds
-// it to the header and to the runway. GPLv3.
+// it to the header and to the runway. MIT.
 
 import { GLIDE } from '../../../web/src/airport-layout.js';
 import { localMetres, origin } from '../../../web/src/scene-math.js';

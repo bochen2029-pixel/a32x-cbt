@@ -1,6 +1,6 @@
 // The graphics tiers: what a phone, a laptop's own graphics and a desktop card each draw, and which of
 // the three a device gets from what it reports about itself. No three.js and no browser here, so the
-// tests can read all of it. GPLv3.
+// tests can read all of it. MIT.
 //
 // A tier is chosen from the device's report (chooseTier), overridden by ?q=low|medium|high in the
 // address or by the page's control (9, or the GFX button), which is remembered. Left to itself, the page

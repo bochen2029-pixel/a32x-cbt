@@ -1,5 +1,5 @@
 // deck_plan.h — a landing on the Ring's deck, or a climb out from it, as a convex problem (deck_plan.cpp): what the
-// crew's plans are (deck.cpp) and what the tests' oracle solves. GPLv3.
+// crew's plans are (deck.cpp) and what the tests' oracle solves. MIT.
 //
 // In the Ring's own frame, which turns at w about its axis and whose centre falls freely, the craft's motion is
 //

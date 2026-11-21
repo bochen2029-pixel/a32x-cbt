@@ -1,7 +1,7 @@
 // The map's arithmetic, stated as orbits behave: a round orbit stays round with Kepler's period, the core's
 // own apoapsis and periapsis come out of its state, a ground track tops out at the inclination, and a craft
 // keeping station with the Ring stays put in the frame that turns with it. The core is the WebAssembly
-// build's (flight/orbit/README.md); ORBIT_CORE names another. GPLv3.
+// build's (flight/orbit/README.md); ORBIT_CORE names another. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

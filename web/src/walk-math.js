@@ -1,5 +1,5 @@
 // The walk's geometry and words, without a browser: the ring's frame in the site's, the walker's view, where
-// the Sun reaches inside the band, the floor's plan as the page paints it, and the readouts' lines. GPLv3.
+// the Sun reaches inside the band, the floor's plan as the page paints it, and the readouts' lines. MIT.
 //
 // The ring's frame (orbit_walk.h): x along ref, y along the axis, z along ref x axis, turning with the ring. At
 // angle th round the ring the outward radius is (sin th, 0, cos th) and spinward (cos th, 0, -sin th); up is

@@ -5,7 +5,7 @@
 // and the depth exact, and the band round the limb and the square round the Sun are worked out in full, so
 // what differs is the softening of sharp detail on the ground (the fields' edges, a coast at a grazing
 // angle): a small share of the pixels, by a few levels in 255. Build first (tools/build.mjs). Skipped without
-// a built page or without Playwright and its Chromium. GPLv3.
+// a built page or without Playwright and its Chromium. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

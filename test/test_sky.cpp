@@ -3,7 +3,7 @@
 // Astronomical Algorithms, 2nd ed.), to the digits the book prints; then the whole chain, through the
 // readouts, against JPL's Horizons system (ephemeris DE441, queried 2026-11-12 for the geocentre and for
 // KDFW 17C's threshold, 32.91569901 N 97.02600098 W, 171 m, airless), which shares nothing with the book.
-// Run one by name or all; ctest runs each line below that reads "// TEST: <name>". GPLv3.
+// Run one by name or all; ctest runs each line below that reads "// TEST: <name>". MIT.
 //
 // TEST: julian_date
 // TEST: sidereal_time

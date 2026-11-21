@@ -2,7 +2,7 @@
 // the low tier's 576 draws a frame by the Ring): in the built page in Chromium, by the Ring at 775 s on the low tier,
 // the deck's marks are seven meshes, two of them instanced spheres holding the pads' 48 edge lights and the lead-in
 // lights, and the pads, the white marks, the yellow and the black stripes one geometry each. Build first
-// (tools/build.mjs). Skipped without a built page or without Playwright and its Chromium. GPLv3.
+// (tools/build.mjs). Skipped without a built page or without Playwright and its Chromium. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

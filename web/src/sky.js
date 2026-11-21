@@ -1,5 +1,5 @@
 // sky.js — the Sun, the Moon and the stars where they are at the flight's date and time (orbit_sky.h,
-// core/sky.cpp), drawn in the far pass. GPLv3.
+// core/sky.cpp), drawn in the far pass. MIT.
 //
 // The date: 12 November 2026 at 19:00 UTC unless ?date= gives another (2026-12-24T03:00Z; UTC unless a
 // zone is written), set in the core before the first frame; a date the core does not take stops the page

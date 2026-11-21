@@ -1,6 +1,6 @@
 // The Ring's plan: where its parts go, as plain numbers in its own frame (y its axis, a point at angle
 // a and radius r at (r sin a, y, r cos a), as core.js says the spokes run). ring.js makes it into meshes;
-// the tests read it. No three.js here. GPLv3.
+// the tests read it. No three.js here. MIT.
 //
 // The shape is RING's (core.js, held equal to orbit_core.h): the band 5 km in radius and 1 km wide,
 // the floor at 5,000 m, the hull 40 m under it, the roof 300 m over it, the rim 80 m above the roof,

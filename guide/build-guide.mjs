@@ -3,7 +3,7 @@
 // to each place the guide shows and takes a screenshot there, then prints guide.html, with those
 // screenshots in it, to a PDF of Letter pages. Node built-ins and a Chromium-family browser, driven over
 // the DevTools protocol by this repository's own driver (app/tools/chrome.mjs): no package to install.
-// Nothing it writes is committed: the screenshots and the PDF go to out/, which git ignores. GPLv3.
+// Nothing it writes is committed: the screenshots and the PDF go to out/, which git ignores. MIT.
 //
 //   node flight/orbit/guide/build-guide.mjs [--page flight/orbit/build-web/index.html] [--out flight/orbit/guide/out]
 //        [--only name,name] [--skip-shots] [--skip-pdf] [--gpu] [--browser <path>] [--list]

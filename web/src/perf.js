@@ -2,7 +2,7 @@
 // percentile and worst over the last two seconds, the tier, the picture's size, and what the renderer drew
 // in a frame. It is how a person measures this page on their own machine and graphics card: everything
 // here was tested in software rendering, which says nothing of real speed. It keeps its own frame clock,
-// so it counts every frame, the walk's too. GPLv3.
+// so it counts every frame, the walk's too. MIT.
 
 import { frameStats, perfLines } from './perf-math.js';
 

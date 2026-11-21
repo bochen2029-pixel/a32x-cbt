@@ -3,7 +3,7 @@
 // flight sounds like, as numbers from the core's readouts; this file is the instrument those numbers play,
 // and the page's part: starting on the pilot's first key or tap (a browser allows no sound before one), the
 // SOUND button and the Y key to mute, and ctx.sound, through which another part of the page plays a moment
-// of its own. The sound only listens: it reads the readouts and writes nothing back. GPLv3.
+// of its own. The sound only listens: it reads the readouts and writes nothing back. MIT.
 //
 // The instrument, in the order the sound flows:
 //   sources   loops of noise that are never heard bare (each is filtered, gated and moved by the readouts),

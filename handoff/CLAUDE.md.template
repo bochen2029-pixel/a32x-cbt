@@ -121,7 +121,7 @@ whose, which licence, what is taken. Implement, do not port, from anything whose
 cannot carry: nothing under the GPL, the statically linked LGPL or CC BY-SA, which Unreal's EULA
 forbids combining with the engine. Data that ships is open data; nothing from Cesium ion or Google
 goes into a build, because neither may be stored offline. The core came from a32x-cbt's
-`flight/orbit` at <commit>, under <the licence you chose> (`DECISIONS.md` <D-nnn>).
+`flight/orbit` (or the runway-to-ring repository split from it) at <commit>, MIT (`DECISIONS.md` <D-nnn>).
 
 *Enforced by:* the licence gate over `PROVENANCE.md` and `third_party/`; G9's licence lens.
 

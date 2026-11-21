@@ -3,7 +3,7 @@
 // answer comes a frame or few later and is dropped when the GPU says its clock jumped (disjoint). The frame
 // rate's controller (adapt.js) reads it to tell a picture that costs too much from a frame whose time goes
 // elsewhere, and to step up without trying; the meter shows it. Where there is none, read() is null and
-// both do without. GPLv3.
+// both do without. MIT.
 
 export class GpuTime {
   constructor(gl, { enabled = true } = {}) {

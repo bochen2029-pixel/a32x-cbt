@@ -2,7 +2,7 @@
 // Planetary Nomenclature (IAU and USGS; public domain; docs/provenance.md, 1h, "The Sun and the Moon"):
 // the outlines of the maria, lacus, sinus and paludes, and the centre and diameter of every named crater
 // on the side the Earth sees. Outlines are simplified (Douglas-Peucker, 0.15 deg) and kept in tenths of a
-// degree; craters in hundredths of a degree and tenths of a kilometre. GPLv3.
+// degree; craters in hundredths of a degree and tenths of a kilometre. MIT.
 //
 //   node tools/moon.mjs <MOON_nomenclature_center_pts.dbf> <pages folder>
 //

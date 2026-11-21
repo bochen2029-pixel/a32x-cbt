@@ -1,7 +1,7 @@
 // The flight deck on the page: its names and numbers are orbit_deck.h's, LAND DECK does what makes sense
 // from where the craft is and says why when it does nothing, the HUD and status lines say what the readouts
 // say, the approach display's layout follows the deviations the right way round, and the page's block reads
-// the core's deck through a whole landing. GPLv3.
+// the core's deck through a whole landing. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';

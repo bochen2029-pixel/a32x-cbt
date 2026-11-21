@@ -3,7 +3,7 @@
 // the port (OC_SAS_PORT). It adds the docking's lines to the HUD and the status line, a docking reticle
 // over the cockpit view, the markings on the hub's port, which turn with the Ring, and the probe on the
 // craft's nose. The docking itself is the core's (core/dock.cpp, orbit_dock.h); the words and the
-// reticle's layout are dock-hud.js's. GPLv3.
+// reticle's layout are dock-hud.js's. MIT.
 
 import * as THREE from 'three';
 import { AUTO, HUB_PORT_M, SAS } from './core.js';

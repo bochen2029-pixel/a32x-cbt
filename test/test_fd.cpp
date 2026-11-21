@@ -1,7 +1,7 @@
 // The flight director's tests (orbit_fd.h). Each states a promise of the director: that it shows what the
 // crew would fly, that it changes nothing, and that a person who flies by its cues alone flies the crew's
 // flight. Run one by name (test_fd flown_to_orbit) or all; ctest runs each line below that reads
-// "// TEST: <name>". GPLv3.
+// "// TEST: <name>". MIT.
 //
 // TEST: readouts_block
 // TEST: shadow_is_the_crew

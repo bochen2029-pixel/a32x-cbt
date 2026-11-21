@@ -2,7 +2,7 @@
 // populated places (public domain; docs/provenance.md, 1h, Graphics). Each place keeps its point, in
 // hundredths of a degree in a 16-bit integer as data/land.js keeps the coastlines, and its largest
 // population (pop_max, the urban area's) as a byte on a log scale: 20 steps a decade, so a byte n is a
-// population of 10^(n/20). Places with no population are dropped. GPLv3.
+// population of 10^(n/20). Places with no population are dropped. MIT.
 //
 //   node tools/places.mjs <ne_10m_populated_places_simple.geojson>
 //

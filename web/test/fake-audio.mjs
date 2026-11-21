@@ -1,4 +1,4 @@
-// A stand-in for Web Audio, for the sound's tests (sound*.test.mjs): not a test itself. GPLv3.
+// A stand-in for Web Audio, for the sound's tests (sound*.test.mjs): not a test itself. MIT.
 import assert from 'node:assert/strict';
 
 // A stand-in for Web Audio: enough to build the instrument and watch what it is told. It keeps the graph (each

@@ -2,7 +2,7 @@
 // the structure's: a camera outside hears none of it, the cockpit hears the swivelled drive's thrum, the lift
 // jet, the roll posts and the gear on the plating. Stated as what the ear should meet, against made-up
 // readouts and against the crew's own landing through the core (the WebAssembly build's; ORBIT_CORE names
-// another). GPLv3.
+// another). MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';

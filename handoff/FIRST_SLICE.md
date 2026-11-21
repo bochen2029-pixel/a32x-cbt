@@ -43,8 +43,8 @@ mechanical gates, and the points where you look. Tags point into `SOURCES.md`.
 - **Data:** KDFW 17C from `flight/web/data/kdfw.json` (yours; its numbers from public-domain sources,
   `docs/provenance.md` §1f); public-domain imagery for the globe (NASA's Blue Marble; confirm the
   product's terms when you download it). Nothing from Cesium ion or Google in the build [C4, C5].
-- **The licence decision first:** wave 0 stops before copying the core into the new repository until
-  `LICENSING.md`'s question is answered.
+- **The licence, decided:** MIT (`LICENSING.md`, 2026-11-21). W0.2's `DECISIONS.md` records it before
+  W0.3 copies the core in.
 
 ## 3. How the harness uses MCP here
 
@@ -110,7 +110,7 @@ skeleton and writes wave 1's packets. It writes no View feature itself.
 |---|---|---|
 | W0.1 | reads the machine, changing nothing: the engine's path and `Windows_SDK.json`, MSVC, the Windows SDK, CMake, Git for Windows, Node, Blender's version | a table in the session's log; anything missing is asked about, not installed |
 | W0.2 | scaffolds the repository as text: `CLAUDE.md` from the template, `README.md`, `DECISIONS.md`, `FICTION.md`, `PROVENANCE.md`, `.gitignore` (Binaries, Intermediate, Saved, DerivedDataCache, `Content/Generated`, `build/`), `.gitattributes` | your word before the first commit |
-| W0.3 | **after your licence decision**: imports the kit's `orbit/` as `core/` and builds it with MSVC (`/fp:precise`, `/MD`, C++20) | `ctest` green, 120 of 120; `orbit_run 10 800` prints the rows of `CANON_DELTA.md` §1 (orbit at 753 s, 500.4 × 499.7 km, 32.84°, 4,389 kg, 36,568 Pa, 2.09 g); the hash it prints, `ea7847fe` on Linux at 599e051, is recorded beside the Windows build's as its baseline |
+| W0.3 | **with the licence recorded (MIT)**: imports the kit's `orbit/` as `core/` and builds it with MSVC (`/fp:precise`, `/MD`, C++20) | `ctest` green, every test (203 from 297b108 on; 120 at 599e051); `orbit_run 10 800` prints the rows of `CANON_DELTA.md` §1 (orbit at 753 s, 500.4 × 499.7 km, 32.84°, 4,389 kg, 36,568 Pa, 2.09 g); the hash it prints, `2ee00f7a` on Linux from 297b108 on (`ea7847fe` at 599e051), is recorded beside the Windows build's as its baseline |
 | W0.4 | freezes contracts 0.1: the C API as it is (the parts' stub headers included), the Snapshot's field list, the frame mapping (`UNREAL_PORT.md` §5), the Command table, the asset manifest's schema | a test that parses the headers and the Snapshot struct and holds them equal |
 | W0.5 | writes the project as text: `.uproject`, `Config/*.ini`, the game module and targets, `Plugins/OrbitSim` (the External module, the runtime module with the subsystem and the Tape) | UBT builds `<Game>Editor Win64 Development` clean |
 | W0.6 | the walking skeleton: the game mode spawns an engine cube driven by the Snapshot, a chase camera, the HUD's first three lines, time warp | in the editor, a screenshot at t = 0, 60 s and 753 s: the cube on the field, climbing, in orbit |
@@ -219,9 +219,9 @@ own `-help`.
 2. Build and test the core:
    `cmake -S core -B build/core -G "Visual Studio 17 2022" -A x64 -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreadedDLL`,
    then `cmake --build build/core --config Release`, then
-   `ctest --test-dir build/core -C Release --output-on-failure`. Check: 120 of 120. Then
+   `ctest --test-dir build/core -C Release --output-on-failure`. Check: every test passes (203 from 297b108 on). Then
    `build/core/Release/orbit_run.exe 10 800`. Check: the rows of `CANON_DELTA.md` §1; record the hash
-   beside Linux's `ea7847fe`.
+   beside Linux's `2ee00f7a` (from 297b108 on; `ea7847fe` at 599e051).
 3. Copy the library and headers into `Plugins/OrbitSim/Source/ThirdParty/OrbitCore/` (a script, not by
    hand). Check: the script refuses a library older than its sources.
 4. Build the game:

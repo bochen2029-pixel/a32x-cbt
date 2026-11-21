@@ -1,5 +1,5 @@
 // Textures painted by code: they tile, a flat surface's normal points straight out, a step's normal
-// leans away from it, and the mask's channels are where three.js reads them. GPLv3.
+// leans away from it, and the mask's channels are where three.js reads them. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Paint, rng } from '../src/paint.js';

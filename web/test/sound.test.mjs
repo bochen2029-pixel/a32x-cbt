@@ -1,6 +1,6 @@
 // The sound, without a browser: the mix as a function of the readouts (sound-mix.js), stated as what the ear
 // should meet, and the instrument (sound.js) built on a stand-in for Web Audio to see that it follows every
-// target the mix makes. What it sounds like is measured in a browser (flight/orbit/README.md). GPLv3.
+// target the mix makes. What it sounds like is measured in a browser (flight/orbit/README.md). MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {

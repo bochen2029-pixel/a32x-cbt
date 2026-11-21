@@ -1,7 +1,7 @@
 // internal.h — what the core's parts share: the maths, the craft's numbers, the state, and the laws a
 // crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h,
 // orbit_fd.h, orbit_wind.h and orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at
-// the end, which return.cpp, dock.cpp, deck.cpp, fd.cpp and wind.cpp define. GPLv3.
+// the end, which return.cpp, dock.cpp, deck.cpp, fd.cpp and wind.cpp define. MIT.
 
 #pragma once
 

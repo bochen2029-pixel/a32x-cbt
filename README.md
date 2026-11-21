@@ -7,7 +7,8 @@ to show that the airframe has the power and the aerodynamics for the trip, and t
 
 It stands apart from the A320. `flight/orbit` has its own small core (`core/`), links nothing from
 A32NX or JSBSim, and changes no file of the Airbus product. Its page reads four of `flight/web`'s
-modules, the KDFW drawing, without changing them. It is GPLv3, like everything in `flight/`. It is not
+modules, the KDFW drawing, without changing them. It is MIT (`LICENSE`), unlike the rest of `flight/`:
+its owner relicensed it on 2026-11-21, and `NOTICE.md` says what in a built page is others'. It is not
 a simulation of any real vehicle and is fit for nothing but a look.
 
 ## Open it
@@ -1187,7 +1188,7 @@ Ring's orbit decaying, the Earth's oblateness. Propellant for the small thruster
 
 ## Handoff to Unreal
 
-`handoff/README.md` starts a kit for building this sketch in Unreal Engine 5.8 from cold on another machine: what it settles against the canon, the port part by part, the first slice, the licence question, and the zip to carry.
+`handoff/README.md` starts a kit for building this sketch in Unreal Engine 5.8 from cold on another machine: what it settles against the canon, the port part by part, the first slice, the licence (settled: MIT), and the zip to carry.
 
 ## Build and test
 

@@ -1,6 +1,6 @@
 // The coastlines, from data/land.js: decoded, tested for a point, and painted into the globe's mask; and
 // the towns, from data/places.js, painted into its night lights. No three.js here, so the tests can read
-// it. GPLv3.
+// it. MIT.
 
 import { LAKES, LAND, SCALE } from '../data/land.js';
 import { PLACES, SCALE as PLACES_SCALE, STEPS } from '../data/places.js';

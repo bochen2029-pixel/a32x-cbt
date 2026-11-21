@@ -1,7 +1,7 @@
 // dock.cpp — docking at the hub, and contact with the ring (orbit_dock.h): the port's geometry, the
 // capture and the hard contact, the ride while held, the crew's docking, the hold a pilot docks under,
 // and the craft against the ring's structure. Every number marked as chosen is a design choice for the
-// sketch, not a measurement of any docking system. GPLv3.
+// sketch, not a measurement of any docking system. MIT.
 
 #include "internal.h"
 

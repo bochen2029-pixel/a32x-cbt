@@ -1,4 +1,4 @@
-// walk.cpp — a person inside the ring (orbit_walk.h), in the ring's turning frame. GPLv3.
+// walk.cpp — a person inside the ring (orbit_walk.h), in the ring's turning frame. MIT.
 //
 // The frame: x along ref, y along the axis, z along ref x axis, turning at W about +y. At angle th round
 // the ring the outward radius is (sin th, 0, cos th), spinward is (cos th, 0, -sin th), and up is the

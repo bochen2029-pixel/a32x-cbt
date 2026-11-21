@@ -1,5 +1,5 @@
 // The page's parts beyond the flight itself, each a module of its own with the same few hooks, so each
-// grows without touching the others' files. GPLv3.
+// grows without touching the others' files. MIT.
 //
 // A feature is an object with any of:
 //   init(ctx)            once, when the scene is built

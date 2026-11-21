@@ -1,7 +1,7 @@
 // orbit_sky.h — the Sun and the Moon where they really are, for the flight's date and time, and the
 // Earth's place under the stars. A date goes in; directions, distances and the Moon's attitude come
 // out, in the site frame, beside the flight's readouts. Nothing here steers the craft: the sky is a
-// function of the epoch and of the flight's time, and the flight does not depend on it. GPLv3.
+// function of the epoch and of the flight's time, and the flight does not depend on it. MIT.
 //
 // Methods (docs/provenance.md, 1h, "The Sun and the Moon"): J. Meeus, Astronomical Algorithms, 2nd
 // ed.: the Sun to 0.01 deg (ch. 25), the Moon to about 10 arcseconds (ch. 47, every term of its
