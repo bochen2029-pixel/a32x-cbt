@@ -10,18 +10,43 @@
 // Ring's centre fall a little differently, and to first order in r that difference is linear. So the motion is
 // linear in (r, r', u), and a minimum-propellant landing is the lossless convexification of Acikmese and Ploen
 // (2007): with sigma >= |u| a slack on the thrust per kilogram and z = ln m, the mass falls as z' = -sigma / (Isp g0),
-// the thrust's bounds rho1 <= |T| <= rho2 become rho1 e^-z <= sigma <= rho2 e^-z, the upper one taken by its tangent
-// about a reference z0(t), which lies below e^-z and so is safe, and the lower one by its second-order expansion,
-// rho1 e^-z0 (1 - d + d^2 / 2) <= sigma with d = z - z0, which lies below e^-z and is a rotated second-order cone;
-// at the optimum |u| = sigma, and the slack costs nothing. The lower bound is the convexification's point: a drive
+// and the thrust's bounds rho1 <= |T| <= rho2 become rho1 e^-z <= sigma <= rho2 e^-z, each taken about a reference
+// z0(t) for ln m, with d = z - z0. The upper one by its tangent, sigma <= rho2 e^-z0 (1 - d), which lies below e^-z
+// for every d: the plan never asks for more than the drive has. The lower one by its second-order expansion,
+// rho1 e^-z0 (1 - d + d^2 / 2) <= sigma, a rotated second-order cone, which lies above e^-z only where the craft is
+// at least as heavy as the reference (d >= 0: the remainder, -d^3 e^-xi / 6, is negative); there the plan's thrust is
+// at least rho1, as it must be. Where the craft is lighter (d < 0) the expansion lies below e^-z by about |d|^3 / 6 of
+// itself, and the plan may ask for that much less than rho1. The reference is not a lower bound on the mass: without
+// one given it is the mass at a steady 250 m/s over the plan, and a plan has spent more than that by the seconds its
+// drive is held lit in (a landing's last 20 s, a climb out's first): there d is down to -0.012 and the shortfall at
+// most 3e-7 of rho1, a twentieth of a newton of the crew's 177 kN (test_deck's least_thrust_expansion and
+// oracle_converges_and_is_lossless measure it). A plan made again takes its reference from the plan before it, moved
+// to the craft's mass.
+// At the optimum |u| = sigma, and the slack costs nothing. The lower bound is the convexification's point: a drive
 // that, once lit, cannot be throttled below rho1 is a non-convex set of thrusts made convex by sigma, and the
 // relaxation is exact. Minimizing the sum of sigma dt is minimizing the delta-v, which is maximizing the mass at the
 // end.
 // The controls are held over each of n intervals of the plan's length (zero-order hold), and the dynamics over each
 // are its exact transition, the tide taken at the interval's middle; the problem is a second-order cone program,
-// which socp.h solves. The intervals are even, or (grid a > 0) closer at the plan's ends, where its burns are, and
-// wider in the coast between: node k at tf (x - a sin(2 pi x) / (2 pi)), x = k / n, so that the first and last are
-// 1 - a times the mean and the middle ones 1 + a. Beside the dynamics and the drive, a plan keeps:
+// which socp.h solves. The crew's intervals are even, or (grid a > 0) closer at the plan's ends, where its burns are,
+// and wider in the coast between: node k at tf (x - a sin(2 pi x) / (2 pi)), x = k / n, so that the first and last
+// are 1 - a times the mean and the middle ones 1 + a. On that grid a window below holds on whole intervals, those that
+// start in it (or, for the turn, the level ends and the gentle stop, that reach into it), so that as a plan's length
+// changes an interval leaves or joins a window, and the plan's cost steps with the length: by 4 to 7 m/s for the
+// oracle at 80 intervals, and by 8.7 and 9.5 m/s at 101 and 145 s for the crew's plan from the hold point (the audit
+// of 60e2582). The tests' oracle sets exact instead (planTimes): every window's edge inside the plan is a node, so
+// that each interval lies wholly inside a window or wholly outside it. The edges cut the plan into pieces. A piece
+// between two edges measured from the same end of the plan is as long whatever the plan's length, and gets as many
+// intervals as a grid near the plan's ends, where its burns are, would give it: intervals 0.8 s long at the end and a
+// tenth of a second longer for each second from it (at 40 intervals; n / 40 times as many at n), even within the
+// piece. The piece between the last edge measured from the start and the first measured from the end, the coast,
+// takes the rest, closer at its ends (grid a): its node j of m at a + L (x - a sin(2 pi x) / (2 pi)), x = j / m. So,
+// as the plan's length changes, the nodes move with it continuously, no window gains or loses an interval, and the
+// plan's cost is continuous in its length. A plan whose coast would have intervals under half a second each (at 40),
+// or whose edges from the start and from the end interleave, is crowded at its ends as a whole instead, each edge
+// moved onto the node nearest it; there the cost is not continuous. The crew keeps its own grid: flown on the exact
+// one, its landings were no surer on fresh draws and dearer in their tails (README.md; INVARIANTS.md G15).
+// Beside the dynamics and the drive, a plan keeps:
 //
 //   the approach's cone at a pad: up >= |(tanS along, tanC across)| from the pad, and up >= -tanA along behind it,
 //     so that the craft comes down through the roof's gap clear of the bulkheads and the rim walls (Blackmore,
@@ -33,18 +58,23 @@
 //     acos(cosLast), so that the craft is level, and its thrust nearly straight up, where it leaves or meets the deck;
 //   no thrust in the first tOrient seconds, while the craft turns for its first burn; the drive lit, at least
 //     thrustMin, from minFrom to minTo seconds;
-//   the thrust's rate: from one interval to the next the force per kilogram changes by at most jerk times the
-//     interval, in size or in way, which the drive's swivel and throttle and the craft's turning can follow; and
-//     the same from the force the craft has at the start (uStart), and to the force that keeps it as it is at the
-//     end (uEnd), each when it is set; and smooth seconds' worth of each change added to the cost, which picks, of
+//   the thrust's rate: from one interval to the next the force per kilogram changes by at most jerk times the time
+//     between their middles, in size or in way, which the drive's swivel and throttle and the craft's turning can
+//     follow; from the force the craft has at the start (uStart) to the first interval's, and from the last
+//     interval's to the force that keeps it as it is at the end (uEnd), by jerk times the whole first and last
+//     interval, each when it is set; and smooth seconds' worth of each change added to the cost, which picks, of
 //     plans that cost the same, the one whose thrust does not chatter between intervals on the arcs where the cone
 //     holds the craft;
 //   elastic: the cone may be left, and the side's line crossed, at a cost of 100 m/s for each metre, so that a plan
 //     made again from a craft a little outside the cone after its tracking's error, or from one over the deck, far
 //     below the spokes, but on the plane, is still a plan; the cone's own 40 m clear of the structure, and the
-//     spokes' 25 m clear of the side's line, are the room for that.
+//     spokes' 25 m clear of the side's line, are the room for that. Nothing holds a plan to that room; and near the
+//     pad there is none, since the cone's apex is on the deck and outside the cone there is under the deck: the
+//     crew refuses a landing's plan made again that takes the craft under its gate's height before the gate
+//     (deck.cpp, overTheGate).
 // A landing keeps to its side until near the end and points up near the end; a climb out, the other way round.
-// The oracle (the tests') poses the same with none of the plans' own additions: no smoothing, no elastic cone.
+// The oracle (the tests') poses the same on the exact grid, with none of the plans' own additions: no smoothing, no
+// elastic cone.
 #pragma once
 
 #include "internal.h"
@@ -64,6 +94,7 @@ struct PlanSpec {
     double thrustMin = 0, minFrom = 0, minTo = 0;   // N, and the seconds in which it holds; 0: none
     double thrustEnd = 0, tEnd = 0;   // N: the drive's bound in the plan's last tEnd seconds instead; 0: none
     double grid = 0;               // the intervals' crowding at the ends, 0 to under 1
+    bool exact = false;            // the oracle's grid (the tests'), every window's edge a node; off, the crew's
     double tOrient = 0;            // s
     V3 padAt{0, 0, 0}, padUp{0, 0, 0}, padSpin{0, 0, 0};   // the cone's apex, its up and its spinward
     double tanS = 0, tanC = 0, tanA = 0;
@@ -97,6 +128,11 @@ struct PlanResult {
 struct RingFrame { V3 c, vc, x, y, z; };
 RingFrame ringFrameAt(double t);
 void tideTensor(double t, double T[3][3]);
+
+// The plan's nodes' times, s from its start, spec.n + 1 of them into t: the crew's grid, or with exact the oracle's
+// (above), which planLanding poses the plan on. False if the spec has no plan (under two intervals, a length not over
+// nothing, a crowding outside [0, 1), or more pieces than intervals).
+bool planTimes(const PlanSpec& spec, double* t);
 
 // The plan: true if solved (SOLVED, or INACCURATE within the solver's looser tolerance).
 bool planLanding(const PlanSpec& spec, PlanResult& out);

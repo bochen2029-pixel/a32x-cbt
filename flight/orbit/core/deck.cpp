@@ -437,11 +437,23 @@ int searchStep(State& s, double t) {
     return 1;
 }
 
+// Whether a landing's plan keeps the craft at its gate's height over the deck or higher until the gate, its last
+// node. The elastic cone (deck_plan.h) lets a plan be found from anywhere, at a price; but near the pad the cone's
+// apex is on the deck, and outside the cone there is under the deck.
+bool overTheGate(const PlanResult& res) {
+    for (size_t j = 1; j + 1 < res.r.size(); ++j)
+        if (R - std::hypot(res.r[j].x, res.r[j].z) < GATE_H) return false;
+    return true;
+}
+
 // The plan made again from where the craft is, to the same end at the same time, its mass linearized about the
 // plan's own, moved to the mass the craft has. Off its plan in a burn (urgent), the craft may need more than the
 // plan's share of the drive to get back to it: then the whole drive, and failing that a later end, a fifth of what
-// is left and two seconds more, each tried a step after the one before failed. Kept if found; else the plan flown
-// goes on, and once every try has failed the failure is counted.
+// is left and two seconds more, each tried a step after the one before failed. Kept if found and, for a landing, if
+// it keeps over the gate (overTheGate); else the plan flown goes on, and once every try has failed the failure is
+// counted. (Kept wherever it went, a plan made again on the exact grid of deck_plan.h, which the crew flew for a
+// while, from 130 m over the deck, 35 m past the pad, the craft sinking at 30 m/s and moving away at 28, ran 11 m
+// under the deck, and the craft's tail struck it at 18 m/s: INVARIANTS.md, G19.)
 void replan(State& s, double t, bool urgent) {
     DeckState& k = s.deck;
     const double tf = k.planEnd - t;
@@ -464,7 +476,7 @@ void replan(State& s, double t, bool urgent) {
     }
     PlanResult res;
     ++k.planSolves;
-    const bool ok = planFrom(s, st, len, zRef, tries[i].share, res) && storePlan(res, k.plan);
+    const bool ok = planFrom(s, st, len, zRef, tries[i].share, res) && (k.planKind != 0 || overTheGate(res)) && storePlan(res, k.plan);
     k.planStatus = res.status;
     k.planIters = res.iters;
     if (ok) { k.planEnd = t + len; k.tryNext = 0; return; }

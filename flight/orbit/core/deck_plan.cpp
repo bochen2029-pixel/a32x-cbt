@@ -7,6 +7,7 @@
 
 #include "socp.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace oc {
@@ -64,7 +65,112 @@ void transition(const double A[6][6], double dt, double Phi[6][6], double Gam[6]
 
 double comp(V3 a, int i) { return i == 0 ? a.x : i == 1 ? a.y : a.z; }
 
+// The exact grid's pieces (deck_plan.h): an interval near a plan's end is GRID_END long at the end and GRID_GROW
+// longer for each second from it, at GRID_N intervals; so a piece from d1 to d2 seconds from that end gets
+// (n / GRID_N) ln((GRID_END + GRID_GROW d2) / (GRID_END + GRID_GROW d1)) / GRID_GROW of them. The coast's intervals
+// at GRID_N, on average no shorter than GRID_COAST, or the plan is too short for that grid.
+const double GRID_END = 0.8, GRID_GROW = 0.1, GRID_N = 40, GRID_COAST = 0.5;
+
+// The whole plan crowded at its ends (grid a), as a fraction of its length: node j of n at tau(j / n), and the x
+// whose tau is y (tau rises, its slope at least 1 - a).
+double tau(double x, double a) { return x - a * std::sin(2 * PI * x) / (2 * PI); }
+double tauInverse(double y, double a) {
+    double lo = 0, hi = 1;
+    for (int i = 0; i < 60; ++i) {
+        const double mid = 0.5 * (lo + hi);
+        (tau(mid, a) < y ? lo : hi) = mid;
+    }
+    return 0.5 * (lo + hi);
+}
+
 }   // namespace
+
+bool planTimes(const PlanSpec& sp, double* t) {
+    const int N = sp.n;
+    const double tf = sp.tf;
+    if (N < 2 || !(tf > 0) || !(sp.grid >= 0 && sp.grid < 1)) return false;
+    if (!sp.exact) {   // the crew's grid: the whole plan crowded at its ends
+        for (int k = 0; k <= N; ++k) {
+            const double x = (double)k / N;
+            t[k] = k == N ? sp.tf : sp.tf * (x - sp.grid * std::sin(2 * PI * x) / (2 * PI));
+        }
+        return true;
+    }
+    // The windows' edges inside the plan, each a time from the start (0) or from the end (1): the turn's and the first
+    // level seconds' from the start, the last level seconds' and the gentle stop's from the end; of the pointing's and
+    // the lit drive's, a window that begins at the start ends a time from the start, one that ends at the end begins a
+    // time from the end, and one between begins a time from the start and ends a time from the end; the spokes' side
+    // begins a time from the start (sideFrom) and ends a time from the end (sideTo).
+    struct Cut { double t; int from; };
+    std::vector<Cut> cuts;
+    auto cut = [&](double s, int from, bool on) { if (on && s > 0 && s < tf) cuts.push_back({s, from}); };
+    auto window = [&](double a, double b, bool on) {
+        if (!on || !(b > a)) return;
+        if (a > 0 && b < tf) { cut(a, 0, true); cut(b, 1, true); }
+        else if (a > 0) cut(a, 1, true);
+        else cut(b, 0, true);
+    };
+    cut(sp.tOrient, 0, true);
+    cut(sp.tFirst, 0, sp.cosFirst > -1);
+    cut(tf - sp.tLast, 1, sp.cosLast > -1);
+    cut(tf - sp.tEnd, 1, sp.thrustEnd > 0);
+    window(sp.pointFrom, sp.pointTo, sp.cosPoint > -1);
+    window(sp.minFrom, sp.minTo, sp.thrustMin > 0);
+    cut(sp.sideFrom, 0, sp.side != 0);
+    cut(sp.sideTo, 1, sp.side != 0);
+    std::sort(cuts.begin(), cuts.end(), [](const Cut& a, const Cut& b) { return a.t < b.t || (a.t == b.t && a.from < b.from); });
+    // the pieces' ends: the start, the edges (one where two meet, from both ends, 2, where they are measured from
+    // different ends), the end
+    std::vector<Cut> at{{0, 0}};
+    for (const Cut& c : cuts) {
+        if (c.t - at.back().t > 1e-9 * tf) at.push_back(c);
+        else if (c.from != at.back().from) at.back().from = 2;
+    }
+    if (tf - at.back().t > 1e-9 * tf) at.push_back({tf, 1});
+    else at.back() = {tf, at.back().from == 1 ? 1 : 2};
+    const int m = (int)at.size() - 1;   // pieces
+    if (m > N) return false;
+    // each piece between two edges from the same end gets its share of a grid crowded at that end; the coast, between
+    // the edges from the start and those from the end, takes the rest
+    std::vector<int> count(m, 0);
+    int fixed = 0, coasts = 0, coast = -1;
+    for (int i = 0; i < m; ++i) {
+        const int from = at[i].from;
+        if (from != at[i + 1].from || from == 2) { ++coasts; coast = i; continue; }
+        const double d1 = from == 0 ? at[i].t : tf - at[i + 1].t, d2 = from == 0 ? at[i + 1].t : tf - at[i].t;
+        const double law = N / GRID_N * std::log((GRID_END + GRID_GROW * d2) / (GRID_END + GRID_GROW * d1)) / GRID_GROW;
+        count[i] = std::max(1, (int)std::lround(law));
+        fixed += count[i];
+    }
+    bool whole = coasts != 1 || fixed >= N;
+    if (!whole) {
+        count[coast] = N - fixed;
+        if ((at[coast + 1].t - at[coast].t) / count[coast] < GRID_COAST * GRID_N / N) whole = true;
+    }
+    if (!whole) {
+        int k = 0;
+        for (int i = 0; i < m; ++i) {
+            const double a = at[i].t, L = at[i + 1].t - a, crowd = i == coast ? sp.grid : 0;
+            for (int j = 0; j < count[i] && k < N; ++j) t[k++] = a + L * tau((double)j / count[i], crowd);
+        }
+        t[N] = tf;
+        return k == N;
+    }
+    // Too short a plan for that grid, or its edges interleave: the whole plan crowded at its ends, as long plans' coasts
+    // are, each edge moved onto the node nearest it (and a piece an interval at least), the nodes between two edges
+    // spread as the whole plan's are between them.
+    std::vector<int> kAt(m + 1);
+    kAt[0] = 0;
+    kAt[m] = N;
+    for (int i = 1; i < m; ++i) kAt[i] = std::max(kAt[i - 1] + 1, (int)std::lround(N * tauInverse(at[i].t / tf, sp.grid)));
+    for (int i = m - 1; i >= 1; --i) kAt[i] = std::min(kAt[i], kAt[i + 1] - 1);
+    for (int i = 0; i < m; ++i) {
+        const double b0 = tau((double)kAt[i] / N, sp.grid), b1 = tau((double)kAt[i + 1] / N, sp.grid);
+        for (int j = kAt[i]; j < kAt[i + 1]; ++j) t[j] = at[i].t + (at[i + 1].t - at[i].t) * (tau((double)j / N, sp.grid) - b0) / (b1 - b0);
+    }
+    t[N] = tf;
+    return true;
+}
 
 RingFrame ringFrameAt(double t) {
     RingFrame f;
@@ -90,12 +196,14 @@ bool planLanding(const PlanSpec& sp, PlanResult& out) {
     if (N < 2 || !(sp.tf > 0) || !(sp.m0 > 0) || !(sp.thrustMax > 0)) { out.status = -1; return false; }
     // the nodes' times, s, and the intervals, scaled
     std::vector<double> tn(N + 1), dts(N);
-    for (int k = 0; k <= N; ++k) {
-        const double x = (double)k / N;
-        tn[k] = k == N ? sp.tf : sp.tf * (x - sp.grid * std::sin(2 * PI * x) / (2 * PI));
-    }
+    if (!planTimes(sp, tn.data())) { out.status = -1; return false; }
     for (int k = 0; k < N; ++k) dts[k] = (tn[k + 1] - tn[k]) / TU;
-    if (!(sp.grid >= 0 && sp.grid < 1)) { out.status = -1; return false; }
+    // whether interval k is in the window from a to b seconds: on the exact grid, whose nodes the window's edges are,
+    // wholly; on the crew's, by its start, as the crew's plans always have been
+    auto inWindow = [&](int k, double a, double b) {
+        if (sp.exact) return tn[k] >= a - 1e-9 && tn[k + 1] <= b + 1e-9;
+        return tn[k] >= a - 1e-9 && tn[k] <= b + 1e-9;
+    };
     const double cz = VU / VE;                        // z' = -cz sigma, sigma scaled (AU), t scaled
     const double mu2 = sp.thrustMax / sp.m0 / AU;     // the bound per kilogram at the start, scaled
     const double mu1 = sp.thrustMin / sp.m0 / AU;     // the least
@@ -177,7 +285,7 @@ bool planLanding(const PlanSpec& sp, PlanResult& out) {
             P.G.endRow();
             P.h.push_back(sp.jerk * (k == 0 ? dts[0] : (dts[k - 1] + dts[k]) / 2) * TU / AU);
         }
-        double c = tk >= sp.pointFrom - 1e-9 && tk <= sp.pointTo + 1e-9 ? sp.cosPoint : -2;
+        double c = inWindow(k, sp.pointFrom, sp.pointTo) ? sp.cosPoint : -2;
         if (k == 0 || tk < sp.tFirst - 1e-9) c = std::fmax(c, sp.cosFirst);
         if (k == N - 1 || tn[k + 1] > sp.tf - sp.tLast + 1e-9) c = std::fmax(c, sp.cosLast);
         if (c > -1) {   // up . u >= c sigma
@@ -230,8 +338,7 @@ bool planLanding(const PlanSpec& sp, PlanResult& out) {
     }
     for (int k = 0; k < N && mu1 > 0; ++k) {
         // (a + d - 1/2, d, a + d - 3/2) in Q3 with a = sigma / (mu1 e^-z0), d = z - z0: 2 (a + d - 1) >= d^2
-        const double tk = tn[k];
-        if (tk < sp.minFrom - 1e-9 || tk > sp.minTo + 1e-9) continue;
+        if (!inWindow(k, sp.minFrom, sp.minTo)) continue;
         const double inv = 1 / (mu1 * std::exp(-z0[k]));
         const double off[3] = {0.5, 0, 1.5};
         for (int row = 0; row < 3; ++row) {
