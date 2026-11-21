@@ -144,7 +144,7 @@
     <b>Code</b><span>github.com/bochen2029-pixel/a32x-cbt, branch <b>orbit-sketch</b>, directory <code style="background:none;color:inherit">flight/orbit</code></span>
     <b>Review</b><span class="url">github.com/bochen2029-pixel/a32x-cbt/pull/1</span>
     <b>Play</b><span class="url">claude.ai/artifact/PB6pcca87oqNiikJSXQRbo</span>
-    <b>This edition</b><span>21 November 2026, from commit 2638c37; screenshots taken from that build at the medium tier, the picture at the tier's own size. The first edition was of 12 November, commit 599e051</span>
+    <b>This edition</b><span>21 November 2026, from commit 5d7e428. The screenshots are 2638c37's build at the medium tier, the picture at the tier's own size, but for the help and the deck's pad, retaken at 5d7e428 for the throttle's keys; nothing else in them changed. The first edition was of 12 November, commit 599e051</span>
     <span class="fine">A sketch, not a simulation of any real vehicle, station, docking system or airport procedure. Its numbers are chosen so that it can be flown from a keyboard and shows the physics; none describes a real system. The cover is the page itself, with its readouts hidden.</span>
   </div>
 </section>
@@ -152,7 +152,7 @@
 <!-- ============================================================ contents -->
 <section class="page" data-part="Contents">
   <h1>Contents</h1>
-  <p class="small soft" style="margin-bottom:6pt">Section 1 is the whole thing on one page; section 2 gets you flying; section 3 takes the loop a part at a time, with the numbers its tests hold it to. Sections 4 to 7 are for whoever picks the code up again. Every number is from the repository's README files or a test at commit 2638c37, and the test is named where it prints it.</p>
+  <p class="small soft" style="margin-bottom:6pt">Section 1 is the whole thing on one page; section 2 gets you flying; section 3 takes the loop a part at a time, with the numbers its tests hold it to. Sections 4 to 7 are for whoever picks the code up again. Every number is from the repository's README files or a test at commit 5d7e428, and the test is named where it prints it.</p>
   <ol id="toc"></ol>
 </section>
 
@@ -187,15 +187,14 @@
   <h2>Where everything lives</h2>
   <table class="tight">
     <tr><th style="width:1.25in">what</th><th>where</th></tr>
-    <tr><td class="k">the code</td><td>GitHub, <b>bochen2029-pixel/a32x-cbt</b>, branch <b>orbit-sketch</b>, under <code>flight/orbit/</code>; MIT, unlike the rest of <code>flight/</code></td></tr>
-    <tr><td class="k">on its own</td><td>GitHub, <b>bochen2029-pixel/runway-to-ring</b>, public: the sketch split out with its history, MIT</td></tr>
+    <tr><td class="k">the code</td><td>GitHub, <b>bochen2029-pixel/a32x-cbt</b>, branch <b>orbit-sketch</b>, under <code>flight/orbit/</code>, MIT; on its own as <b>runway-to-ring</b></td></tr>
     <tr><td class="k">the review</td><td>draft pull request 1, <span class="url">https://github.com/bochen2029-pixel/a32x-cbt/pull/1</span>, from orbit-sketch</td></tr>
     <tr><td class="k">the page, hosted</td><td><span class="url">https://claude.ai/artifact/PB6pcca87oqNiikJSXQRbo</span>, private to the owner until shared</td></tr>
     <tr><td class="k">the page, local</td><td><code>flight/orbit/build-web/index.html</code> once built (section 7): one file, run from <code>file://</code></td></tr>
     <tr><td class="k">the Unreal kit</td><td><code>flight/orbit/handoff/</code>, and the zip it makes (section 6)</td></tr>
     <tr><td class="k">this guide</td><td><code>flight/orbit/guide/</code>: <code>guide.html</code> and <code>build-guide.mjs</code>, which takes the screenshots and prints the PDF</td></tr>
   </table>
-  <p class="small soft">At commit 2638c37 the core's tests pass 203 of 203 natively and as WebAssembly, the page's 236 of 236. It is not a simulation of any real vehicle and claims no fidelity to one: in the README's words it "is fit for nothing but a look". Every number in it comes out of the physics or is written down as chosen.</p>
+  <p class="small soft">At commit 5d7e428 the core's tests pass 203 of 203 natively and as WebAssembly, the page's 241 of 241. It is not a simulation of any real vehicle and claims no fidelity to one: in the README's words it "is fit for nothing but a look". Every number in it comes out of the physics or is written down as chosen.</p>
 </section>
 
 <!-- ============================================================ 2 quick start -->
@@ -769,7 +768,7 @@
   <h2 id="core" data-toc>The core</h2>
   <p><code>flight/orbit/core</code> is C++17 that includes only <code>&lt;cmath&gt;</code>, <code>&lt;cstdint&gt;</code> and <code>&lt;cstring&gt;</code>: no engine, no clock, no random source, no thread, no file. It advances only in whole fixed steps of 0.02 s, fifty a second, by fourth-order Runge–Kutta in an Earth-centred inertial frame; the readouts are given in the site's east, north and up, turning with the Earth. Time is the step count. The same inputs give the same state, bit for bit, and a hash of the whole state (<code>oc_hash</code>) shows it. The crew, the approach, docking, the deck's landing and take-off and the flight home live inside it as modes that command only rates, throttle, thrusters, the swivel, gear and brakes, as a pilot does.</p>
   <div class="note">
-    <p><b>The same flight, every time.</b> <code>flight/orbit/build/orbit_run 10 760</code> flies the crew to 760 s and prints the flight every 10 s and a hash of the state. At 2638c37 the hash is <code>7b2cae00</code> natively (g++ 13.3 with glibc 2.39) and <code>03b21c18</code> as WebAssembly: each binary repeats itself bit for bit, and the two builds agree to every digit printed but not to the bit, since their C libraries' <code>sin</code> and <code>exp</code> differ in the last place. <code>orbit_fingerprint</code> prints the hash and every readout block's digest at 3,756 marks along twelve flights: built at two commits and diffed, it shows whether a change moved anything.</p>
+    <p><b>The same flight, every time.</b> <code>flight/orbit/build/orbit_run 10 760</code> flies the crew to 760 s and prints the flight every 10 s and a hash of the state. At 5d7e428 the hash is <code>7b2cae00</code> natively (g++ 13.3 with glibc 2.39) and <code>03b21c18</code> as WebAssembly: each binary repeats itself bit for bit, and the two builds agree to every digit printed but not to the bit, since their C libraries' <code>sin</code> and <code>exp</code> differ in the last place. <code>orbit_fingerprint</code> prints the hash and every readout block's digest at 3,756 marks along twelve flights: built at two commits and diffed, it shows whether a change moved anything.</p>
   </div>
 </section>
 
@@ -781,10 +780,10 @@
   <p>Each part beyond the flight is a module of its own listed in <code>features.js</code>, with the same few hooks: <code>init(ctx)</code> once; <code>command(name, ctx)</code> for a key or a button, true if it took it; <code>update(ctx)</code> each frame before drawing; <code>hud(ctx)</code> for more readout lines; <code>status(ctx)</code> for the status line; and <code>owns(ctx)</code> with <code>frame(ctx, dt)</code> for a part that draws the whole frame itself, as the walk does. A part reads the core's readouts and gives commands; none writes the flight's state. The page keeps a handle, <code>window.orbitSketch</code>, for tests and for tools such as this guide's: the core, the page's state, and <code>command(name)</code>.</p>
   <h2 id="tests" data-toc>The tests</h2>
   <table>
-    <tr><th>suite</th><th>how it runs</th><th class="n">at 2638c37</th></tr>
+    <tr><th>suite</th><th>how it runs</th><th class="n">at 5d7e428</th></tr>
     <tr><td>the core, natively</td><td><code>ctest</code> in <code>flight/orbit/build</code>: ten test programs, each test by name</td><td class="n">203 of 203</td></tr>
     <tr><td>the core, as WebAssembly</td><td>the same tests built by Emscripten 6.0.12 and run under node</td><td class="n">203 of 203</td></tr>
-    <tr><td>the page</td><td><code>node --test</code> over <code>web/test/*.test.mjs</code>: 35 files, most under node, a few driving the built page in headless Chromium through Playwright</td><td class="n">236 of 236</td></tr>
+    <tr><td>the page</td><td><code>node --test</code> over <code>web/test/*.test.mjs</code>: 36 files, most under node, a few driving the built page in headless Chromium through Playwright</td><td class="n">241 of 241</td></tr>
     <tr><td>the handoff kit's zip</td><td><code>node --test</code> over the packager's tests</td><td class="n">10, 1 skipped</td></tr>
   </table>
   <table class="tight">
@@ -879,7 +878,7 @@
   </ol>
   <p>Beyond the sketch, the larger plan is to carry the core into an Unreal Engine 5.8 project, which has not been started: section 6. The order there is decided by its own canon and the first slice, not by this list.</p>
   <div class="note">
-    <p><b>The state of the branch.</b> Everything is on <b>orbit-sketch</b>, ahead of master, in draft pull request 1. Nothing of the orbit sketch is merged into master. The A320 trainer and the flyable A320 are untouched by it. <code>flight/orbit/tools/standalone.mjs</code> can make the sketch a repository of its own, its history kept, on a branch beside this one; where that repository lives is the owner's to say, and nothing has been pushed.</p>
+    <p><b>The state of the branch.</b> Everything is on <b>orbit-sketch</b>, ahead of master, in draft pull request 1. Nothing of the orbit sketch is merged into master. The A320 trainer and the flyable A320 are untouched by it. <code>flight/orbit/tools/standalone.mjs</code> makes it a repository of its own, history kept: <b>runway-to-ring</b>, MIT, which passes its tests alone. Until the repository exists on GitHub, its history waits on the <b>orbit-standalone</b> branch.</p>
   </div>
 </section>
 
@@ -897,12 +896,12 @@
     <tr><td class="k">CANON_DELTA.md</td><td>what the sketch settles against the canon, each number with the test that shows it; where it departs; what it never touched; a section for each part, docking to the tour</td></tr>
     <tr><td class="k">UNREAL_PORT.md</td><td>part by part: what becomes a plugin around the existing core, what becomes actors, what Unreal gives for free and what it costs, the frames and units, performance tiers, VR</td></tr>
     <tr><td class="k">FIRST_SLICE.md</td><td>the walled-off first demo: who makes which asset, how MCP is used, the waves and gates, the exit tests, the step list for the local harness</td></tr>
-    <tr><td class="k">LICENSING.md</td><td>the licence, decided by the owner on 2026-11-21: MIT, and why that lets the core into an Unreal game</td></tr>
+    <tr><td class="k">LICENSING.md</td><td>the licence, decided: MIT</td></tr>
     <tr><td class="k">CLAUDE.md.template</td><td>house rules for the new repository</td></tr>
     <tr><td class="k">BOOTSTRAP_PROMPT.md</td><td>the first message for the local session, and why it is written as it is</td></tr>
     <tr><td class="k">VISION.md</td><td>the register, from the owner (21 November): the three films the idea grew from, the game in a sentence, and how its story meets the canon. The films are inspiration only; nothing is lifted from them</td></tr>
     <tr><td class="k">OPEN_RING_AIR.md</td><td>the owner's open Ring that holds its air by its spin, the size at which it works, and their other way: the air held to the deck by a rule of the world</td></tr>
-    <tr><td class="k">RING_AIR_SPEC.md</td><td>that other way, specified: the 5 km Ring open to space, its air one function (sea level to 30 m, a 20 m skin, vacuum from 50 m), the Elysium-style autoland on a curved glide path in the turning frame, its tests and the order to build it; the Bishop ring as an appendix</td></tr>
+    <tr><td class="k">RING_AIR_SPEC.md</td><td>that other way, specified, with its autoland</td></tr>
     <tr><td class="k">SOURCES.md</td><td>where every claim about Unreal, Cesium, Blender, Claude Code and the licences came from: read, only searched (unverified), or measured</td></tr>
   </table>
   <h3>The zip, and the first message</h3>
@@ -914,7 +913,7 @@ node --test flight/orbit/handoff/tools/package.test.mjs</pre>
 <section class="page" data-part="6 · The Unreal Engine plan">
   <h2 id="licence" data-toc>The licence, decided: MIT</h2>
   <p>The sketch was GPLv3, because everything in <code>flight/</code> is, by this repository's rule. Unreal Engine's EULA forbids combining the engine with GPL code, and the GPL wants the whole of a combined work under the GPL, which Epic's code cannot be. So the core, as GPLv3, could not go into a shipped Unreal game. But it was the owner's to relicense: it links no third-party GPL code (only <code>&lt;cmath&gt;</code>, <code>&lt;cstdint&gt;</code>, <code>&lt;cstring&gt;</code>), takes nothing from A32NX or JSBSim, and what it took from outside is method, public domain or CC0.</p>
-  <p>On 2026-11-21 the owner did: <b>MIT</b>, "and be done with it". <code>flight/orbit/LICENSE</code> carries it, <code>NOTICE.md</code> names what a built page carries of others' (three.js, Emscripten's runtime, musl, LLVM's libraries, dlmalloc), and every built page carries both at the top of its body. The standalone repository, <b>runway-to-ring</b>, has the same two files. <code>LICENSING.md</code> records the decision, the options that were open, and what was done.</p>
+  <p>On 2026-11-21 the owner did: <b>MIT</b>, "and be done with it". <code>LICENSE</code> carries it, <code>NOTICE.md</code> names what a built page holds of others' (three.js, Emscripten's runtime and libraries), and every built page carries both. <code>LICENSING.md</code> records the decision.</p>
   <p class="small soft">The kit says plainly that it is not legal advice.</p>
   <h2 id="slice" data-toc>The first slice</h2>
   <p>The smallest Unreal build in which you sit in the Shuttle (the canon's word for the craft) on 17C, take off, reach orbit, see the Ring, dock, and walk 100 m inside it, everything else walled off and saying so. It is built in waves, the owner's way from subsim: contracts first, a walking skeleton, parallel packets each with owner directories, mechanical gates (G0 to G9: clean builds, the contracts' hash, determinism at three frame rates, no binary asset in git outside an allow-list, budgets, screenshots looked at by someone other than the author, an independent reviewer), and the points where the owner looks.</p>
@@ -944,7 +943,7 @@ node --test flight/orbit/handoff/tools/package.test.mjs</pre>
   </table>
   <p>At the sketch's 5 km an open Ring holds no air at all: the spin's pull is too weak over so short a height, so the air would fill the wheel at three quarters of the floor's pressure and pour out of the open sides. That is why the sketch's Ring has a glazed roof and sealed walls, and why its deck is a vacuum behind bulkheads: the sketch is consistent as it stands. Done faithfully, the idea wants a <b>Bishop ring</b>, Forrest Bishop's 1997 concept: about 1,000 km in radius with walls about 200 km high and an open top. There the air reaches near-vacuum about 120 km above the floor, and <b>the deck landing becomes an entry</b>: the air turns with the floor at up to 3.1 km/s, so a craft coming down from near the axis meets it at up to Mach 9, brakes, heats and glows, then glides to the deck.</p>
   <p>The owner's other way (21 November): keep the Ring at 5 km and make the air a rule of the world, one atmosphere at the floor and almost none 50 m up. That is a scale height of 11 m, which weight would need about 780 g to hold, so the note names it as a field, not gravity. The co-rotating approach then stays in vacuum, and the air comes in the last tens of metres, in the hover. It trades physical truth for the same Ring and a short, cheap, dramatic last 50 m; its one risk is that the rule must be the same for everything.</p>
-  <p><b>Specified for the Unreal version</b> (<code>handoff/RING_AIR_SPEC.md</code>, 21 November, on the owner's word). The band open to space all round, as in <i>Elysium</i>. The air one function: ordinary air the spin holds up to 30 m, sea level to a person and to anything built under 25 m; then a 20 m skin where a field holds it, touching nothing but the air; vacuum from 50 m. The autoland comes in antispinward on a 6° glide path fixed in the turning frame, a steady turn about the Ring's axis seen from the stars, its pull rising from 0.39 g at the fix to 1 g over the pad, then converts as the F-35B does, through the skin into the air, to a hover and a vertical landing: about 200 s and 1.3 t of propellant from the hold point, against the least-propellant crew's 692 kg, which the tour can spare. Sixteen acceptance tests, and the order to build it, core first. The Bishop ring is its appendix. Nothing of either is built.</p>
+  <p><b>Specified for the Unreal version</b> (<code>handoff/RING_AIR_SPEC.md</code>). The band open to space; the air one function: what the spin holds up to 30 m, then a 20 m skin a field holds, vacuum from 50 m. The autoland flies a 6° glide path fixed in the turning frame, its pull rising from 0.39 g to 1 g, then converts as the F-35B does, through the skin, to a hover and a vertical landing: about 1.3 t from the hold point, which the tour can spare. Sixteen acceptance tests; the Bishop ring as its appendix. Not built.</p>
 </section>
 
 <!-- ============================================================ 7 picking it up -->
@@ -1016,7 +1015,7 @@ node --test flight/orbit/guide/build-guide.test.mjs  # its figures and screensho
     <tr><td>12:47–15:14</td><td>The page holds its frame rate, the Earth worked out at half size, fewer draws (1b8b6d6, merged d2ffd35).</td></tr>
     <tr><td>12:56–15:39</td><td>The third audit's fixes: D4, D5, the flight home flown again and kept clear of the Ring, pool 2030 (08375e6), the deck's oracle on an exact grid (216a350); merged at 2638c37.</td></tr>
     <tr><td>15:40–17:06</td><td>The guide refreshed at 2638c37 (8d6626a), and what its refresh found (d223597); the standalone repository given a lockfile, so that <code>npm ci</code> works there (297b108).</td></tr>
-    <tr><td>17:30–18:50</td><td>On the owner's answers: the sketch is MIT, every built page carrying its licence and notices (7eccaf8); the open Ring's air and the autoland into it, specified for the Unreal version (0086c70); the throttle on = and − alone, and thrust vectoring and a joystick on the list.</td></tr>
+    <tr><td>17:30–18:50</td><td>On the owner's answers: the sketch is MIT, every built page carrying its licence and notices (7eccaf8); the open Ring's air and the autoland into it, specified for the Unreal version (0086c70); the throttle on = and − alone, and thrust vectoring and a joystick on the list (5d7e428).</td></tr>
   </table>
 </section>
 
@@ -1105,7 +1104,7 @@ node --test flight/orbit/guide/build-guide.test.mjs  # its figures and screensho
       head.textContent = `Runway to Ring · ${page.dataset.part || ''}`;
       const foot = document.createElement('footer');
       foot.className = 'foot';
-      foot.innerHTML = '<span>The orbit sketch, a guide · 21 November 2026 · commit 2638c37</span><span class="folio"></span>';
+      foot.innerHTML = '<span>The orbit sketch, a guide · 21 November 2026 · commit 5d7e428</span><span class="folio"></span>';
       foot.querySelector('.folio').textContent = String(i + 1);
       page.append(head, foot);
     });
