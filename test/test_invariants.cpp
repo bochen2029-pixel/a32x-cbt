@@ -27,12 +27,15 @@
 // TEST: escape_periapsis
 // TEST: lift_from_the_windward_face
 // TEST: peg_plan_is_its_own
+// TEST: windy_ledger
+// TEST: wind_finite
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"
 #include "../core/orbit_return.h"
 #include "../core/orbit_walk.h"
+#include "../core/orbit_wind.h"
 #include "../core/internal.h"
 
 #include <algorithm>
@@ -126,17 +129,19 @@ bool raiseAboveTheAir() {
 // holds for the step: the drive along the nose, the air (README.md: lift across the wind in the plane
 // of symmetry, drag along it, a side force with sideslip), the small thrusters and the gear. Restated
 // here, through the core's own atmosphere and coefficients, so that a force the integrator applies and
-// this list does not know shows as a residual. A new force in the core's deriv() belongs here too.
+// this list does not know shows as a residual. A new force in the core's deriv() belongs here too. The air's
+// velocity is the craft's less the Earth's turn and the wind (wind.cpp), at time t.
 
 struct Forces {
     V3 thrust, air, rcs, gear;
     V3 total() const { return thrust + air + rcs + gear; }
 };
 
-Forces forcesOn(const oc::State& s) {
+Forces forcesOn(const oc::State& s, double t) {
     Forces f{{0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
     const double rm = oc::norm(s.r), mass = oc::M_DRY + s.prop;
-    const V3 vAir = s.v - oc::cross(V3{0, 0, oc::WE}, s.r);   // the air turns with the Earth
+    V3 vAir = s.v - oc::cross(V3{0, 0, oc::WE}, s.r);   // the air turns with the Earth
+    if (s.wind.strength > 0) vAir = vAir - oc::windAt(s.wind, s.r, t);   // and moves over it
     const V3 vb = oc::irot(s.q, vAir);
     const double tas = oc::norm(vb);
     if (tas > 0.5) {
@@ -182,6 +187,7 @@ struct Sum3 {
 // against the angular momentum.
 const double TAU = 0.25;
 const double ORDER = (H / TAU) * (H / TAU);
+double orderFor(double tau) { return (H / tau) * (H / tau); }
 
 struct Ledger {
     long steps = 0;
@@ -197,7 +203,7 @@ void ledgerStep(Ledger& L, const oc::State& before, const oc::State& after) {
     oc::State A = before;
     A.thr = after.thr; A.rcs = after.rcs; A.steer = after.steer; A.brake = after.brake; A.gear = after.gear;
     const oc::State& B = after;
-    const Forces fa = forcesOn(A), fb = forcesOn(B);
+    const Forces fa = forcesOn(A, A.n * H), fb = forcesOn(B, B.n * H);
     auto gravity = [](V3 r) { const double rm = oc::norm(r); return r * (-MU / (rm * rm * rm)); };
     // the midpoint: cubic Hermite in r and v (with the accelerations at the ends) and in q (with q'),
     // the mass flow being constant over a step
@@ -210,7 +216,7 @@ void ledgerStep(Ledger& L, const oc::State& before, const oc::State& after) {
                           (A.q.y + B.q.y) / 2 + (qa.y - qb.y) * H / 8, (A.q.z + B.q.z) / 2 + (qa.z - qb.z) * H / 8});
     M.w = (A.w + B.w) * 0.5;
     M.prop = (A.prop + B.prop) / 2;
-    const Forces fm = forcesOn(M);
+    const Forces fm = forcesOn(M, (A.n + 0.5) * H);
     auto simpson = [&](V3 Forces::*k) { return H / 6 * (oc::dot(fa.*k, A.v) + 4 * oc::dot(fm.*k, M.v) + oc::dot(fb.*k, B.v)); };
     const double pa = oc::dot(fa.total(), A.v), pm = oc::dot(fm.total(), M.v), pb = oc::dot(fb.total(), B.v);
     const double S = H / 6 * (pa + 4 * pm + pb), T = H / 2 * (pa + pb);
@@ -403,6 +409,47 @@ void ascentWorkEnergy() {
     CHECK(std::fabs(L.dE.s - (L.simpson.s - L.air.s)) > 100 * tolE, "the ledger without the air still closes: %.3e", L.dE.s - (L.simpson.s - L.air.s));
     CHECK(L.planted.s > 100 * tolE, "one micro-g along the track would do %.3e J/kg, bound %.3e", L.planted.s, tolE);
     std::printf("  without the air the ledger misses by %.3e J/kg; one micro-g unseen would add %.3e\n", L.dE.s - (L.simpson.s - L.air.s), L.planted.s);
+}
+
+// The same balance through a severe wind (strength 3): the air's work is reckoned on the craft's velocity
+// through the moving air, and the ledger still closes. The gusts change the forces as fast as the craft
+// passes the shortest of them, 25 m (wind.cpp's KMAX), so the bound's time scale is the shorter of the rate
+// loop's 0.25 s and 25 m over the fastest airspeed met under 25 km, where the gusts stop.
+void windyLedger() {
+    oc_reset(LAT, LON, HDG);
+    oc_wind(2, 3.0);
+    while (oc::g.gear) { oc_step(1); if (get(OC_CRASHED) > 0 || get(OC_T) > 200) { CHECK(false, "no take-off"); return; } }
+    Ledger L;
+    double fastest = 0;
+    while (get(OC_PHASE) != OC_PH_ORBIT || get(OC_THROTTLE) > 0) {
+        const oc::State before = oc::g;
+        oc_step(1);
+        ledgerStep(L, before, oc::g);
+        if (get(OC_ALT) < 25000) fastest = std::fmax(fastest, get(OC_TAS));
+        if (get(OC_CRASHED) > 0 || get(OC_T) > 1500) { CHECK(false, "no orbit"); return; }
+    }
+    const double tau = std::fmin(TAU, 25.0 / fastest);
+    const double tolE = orderFor(tau) * L.gap.s + roundingWalk(L.steps, L.eScale), tolH = orderFor(tau) * L.hGap.s + roundingWalk(L.steps, L.hScale);
+    std::printf("  in a severe wind, %ld steps: energy %+.6e J/kg = drive %+.6e + air %+.6e; residual %.2e J/kg (bound %.2e: tau %.3f s, %.0f m/s under 25 km)\n",
+                L.steps, L.dE.s, L.thrust.s, L.air.s, L.residual(), tolE, tau, fastest);
+    std::printf("  angular momentum moved %.6e m2/s; residual %.2e (bound %.2e)\n", oc::norm(L.dH.value()), L.hResidual(), tolH);
+    CHECK(std::fabs(L.residual()) <= tolE, "energy: residual %.3e J/kg, bound %.3e", L.residual(), tolE);
+    CHECK(L.hResidual() <= tolH, "angular momentum: residual %.3e m2/s, bound %.3e", L.hResidual(), tolH);
+    // and it can fail: reckoned on the velocity over the ground, as if there were no wind, it does not close
+    oc_reset(LAT, LON, HDG);
+    oc_wind(2, 3.0);
+    while (oc::g.gear) oc_step(1);
+    Ledger blind;
+    for (int i = 0; i < 6000; ++i) {
+        oc::State before = oc::g;
+        oc_step(1);
+        oc::State after = oc::g;
+        before.wind.strength = after.wind.strength = 0;
+        ledgerStep(blind, before, after);
+    }
+    const double tolBlind = orderFor(tau) * blind.gap.s + roundingWalk(blind.steps, blind.eScale);
+    std::printf("  blind to the wind, 120 s of the climb: residual %.3e J/kg against a bound of %.2e\n", blind.residual(), tolBlind);
+    CHECK(std::fabs(blind.residual()) > 10 * tolBlind, "blind to the wind, the ledger still closes: %.3e, bound %.3e", blind.residual(), tolBlind);
 }
 
 // The propellant used is the integral of the flow: thrust over exhaust speed, 36 kg/s at full thrust
@@ -715,6 +762,10 @@ unsigned digest() {
                         s.dock.cSpeed, s.dock.cOffset, s.dock.cSlide, s.dock.cAngle, s.dock.cRoll, s.dock.cRollRate, c.pitch, c.roll, c.yaw, c.throttle, c.tx, c.ty, c.tz, (double)c.gearDown, c.brake};
     unsigned h = 2166136261u;
     oc::hashDoubles(h, d, (int)(sizeof d / sizeof d[0]));
+    if (s.wind.strength > 0) {   // the wind, when there is one (with none, the digest is what it was before the wind)
+        const double w[] = {(double)s.wind.seed, s.wind.strength};
+        oc::hashDoubles(h, w, 2);
+    }
     return h;
 }
 
@@ -963,6 +1014,33 @@ void abuseFinite() {
           a.crashes, a.alive, escape);
 }
 
+void windOnTheRunway(Scan& scan) { oc_reset(LAT, LON, HDG); oc_wind(13, 3.0); oc_auto(OC_AUTO_OFF); scan(); }
+void windInTheAir(Scan& scan) { oc_reset(LAT, LON, HDG); oc_wind(13, 3.0); while (get(OC_T) < 60) { oc_step(1); scan(); } oc_auto(OC_AUTO_OFF); }
+
+// No readout of any block is ever NaN or infinite in a severe wind (strength 3): the crew's whole flight to
+// orbit, scanned every step, and a pilot who does everything wrong on the runway and in the air, through
+// crashes, as abuse_finite has it. The wind's own readouts are scanned with the rest.
+void windFinite() {
+    Scan scan;
+    oc_reset(LAT, LON, HDG);
+    oc_wind(13, 3.0);
+    while (get(OC_PHASE) != OC_PH_ORBIT) {
+        oc_step(1);
+        scan();
+        for (int i = 0; i < oc_wind_out_len(); ++i)
+            if (!std::isfinite(oc_wind_out()[i]) && !scan.bad) { scan.where = "oc_wind_out"; scan.index = i; scan.at = get(OC_T); ++scan.bad; }
+        if (get(OC_CRASHED) > 0 || get(OC_T) > 1500) { CHECK(false, "no orbit"); return; }
+    }
+    Abuse a;
+    a.run(windOnTheRunway, 30000);
+    a.run(windInTheAir, 30000);
+    std::printf("  the crew to orbit in a severe wind, %ld steps; abused in it, %ld steps, %ld crashes; %ld with a readout not finite\n", scan.steps, a.scan.steps,
+                a.crashes, scan.bad + a.scan.bad);
+    CHECK(scan.bad == 0, "%s[%d] not finite at %.2f s", scan.where, scan.index, scan.at);
+    CHECK(a.scan.bad == 0, "%s[%d] not finite at %.2f s, and %ld steps in all", a.scan.where, a.scan.index, a.scan.at, a.scan.bad);
+    CHECK(a.crashes > 0 && a.alive > 30000, "the abuse did not go where it says: %ld crashes, %ld steps alive", a.crashes, a.alive);
+}
+
 // The Ring's numbers are one set (orbit_core.h's OC_RING_* and OC_HUB_*, which web/test/core.test.mjs
 // holds the page's equal to), and they are the shape README.md describes: one g at the floor (ring-g),
 // a turn in 142 s (ring-turn), a roof 300 m over the floor, the hull outside it, the rim walls' inner edge
@@ -1009,6 +1087,18 @@ void hashCoversTheState() {
         std::printf("  %s: %08x and %08x now; %08x and %08x 40 s on\n", c.what, now[0], now[1], later[0], later[1]);
         CHECK(now[0] != now[1] || later[0] == later[1], "%s: equal hashes (%08x), then %08x and %08x", c.what, now[0], later[0], later[1]);
     }
+    // the wind (oc_wind), which decides the future only in the air: so a minute into the climb
+    unsigned now[2], later[2];
+    for (int branch = 0; branch < 2; ++branch) {
+        oc_reset(LAT, LON, HDG);
+        oc_step(3000);
+        if (branch == 1) oc_wind(4, 1.0);
+        now[branch] = oc_hash();
+        oc_step(2000);
+        later[branch] = oc_hash();
+    }
+    std::printf("  the wind (oc_wind), climbing: %08x and %08x now; %08x and %08x 40 s on\n", now[0], now[1], later[0], later[1]);
+    CHECK(now[0] != now[1] || later[0] == later[1], "the wind: equal hashes (%08x), then %08x and %08x", now[0], later[0], later[1]);
 }
 
 // A control that is not a number is refused, as the house rule refuses a write outside its range: the
@@ -1145,6 +1235,8 @@ const Test tests[] = {
     {"escape_periapsis", escapePeriapsis, false},
     {"lift_from_the_windward_face", liftFromTheWindwardFace, false},
     {"peg_plan_is_its_own", pegPlanIsItsOwn, false},
+    {"windy_ledger", windyLedger, false},
+    {"wind_finite", windFinite, false},
 };
 
 }   // namespace

@@ -1,7 +1,7 @@
 // internal.h — what the core's parts share: the maths, the craft's numbers, the state, and the laws a
 // crew mode flies through. Not an API: orbit_core.h, orbit_return.h, orbit_dock.h, orbit_deck.h,
-// orbit_fd.h and orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at the end,
-// which return.cpp, dock.cpp, deck.cpp and fd.cpp define. GPLv3.
+// orbit_fd.h, orbit_wind.h and orbit_walk.h are. orbit_core.cpp owns everything here but the feature hooks at
+// the end, which return.cpp, dock.cpp, deck.cpp, fd.cpp and wind.cpp define. GPLv3.
 
 #pragma once
 
@@ -109,6 +109,7 @@ struct Controls { double pitch, roll, yaw, throttle, tx, ty, tz; int gearDown; d
 #include "dock_state.h"     // oc::DockState: dock.cpp's own
 #include "return_state.h"   // oc::ReturnState: return.cpp's own
 #include "fd_state.h"       // oc::FdState: fd.cpp's own
+#include "wind_state.h"     // oc::WindState: wind.cpp's own
 
 namespace oc {
 
@@ -141,6 +142,7 @@ struct State {
     DockState dock;
     DeckState deck;
     FdState fd;
+    WindState wind;
 };
 
 struct Site { double lat, lon, hdg; V3 e, n, u, p0; };   // the start point, Earth-fixed
@@ -209,6 +211,7 @@ extern Aim aim;
 // readouts block and folds its state into the hash.
 
 void returnReset(State& s);                                    // at oc_reset
+int returnRefusal(const State& s);                             // OC_RET_NO_*: why oc_auto(OC_AUTO_RETURN) may not start here; 0 if it may
 void returnEngage(State& s);                                   // oc_auto(OC_AUTO_RETURN)
 void returnCrew(State& s, const Local& L, double* throttle);   // a step's commands, flying home
 void returnAfterStep(State& s);                                // after each step, whoever flies
@@ -248,6 +251,15 @@ void fdBefore(State& s, const Local& L);
 void fdAfter(State& s, const Local& L, double throttle);
 void fdWriteOut(const State& s, double* out);   // its readouts, the last of oc_out's
 void fdHash(const State& s, unsigned& h);
+// wind.cpp: the wind (orbit_wind.h). windAt is the air's velocity over the turning Earth at r (ECI) and t,
+// in ECI axes, nil with the wind off; orbit_core.cpp takes it off the craft's velocity where the air pushes
+// (localOf, deriv) and nothing else reads it: the crew learns the wind from its instruments. windCalls
+// counts its evaluations, for tests; nothing in flight reads it.
+V3 windAt(const WindState& w, V3 r, double t);
+void windReset(State& s);
+void windWriteOut(const State& s);
+void windHash(const State& s, unsigned& h);   // folds nothing in with the wind off, so the hash is what it was
+extern long long windCalls;
 
 void writeOut();   // orbit_core.cpp: every readouts block, from the state as it stands
 

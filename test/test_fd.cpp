@@ -191,12 +191,15 @@ void takesUpTheFlightHome() {
     oc_reset(LAT, LON, HDG);
     while (get(OC_T) < 800) oc_step(50);
     oc_auto(OC_AUTO_RETURN);
-    const double at[] = {4000, 5500, 6900, 7700};
+    // in the coast, the entry and the terminal glide by the clock; on final 30 s after the approach begins
+    // (by the phase, since how soon the crew reaches its final depends on the flight home's guidance)
+    double at[] = {4000, 5500, 6900, 1e30};
     int k = 0;
     long mirrored = 0, mirrorApart = 0;
     while (k < 4 && get(OC_T) < 9000 && get(OC_CRASHED) == 0) {
         oc_step(1);
         const int ph = (int)ret(OC_RET_PHASE);
+        if (ph == OC_RET_PH_APPROACH && at[3] > 1e29) at[3] = get(OC_T) + 30;
         if (ph >= OC_RET_PH_COAST && ph <= OC_RET_PH_FLARE) {   // the crew's own, read out as the director's
             ++mirrored;
             if (get(OC_FD_VALID) != 1 || get(OC_FD_PHASE) != OC_FD_PH_ORBIT + ph || std::fabs(get(OC_FD_LIFT_BANK_DEG) - ret(OC_RET_BANK_CMD_DEG)) > 1e-9 ||

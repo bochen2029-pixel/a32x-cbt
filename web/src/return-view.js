@@ -6,17 +6,25 @@
 // Everything shown comes from the core's readouts; nothing here flies. GPLv3.
 
 import * as THREE from 'three';
+import { DOCK } from './dock-hud.js';
 import { fmtDistance } from './hud.js';
 
 // The readouts, orbit_return.h's OC_RET_* in its order (a test reads the header to hold the two equal).
 export const RET_OUT = [
   'phase', 'event', 'tEvent', 'range', 'cross', 'togo', 'bankCmd', 'alphaCmd', 'miss', 'reversals', 'dv', 'passes',
   'heat', 'heatPeak', 'heatLoad', 'temp', 'glow', 'load', 'loadPeak', 'qbarPeak', 'over', 'glideDev',
-  'touched', 'tdSink', 'tdAlong', 'tdOff', 'tdSpeed', 'tdPitch', 'tdT', 'stopped', 'stopAlong', 'stopOff', 'propUsed',
+  'touched', 'tdSink', 'tdAlong', 'tdOff', 'tdSpeed', 'tdPitch', 'tdT', 'stopped', 'stopAlong', 'stopOff', 'propUsed', 'refused',
+  'windE', 'windN', 'reach', 'skipped', 'tdCrab', 'lowered',
 ];
 export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5, terminal: 6, approach: 7, flare: 8, rollout: 9, stopped: 10 };
-export const RET_EV = { none: 0, clear: 1, burn: 2, burnEnd: 3, interface: 4, terminal: 5, touchdown: 6 };
+export const RET_EV = { none: 0, clear: 1, burn: 2, burnEnd: 3, interface: 4, terminal: 5, touchdown: 6, lower: 7 };
 export const LIMITS = { heat: 600000, load: 2.5, qbar: 20000 };   // OC_RET_HEAT_LIMIT, _LOAD_LIMIT, _QBAR_LIMIT
+export const NEAR_RING = 9000;   // m, OC_RET_NEAR_RING_M: nearer the Ring's centre the crew backs away first
+export const RET_NO = { none: 0, deck: 1, riding: 2 };   // OC_RET_NO_*: why RETURN was refused
+const REFUSED = {
+  [RET_NO.deck]: 'On the deck: take off and clear the Ring first',
+  [RET_NO.riding]: 'Riding with the Ring: the crew flies home from clear of it, or from at rest by it',
+};
 const SKIP_UNTIL = 60;   // s before the burn: the skip stops, so the turn's end and the burn are seen
 
 // A wait, as a clock reads it: hours and minutes when long, minutes and seconds, seconds.
@@ -35,9 +43,12 @@ export function fmtSide(m) {
 }
 
 // May the flight home start? From orbit, or taken back on the way down; not from the runway, nor on the
-// climb to orbit.
-export function canReturn(s, r) {
+// climb to orbit; and, as the core refuses it, not on the Ring's deck (deck: its readouts, when the page
+// has them) nor near the Ring moving past it faster than docking would close, riding with the deck.
+export function canReturn(s, r, deck) {
   if (s.crashed > 0) return { ok: false, why: 'The craft has crashed' };
+  if (deck && deck.onDeck > 0.5) return { ok: false, why: REFUSED[RET_NO.deck] };
+  if (s.ringRange < NEAR_RING && Math.hypot(s.vrelE, s.vrelN, s.vrelU) > DOCK.engageSpeed) return { ok: false, why: REFUSED[RET_NO.riding] };
   if (s.peri > 150000) return { ok: true };
   if (r.phase > RET_PH.none && !(s.onGround > 0.5 && r.stopped > 0)) return { ok: true };   // taken back on the way home
   if (s.onGround < 0.5 && s.vs < 0 && s.alt > 20000) return { ok: true };                    // falling from orbit already
@@ -49,7 +60,8 @@ export function skipDone(r, auto, AUTO) {
   if (auto !== AUTO.return) return 'handed back';
   const ph = Math.round(r.phase);
   if (ph !== RET_PH.wait && ph !== RET_PH.depart) return 'past the wait';
-  if (ph === RET_PH.wait && Math.round(r.event) !== RET_EV.burn) return 'no pass in reach';
+  const ev = Math.round(r.event);
+  if (ph === RET_PH.wait && ev !== RET_EV.burn && ev !== RET_EV.lower) return 'no pass in reach';
   if (ph === RET_PH.wait && r.tEvent < SKIP_UNTIL) return 'the burn is near';
   return null;
 }
@@ -65,6 +77,10 @@ export function returnStatus(r, s, { touch = false, skipping = false } = {}) {
     case RET_PH.depart:
       return { line: `HOME · LEAVING THE RING · clear in ${fmtWait(r.tEvent)}`, hint: skipping ? 'skipping ahead…' : `${k.skip} · ${k.take}` };
     case RET_PH.wait:
+      if (Math.round(r.event) === RET_EV.lower) {   // from an orbit far from round: its top lowered first
+        if (skipping) return { line: `HOME · SKIPPING · round off in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
+        return { line: `HOME · ROUNDING OFF FIRST · in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
+      }
       if (Math.round(r.event) !== RET_EV.burn) return { line: 'HOME · NO PASS WITHIN REACH YET', hint: `the crew looks again every 10 min · ${k.take}` };
       if (skipping) return { line: `HOME · SKIPPING · the burn in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
       return { line: `HOME · WAITING · the burn in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
@@ -111,12 +127,21 @@ export function returnHud(r, s, narrow = false) {
     const miss = r.miss >= 0 ? `+${fmtDistance(r.miss)}` : `−${fmtDistance(-r.miss)}`;
     lines.push(`GUIDE bank ${r.bankCmd >= 0 ? 'R' : 'L'} ${Math.abs(r.bankCmd).toFixed(0)}°   α ${r.alphaCmd.toFixed(0)}°   ${Math.round(r.reversals)} reversals   gate ${miss}`);
   }
+  if (!narrow && ph === RET_PH.wait && Math.round(r.event) === RET_EV.lower) {
+    lines.push(`PLAN first round the orbit off: ${r.dv.toFixed(0)} m/s at its lowest point in ${fmtWait(r.tEvent)}, then a pass`);
+  }
   if (!narrow && (ph === RET_PH.wait || ph === RET_PH.depart) && Math.round(r.event) === RET_EV.burn) {
-    lines.push(`PLAN de-orbit ${r.dv.toFixed(0)} m/s in ${fmtWait(r.tEvent)}   ${Math.round(r.passes)} passes let go`);
+    const margin = r.skipped > 0 ? ` (${Math.round(r.skipped)} short of margin)` : '';
+    lines.push(`PLAN de-orbit ${r.dv.toFixed(0)} m/s in ${fmtWait(r.tEvent)}   ${Math.round(r.passes)} passes let go${margin}   reach ${fmtDistance(r.reach)}`);
   }
   if (ph === RET_PH.approach || ph === RET_PH.flare) {
     const dev = r.glideDev;
     lines.push(`GLIDE ${Math.abs(dev).toFixed(0)} m ${dev >= 0 ? 'above' : 'below'} the 3° path`);
+  }
+  const wind = Math.hypot(r.windE || 0, r.windN || 0);
+  if (!narrow && ph >= RET_PH.terminal && ph <= RET_PH.flare && wind > 0.5) {   // the wind the crew has worked out: where it blows from
+    const from = Math.round(((Math.atan2(-r.windE, -r.windN) * 180) / Math.PI + 360) % 360);
+    lines.push(`WIND ${String(from).padStart(3, '0')}° ${wind.toFixed(0)} m/s, as the crew reckons it from air data`);
   }
   if (r.touched > 0) {
     const off = `${Math.abs(r.tdOff).toFixed(1)} m ${r.tdOff >= 0 ? 'right' : 'left'}`;
@@ -371,7 +396,7 @@ export const ret = {
     }
     if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say('Home, stopped on 17C: Backspace starts again'); return true; }
     if (auto === ctx.AUTO.return) { ctx.say('The crew is flying home: Space takes the controls'); return true; }
-    const may = canReturn(s, r);
+    const may = canReturn(s, r, ctx.core.deck);
     if (!may.ok) { ctx.say(may.why); return true; }
     let words = 'The crew flies home to KDFW 17C';
     if (docked(ctx.core)) {
@@ -380,6 +405,7 @@ export const ret = {
     }
     ctx.core.auto(ctx.AUTO.return);
     ctx.core.read();
+    if (Math.round(ctx.core.s.auto) !== ctx.AUTO.return) { ctx.say(REFUSED[Math.round(r.refused)] || 'The flight home cannot start here'); return true; }
     ctx.say(words);
     this.skipping = false;
     this.announce = Math.round(r.phase) === RET_PH.wait;   // the plan is made on the core's next step: say it then
@@ -392,6 +418,7 @@ export const ret = {
     if (this.announce && core.s.t > this.engagedAt && Math.round(r.phase) === RET_PH.wait && Math.round(core.s.auto) === ctx.AUTO.return) {
       this.announce = false;
       if (Math.round(r.event) === RET_EV.burn) ctx.say(`The crew flies home to KDFW 17C: the de-orbit burn in ${fmtWait(r.tEvent)}`);
+      else if (Math.round(r.event) === RET_EV.lower) ctx.say(`No pass soon from an orbit this far from round: the crew lowers its top first, in ${fmtWait(r.tEvent)}`);
       else ctx.say('No pass within reach from this orbit yet: the crew waits and looks again');
     } else if (Math.round(r.phase) !== RET_PH.wait) this.announce = false;
     if (this.skipping) {

@@ -70,14 +70,15 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 | the crew's approach | 729 s to the hold point, 300 m off the hub's port, on the small thrusters |
 | one revolution | 5,669 s, Kepler's period for the orbit to 0.02 s |
 | the crew docks, from orbit (`test_return`'s `lands_after_undocking`) | at the hub's port at 1,807 s |
-| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,868 s: 432 m past the threshold, 0.07 m off the centreline, sinking 0.74 m/s |
+| home from the port: let go at 1,817 s, the return engaged at once | the burn at 2,726 s (125 m/s), on 17C at 7,652 s: 437 m past the threshold, 0.02 m off the centreline, sinking 0.73 m/s |
 
 ## What is in it
 
 | part | how | from |
 |---|---|---|
 | the Earth | a sphere of 6,371 km, its gravity a point mass's, turning once a sidereal day; the ground level to the local plumb line, so a parked craft stays parked | ours |
-| the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %). No wind | the standard's, to 86 km; ours above |
+| the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %) | the standard's, to 86 km; ours above |
+| the wind | none unless set (`oc_wind`, "The wind" below): a field of height, place and time from a seed, the mean wind of MIL-F-8785C's log law near the ground up to a jet stream 10 to 12 km up, and von Kármán's gusts at that specification's intensities and lengths | MIL-F-8785C; von Kármán; Kraichnan's random Fourier modes |
 | the craft | 60 t, half of it propellant; a delta lifting body, 150 m², 18 m span; Polhamus's lift for a slender delta, blending to Newtonian impact from Mach 1.5 to 5; static and damping derivatives; three gear legs | ours; Polhamus's method |
 | the drive | 1.2 × the take-off weight, 706 kN, at 2,000 s of specific impulse: **the one fiction**. At 450 s, the best of chemical rockets, half the craft's mass in propellant would buy 3 km/s, a third of what orbit takes. Thrust follows the throttle with a 0.4 s lag | ours |
 | control | a rate loop by dynamic inversion, inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give | ours |
@@ -96,7 +97,7 @@ holding off its hub reads about 0.7 m/s there.
 The core is one program in parts, each with its own header, readouts and tests: `core/orbit_core.cpp`
 (the flight, the crew to orbit, the approach), `return.cpp` (the flight home), `dock.cpp` (docking and
 contact with the Ring), `deck.cpp` (the flight deck, and the craft as a jet), `fd.cpp` (the flight
-director), `walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
+director), `wind.cpp` (the wind), `walk.cpp` (a person inside the Ring); `internal.h` is what they share. The
 page is the same: `web/src/main.js` flies and draws, and each further part is a module of its own
 (`web/src/features.js` lists them and says what each may do). The Ring's shape is one set of numbers,
 in `orbit_core.h`, that the core and the drawing both use.
@@ -322,6 +323,45 @@ keep the walker out), shadows of the blocks, the spokes and the hub on the floor
 the hatch, the Earth's tide across the ring (six parts in ten thousand of a g). The Earth's light is in:
 where the Earth stands above the floor's level, the band takes a soft blue light from its sunlit part.
 
+### The wind
+
+The air has its own motion over the turning Earth only when a wind is set: `oc_wind(seed, strength)`
+(`orbit_wind.h`, `core/wind.cpp`), kept through everything but a reset. The seed picks the day; the
+strength scales the whole field, 1 being MIL-F-8785C's light day (15 knots 20 ft up), 2 its moderate (30),
+3 its severe (45). `orbit_core.cpp` takes the wind off the craft's velocity wherever the air's push is
+reckoned, so it moves every aerodynamic force and moment and every readout made from the airspeed; nothing
+else reads it, and the crews learn it from their instruments or not at all.
+
+- **The mean wind.** Up to 1,000 ft, the specification's log law, W20 ln(h / z₀) / ln(20 ft / z₀) with
+  z₀ = 0.15 ft, veering with height through 25° as an Ekman layer does, from the surface wind to the wind
+  above it, which may come from anywhere. Above, a smooth climb to a westerly jet stream's core 10 to 12 km
+  up (30 m/s at strength 1, give or take 30 %), 30 % of it 8 km higher, an upper wind of 15 m/s from 35 to
+  80 km, and nothing from 100 km; its speed and direction wander round the world and through the days, as
+  the westerlies' long waves do.
+- **The gusts.** Von Kármán's isotropic turbulence, at the specification's intensities and lengths by
+  height: near the ground σ_w = 0.1 W20 with L_w the height, and the level gusts stronger and longer by its
+  formulae; from 2,000 ft L = 2,500 ft and σ = 0.1 W20, fading from 15 km to nothing at 25 km. The field
+  is a sum of 120 random Fourier modes (Kraichnan's method) in 40 shells from 30 km to 25 m, each turning
+  slowly in time at its eddies' rate; shorter gusts the craft's own size averages out. Sampled along any
+  straight path it has von Kármán's longitudinal spectrum along the path and the transverse across it.
+
+From the tests (`test/test_wind.cpp`; `invariants.windy_ledger`, `invariants.wind_finite`):
+
+| | |
+|---|---|
+| no wind (the default, or a strength of 0) | the field never evaluated; every hash and readout as before the wind existed, bit for bit, natively and as WebAssembly (`INVARIANTS.md`, O16) |
+| the mean wind near the ground | the log law to 5 × 10⁻¹¹; the veer from 20 to 1,000 ft 11.11°, as the law's share of the 25° says |
+| the jet, 50 seeds over KDFW | the strongest wind from 1 to 30 km between 10.0 and 12.0 km up, 17 to 47 m/s; the steepest shear above 300 m 0.008 s⁻¹ |
+| the gusts 8 km up, 48 seeds, octaves from 1.6 km to 50 m | within 12 % of the field's own spectrum along and across; down to 100 m within 7 % of MIL-F-8785C's von Kármán, and 95 % off Dryden's in the shortest octave; variance 0.97, 1.00, 1.02 of (0.1 W20)² |
+| the gusts 50 ft up, 48 seeds | σ_w 1.006 of 0.1 W20; σ_u 1.853 of it, the specification's 1.839 |
+| parked in a 13 m/s wind | the airspeed reads the air's speed past the craft exactly; the craft rocks on its gear at 1 cm/s |
+| still air at v − w against the wind at v | the same push, to 2 × 10⁻¹⁴ |
+| the crew to orbit through three severe days, 12 to 28 m/s on the runway | 748 to 754 s, 500.4 to 500.5 × 499.6 to 499.7 km: as in still air (753 s, 500.4 × 499.7) within 5 s and 0.1 km |
+| the ascent's work and energy in a severe wind | the ledger closes to 4.4 × 10⁻⁵ J/kg; reckoned on the velocity over the ground instead, it misses by 7 × 10⁵ |
+
+The field's numbers are the specification's where it gives them and this sketch's elsewhere (the jet, the
+upper wind, the Ekman turn's size, the wander); it describes no real day's weather.
+
 ### The flight home
 
 **RETURN** (R) hands the craft to the crew to fly home to KDFW 17C from wherever it is in orbit: the
@@ -331,6 +371,13 @@ runway can be reached, burns tail first, falls to the air, flies the entry nose 
 round a circle onto a long final from the north, and lands under power. The wait can be most of a day:
 **RETURN** again, or TO ORBIT, skips ahead to a minute before the burn. Space takes the controls at any
 point and gives them back; the crew picks the flight home up from wherever the craft is.
+
+It is refused, and whoever was flying flies on, on the Ring's deck and within 9 km of the Ring's centre
+while the craft moves past it faster than 50 m/s in the frame turning with its orbit, as it does riding
+with the deck: its way out, backing away on the small thrusters, is for a craft at rest by the Ring (from
+the deck it put the belly on the deck in 0.6 s). On the Ring's far side the way out keeps 600 m from the
+axis until 1 km out along it, clear of the hub's solar mast, its arrays and the radiators the page draws
+there, which the core does not collide with.
 
 How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
 throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the
@@ -388,7 +435,12 @@ at 99 to 100 m/s, and stops 2.1 km down the runway on its centreline. Peak dynam
 9.4 kPa. The tests also start it from six times round the day, from a lowered orbit, with the pilot
 taking the controls in the entry, the glide and on final and giving them back, and with the
 guidance's model wrong at the corners of the box below. They check that the same inputs give the same
-flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g).
+flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g). In still air with its
+instruments exact the guidance promises more than a landing, and these tests hold it to that: the wheels
+300 to 600 m past the threshold, sinking 0.5 to 1.0 m/s (the flare's aim and twice it), and within 0.3 m
+of the centreline (the final's lateral law, 0.012 s⁻² stiff, leaves 0.3 m for a side push of 3.6 mm/s²,
+under half the Earth's turn's 8 mm/s² it feeds forward). Looser, they let through an approach that never
+learned its coefficients (264 and 727 m, 1.57 and 0.16 m/s) and one blind to the Earth's turn (0.62 m).
 
 **Robustness.** The guidance's model of the air and the craft made wrong while the craft flies the
 core's own (`oc_return_model_error`): the density off by a factor and a wave of 12 km in height, the
@@ -814,7 +866,7 @@ certified in `evidence/`):
 | the same person, the throttle full until its cue says shut | 572.0 × 499.1 km: the cue's taper is what puts the orbit at the Ring's height |
 | the flight home, the crew's from the insertion orbit until the person takes it, who also leads the cue by 0.4 s and brakes once down | taken waiting for the pass (the burn by hand too), falling to the air, or on final: **down 310 to 311 m past the threshold, 0.10 m off the centreline**, sinking 3.8 to 3.9 m/s at 106 m/s, stopped 2.25 km down the runway 0.2 m off; heat 387 to 438 kW/m², 1.63 to 1.96 g, 9.5 kPa at most. The crew's own: 432 m, 0.07 m, 0.74 m/s |
 | the same, without the lead, taken falling to the air | down 305 m past, 0.10 m off, but 4.87 m/s and 2.70 g: past the load's 2.5 g limit |
-| the crew's own final into 17C | within 0.021 dot of the localizer and 0.020 dot of the glide slope from 12 km to 1 km out |
+| the crew's own final into 17C | the localizer within 0.008 dot from 12 km to 1 km out; the glide slope met 8.7 km out (within 0.8 dot before it, rolling out of the unpowered turn onto the final) and held within 0.047 dot to 1 km |
 
 The check on the person is 10 km at either end of the orbit, 0.3° of inclination, 5° of each cue where it
 moves smoothly; where a cue steps (a new phase, the turn's bank, the insertion's first pitch) the 5 s after
@@ -850,7 +902,8 @@ where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists t
 
 ## What is not
 
-The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Wind. The
+The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Weather but the
+wind: no cloud, rain or shear of a front, and the wind does not change the air's density or temperature. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
 
 ## Handoff to Unreal
@@ -890,7 +943,9 @@ without the document's skeleton, for a host that wraps a page in its own.
 
 Each part's tests are `test/test_<part>.cpp`, and ctest runs each test by the name it declares in a line
 reading `// TEST: <name>` (`ctest -R dock` runs docking's). `flight/orbit/build/orbit_run 10 900` prints
-the crew's flight every 10 s for 900 s.
+the crew's flight every 10 s for 900 s. `flight/orbit/build/orbit_fingerprint` prints the state's hash and
+every readout block's digest at 3,756 marks along twelve flights: built at two commits and diffed, it shows
+whether a change moved anything (`INVARIANTS.md`, O16).
 `web/data/land.js` is made by `node flight/orbit/web/tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>`.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
