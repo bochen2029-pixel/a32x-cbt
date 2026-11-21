@@ -111,20 +111,20 @@ export const STAGES = {
     next: (s, m) => (m.wall > 15 ? 'deck' : null),
   },
   // Back aboard and let go of the port, the crew lands on the flight deck: out over the open sector, a coast
-  // while the pad comes round, then the approach the owner pictured from Elysium, an airliner's glide path
-  // down a runway that is the inside of a wheel, the drive swivelling down as the weight comes on, and a
-  // hover onto the pad.
+  // while the pad comes round, then the approach the owner pictured from Elysium, one burn down the crew's
+  // plan through the roof's gap that takes up the deck's speed, the drive swivelling down as the weight comes
+  // on, and a hover onto the pad.
   deck: {
     enter: { walk: 'stop', view: 'chase', commands: ['dock', 'deck'], warp: 100 },
     title: 'The flight deck',
     warp: (s) => (s.deckPhase === DECK_PH.glide ? 5 : s.deckPhase === DECK_PH.hover || s.deckPhase === DECK_PH.descend ? 2 : s.deckPhase === DECK_PH.landed ? 1 : 100),
     text(s) {
       switch (s.deckPhase) {
-        case DECK_PH.glide: return `The approach: an airliner's glide path down a runway that is the inside of a wheel, ${Math.abs(s.deckAlong).toFixed(0)} m/s against the deck, the drive swivelled ${s.nozzle.toFixed(0)}° down as the weight comes on: ${s.deckG.toFixed(2)} g.`;
+        case DECK_PH.glide: return `The final burn, down through the roof's gap onto a runway that is the inside of a wheel: ${Math.abs(s.deckAlong).toFixed(0)} m/s against the deck, the drive swivelled ${s.nozzle.toFixed(0)}° down as the weight comes on: ${s.deckG.toFixed(2)} g.`;
         case DECK_PH.hover: return `Zero-zero over the pad, ${s.deckHeight.toFixed(0)} m up, at the Ring's one g.`;
         case DECK_PH.descend: return `Down onto the pad: ${s.deckHeight.toFixed(1)} m.`;
         case DECK_PH.landed: return `On the pad. Sinking ${s.deckSink.toFixed(2)} m/s at the touch, ${Math.abs(s.deckOff).toFixed(1)} m from its centre; held down by the spin alone.`;
-        case DECK_PH.wait: return 'Coasting, weightless, while the deck sweeps by at 221 m/s and the pad comes round.';
+        case DECK_PH.wait: return 'Coasting, weightless, while the deck turns below at 221 m/s and the pad comes round.';
         default: return 'Letting go of the port, the crew flies out over the flight deck, the open sector of the band between two spokes.';
       }
     },
