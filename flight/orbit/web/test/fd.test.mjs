@@ -213,21 +213,28 @@ test('the crew flying home comes down the middle of the ILS, and the director re
     core.auto(AUTO.return);
     while (r.phase < RET_PH.approach && s.t < 9000 && s.crashed === 0) s = core.step(500);
     assert.equal(r.phase, RET_PH.approach, 'on the approach');
-    let samples = 0, worstLoc = 0, worstGs = 0, director = 0;
+    // On final, 12 km to 1 km out, on the centreline: the localizer held throughout; the glide slope met
+    // well out and held from there down to 1 km. Before it is met the craft is never off the scale: since
+    // the flight home of 2026-11-21 glides round its turn without power, it rolls out within a dot of the
+    // slope (a fifth of a dot high, then three quarters low as the drive takes over) and meets it 8.7 km out.
+    let samples = 0, worstLoc = 0, worstGs = 0, director = 0, capturedAt = null, offBefore = 0;
     while (r.phase === RET_PH.approach && s.crashed === 0) {
       s = core.step(25);
       const dev = ilsDeviation(g, [s.siteE, s.siteN, s.siteU], s.alt);
-      // on final, 12 km to 1 km out: on the centreline, not on the turn onto it
       if (dev.along > -1000 || dev.along < -12000 || Math.abs(dev.right) > 300 || r.phase !== RET_PH.approach) continue;
       samples += 1;
       worstLoc = Math.max(worstLoc, Math.abs(dev.loc.dots));
-      worstGs = Math.max(worstGs, Math.abs(dev.gs.dots));
+      if (capturedAt === null && Math.abs(dev.gs.dots) < 0.05) capturedAt = -dev.along;
+      if (capturedAt === null) offBefore = Math.max(offBefore, Math.abs(dev.gs.dots));
+      else worstGs = Math.max(worstGs, Math.abs(dev.gs.dots));
       assert.ok(dev.loc.valid && dev.gs.valid && ilsShown(s, dev, g), `received ${-dev.along} m out`);
       director += s.fdValid === 1 && s.fdPhase === FD_PH.approach && s.fdGear === (dev.along > -9000 ? 1 : s.fdGear);
     }
-    t.diagnostic(`${samples} samples on final, 12 km to 1 km out: the localizer within ${worstLoc.toFixed(4)} dot, the glide slope ${worstGs.toFixed(3)}`);
+    t.diagnostic(`${samples} samples on final, 12 km to 1 km out: the localizer within ${worstLoc.toFixed(4)} dot; the glide slope met ${(capturedAt / 1000).toFixed(1)} km out, then within ${worstGs.toFixed(3)} dot; before, within ${offBefore.toFixed(3)}`);
     assert.ok(samples > 100, `${samples} samples on final`);
     assert.ok(worstLoc < 0.05, `the localizer within ${worstLoc} dot`);
-    assert.ok(worstGs < 0.1, `the glide slope within ${worstGs} dot`);
+    assert.ok(capturedAt !== null && capturedAt > 7000, `the glide slope met ${capturedAt} m out`);
+    assert.ok(offBefore < 1, `before it, within a dot of it: ${offBefore.toFixed(3)}`);
+    assert.ok(worstGs < 0.1, `then the glide slope within ${worstGs} dot`);
     assert.equal(director, samples, 'the director read out the approach all the way');
   });

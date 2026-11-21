@@ -124,7 +124,8 @@ Local localOf(const State& s) {
     L.heading = std::atan2(dot(xb, L.east), dot(xb, L.north));
     L.pitch = std::asin(clampd(dot(xb, L.up), -1, 1));
     L.roll = std::atan2(-dot(yb, L.up), -dot(zb, L.up));
-    const V3 vAir = s.v - cross(V3{0, 0, WE}, s.r);
+    V3 vAir = s.v - cross(V3{0, 0, WE}, s.r);
+    if (s.wind.strength > 0) vAir = vAir - windAt(s.wind, s.r, timeOf(s));   // the air's own motion (wind.cpp)
     L.vAirBody = irot(s.q, vAir);
     L.tas = norm(vAir);
     L.air = atmosphere(L.alt);
@@ -237,7 +238,8 @@ Deriv deriv(const State& s, double t, V3 r, V3 v, Q q, V3 w, double prop) {
     V3 mom = s.torque;
 
     // the air
-    const V3 vAir = v - cross(V3{0, 0, WE}, r);
+    V3 vAir = v - cross(V3{0, 0, WE}, r);
+    if (s.wind.strength > 0) vAir = vAir - windAt(s.wind, r, t);   // the air's own motion at the stage (wind.cpp)
     const V3 vb = irot(q, vAir);
     const double tas = norm(vb);
     V3 fBody{0, 0, 0};
@@ -675,6 +677,7 @@ void writeOut() {
     returnWriteOut(s);
     dockWriteOut(s);
     deckWriteOut(s);
+    windWriteOut(s);
 }
 
 // FNV-1a over the doubles that are the state, then the features' own; the flight director's apart (oc_hash)
@@ -690,6 +693,7 @@ unsigned flightHash() {
     returnHash(g, h);
     dockHash(g, h);
     deckHash(g, h);
+    windHash(g, h);   // nothing with the wind off
     return h;
 }
 
@@ -713,6 +717,7 @@ void oc_reset(double lat_deg, double lon_deg, double heading_deg) {
     dockReset(g);
     deckReset(g);
     fdReset(g);
+    windReset(g);   // no wind: oc_wind sets one
     hands.gearDown = 1;
     hands.brake = 1;
     const V3 fwd = site.e * std::sin(site.hdg) + site.n * std::cos(site.hdg);
@@ -750,6 +755,11 @@ void oc_auto(int mode) {
         const double t = timeOf(g);
         const V3 d = g.r - ringPos(t), passing = g.v - ringVel(t) - cross(ring.normal * ring.rate, d);
         if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
+    }
+    // The flight home is refused on the Ring's deck and riding with it (return.cpp): who was flying flies on.
+    if (mode == OC_AUTO_RETURN) {
+        g.ret.refused = returnRefusal(g);
+        if (g.ret.refused) { writeOut(); return; }
     }
     const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK;
     fdHanded(g, g.autoMode);   // the flight director takes up the guidance afresh (fd.cpp)
