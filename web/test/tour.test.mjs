@@ -177,3 +177,8 @@ test('the climb remembers Mach 1 and the most dynamic pressure', () => {
   assert.match(last, /through Mach 1 at 7\.0 km/);
   assert.match(last, /36\.6 kPa, is behind it/);
 });
+
+test('the way home\'s first frame, before RETURN has been given, says what comes and not that it is falling', () => {
+  assert.equal(STAGES.home.text({ ...base, retPhase: RET_PH.none, alt: 499000 }), 'The crew takes the craft home, from the Ring to 17C.');
+  assert.match(STAGES.home.text({ ...base, retPhase: RET_PH.coast, alt: 300000 }), /^Falling toward the air/);
+});
