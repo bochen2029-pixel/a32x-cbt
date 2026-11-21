@@ -64,6 +64,33 @@ vacuum sector behind bulkheads. The sketch is consistent as it stands.
 
 The owner's idea, done faithfully, is option 1.
 
+4. **Keep 5 km, and make the air a rule of the world: the owner's "magic" layer** (2026-11-21, a brainstorm,
+   not a decision).
+   - **The setting.** The Ring stays this size and stays open over the deck. The air at the floor is one
+     atmosphere, and by about 50 m up there is almost none.
+   - **What the physics would need.** A layer that thin wants a scale height of about 11 m: 1 % of the
+     floor's density at 50 m, 40 % at 10 m, 16 % at 20 m. Held by weight, that takes an air that feels
+     about 780 g, where the floor gives it 1. So it is not gravity. It is a rule of the setting, a field
+     that holds the air down, like a force field in a film.
+   - **Say so in the game.** Everything else stays physical, and the model treats the field as given:
+     the density is ρ_floor·exp(−h/11 m) over the floor, turning with the Ring, and nothing above about
+     80 m.
+   - **What it does to the landing.** Most of the Elysium-style approach the owner pictures stays in
+     vacuum. The craft comes in co-rotating, tracking the Ring's curve like an airliner on a curved glide
+     path, as `deck.cpp`'s crew already flies it. The air arrives only in the last tens of metres, where
+     the craft is already in hover. A descent at 30 m/s meets 0.55 kPa at the floor: a real buffet and a
+     real ground effect, and its sound, but not wings flying. The aerodynamic part of the show is the
+     hover's air: rotor wash on the plating, the plume's dust, the sound arriving as the air thickens.
+   - **What it costs.** Little. It is a density function in the deck's frame, no structure, no streaming.
+     Air in the deck's sector needs no bulkheads to hold it, so the deck and the town can share the band
+     (the bulkheads become doors).
+   - **Its risk.** The rule must be the same for everything: the walk, the sound, the plume, a dropped
+     ball. Otherwise it reads as a bug. One function, used everywhere.
+
+Option 4 trades physical truth for the same Ring and a short, cheap, dramatic last 50 m. Option 1 is
+truthful and spectacular, and costs a world's worth of geometry. It is the owner's choice; neither is
+built.
+
 ## What the model must then have
 
 - **The air turns with the Ring.** In the turning frame the still air is the reference. The craft's speed
