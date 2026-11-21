@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 import { DOCK } from './dock-hud.js';
-import { fmtDistance } from './hud.js';
+import { fmtDistance, status } from './hud.js';
 
 // The readouts, orbit_return.h's OC_RET_* in its order (a test reads the header to hold the two equal).
 export const RET_OUT = [
@@ -73,17 +73,23 @@ export function returnStatus(r, s, { touch = false, skipping = false } = {}) {
     ? { skip: 'RETURN again: skip ahead to the burn', take: 'CREW: take the controls', reset: 'RESTART' }
     : { skip: 'R again: skip ahead to the burn', take: 'Space: take the controls', reset: 'Backspace: start again' };
   const togo = fmtDistance(r.togo);
+  // within a minute of it there is nothing left to skip (skipDone stops there): the skip is not offered
+  const skip = r.tEvent >= SKIP_UNTIL ? `${k.skip} · ` : '';
   switch (ph) {
-    case RET_PH.depart:
-      return { line: `HOME · LEAVING THE RING · clear in ${fmtWait(r.tEvent)}`, hint: skipping ? 'skipping ahead…' : `${k.skip} · ${k.take}` };
+    case RET_PH.depart: {
+      // where the craft is from the Ring and how fast it opens, both the core's; not OC_RET_T_EVENT, which while
+      // backing away divides the way still to go by the speed so far, so reads hours at the start of minutes
+      const way = s.ringRate > 0.5 ? `, ${s.ringRate.toFixed(0)} m/s` : '';
+      return { line: `HOME · LEAVING THE RING · ${fmtDistance(s.ringRange)} out${way}`, hint: skipping ? 'skipping ahead…' : `${k.skip} · ${k.take}` };
+    }
     case RET_PH.wait:
       if (Math.round(r.event) === RET_EV.lower) {   // from an orbit far from round: its top lowered first
         if (skipping) return { line: `HOME · SKIPPING · round off in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
-        return { line: `HOME · ROUNDING OFF FIRST · in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
+        return { line: `HOME · ROUNDING OFF FIRST · in ${fmtWait(r.tEvent)}`, hint: `${skip}${k.take}` };
       }
       if (Math.round(r.event) !== RET_EV.burn) return { line: 'HOME · NO PASS WITHIN REACH YET', hint: `the crew looks again every 10 min · ${k.take}` };
       if (skipping) return { line: `HOME · SKIPPING · the burn in ${fmtWait(r.tEvent)}`, hint: touch ? 'RETURN again: stop skipping' : 'R again: stop skipping' };
-      return { line: `HOME · WAITING · the burn in ${fmtWait(r.tEvent)}`, hint: `${k.skip} · ${k.take}` };
+      return { line: `HOME · WAITING · the burn in ${fmtWait(r.tEvent)}`, hint: `${skip}${k.take}` };
     case RET_PH.burn:
       return { line: `HOME · DE-ORBIT BURN · ${r.dv.toFixed(0)} m/s`, hint: k.take };
     case RET_PH.coast:
@@ -370,11 +376,26 @@ function docked(core) {
   return m.HEAPF64[m._oc_dock_out() / 8 + AT_DOCK] > 0.5;
 }
 
+// Whether a flight home is under way, kept as the core's flight director keeps it (fd.cpp, F.home): the crew
+// flying home sets it, the crew to orbit clears it, and so does a take-off again after the flight home's
+// rollout. A pilot who took the controls on the way home and hands them back (Space) gives them to the crew
+// flying home, which picks the flight up from wherever the craft is; the crew to orbit would climb away.
+export function homewardNext(was, { auto, phase, t, lastT, onGround, alt, lastPhase }, AUTO) {
+  if (t < lastT) return { home: false, phase: RET_PH.none };   // started again
+  if (auto === AUTO.return) return { home: true, phase };
+  if (auto === AUTO.crew) return { home: false, phase: RET_PH.none };
+  if (was && lastPhase >= RET_PH.rollout && !(onGround > 0.5) && alt > 20) return { home: false, phase: RET_PH.none };
+  return { home: was, phase: lastPhase };
+}
+
 export const ret = {
   name: 'ret',
   skipping: false,
   announce: false,
   engagedAt: 0,
+  homeward: false,
+  homePhase: 0,
+  lastT: 0,
 
   init(ctx) {
     this.r = ctx.core.addBlock('ret', '_oc_return_out', '_oc_return_out_len', RET_OUT);
@@ -386,6 +407,18 @@ export const ret = {
     const s = ctx.core.s, r = this.r, auto = Math.round(s.auto);
     const waiting = auto === ctx.AUTO.return && (Math.round(r.phase) === RET_PH.wait || Math.round(r.phase) === RET_PH.depart);
     if (c === 'orbit' && waiting) c = 'return';   // TO ORBIT, in orbit flying home: the same skip ahead
+    // the controls handed back on the way home go to the crew flying home (homewardNext); refused there (the
+    // deck, riding with the Ring), the page's own CREW goes on as before
+    if ((c === 'crew' || c === 'return') && auto === ctx.AUTO.off && this.homeward && !docked(ctx.core)) {   // docked: RETURN lets go first, below
+      ctx.core.auto(ctx.AUTO.return);
+      ctx.core.read();
+      if (Math.round(ctx.core.s.auto) === ctx.AUTO.return) {
+        this.skipping = false;
+        ctx.say('The crew has it: home to KDFW 17C from here');
+        return true;
+      }
+      if (c === 'crew') return false;
+    }
     if (c !== 'return') return false;
     if (waiting) {
       if (this.skipping) { this.skipping = false; ctx.say('Stopped skipping'); return true; }
@@ -394,8 +427,8 @@ export const ret = {
       ctx.say('Skipping ahead to the de-orbit burn…');
       return true;
     }
-    if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say('Home, stopped on 17C: Backspace starts again'); return true; }
-    if (auto === ctx.AUTO.return) { ctx.say('The crew is flying home: Space takes the controls'); return true; }
+    if (auto === ctx.AUTO.return && Math.round(r.phase) === RET_PH.stopped) { ctx.say(`Home, stopped on 17C: ${this.touch ? 'RESTART' : 'Backspace'} starts again`); return true; }
+    if (auto === ctx.AUTO.return) { ctx.say(`The crew is flying home: ${this.touch ? 'CREW' : 'Space'} takes the controls`); return true; }
     const may = canReturn(s, r, ctx.core.deck);
     if (!may.ok) { ctx.say(may.why); return true; }
     let words = 'The crew flies home to KDFW 17C';
@@ -414,7 +447,13 @@ export const ret = {
   },
 
   update(ctx) {
-    const core = ctx.core, r = this.r;
+    const core = ctx.core, r = this.r, s = core.s;
+    const h = homewardNext(this.homeward, {
+      auto: Math.round(s.auto), phase: Math.round(r.phase), t: s.t, lastT: this.lastT, onGround: s.onGround, alt: s.alt, lastPhase: this.homePhase,
+    }, ctx.AUTO);
+    this.homeward = h.home;
+    this.homePhase = h.phase;
+    this.lastT = s.t;
     if (this.announce && core.s.t > this.engagedAt && Math.round(r.phase) === RET_PH.wait && Math.round(core.s.auto) === ctx.AUTO.return) {
       this.announce = false;
       if (Math.round(r.event) === RET_EV.burn) ctx.say(`The crew flies home to KDFW 17C: the de-orbit burn in ${fmtWait(r.tEvent)}`);
@@ -446,7 +485,12 @@ export const ret = {
   },
 
   status(ctx) {
-    if (Math.round(ctx.core.s.auto) !== ctx.AUTO.return) return null;
+    const auto = Math.round(ctx.core.s.auto);
+    if (auto === ctx.AUTO.off && this.homeward) {   // the pilot flying home: the hand's own line, and how to hand it back
+      const own = status(ctx.core.s, ctx.state.warp, this.touch, ctx.input.hands);
+      return { line: own.line, hint: own.hint || `${this.touch ? 'CREW' : 'Space'}: the crew flies home from here` };
+    }
+    if (auto !== ctx.AUTO.return) return null;
     return returnStatus(this.r, ctx.core.s, { touch: this.touch, skipping: this.skipping });
   },
 };

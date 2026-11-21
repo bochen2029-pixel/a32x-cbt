@@ -26,4 +26,7 @@ test('the lines say the rate, the tier, the picture and the draws', () => {
   assert.match(lines[0], /^50 fps · 20\.0 ms a frame/);
   assert.match(lines[1], /tier medium \(auto\) · 2560×1440 at 2\.00, 3\.69 Mpx · 2 depth slices/);
   assert.match(lines[2], /120 draw calls · 210 k triangles a frame/);
+  // a slow device's rate, to a tenth: one frame of 3.2 s read "0 fps" (2026-11-21's play-test, in software)
+  assert.match(perfLines(frameStats([3233.2]))[0], /^0\.3 fps · 3233\.2 ms a frame/);
+  assert.match(perfLines(frameStats([200, 200]))[0], /^5\.0 fps/);
 });

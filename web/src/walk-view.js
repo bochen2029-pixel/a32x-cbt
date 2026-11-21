@@ -11,8 +11,9 @@ import { FEATURES } from './features.js';
 import { PLACE, WALK, WALK_OUT, WHERE, WalkCore } from './walk-core.js';
 import {
   W, between, clamp, feltUp, moving, outward, ringDirToSite, ringFrame, ringToSite, siteDirToRing, skyWindow, sunFor, surfaceAt, viewAxes, walkLines,
-  walkStatus,
+  walkLinesNarrow, walkStatus,
 } from './walk-math.js';
+import { helpHtml } from './input.js';
 import { WalkWorld } from './walk-world.js';
 
 const WARPS = [1, 2, 5, 10, 25, 50];
@@ -36,14 +37,40 @@ export const HELP_WALK = [
   ['H', 'this help'],
 ];
 
+// The same on a touch screen.
+export const HELP_WALK_TOUCH = [
+  ['the stick', 'walk; to the sides, step aside'],
+  ['drag', 'turn and look'],
+  ['RUN', 'run, or walk again'],
+  ['JUMP', 'jump'],
+  ['USE', 'a lift, its call, the hatch to the craft'],
+  ['BALL', 'drop a ball'],
+  ['TIME − +', 'time slower / faster'],
+  ['RESTART', 'back to the hatch'],
+  ['', 'a tap on this help puts it away'],
+];
+
+// While walking, the flight's own overlays go: the markers, the throttle, and the canvases the flight's features
+// draw in their update hooks (the docking reticle, the flight director's display, the deck's approach display,
+// the map), which do not run while the walk draws the frame and would stay on the screen as last drawn.
+export const FLIGHT_OVERLAYS = ['fpm', 'target', 'throttle', 'dock-reticle', 'fd-display', 'deck-approach', 'map'];
+
+// On a touch screen the walk's own four (JUMP, USE, RUN, BALL) stand where the throttle was, under the right
+// thumb, and the page's few the walk keeps (TIME − +, HELP, RESTART) go in a row over them and the stick, clear
+// of both; the page's USE is the walk's USE there, so it goes.
 const CSS = `
-  body.walking #fpm, body.walking #target, body.walking #throttle { display: none !important; }
+  ${FLIGHT_OVERLAYS.map((id) => `body.walking #${id}`).join(', ')} { display: none !important; }
   body.walking #buttons button { display: none; }
   body.walking #buttons button[data-cmd="walk"], body.walking #buttons button[data-cmd="slower"], body.walking #buttons button[data-cmd="faster"],
   body.walking #buttons button[data-cmd="help"], body.walking #buttons button[data-cmd="reset"] { display: block; }
   #walk-touch { display: none; position: absolute; right: var(--edge-r); bottom: var(--edge-b); grid-template-columns: repeat(2, 62px);
     gap: 10px; pointer-events: auto; }
-  @media (pointer: coarse) { body.walking #walk-touch { display: grid; } }
+  @media (pointer: coarse) {
+    body.walking #walk-touch { display: grid; }
+    body.walking #buttons, body.walking #buttons.open { left: var(--edge-l); right: var(--edge-r); top: auto; bottom: calc(var(--edge-b) + 146px);
+      max-width: none; margin: 0; padding: 0; background: none; border: 0; grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: end; }
+    body.walking #buttons button[data-cmd="walk"] { display: none; }
+  }
   #walk-touch button { width: 62px; height: 62px; border-radius: 50%; font: 600 11px/1 var(--sans); letter-spacing: 0.06em; color: var(--ink);
     background: var(--glass); border: 1px solid var(--line); touch-action: none; -webkit-user-select: none; user-select: none; }
   #walk-touch button.on { border-color: var(--vector); color: var(--vector); }
@@ -51,6 +78,10 @@ const CSS = `
     background: rgba(232, 238, 244, 0.75); box-shadow: 0 0 2px #000; }
   body.walking #walk-dot { display: block; }
 `;
+
+// The page's commands the walk's own keys also give (input.js): Space the crew's, F the Moon's, G the gear's; the
+// screen's throttle, hidden while walking. Taken by the walk without a word.
+const WALK_KEYS = new Set(['crew', 'moon', 'gear', 'hand-throttle']);
 
 // Where ?walk starts the walk, for a look and for the page's tests: ?walk (the hatch), ?walk=lift, ?walk=floor.
 function urlPlace() {
@@ -65,7 +96,7 @@ function urlPlace() {
 
 const v = {
   on: false, core: null, world: null, cam: null, warp: 1, debt: 0, look: { heading: 0, pitch: 0 },
-  prev: null, cur: null, drag: null, was: {}, usePulse: false, touchJump: false, touchRun: false, touchBall: false,
+  prev: null, cur: null, drag: null, was: {}, usePulse: false, touchJump: false, jumpTap: false, touchRun: false, touchBall: false,
   pressed: new Set(),   // keys pressed since the last frame: a tap shorter than a frame still counts
   hudNext: 0, sayUntil: 0, saved: null, lean: null, toEcef: null, sun: null, ballMark: null, quality: null,
 };
@@ -99,11 +130,11 @@ function start(ctx, place) {
   if (!v.saved) {
     const help = document.getElementById('help'), button = document.querySelector('#buttons button[data-cmd="walk"]');
     v.saved = { look: { ...ctx.input.look }, fov: ctx.camera.fov, help: help ? help.innerHTML : '', label: button ? button.textContent : '' };
-    if (help) help.innerHTML = HELP_WALK.map(([k, t]) => `<div><b>${k}</b><span>${t}</span></div>`).join('');
+    if (help) help.innerHTML = helpHtml(ctx.hud && ctx.hud.touch ? HELP_WALK_TOUCH : HELP_WALK);
     if (button) button.textContent = 'USE';
   }
   document.body.classList.add('walking');
-  const words = { [PLACE.hatch]: 'Aboard the Ring: the hub\'s lobby, at three hundredths of a g. The lifts are ahead.', [PLACE.lift]: 'In lift 1\'s car, at the hub. E: ride down.', [PLACE.floor]: 'On the floor, at one g, by lift 1.' };
+  const words = { [PLACE.hatch]: 'Aboard the Ring: the hub\'s lobby, at three hundredths of a g. The lifts are ahead.', [PLACE.lift]: `In lift 1's car, at the hub. ${ctx.hud && ctx.hud.touch ? 'USE' : 'E'}: ride down.`, [PLACE.floor]: 'On the floor, at one g, by lift 1.' };
   say(ctx, words[place]);
 }
 
@@ -188,7 +219,9 @@ function bindTouch() {
     box.appendChild(b);
     return b;
   };
-  button('JUMP', () => { v.touchJump = true; }, () => { v.touchJump = false; });
+  // held, it jumps again on landing, as Space held does; tapped, it jumps once, however short the tap was against
+  // a frame (a tap shorter than a slow device's frame was lost)
+  button('JUMP', () => { v.touchJump = true; v.jumpTap = true; }, () => { v.touchJump = false; });
   button('USE', () => { v.usePulse = true; });
   button('RUN', (b) => { v.touchRun = !v.touchRun; b.classList.toggle('on', v.touchRun); });
   button('BALL', () => { v.touchBall = true; });
@@ -202,9 +235,10 @@ function hands(ctx, dt) {
   let right = (on('d') ? 1 : 0) - (on('a') ? 1 : 0);
   let turn = (on('ArrowRight') ? 1 : 0) - (on('ArrowLeft') ? 1 : 0), tilt = 0;
   const tapped = (k) => v.pressed.has(k);
-  let run = on('Shift') || v.touchRun, jump = on(' ') || tapped(' ') || v.touchJump, use = on('e') || tapped('e') || v.usePulse;
+  let run = on('Shift') || v.touchRun, jump = on(' ') || tapped(' ') || v.touchJump || v.jumpTap, use = on('e') || tapped('e') || v.usePulse;
   let drop = tapped('f'), toss = tapped('g');
   v.pressed.clear();
+  v.jumpTap = false;
   const edge = (key, now) => { const was = v.was[key]; v.was[key] = now; return now && !was; };
   if (v.touchBall) { drop = true; v.touchBall = false; }
   v.usePulse = false;
@@ -366,7 +400,7 @@ function hud(ctx, o, now) {
   h.top.textContent = st.line;
   h.hint.textContent = st.hint;
   const lines = walkLines(o, v.warp, v.sun && Math.round(o.where) !== WHERE.hub ? sunFor(o, v.sun) : null);
-  h.lines.textContent = (window.innerWidth < 560 ? lines.slice(0, 5).map((l) => l.replace(/ {2,}/g, ' ')) : lines).join('\n');
+  h.lines.textContent = (window.innerWidth < 560 ? walkLinesNarrow(lines) : lines).join('\n');
   h.place(h.fpm, null);
   h.place(h.tgt, null);
 }
@@ -396,8 +430,13 @@ export const walk = {
       case 'slower': v.warp = WARPS[Math.max(0, WARPS.indexOf(v.warp) - 1)]; say(ctx, `Time ${v.warp}×`); break;
       case 'faster': v.warp = WARPS[Math.min(WARPS.length - 1, WARPS.indexOf(v.warp) + 1)]; say(ctx, `Time ${v.warp}×`); break;
       case 'reset': v.core.reset(PLACE.hatch); v.prev = { ...v.core.o }; v.cur = { ...v.core.o }; v.look = { heading: v.core.o.heading, pitch: 0 }; say(ctx, 'Back at the hatch'); break;
-      case 'help': return false;   // the page shows the help, which is the walk's while walking
-      default: break;              // the flight's commands wait until the walk is over
+      case 'help': return false;      // the page shows the help, which is the walk's while walking
+      case 'quality': return false;   // the graphics tier: the walk follows it (frame)
+      default:
+        // the flight's commands wait until the walk is over; said, rather than nothing, for those that are not
+        // also the walk's own keys (Space, Enter, F and G are its jump, use and ball)
+        if (!WALK_KEYS.has(c)) say(ctx, `Aboard the Ring: the flight's ${ctx.hud && ctx.hud.touch ? 'buttons wait' : 'keys wait'} until you are back aboard (${ctx.hud && ctx.hud.touch ? 'USE' : 'E'} at the hatch)`);
+        break;
     }
     return true;
   },
