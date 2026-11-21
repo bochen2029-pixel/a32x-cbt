@@ -64,6 +64,7 @@
     position: absolute; right: calc(var(--edge-r) + 196px); bottom: var(--edge-b); display: none; gap: 3px 12px; grid-template-columns: auto auto;   /* beside the buttons' column */
     padding: 10px 12px; background: var(--glass-strong); border: 1px solid var(--line); border-radius: 6px; font-size: 12px;
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); max-height: calc(100vh - 140px); overflow: auto; pointer-events: auto;
+    max-width: max(300px, calc(50vw - 260px)); z-index: 4;   /* clear of the screen's middle, where the craft is, while there is room; over the map */
   }
   #help.shown { display: grid; }
   #help div { display: contents; }
@@ -72,7 +73,7 @@
   /* the buttons: three groups, each two across */
   #buttons { position: absolute; top: calc(var(--edge-t) + 50px); right: var(--edge-r); width: 184px; display: grid; gap: 10px; pointer-events: auto; }
   #buttons .group { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
-  #btn-view, #btn-quality { grid-column: span 2; }
+  #btn-quality { grid-column: span 2; }
   #buttons button {
     font: 600 11px/1 var(--sans); letter-spacing: 0.06em; color: var(--ink); background: var(--glass); border: 1px solid var(--line);
     border-radius: 5px; padding: 9px 10px; min-width: 70px; cursor: pointer; text-shadow: var(--shadow);
@@ -96,12 +97,12 @@
     #touch { display: block; }
     #top { right: var(--edge-r); max-width: none; }
     #readouts { bottom: auto; top: calc(var(--edge-t) + 58px); font-size: 10.5px; line-height: 1.45; padding: 7px 9px; }
-    #help { bottom: auto; top: calc(var(--edge-t) + 58px); left: var(--edge-l); right: var(--edge-r); z-index: 3; max-height: calc(100vh - 300px); }
+    #help { bottom: auto; top: calc(var(--edge-t) + 58px); left: var(--edge-l); right: var(--edge-r); z-index: 4; max-height: calc(100vh - 300px); max-width: none; }
     /* six under the thumbs, between the stick and the throttle; the rest behind MORE */
     #buttons { top: auto; bottom: var(--edge-b); left: calc(var(--edge-l) + 138px); right: calc(var(--edge-r) + 56px); width: auto;
       grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; align-content: end; }
     #buttons .group { display: contents; }
-    #btn-view, #btn-quality { grid-column: auto; }
+    #btn-quality { grid-column: auto; }
     #buttons button { min-width: 0; padding: 11px 4px; font-size: 11px; background: var(--glass-strong); }
     #buttons button:not(.quick) { display: none; }
     #btn-more { display: block; }
@@ -114,7 +115,9 @@
     #readouts { font-size: 10px; line-height: 1.35; }
     #buttons { left: calc(var(--edge-l) + 140px); right: calc(var(--edge-r) + 58px); max-width: 360px; margin: 0 auto;
       grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    #buttons.open { bottom: var(--edge-b); top: calc(var(--edge-t) + 58px); align-content: start; max-width: none; }
+    /* four across, or the last row (RESTART, LESS) falls off a landscape phone's 342 px; and it scrolls, should it still */
+    #buttons.open { bottom: var(--edge-b); top: calc(var(--edge-t) + 58px); align-content: start; max-width: none;
+      grid-template-columns: repeat(4, minmax(0, 1fr)); overflow-y: auto; }
   }
   @media (max-width: 520px) {
     #statusline { font-size: 12px; }
@@ -142,10 +145,11 @@
     </div>
     <div class="group" role="group" aria-label="View and time">
       <button type="button" id="btn-view" class="quick" data-cmd="view">VIEW</button>
+      <button type="button" id="btn-sas" data-cmd="sas-next">HOLD</button>
       <button type="button" id="btn-slower" data-cmd="slower">TIME −</button>
       <button type="button" id="btn-faster" class="quick" data-cmd="faster">TIME +</button>
-      <button type="button" id="btn-sas" data-cmd="sas-next">HOLD</button>
       <button type="button" id="btn-gear" data-cmd="gear">GEAR</button>
+      <button type="button" id="btn-brake" data-cmd="brake">BRAKES</button>
     </div>
     <div class="group" role="group" aria-label="The page">
       <button type="button" id="btn-quality" data-cmd="quality">GFX</button>
