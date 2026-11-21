@@ -609,8 +609,9 @@ nothing, and the first two seconds at a tier, while its shaders compile, count f
 - **On target** for a second and a half: up a rung, on trial, judged on its first four frames. A display's
   refresh hides how much faster a frame could be drawn, so the only way to learn is to try; when a try
   fails, the page steps back and that rung waits twice as long before the next, to half a minute. Where the
-  browser gives the GPU's own time, the page knows instead: it steps up as soon as the rung above fits,
-  never tries one that does not, and when it is slow while the GPU has room, it leaves the pixels alone.
+  browser gives the GPU's own time, the page knows instead: it steps up at once where the rung above fits
+  with room, tries it after the wait where it fits at all, never where it does not, and when it is slow
+  while the GPU has room, it leaves the pixels alone.
 - **The tiers**, while the page chooses them (auto): a tier down when the picture is three rungs down (half
   the pixels) and still slow for two seconds, since a tier lower at full size looks better than one higher
   at half of it, or, by the GPU's time, when fewer pixels do not help and the GPU is still busy; a tier up,
