@@ -35,7 +35,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 /** The kit's documents, in reading order. Each must exist, or the archive is refused. */
 export const KIT_DOCS = [
   'README.md', 'CANON_DELTA.md', 'UNREAL_PORT.md', 'FIRST_SLICE.md', 'LICENSING.md', 'CLAUDE.md.template',
-  'BOOTSTRAP_PROMPT.md', 'SOURCES.md', 'OPEN_RING_AIR.md', 'VISION.md',
+  'BOOTSTRAP_PROMPT.md', 'SOURCES.md', 'OPEN_RING_AIR.md', 'RING_AIR_SPEC.md', 'VISION.md',
 ];
 /** The orbit sketch's parts that travel: everything git tracks under these. */
 const ORBIT_PARTS = ['README.md', 'INVARIANTS.md', 'CMakeLists.txt', 'core', 'test', 'tools', 'evidence', 'web'];

@@ -9,7 +9,7 @@
 // certificates that one of them is infeasible. Each iteration takes a Newton step on that system and on the
 // centred complementarity lambda o lambda = mu e, in the variables scaled by Nesterov and Todd's point W
 // (W z = W^-1 s = lambda), first with no centring (the affine step), then with the centring Mehrotra's rule
-// sets from how far the affine step got, sigma = (1 - alpha)^3, and his second-order correction. Every
+// sets from how far the affine step got, sigma = (1 - alpha)^3, and Mehrotra's second-order correction. Every
 // direction needs the KKT system
 //
 //     [ 0  A'  G'  ] [ux]   [fx]

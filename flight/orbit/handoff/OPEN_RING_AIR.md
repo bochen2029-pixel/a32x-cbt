@@ -1,6 +1,7 @@
 # An open Ring that holds its air by its spin
 
-A design note for the Unreal version, from the owner, 2026-11-12. Nothing here is built.
+A design note for the Unreal version, from the owner, 2026-11-12. Nothing here is built. Option 4, the
+owner's, is specified in full in `RING_AIR_SPEC.md` (2026-11-21).
 
 ## The idea
 
@@ -88,8 +89,8 @@ The owner's idea, done faithfully, is option 1.
      ball. Otherwise it reads as a bug. One function, used everywhere.
 
 Option 4 trades physical truth for the same Ring and a short, cheap, dramatic last 50 m. Option 1 is
-truthful and spectacular, and costs a world's worth of geometry. It is the owner's choice; neither is
-built.
+truthful and spectacular, and costs a world's worth of geometry. The owner asked for option 4 to be
+specified: `RING_AIR_SPEC.md`, with option 1 as its Appendix B. Neither is built.
 
 ## What the model must then have
 

@@ -12,6 +12,7 @@ How each was read:
   not resolve). Treat these as **unverified until you open the page** on your own machine.
 - **local**: your own repositories, as cloned on the machine that wrote the kit.
 - **measured**: run by the session that wrote the kit; the command is given where the number is used.
+- **to read**: named, and not yet opened by any session; read it before relying on what it is cited for.
 
 ## Unreal Engine
 
@@ -80,6 +81,15 @@ How each was read:
 | R3 | Booster Lander, `DECISIONS.md` D-011 and its addendum | local | Unreal as one more pure observer; "precompute in, telemetry out, always"; a cheap early UE spike; "we add clients", never a migration |
 | R4 | subsim: `docs/DESIGN_repo_blueprint_for_parallel_agents_v1_2026-11-03.md`, `docs/RUNBOOK_implementation_v1_2026-11-07.md`, `GATES.md`, `INVARIANTS.md`, `DECISIONS.md` sub:D113 | local | how you run waves: contracts first, packets with owner directories, tests and implementation by different agents, gates G0 to G9, a walking skeleton on fakes, the coordinator merges; your reference machine (an RTX 4070 Ti SUPER, an i9-9900K, 64 GB); cross-compiler hashes need the project's own maths in place of `<cmath>` |
 | R5 | abacus, `README.md` | local | certified maths over MCP (`units.convert`, `check.equal` and others), registered at user scope |
+
+## Physics for RING_AIR_SPEC.md
+
+| tag | source | read | what it supports |
+|---|---|---|---|
+| V1 | the published correlations for jet V/STOL aircraft hovering in ground effect: the jet-induced suck-down and the fountain lift, as NASA's and others' design reports give them | to read | only the shape of `RING_AIR_SPEC.md` §3.3's suck-down, falling with the nozzle's height; its constants are the spec's own until these are read |
+| V2 | M. J. Lighthill, "On sound generated aerodynamically", Proceedings of the Royal Society A (1952 and 1954) | to read | the jet noise's power proportional to the ambient density (§3.4), as the textbooks state the eighth-power law |
+| M10 | the tour's propellant, flown by the native core at 7eccaf8 (the crew to orbit, DOCK, 30 s docked, DECK, 20 s landed, TAKEOFF, 20 s at the hold point, RETURN to the stop): 4,388 kg at orbit, 3,696 on the pad, 2,966 at the hold point, 2,554 at the stop on 17C | measured | `RING_AIR_SPEC.md` §4.7 |
+| M11 | the air's values, the path's table, the capture and the propellant estimate | measured | `node flight/orbit/tools/ring_air_estimate.mjs` prints every number of `RING_AIR_SPEC.md` §2 and §4 |
 
 ## Measured for this kit
 
