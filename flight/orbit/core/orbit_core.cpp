@@ -777,7 +777,7 @@ void oc_auto(int mode) {
         if (g.ret.refused) { writeOut(); return; }
     }
     const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK || mode == OC_AUTO_TAKEOFF;
-    fdHanded(g, g.autoMode);   // the flight director takes up the guidance afresh (fd.cpp)
+    const int was = g.autoMode, atmoLaw = g.atmoLaw, holdValid = g.holdValid;
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
     g.holdValid = 0;
@@ -785,6 +785,11 @@ void oc_auto(int mode) {
     if (g.autoMode == OC_AUTO_DOCK) dockEngage(g);
     if (g.autoMode == OC_AUTO_DECK) deckEngage(g);
     if (g.autoMode == OC_AUTO_TAKEOFF) deckTakeoff(g);
+    // Refused by its crew (docking, the deck's landing or take-off), the call changes nothing but the refusal's
+    // readout: who was flying flies on, with their laws' memory and the flight director's. (The audit of 60e2582:
+    // the director took up the guidance afresh before the refusal, and the pilot's pitch cue jumped 0.9 degrees.)
+    if (g.autoMode == was) { g.atmoLaw = atmoLaw; g.holdValid = holdValid; writeOut(); return; }
+    fdHanded(g, was);   // the flight director takes up the guidance afresh (fd.cpp)
     if (g.autoMode != OC_AUTO_CREW) { writeOut(); return; }
     // The crew picks up where the craft is, not where it last left off.
     const Local L = localOf(g);

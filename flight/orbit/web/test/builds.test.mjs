@@ -14,8 +14,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const orbit = join(here, '..', '..');
 const native = join(orbit, 'build', 'orbit_run'), wasm = join(orbit, 'build-wasm', 'orbit_run.js');
 
-test('the native and WebAssembly builds print the same flight, row for row, for the crew\'s 900 s (G3)',
-  { skip: (!existsSync(native) && 'no native build') || (!existsSync(wasm) && 'no WebAssembly build') }, () => {
+// A test that cannot set up what it measures fails (INVARIANTS.md): without both builds there is nothing to compare,
+// and that is said, not skipped. (The audit of 60e2582: it skipped, and passed nothing.)
+test('the native and WebAssembly builds print the same flight, row for row, for the crew\'s 900 s (G3)', () => {
+    assert.ok(existsSync(native), `no native build at ${native}: build it first (README, "Build and test")`);
+    assert.ok(existsSync(wasm), `no WebAssembly build at ${wasm}: build it first (README, "Build and test")`);
     const run = (file, args) => execFileSync(file, args, { encoding: 'utf8', maxBuffer: 1 << 24 }).split('\n').filter(Boolean);
     const a = run(native, ['10', '900']), b = run(process.execPath, [wasm, '10', '900']);
     const rows = (lines) => lines.filter((l) => !/hash/.test(l));
