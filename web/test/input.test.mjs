@@ -1,9 +1,10 @@
-// The keys as a person presses them: a focused button keeps its own Enter, Shift held for the throttle does
-// not stop the time keys, Ctrl held for it does not open the browser's dialogs, and the help has a list for a
-// touch screen. MIT.
+// The keys as a person presses them: a focused button keeps its own Enter, Shift held (for +, or from habit) does
+// not stop the time keys, Ctrl is the browser's and not the throttle's, and the help has a list for a touch
+// screen. MIT.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HELP, HELP_TOUCH, Input, helpHtml } from '../src/input.js';
+import { readFileSync } from 'node:fs';
 
 // Input listens on the window and the canvas; neither is needed to press its keys here.
 const quiet = { addEventListener() {} };
@@ -30,7 +31,7 @@ test('Enter and Space on a button with the keyboard\'s focus are the button\'s; 
   assert.deepEqual(press(input, 'g', { target: { tagName: 'BUTTON' } }).commands, ['gear']);
 });
 
-test('with Shift held for the throttle, the time and hold keys still work', () => {
+test('with Shift held (for +, or from habit), the time and hold keys still work', () => {
   const input = new Input(quiet);
   assert.deepEqual(press(input, '>', { code: 'Period', shift: true }).commands, ['faster']);
   assert.deepEqual(press(input, '<', { code: 'Comma', shift: true }).commands, ['slower']);
@@ -40,12 +41,13 @@ test('with Shift held for the throttle, the time and hold keys still work', () =
   assert.deepEqual(press(input, ';', { code: 'Comma' }).commands, []);               // a layout's own key, unshifted, is left alone
 });
 
-test('with Ctrl held for the throttle, a flying key is not the browser\'s shortcut', () => {
+test('Ctrl is the browser\'s: the page takes no shortcut from it, and flies nothing with it', () => {
   const input = new Input(quiet);
-  assert.equal(press(input, 's', { ctrl: true }).prevented, true);   // Ctrl-S: the save dialog, while pulling up
-  assert.equal(press(input, 'd', { ctrl: true }).prevented, true);   // Ctrl-D: the bookmark dialog, while banking
+  assert.equal(press(input, 's', { ctrl: true }).prevented, false);   // Ctrl-S is the browser's again: Ctrl flies nothing
+  assert.equal(press(input, 'd', { ctrl: true }).prevented, false);
   assert.equal(press(input, 's').prevented, false);
   assert.ok(input.held.size === 0, 'every key let go is let go');
+  assert.doesNotMatch(HELP.map(([k, v]) => `${k} ${v}`).join(' '), /Ctrl/, 'the help offers no Ctrl key');
 });
 
 test('the help has a list for a touch screen, by its buttons, with no keyboard\'s keys in it', () => {
@@ -56,7 +58,7 @@ test('the help has a list for a touch screen, by its buttons, with no keyboard\'
   assert.equal(helpHtml([['<b>', 'a & b']]), '<div><b>&lt;b&gt;</b><span>a &amp; b</span></div>');
 });
 
-test('the throttle on = and − as well as Shift and Ctrl, held: no Ctrl, so no browser shortcut with the flying keys', () => {
+test('the throttle on = and − (and +), held; Shift and Ctrl move it no more, so no flying hand rests on Ctrl', () => {
   const input = new Input(quiet);
   const hold = (key, seconds) => {
     input.key({ key, code: '', target: { tagName: 'CANVAS' }, repeat: false, shiftKey: key === '+', ctrlKey: false, metaKey: false, altKey: false, preventDefault() {} }, true);
@@ -72,5 +74,17 @@ test('the throttle on = and − as well as Shift and Ctrl, held: no Ctrl, so no 
   hold('+', 0.5);   // = with Shift held
   assert.ok(Math.abs(input.hands.throttle - 0.5) < 1e-9, `+ for half a second: ${input.hands.throttle}`);
   hold('Control', 1);
-  assert.equal(input.hands.throttle, 0, 'Ctrl as before');
+  assert.ok(Math.abs(input.hands.throttle - 0.5) < 1e-9, `Ctrl held a second moves nothing: ${input.hands.throttle}`);
+  hold('Shift', 1);
+  assert.ok(Math.abs(input.hands.throttle - 0.5) < 1e-9, `nor Shift: ${input.hands.throttle}`);
+});
+
+// tour.js imports three.js by way of the views, so its hand keys are read from its source, as written.
+test('a hand on the throttle\'s keys ends the tour, as a hand on the stick\'s does; Shift and Ctrl alone do not', () => {
+  const src = readFileSync(new URL('../src/tour.js', import.meta.url), 'utf8');
+  const list = /HAND_KEYS = new Set\((\[[^\]]*\])\)/.exec(src);
+  assert.ok(list, 'tour.js declares its hand keys');
+  const hands = new Set(JSON.parse(list[1].replace(/'/g, '"')));
+  for (const k of ['w', 's', 'a', 'd', 'q', 'e', 'ArrowUp', '=', '+', '-']) assert.ok(hands.has(k), `${k} takes over`);
+  for (const k of ['Shift', 'Control']) assert.ok(!hands.has(k), `${k} alone does not`);
 });

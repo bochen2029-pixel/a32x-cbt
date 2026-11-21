@@ -9,8 +9,7 @@ yet; §8 is the order to build it in, core first, because the C++ core is what t
 
 Every number below is either derived here or measured on the sketch at 7eccaf8:
 `tools/ring_air_estimate.mjs` makes the air's and the path's again (§5.5), and the tour's come from the
-native core. Each one is chosen for the sketch
-and describes no real vehicle or station.
+native core. What is chosen is the sketch's own, and describes no real vehicle or station.
 
 ## 1. Decisions this spec takes
 
@@ -19,7 +18,7 @@ and describes no real vehicle or station.
 | D1 | The Ring keeps its size, spin and spokes: 5 km floor, 1 km band, rim walls 380 m high, six spokes. The band is open to space all round, as in *Elysium*: no roof over the floor and no bulkheads across it. Each spoke meets the band on a yoke across it at the roof's old level, 300 m up, resting on the walls' tops. | The owner's picture ("open to space, as in the film *Elysium*", `OPEN_RING_AIR.md`); the air needs no roof; and the approach of §4 flies 1.7 km along the band at up to 200 m, which a roof would cut. Under 300 m the band is clear all the way round. | Keep the sketch's roof and cut an approach slot in it, 2.2 km spinward of the deck and 100 m wide over the path; nothing else in this spec changes. |
 | D2 | The air is a **plateau and a skin**: ordinary air held by the spin up to 30 m, then a 20 m skin in which a field holds it down, and vacuum from 50 m. | People breathe sea-level air on the floor and on anything up to 30 m, so an open town needs no sealed buildings; below 30 m the air is the air the Ring's own spin holds, and the only fiction is the skin. The owner's words hold: 1 atm at the floor, nothing by 50 m. | The plain exponential (§2.8) is one constant set away; its cost is thin air at head height and hypoxia on a 10 m roof. |
 | D3 | The field acts on the air only: not on the craft, a person, a ball or anything solid. Exhaust that reaches the layer becomes part of its air. | One rule, stated once. A field that pushed solids would be a second gravity, and the Ring's 1 g would no longer be its spin. | none intended |
-| D4 | The autoland is a new crew mode, `OC_AUTO_AUTOLAND`, beside the least-propellant crew (`OC_AUTO_DECK`), which stays as it is. | The least-propellant crew is the oracle-checked baseline; the autoland is the airliner-like way, costing about 0.6 t more (§5.5). | Drop the mode; nothing else depends on it. |
+| D4 | The autoland is a new crew mode, `OC_AUTO_AUTOLAND`, beside the least-propellant crew (`OC_AUTO_DECK`), which stays as it is. | The least-propellant crew is the oracle-checked baseline; the autoland is the airliner-like way, costing about 0.6 t more (§4.7). | Drop the mode; nothing else depends on it. |
 | D5 | In the web sketch the open-Ring world is a flag, off by default. With it off, the core computes exactly what it computes now: every state, hash and test. | The sketch's own world (roof, sealed band, vacuum deck behind bulkheads) is consistent and measured; the Unreal build turns the flag on. Like O16 for the wind. | Make the flag the default once the Unreal version leads. |
 
 ## 2. The air: one function
@@ -74,7 +73,7 @@ band, 1.48 million tonnes.
 ### 2.3 What the field is
 
 Held still in the skin, the air needs a force per kilogram that balances its pressure's fall:
-−(1/ρ) dp/dh = R_s T · x/δ² for the Gaussian part. It is 880 g's worth 5 m into the skin, 1,806 at 10 m,
+−(1/ρ) dp/dh, about R_s T · x/δ² (the Gaussian's part; the last of the skin, where ρ is pulled to 0, more). It is 880 g's worth 5 m into the skin, 1,806 at 10 m,
 3,102 at 15 m and about 10,000 at 19 m, where the last of the air is thin. That is the fiction, said
 once: a field in the skin that holds the air, the way a film holds a bubble, and touches nothing else
 (D3). Below the skin there is no fiction at all.
@@ -170,8 +169,8 @@ At the approach's speeds the turning frame dominates the air. Along the floor at
 pull a craft must hold against, to keep its height, is r(ω + u/r)²: at the final approach fix, 80 m/s
 antispinward at 200 m, it is 0.39 g; at the hover over the pad, 0.99 g. Spinward at 80 m/s it would be
 1.8 g. A ball dropped 20 m in the plateau lands 2.03 s later, 1.20 m antispinward of the point under where
-it was let go (without drag; with a ball's drag a few centimetres less). The walk already turns with the
-Ring; with the air it also has drag.
+it was let go, without drag (RA7 holds the core to it, and with drag to a fine integration). The walk
+already turns with the Ring; with the air its ball also has drag.
 
 ### 3.3 The jets near the deck
 
@@ -188,8 +187,8 @@ where h_n is the nozzle's height over the floor, T_swivel the thrust through the
 D_e = 2 m an effective jet diameter, and k_sd = 0.04, so that with the legs on the deck (h_n about 2 m) it
 takes 4 % of the thrust. The shape follows the published V/STOL hover-in-ground-effect correlations, which
 fall with height roughly this way; the constants are this sketch's, chosen so the hover's height loop
-(0.3 /s on place, 1.0 /s on speed) absorbs the change. Read the correlations before tuning; the SOURCES.md
-row for them is marked "search". No fountain lift: the craft has one main nozzle.
+(0.3 /s on place, 1.0 /s on speed) absorbs the change. Read the correlations before tuning: `SOURCES.md`,
+V1, not yet read. No fountain lift: the craft has one main nozzle.
 
 ### 3.4 The plume and the sound
 
@@ -230,8 +229,9 @@ and their rates; y is the Ring's axis.
 
 The approach is antispinward: the craft comes from +s toward the pad. It costs least: the coast out from
 the hold point already moves antispinward in the Ring's frame (at rest among the stars, the floor sweeps
-past at 221.5 m/s), and the pull is lightest that way. Spinward would mean 1.8 g at the fix and about 0.9 t
-more propellant.
+past at 221.5 m/s), and the pull is lightest that way. Spinward, the same path would pull 1.77 g at the fix
+and ask 593 kN there, 0.84 of `T_MAX`, and cost about 0.74 t more: 575 kg for the capture and 1,117 kg
+from the fix to the hover point, against 314 and 635 (the estimate with the spin's sign turned over).
 
 ### 4.3 The path
 
@@ -296,7 +296,7 @@ A point mass of 34 t flown exactly along the path (the estimate of §5.5, not th
 | 5.4 s | 1,312 m | 158 m | 68.9 m/s | 0.46 g | 181 kN | 0 |
 | 11.9 s | 912 m | 116 m | 55.6 m/s | 0.55 g | 206 kN | 0 |
 | 20.5 s | 512 m | 74 m | 38.0 m/s | 0.68 g | 245 kN | 0 |
-| 26.8 s | 313 m | 53 m | 27.2 m/s | 0.76 g | 261 kN | 0 |
+| 26.7 s | 313 m | 53 m | 27.2 m/s | 0.76 g | 261 kN | 0 |
 | 36.0 s | 113 m | 32 m | 16.3 m/s | 0.85 g | 289 kN | 96 % |
 | 49.5 s | 0 | 20 m | 0 | 0.99 g | 332 kN | 100 % |
 
@@ -362,8 +362,8 @@ the hover, after a long, quiet, precise approach in a turning frame.
 
 ### 5.5 How these numbers were made
 
-`node flight/orbit/tools/ring_air_estimate.mjs` prints them. A point mass flown exactly along the path in the Ring's turning frame: the specific force from the path's
-own accelerations and the frame's centrifugal and Coriolis terms, the mass falling at a specific impulse of
+`node flight/orbit/tools/ring_air_estimate.mjs` prints them. A point mass flown exactly along the path in
+the Ring's turning frame: the specific force from the path's own accelerations and the frame's centrifugal and Coriolis terms, the mass falling at a specific impulse of
 2,000 s, from 34 t at the FAF; the hover and descent by the deck crew's descent law (2 m/s, easing at
 0.45 m/s² to 0.3 m/s at the touch); the capture as a radial departure, a coast and one burn. The tour's
 propellant from the native core at 7eccaf8, flying the tour's sequence (crew to orbit, dock, the deck

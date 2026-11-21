@@ -19,9 +19,10 @@ const CSS = `
 // commands that only change what is shown: they leave the tour running
 const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view', 'fd', 'quality']);
 // The keys that fly the craft or walk the walker, held rather than pressed (input.js, walk-view.js): they are no
-// command, but a hand on them takes over as a command does. Looking about (a drag, the wheel) does not, nor do
-// Shift and Ctrl alone, which also change other keys (shift-N, the map's next view).
-export const HAND_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e', 'i', 'k', 'j', 'l', 'u', 'm', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
+// command, but a hand on them takes over as a command does, the throttle's (= + −) as the stick's. Looking about
+// (a drag, the wheel) does not, nor do Shift and Ctrl alone, which also change other keys (shift-N, the map's
+// next view) or are the browser's.
+export const HAND_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e', 'i', 'k', 'j', 'l', 'u', 'm', '=', '+', '-', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 export const tour = {
   name: 'tour',

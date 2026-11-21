@@ -7,14 +7,14 @@ export const HELP = [
   ['W S / ↑ ↓', 'pitch down / up'],
   ['A D / ← →', 'bank left / right'],
   ['Q E', 'yaw (nose wheel on the ground)'],
-  ['= −, Shift Ctrl', 'throttle up / down (= and − leave Ctrl, which the browser shares, alone);  Z full, X cut'],
+  ['= −', 'throttle up / down, held (+ and the keypad\'s + − too);  Z full, X cut'],
   ['I K  J L  U M', 'small thrusters: fore/aft, left/right, up/down'],
   ['1 2 3 4 5 6', 'attitude hold, prograde, retrograde, the Ring, the hub\'s port, the deck (hover)'],
   ['G  B', 'gear;  brakes'],
   ['T', 'in orbit: the crew flies the approach'],
   ['P', 'the crew docks at the hub; docked: let go'],
   ['C', 'the crew lands on the Ring\'s flight deck'],
-  ['6, on the deck', 'hover: W S A D fly against the deck, let go to hold; = − (or Shift Ctrl) climb, sink (the middle holds)'],
+  ['6, on the deck', 'hover: W S A D fly against the deck, let go to hold; = − climb, sink (the middle holds)'],
   ['7', 'on the deck: the crew takes off, out through the roof\'s gap to the hold point (then R flies home)'],
   ['R', 'the crew flies home to KDFW'],
   ['Enter', 'docked: go aboard the Ring and walk'],
@@ -63,15 +63,11 @@ export function helpHtml(rows) {
   return rows.map(([k, v]) => `<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('');
 }
 
-// The command keys (key()'s map) by the physical key, for when Shift, held for the throttle, makes them another
-// character: Shift-. is >, Shift-1 is !.
+// The command keys (key()'s map) by the physical key, for when Shift, held for + (the throttle's key with Shift on
+// some layouts) or from habit, makes them another character: Shift-. is >, Shift-1 is !.
 const SHIFTED = {
   Comma: ',', Period: '.', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Digit6: '6', Digit8: '8', Digit9: '9',
 };
-// The page's letter keys. Ctrl is the throttle's key, held while the others fly, and with it the browser would
-// take them for its own shortcuts (Ctrl-S saves the page, Ctrl-D bookmarks it): those a page may refuse are
-// refused. Ctrl-W, Ctrl-T and Ctrl-N the browser keeps for itself, whatever the page asks.
-const LETTERS = new Set(['w', 'a', 's', 'd', 'q', 'e', 'i', 'k', 'j', 'l', 'u', 'm', 'z', 'x', 'g', 'b', 'c', 'p', 'r', 't', 'o', 'v', 'h', 'f', 'n', 'y']);
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -120,13 +116,12 @@ export class Input {
         1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', 5: 'sas4', 6: 'sas5', 7: 'takeoff', c: 'deck', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
         f: 'moon', 9: 'quality', 8: 'fd',
       };
-      const c = map[k] ?? (e.shiftKey && SHIFTED[e.code] ? map[SHIFTED[e.code]] : undefined);   // Shift held for the throttle
+      const c = map[k] ?? (e.shiftKey && SHIFTED[e.code] ? map[SHIFTED[e.code]] : undefined);   // Shift held, for + or from habit
       if (c !== undefined) this.commands.push(c);
     }
     if (down) this.held.add(k);
     else this.held.delete(k);
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace'].includes(k)) e.preventDefault();
-    if (down && e.ctrlKey && !e.metaKey && LETTERS.has(k)) e.preventDefault();   // Ctrl held for the throttle: not the browser's shortcut
   }
 
   // The screen's controls: a stick under the left thumb, a throttle under the right, buttons.
@@ -162,9 +157,10 @@ export class Input {
     let roll = (on('d', 'ArrowRight') ? 1 : 0) - (on('a', 'ArrowLeft') ? 1 : 0);
     let yaw = (on('e') ? 1 : 0) - (on('q') ? 1 : 0);
     let tx = (on('i') ? 1 : 0) - (on('k') ? 1 : 0), ty = (on('l') ? 1 : 0) - (on('j') ? 1 : 0), tz = (on('m') ? 1 : 0) - (on('u') ? 1 : 0);
-    // the throttle: = and − (Shift turns = into +), or Shift and Ctrl; held, as the stick is. Ctrl held with the
-    // flying keys gives the browser Ctrl-W, which closes the tab whatever a page asks: = and − give it nothing.
-    let throttleRate = (on('Shift', '=', '+') ? 0.6 : 0) - (on('Control', '-') ? 0.6 : 0);
+    // the throttle: = and − (Shift turns = into +; the keypad's + and − are the same keys), held, as the stick is.
+    // Not Shift or Ctrl, as it once was: Ctrl held with the flying keys gives the browser Ctrl-W, which closes the
+    // tab whatever a page asks, and Shift alone with no Ctrl to pair it would be half a throttle (2026-11-21).
+    let throttleRate = (on('=', '+') ? 0.6 : 0) - (on('-') ? 0.6 : 0);
     if (this.touch.active) { pitch += this.touch.pitch; roll += this.touch.roll; }
     let pads = [];
     try { pads = navigator.getGamepads ? navigator.getGamepads() : []; } catch { pads = []; }   // a frame may refuse gamepads

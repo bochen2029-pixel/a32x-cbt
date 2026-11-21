@@ -224,7 +224,7 @@
     <tr><td class="k"><kbd>W</kbd> <kbd>S</kbd>, <kbd>↑</kbd> <kbd>↓</kbd></td><td>left stick</td><td>pitch down, up</td></tr>
     <tr><td class="k"><kbd>A</kbd> <kbd>D</kbd>, <kbd>←</kbd> <kbd>→</kbd></td><td>left stick</td><td>bank left, right</td></tr>
     <tr><td class="k"><kbd>Q</kbd> <kbd>E</kbd></td><td>right stick</td><td>yaw; the nose wheel on the ground</td></tr>
-    <tr><td class="k"><kbd>=</kbd> <kbd>−</kbd>, <kbd>Shift</kbd> <kbd>Ctrl</kbd>; <kbd>Z</kbd> <kbd>X</kbd></td><td>triggers</td><td>throttle up, down, held; full, cut. <kbd>=</kbd> and <kbd>−</kbd> leave out Ctrl, whose W the browser takes to close the tab whatever a page asks. Thrust follows the throttle with a 0.4 s lag</td></tr>
+    <tr><td class="k"><kbd>=</kbd> <kbd>−</kbd>; <kbd>Z</kbd> <kbd>X</kbd></td><td>triggers</td><td>throttle up, down, held; full, cut. Not Shift or Ctrl: Ctrl held with the flying keys gives the browser Ctrl-W, which closes the tab whatever a page asks. Thrust follows the throttle with a 0.4 s lag</td></tr>
     <tr><td class="k"><kbd>I</kbd> <kbd>K</kbd> <kbd>J</kbd> <kbd>L</kbd> <kbd>U</kbd> <kbd>M</kbd></td><td>d-pad</td><td>the small thrusters: fore and aft, left and right, up and down (the d-pad gives the first two)</td></tr>
     <tr><td class="k"><kbd>1</kbd> to <kbd>6</kbd> · HOLD</td><td>X cycles them</td><td>hold the attitude, prograde, retrograde, toward the Ring, on the hub's port (for docking), the deck hold (hovering)</td></tr>
     <tr><td class="k"><kbd>G</kbd>, <kbd>B</kbd> · GEAR, BRAKES</td><td>Y, Back</td><td>gear, which comes up only off the ground: with weight on it, on the runway or the deck, it stays locked down; brakes</td></tr>
@@ -486,7 +486,7 @@
     <li>From the hold point (<kbd>T</kbd>, or docked and let go), press <kbd>C</kbd>: the crew burns out, coasts while the pad comes round, and makes its final burn down through the roof's gap.</li>
     <li>When the status line reads DESCENDING, 6 m over the pad, press <kbd>Space</kbd>. You have the deck hold, the throttle at its middle: the craft holds its place and its height.</li>
     <li>Fly it over the pad's centre with <kbd>W</kbd> <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> and let go; the hold keeps the place. The approach display's PLAN shows the pad.</li>
-    <li>Shut the throttle (<kbd>X</kbd>): the sink eases to a touchdown's near the deck and the craft lands. On the deck, the throttle opened (<kbd>=</kbd> or <kbd>Shift</kbd>) lifts it off again, and <kbd>7</kbd> gives the take-off to the crew.</li>
+    <li>Shut the throttle (<kbd>X</kbd>): the sink eases to a touchdown's near the deck and the craft lands. On the deck, the throttle opened (<kbd>=</kbd>) lifts it off again, and <kbd>7</kbd> gives the take-off to the crew.</li>
   </ol>
   <h3>The oracle</h3>
   <p>The tests ask the same solver for the least propellant a plan of its discretization lands with from the hold point (<code>oracle_against_the_crew</code>), with nothing of the crew's rules but the cone, the spokes' side and a level end: the whole drive, no price on time, no limit on how fast the thrust changes, no lit drive, no gate, the touch 3 m over the pad's centre at 0.3 m/s. It is posed on an exact grid, every window's edge a node, and it is the best plan of that discretization, not a bound on every guidance: holding the thrust over each interval and taking the drive's bound by its tangent restrict it, and holding the cone and the side only at the nodes relaxes it. Its cost falls smoothly as the plan lengthens across 40 to 400 s (<code>oracle_length_search</code>: no step at any half second), so its least over that bracket is at the bracket's end: <b>301.5 m/s, 525 kg, a plan 400 s long</b>, at full thrust or shut. Longer plans cost less still, 295.9 m/s at 1,000 s: the bracket sets the least. It converges: 301.71, 301.51 and 301.48 m/s at 40, 80 and 160 intervals.</p>
@@ -1014,7 +1014,9 @@ node --test flight/orbit/guide/build-guide.test.mjs  # its figures and screensho
     <tr><td>09:52–12:33</td><td>The deck crew by a plan of least propellant, and its take-off (9d7398a, merged 60e2582); the tour lands on the deck (bb03337), and the two faults its first run found (204a3a4).</td></tr>
     <tr><td>12:35–14:13</td><td>The page played by hand and fixed where a person meets it (merged c0070ad); the hub's fittings solid (04b0f8a); the throttle on = and − (24635a0).</td></tr>
     <tr><td>12:47–15:14</td><td>The page holds its frame rate, the Earth worked out at half size, fewer draws (1b8b6d6, merged d2ffd35).</td></tr>
-    <tr><td>12:56–15:39</td><td>The third audit's fixes: D4, D5, the flight home flown again and kept clear of the Ring, pool 2030 (08375e6), the deck's oracle on an exact grid (216a350); merged at 2638c37, the commit this guide describes.</td></tr>
+    <tr><td>12:56–15:39</td><td>The third audit's fixes: D4, D5, the flight home flown again and kept clear of the Ring, pool 2030 (08375e6), the deck's oracle on an exact grid (216a350); merged at 2638c37.</td></tr>
+    <tr><td>15:40–17:06</td><td>The guide refreshed at 2638c37 (8d6626a), and what its refresh found (d223597); the standalone repository given a lockfile, so that <code>npm ci</code> works there (297b108).</td></tr>
+    <tr><td>17:30–18:50</td><td>On the owner's answers: the sketch is MIT, every built page carrying its licence and notices (7eccaf8); the open Ring's air and the autoland into it, specified for the Unreal version (0086c70); the throttle on = and − alone, and thrust vectoring and a joystick on the list.</td></tr>
   </table>
 </section>
 
