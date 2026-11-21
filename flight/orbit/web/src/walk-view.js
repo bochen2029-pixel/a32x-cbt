@@ -134,7 +134,7 @@ function start(ctx, place) {
     if (button) button.textContent = 'USE';
   }
   document.body.classList.add('walking');
-  const words = { [PLACE.hatch]: 'Aboard the Ring: the hub\'s lobby, at three hundredths of a g. The lifts are ahead.', [PLACE.lift]: 'In lift 1\'s car, at the hub. E: ride down.', [PLACE.floor]: 'On the floor, at one g, by lift 1.' };
+  const words = { [PLACE.hatch]: 'Aboard the Ring: the hub\'s lobby, at three hundredths of a g. The lifts are ahead.', [PLACE.lift]: `In lift 1's car, at the hub. ${ctx.hud && ctx.hud.touch ? 'USE' : 'E'}: ride down.`, [PLACE.floor]: 'On the floor, at one g, by lift 1.' };
   say(ctx, words[place]);
 }
 

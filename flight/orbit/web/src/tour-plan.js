@@ -14,6 +14,7 @@ const AUTO_CREW = 1;   // orbit_core.h's OC_AUTO_CREW
 export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5, terminal: 6, approach: 7, flare: 8, rollout: 9, stopped: 10 };
 
 const km = (m) => (m / 1000).toFixed(m < 100000 ? 1 : 0);
+const restart = (s) => (s.touch ? 'RESTART' : 'Backspace');   // a phone has no Backspace: its button
 
 // what the tour reads, from the page's blocks, in one flat record
 export function snapshot(core, walking, wall, extra = {}) {
@@ -25,6 +26,7 @@ export function snapshot(core, walking, wall, extra = {}) {
     retPhase: Math.round(r.phase || 0), dv: r.dv ?? 0, togo: r.togo ?? 0, heat: r.heat ?? 0, heatPeak: r.heatPeak ?? 0,
     load: r.load ?? 0, tdAlong: r.tdAlong ?? 0, tdSink: r.tdSink ?? 0, tdOff: r.tdOff ?? 0, stopAlong: r.stopAlong ?? 0,
     walking, wall, skipping: !!extra.skipping,   // the flight home skipping ahead to its burn (return-view.js)
+    touch: !!extra.touch,                        // a touch screen: the buttons' names in the captions
   };
 }
 
@@ -146,7 +148,7 @@ export const STAGES = {
   done: {
     enter: { warp: 1 },
     title: 'Home',
-    text: (s) => `Stopped on 17C, ${km(s.stopAlong)} km down the runway: from the runway to the Ring and back. Backspace starts again.`,
+    text: (s) => `Stopped on 17C, ${km(s.stopAlong)} km down the runway: from the runway to the Ring and back. ${restart(s)} starts again.`,
     next: (s, m) => (m.wall > 15 ? 'end' : null),
   },
 };
@@ -157,7 +159,7 @@ export const ORDER = Object.keys(STAGES);
 // { stage, memory, commands, warp, view, walk, caption, ended }. A crash ends the tour with the reason.
 export function tourStep(stage, memory, s) {
   const out = { stage, memory, commands: [], warp: null, view: null, walk: null, caption: null, ended: false };
-  if (s.crashed) return { ...out, ended: true, caption: { title: 'The tour ends', text: 'The craft crashed: Backspace starts again.' } };
+  if (s.crashed) return { ...out, ended: true, caption: { title: 'The tour ends', text: `The craft crashed: ${restart(s)} starts again.` } };
   let st = STAGES[stage];
   if (!memory.entered) {
     memory.entered = true;

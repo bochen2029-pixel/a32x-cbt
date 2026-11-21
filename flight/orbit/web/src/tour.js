@@ -129,7 +129,7 @@ export const tour = {
     if (!this.on) return;
     this.wall += dt;
     const walking = !!(ctx.walk && ctx.walk.v.on);
-    const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall, { skipping: ret.skipping }));
+    const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall, { skipping: ret.skipping, touch: this.touch }));
     // back aboard before the flight's commands: while walking, the walk holds them
     if (out.walk === 'stop' && walking) ctx.walk.stop('Back aboard');
     for (const c of out.commands) this.give(ctx, c);

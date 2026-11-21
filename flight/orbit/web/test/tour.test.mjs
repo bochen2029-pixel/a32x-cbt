@@ -119,7 +119,10 @@ test('the skip of the wait is asked again if it was not taken, and never while i
 test('a crash ends the tour and says so', () => {
   const outs = drive([{ t: 0 }, { t: 50, crashed: true, wall: 1 }]);
   assert.equal(outs.at(-1).ended, true);
-  assert.match(outs.at(-1).caption.text, /crashed/);
+  assert.match(outs.at(-1).caption.text, /crashed: Backspace starts again/);
+  // a phone has no Backspace: the captions name its button
+  assert.match(drive([{ t: 0, touch: true }, { t: 50, crashed: true, wall: 1, touch: true }]).at(-1).caption.text, /crashed: RESTART starts again/);
+  assert.match(STAGES.done.text({ ...base, stopAlong: 2121, touch: true }), /RESTART starts again\.$/);
 });
 
 test('started anywhere, the tour starts on the runway: its reset first, and the captions the runway\'s', () => {
