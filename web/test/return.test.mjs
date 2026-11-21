@@ -11,7 +11,7 @@ import { AUTO, Core, PH } from '../src/core.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const header = readFileSync(join(here, '..', '..', 'core', 'orbit_return.h'), 'utf8');
-const threePath = join(here, '..', '..', '..', 'web', 'node_modules', 'three', 'build', 'three.module.js');
+const threePath = join(here, '..', '..', 'node_modules', 'three', 'build', 'three.module.js');
 const built = resolve(process.env.ORBIT_CORE || join(here, '..', '..', 'build-wasm', 'orbit_core.js'));
 const noThree = !existsSync(threePath) && `three.js is not at ${threePath}: npm ci in flight/web`;
 

@@ -1,3 +1,5 @@
+> Split from a32x-cbt's `flight/orbit` at 21252be, with its history (8ba7af0 is the last commit of it). MIT (`LICENSE`; others' code in a built page: `NOTICE.md`). `vendor/flight-web` is a32x-cbt's KDFW drawing, which the page reuses; `tools/zip.mjs` and `tools/chrome.mjs` are a32x-cbt's own. Build and test: `CLAUDE.md`.
+
 # Runway to Ring — the orbit sketch
 
 A sketch, made on the operator's word of 2026-11-12 and outside `ROADMAP.md`'s phases: a spaceplane
@@ -13,7 +15,7 @@ a simulation of any real vehicle and is fit for nothing but a look.
 
 ## Open it
 
-Build it (below) and open `flight/orbit/build-web/index.html`. It runs from `file://` and fetches
+Build it (below) and open `build-web/index.html`. It runs from `file://` and fetches
 nothing. Add `?at=775` to the address to start in orbit, or any number of seconds into the crew's
 flight.
 
@@ -621,7 +623,7 @@ on a pass 1,020 km off the plane; with the factor within 1.2, 73 of 73 landed, a
 within 700 km of the plane and 18 of 30 where it lay 1,000 km off.) The plan now takes a pass only with
 the reach left at lift over drag 20 % below the model's, which a model 25 to 33 % optimistic outruns.
 
-Run it: `flight/orbit/build/test_return monte_carlo <first> <count> <pool> [density wave coefficients]`
+Run it: `build/test_return monte_carlo <first> <count> <pool> [density wave coefficients]`
 prints a line for each run and the rate with a 95 % Wilson interval; shard a pool across processes by
 `first`.
 
@@ -700,8 +702,8 @@ moonlight on the ground and in the night sky; the Moon's physical libration (0.0
 the craters' wear and the rays' directions are this project's; the maria's outlines and the craters'
 places are the Gazetteer's.
 
-`web/data/moon.js` is made by `node flight/orbit/web/tools/moon.mjs <MOON_nomenclature_center_pts.dbf> <pages>`,
-and `web/data/stars.js` by `node flight/orbit/web/tools/stars.mjs <slice.csv> ...`; each tool says where its
+`web/data/moon.js` is made by `node web/tools/moon.mjs <MOON_nomenclature_center_pts.dbf> <pages>`,
+and `web/data/stars.js` by `node web/tools/stars.mjs <slice.csv> ...`; each tool says where its
 inputs come from.
 
 ### Graphics, from a phone to a big card
@@ -1222,17 +1224,17 @@ On the owner's list, none of it built yet:
 The core and its tests, natively:
 
 ```
-cmake -S flight/orbit -B flight/orbit/build
-cmake --build flight/orbit/build
-ctest --test-dir flight/orbit/build --output-on-failure
+cmake -S flight/orbit -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
 The same as WebAssembly, with Emscripten 6.0.12 (`docs/provenance.md`, 2b), and its tests under node:
 
 ```
-emcmake cmake -S flight/orbit -B flight/orbit/build-wasm
-cmake --build flight/orbit/build-wasm
-ctest --test-dir flight/orbit/build-wasm --output-on-failure
+emcmake cmake -S flight/orbit -B build-wasm
+cmake --build build-wasm
+ctest --test-dir build-wasm --output-on-failure
 ```
 
 That build also makes `orbit_core_plain.js`, the core as plain JavaScript, which the page runs and says
@@ -1241,26 +1243,26 @@ so where a host will not run WebAssembly. Emscripten marks that mode (`-sWASM=0`
 The page, which uses `flight/web`'s three.js and esbuild (`npm ci` in `flight/web` first), and its tests:
 
 ```
-node flight/orbit/web/tools/build.mjs --core flight/orbit/build-wasm/orbit_core.js --core-js flight/orbit/build-wasm/orbit_core_plain.js
-node --test flight/orbit/web/test/*.test.mjs
+node web/tools/build.mjs --core build-wasm/orbit_core.js --core-js build-wasm/orbit_core_plain.js
+node --test web/test/*.test.mjs
 ```
 
 `build-web/index.html` is the whole page in one file, about 2 MB; `build-web/page.html` is the same
 without the document's skeleton, for a host that wraps a page in its own.
 
 Each part's tests are `test/test_<part>.cpp`, and ctest runs each test by the name it declares in a line
-reading `// TEST: <name>` (`ctest -R dock` runs docking's). `flight/orbit/build/orbit_run 10 900` prints
-the crew's flight every 10 s for 900 s. `flight/orbit/build/orbit_fingerprint` prints the state's hash and
+reading `// TEST: <name>` (`ctest -R dock` runs docking's). `build/orbit_run 10 900` prints
+the crew's flight every 10 s for 900 s. `build/orbit_fingerprint` prints the state's hash and
 every readout block's digest at 3,756 marks along twelve flights: built at two commits and diffed, it shows
 whether a change moved anything (`INVARIANTS.md`, O16).
-`web/data/land.js` is made by `node flight/orbit/web/tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>`.
+`web/data/land.js` is made by `node web/tools/land.mjs <ne_50m_land.geojson> <ne_50m_lakes.geojson>`.
 
 The core is deterministic: the same inputs give the same state, and the tests check it by a hash of the
 state. Native and WebAssembly runs agree to the digits printed above, not bit for bit.
 
-The guide, a PDF for whoever comes to the sketch cold (`guide/`): `node flight/orbit/guide/build-guide.mjs`
+The guide, a PDF for whoever comes to the sketch cold (`guide/`): `node guide/build-guide.mjs`
 opens the built page in Chrome, Chromium or Edge over the DevTools protocol, takes its screenshots there
 and prints `guide/guide.html` to `guide/out/Runway-to-Ring-guide.pdf`; a quarter to half an hour in
 software GL. `--list` names the screenshots, `--only` retakes some, `--skip-shots` only prints. `guide/out/`
-is not committed. `node --test flight/orbit/guide/build-guide.test.mjs` holds the guide's figures and the
+is not committed. `node --test guide/build-guide.test.mjs` holds the guide's figures and the
 tool's screenshots to each other.

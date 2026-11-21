@@ -103,7 +103,7 @@ three tests pass, and so do the other 26, natively and as WebAssembly.
   `OC_APO` reads 10¹² m and `OC_T_APO` 0, and the page's HUD reads an `apo` over 10⁹ as "escape".
   `orbit_core.h` should say so.
 
-The three fixes, as they were tried (`flight/orbit/core/orbit_core.cpp`):
+The three fixes, as they were tried (`core/orbit_core.cpp`):
 
 ```diff
 -    if (energy >= 0) { o.a = 0; o.e = 1; o.apo = 1e12; o.peri = h2 / (2 * MU) - RE; o.tApo = 0; return o; }

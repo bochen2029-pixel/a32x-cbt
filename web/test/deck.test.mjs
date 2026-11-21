@@ -69,7 +69,7 @@ test('docked, LAND DECK and TAKE OFF say how to let go in the words of the keys 
 });
 
 // deck-view.js draws with three.js: from flight/web's packages, as the page's build resolves 'three' (dock.test.mjs)
-const threePath = join(here, '..', '..', '..', 'web', 'node_modules', 'three', 'build', 'three.module.js');
+const threePath = join(here, '..', '..', 'node_modules', 'three', 'build', 'three.module.js');
 const noThree = !existsSync(threePath) && `three.js is not at ${threePath}: npm ci in flight/web`;
 
 test('HOLD keeps the deck hold while riding with the deck, whose one g the attitude hold would let the craft fall in', { skip: noThree }, async () => {

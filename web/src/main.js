@@ -5,10 +5,10 @@
 // frame reaches the screen is the pipeline's (pipeline.js). MIT.
 
 import * as THREE from 'three';
-import { Airport } from '../../../web/src/airport.js';
-import { findRunwayEnd, validateAirport } from '../../../web/src/airport-layout.js';
-import { origin } from '../../../web/src/scene-math.js';
-import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
+import { Airport } from '../../vendor/flight-web/src/airport.js';
+import { findRunwayEnd, validateAirport } from '../../vendor/flight-web/src/airport-layout.js';
+import { origin } from '../../vendor/flight-web/src/scene-math.js';
+import KDFW from '../../vendor/flight-web/data/kdfw.json' with { type: 'json' };
 import { AUTO, DT, HUB_PORT_M, PH, SAS, START, loadCore } from './core.js';
 import { Craft } from './craft.js';
 import { ridingDeck } from './dock-hud.js';

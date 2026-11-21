@@ -13,8 +13,8 @@
 // never drawn at once. The numbers are fd-hud.js's. MIT.
 
 import * as THREE from 'three';
-import { validateAirport } from '../../../web/src/airport-layout.js';
-import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
+import { validateAirport } from '../../vendor/flight-web/src/airport-layout.js';
+import KDFW from '../../vendor/flight-web/data/kdfw.json' with { type: 'json' };
 import { AUTO } from './core.js';
 import {
   FD_MODES, FD_MODE_WORDS, FD_PH, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, glidePathGates, ilsDeviation, ilsGeometry, ilsShown,

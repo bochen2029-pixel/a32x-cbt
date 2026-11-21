@@ -12,7 +12,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { unzip } from '../../../../app/tools/zip.mjs';
+import { unzip } from '../../tools/zip.mjs';
 import { KIT_DOCS, Refusal, build, check, expectedCanonHash, firstTextBlock, repoRoot, sha256 } from './package.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));

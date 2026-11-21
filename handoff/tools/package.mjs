@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
-import { unzip, zip, ZIP_EPOCH } from '../../../../app/tools/zip.mjs';
+import { unzip, zip, ZIP_EPOCH } from '../../tools/zip.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 

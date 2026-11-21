@@ -19,7 +19,7 @@ import { readNotice } from './notice.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const web = resolve(here, '..');
-const flightWeb = resolve(web, '..', '..', 'web');
+const flightWeb = resolve(web, '..');
 const require = createRequire(join(flightWeb, 'package.json'));
 let esbuild;
 try {

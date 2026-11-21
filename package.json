@@ -1,0 +1,16 @@
+{
+  "name": "runway-to-ring",
+  "private": true,
+  "description": "A spaceplane from KDFW 17C to a ring station in orbit and back, the orbit sketch split from a32x-cbt's flight/orbit.",
+  "license": "MIT",
+  "scripts": {
+    "build": "node web/tools/build.mjs --core build-wasm/orbit_core.js --core-js build-wasm/orbit_core_plain.js",
+    "test": "cd web && node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

@@ -97,7 +97,7 @@ test('docked, a command with nothing to do says what there is to do instead', ()
 });
 
 // dock-view.js draws with three.js: from flight/web's packages, as the page's build resolves 'three' (return.test.mjs)
-const threePath = join(here, '..', '..', '..', 'web', 'node_modules', 'three', 'build', 'three.module.js');
+const threePath = join(here, '..', '..', 'node_modules', 'three', 'build', 'three.module.js');
 const noThree = !existsSync(threePath) && `three.js is not at ${threePath}: npm ci in flight/web`;
 
 test('docked, CREW, TO ORBIT and APPROACH change nothing and say why; HOLD goes from the port\'s on to the deck\'s', { skip: noThree }, async () => {

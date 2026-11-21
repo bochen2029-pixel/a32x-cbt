@@ -3,8 +3,8 @@
 // own geometry (flight/web's drawing of the field, unchanged). fd-view.js draws it; test/fd.test.mjs holds
 // it to the header and to the runway. MIT.
 
-import { GLIDE } from '../../../web/src/airport-layout.js';
-import { localMetres, origin } from '../../../web/src/scene-math.js';
+import { GLIDE } from '../../vendor/flight-web/src/airport-layout.js';
+import { localMetres, origin } from '../../vendor/flight-web/src/scene-math.js';
 import { AUTO } from './core.js';
 import { fixed, fmtDistance } from './hud.js';
 

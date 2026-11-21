@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const three = join(here, '..', '..', '..', 'web', 'node_modules', 'three');
+const three = join(here, '..', '..', 'node_modules', 'three');
 const why = !existsSync(join(three, 'build', 'three.module.js')) && `three.js is not at ${three}: npm ci in flight/web`;
 let bandAngles, EARTH_UPSAMPLE;
 if (!why) {

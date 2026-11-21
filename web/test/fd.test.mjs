@@ -7,9 +7,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { createRequire, register } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { validateAirport } from '../../../web/src/airport-layout.js';
-import { localMetres, origin } from '../../../web/src/scene-math.js';
-import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
+import { validateAirport } from '../../vendor/flight-web/src/airport-layout.js';
+import { localMetres, origin } from '../../vendor/flight-web/src/scene-math.js';
+import KDFW from '../../vendor/flight-web/data/kdfw.json' with { type: 'json' };
 import { AUTO, Core, START } from '../src/core.js';
 import {
   FD_PH, ILS, SOFT, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, glidePathGates, ilsDeviation, ilsGeometry, ilsShown, wrap180,
@@ -19,7 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const header = readFileSync(join(here, '..', '..', 'core', 'orbit_fd.h'), 'utf8');
 const built = resolve(process.env.ORBIT_CORE || join(here, '..', '..', 'build-wasm', 'orbit_core.js'));
 const D2R = Math.PI / 180, FT = 0.3048;
-const threePath = join(here, '..', '..', '..', 'web', 'node_modules', 'three', 'build', 'three.module.js');
+const threePath = join(here, '..', '..', 'node_modules', 'three', 'build', 'three.module.js');
 const noThree = !existsSync(threePath) && `three.js is not at ${threePath}: npm ci in flight/web`;
 
 // the flight home's readouts' names, from return-view.js, which takes 'three' as the page's build resolves it

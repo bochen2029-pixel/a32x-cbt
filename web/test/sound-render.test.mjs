@@ -20,7 +20,7 @@ const find = (name, extra = []) => {
 };
 // Playwright where node finds it, or installed globally beside node; esbuild from flight/web's own
 const playwright = process.env.PLAYWRIGHT_MODULE || find('playwright', [join(dirname(process.execPath), '..', 'lib', 'node_modules')]);
-const esbuild = find('esbuild', [join(here, '..', '..', '..', 'web')]);
+const esbuild = find('esbuild', [join(here, '..', '..')]);
 let why = !playwright ? 'no Playwright: npm install it, or set PLAYWRIGHT_MODULE' : !esbuild ? 'no esbuild: npm ci in flight/web' : '';
 let chromium = null;
 if (!why) {
