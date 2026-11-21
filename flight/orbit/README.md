@@ -26,7 +26,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | W S, ↑ ↓ | left stick | pitch down, up |
 | A D, ← → | left stick | bank left, right |
 | Q E | right stick | yaw; the nose wheel on the ground |
-| Shift, Ctrl; Z, X | triggers | throttle up, down; full, cut |
+| = and −, or Shift and Ctrl; Z, X | triggers | throttle up, down; full, cut (= and − leave out Ctrl, whose W the browser takes to close the tab) |
 | I K, J L, U M | d-pad | the small thrusters: fore and aft, left and right, up and down |
 | 1 2 3 4 5 6 | X cycles | hold attitude, prograde, retrograde, the Ring, the hub's port, the deck (hover) |
 | G, B | Y | gear (it comes up only off the ground: with weight on it, on the runway or the deck, it stays locked down); brakes |
