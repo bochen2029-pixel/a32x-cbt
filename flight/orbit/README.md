@@ -319,7 +319,7 @@ certified in `evidence/`):
 | what it costs, from the hold point | 711 kg of 4,388: 410 m/s of delta-v against the deck's own 221.5 m/s; the burn out 105 kg, the coast 2, the final burn 513, the descent from the gate 91 |
 | the take-off | straight up for 8.6 s, the climb out to 28.4 s, the coast to 108.1 s, at the hold point at 122.6 s: 730 kg; up through the roof's height 615 m from the sector's centre and never under it again; held 0.6 m off the hold point 20 s on |
 | from the pad, home | the take-off, then RETURN from the hold point: on 17C 1.65 h later, 430 m past the threshold, 0.02 m off the centreline, sinking 0.73 m/s; stopped 2,086 m along; 378 kW/m² at the most, 1.64 g; 413 kg for the flight home |
-| the deck's markings and lamps | seven draws: the pads on one texture, the white, yellow and black marks one geometry each, the 48 edge lights and the lead-in lights instanced (456 draws before) |
+| the deck's markings and lamps | seven draws: the pads on one texture, the white, yellow and black marks one geometry each, the 48 edge lights and the lead-in lights instanced (455 before); by the frame meter, on the low tier by the Ring, 576 draws a frame before and 128 after |
 
 Every number here is chosen to make a landing that can be flown from a keyboard and shows the physics.
 None of them describes a real aircraft, ship or station.
