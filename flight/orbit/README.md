@@ -295,7 +295,8 @@ tests (`test/test_walk.cpp`) work each motion out again that way and hold the tw
 | the hub's lobby, 150 m from the axis | 0.03 g. A jump is a leap of 25 m that lasts 21 s and comes down 38.5 m spinward |
 | the legs | push up to 4 m/s² on the rim; where the weight is next to nothing the soles are the limit, μ times it (the lobby's grip floor adds 1 m/s²) |
 | the lift, hub to floor | 334 s: ω²r at each height, 0.19 g at 560 m, 0.82 g at 4 km; pushed sideways at 2ωv, 1.5 m/s²; at rest at the floor at one g; up the same |
-| the floor's plan | 1,824 solid things: 1,500 low blocks, 240 parapets along the canal and across it at the bridges, the spokes' feet, the lifts' shafts |
+| the floor's plan | 1,785 solid things: 1,467 low blocks, 230 parapets along the canal and across it at the bridges, the spokes' feet, the lifts' shafts, the flight deck's two bulkheads and two lock gates |
+| the flight deck | sealed off: walking spinward along the promenade from spoke 1's plaza, the walker stops 0.3 m short of the bulkhead's face, 1.85 km on; a ball thrown at it comes back off it at half its speed |
 
 The lift's ride is chosen for its riders. Coriolis's push 2ωv is sideways and the same at any height, so the
 cruise is the speed that holds it to 1.5 m/s², 16.9 m/s. At the hub the riders weigh three hundredths of a g,
@@ -303,10 +304,20 @@ and a car that left faster than they fall would leave them on its ceiling: it le
 their weight, which makes its distance from the axis a hyperbolic cosine in time. At the floor it starts and
 stops at 1 m/s². While it moves the riders hold its rail.
 
+The flight deck, the open sector between spokes 1 and 2 (the core's 0 and 1; `orbit_core.h`'s OC_DECK_*),
+is no part of the walk. A pressure bulkhead 20 m thick and 312 m tall seals each end, where `orbit_core.h`,
+`deck.cpp` and `ring-plan.js` put them (the tests hold all three equal); the canal ends at a lock gate in front
+of each; no block stands within 15 m; and the walker cannot be set down between them. From the town a
+bulkhead is a great wall with its hangar door, 560 m wide and 210 m tall, its frame lit, a row of windows
+under the roof's edge and a red beacon at each top corner; it shades the town beside it. Over the deck there
+is no roof, no air and none of the roof's lamps: from a lift, or from across the ring, it lies open between
+its bulkheads with its plating, lanes and pads.
+
 The page draws three passes: the real sky first, the flight's own far scene (the ray-cast Earth, its air,
 the stars), from where the eye is in the site frame as the ring turns once in 142 s; then the ring's inside
 over it, far (40 m to 16 km) and near, in the ring's frame, built from the core's plan so the walker meets
-what is drawn. The floor is painted from where it is (grass, the canal's promenade, streets and bridges, the
+what is drawn. The sky is drawn only in the part of the picture where it can be seen: a coarse grid of rays
+from the eye is traced out over the rim walls as the Sun's light is, and the rest is the ring's inside. The floor is painted from where it is (grass, the canal's promenade, streets and bridges, the
 spokes' plazas, lanes, paths under the walls); the blocks carry storeys and windows; the roof is glass on a
 lattice with lamps along it. The Sun lights the band only where it gets in over a rim wall's top, worked out
 for each pixel, with the lattice's soft shadow: on the 12th of November it stands 23.7° out of the ring's
@@ -314,9 +325,22 @@ plane, so the middle of the band has about 50 s of sunlight in each turn and the
 Sun's side none. A fill from the roof's lamps lights the rest, and the band's air hazes what is seen through
 it. The view leans a quarter of the way toward the felt up, so the lift's sideways push is felt.
 
+The walk follows the graphics tier (`quality.js`): it draws through the page's pipeline, so it has the tier's
+cap on the picture's size and, above low, its multisampling and the glow round what is brighter than white.
+At low it does less: no shadow of the roof's lattice and none of the bulkheads, no light from the Earth, the
+grass in one octave, the blocks' windows as their average, the far side's roof and the small things past
+2.5 km (blocks, parapets, lock gates) left out; medium draws those to 7 km, high to the far side. Timed in
+SwiftShader, software and so relative only, a 1280 × 720 frame looking along the band takes 0.52 s at low,
+1.07 s at medium and 1.22 s at high; looking up through the roof, 0.73, 1.62 and 1.55 s. At low that is 0.63
+and 0.93 of what the walk took before it followed the tiers. Above low it is more than before, since the walk
+now draws through the pipeline's multisampled picture and its glow, which software pays for as dearly as the
+scene and a graphics card hardly at all; before, it drew those tiers with no multisampling.
+
 Not in the walk: people, furnishing, doors into the blocks (they are solid), water to swim in (the parapets
-keep the walker out), shadows of the blocks, the spokes and the hub on the floor, the Earth's light, the way
-from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g).
+keep the walker out), the flight deck itself, shadows of the blocks, the spokes and the hub on the floor, the
+way from the port to the hatch, the Earth's tide across the ring (six parts in ten thousand of a g). The town
+the walk is laid out on is its own (`walk.cpp`'s plan); the Ring drawn from outside paints another
+(`ring-plan.js`), and the two do not match.
 
 ### The flight home
 
