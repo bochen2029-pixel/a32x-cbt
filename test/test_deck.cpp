@@ -8,7 +8,8 @@
 // TEST: crew_lands_from_hold
 // TEST: glide_bleeds_the_deck_speed
 // TEST: crew_lands_from_orbit
-// TEST: monte_carlo
+// TEST: monte_carlo_development
+// TEST: monte_carlo_held_out
 // TEST: parked_stays_put
 // TEST: pilot_lands_by_hand
 // TEST: lift_off_and_hold
@@ -29,10 +30,20 @@
 // TEST: deck_hold_flies_true
 // TEST: drift_and_tilt_limits
 // TEST: struck_where_its_shape_meets
+// TEST: oracle_against_the_crew
+// TEST: oracle_converges_and_is_lossless
+// TEST: takeoff_to_the_hold_point
+// TEST: takeoff_refused
+// TEST: pad_to_the_runway
+// TEST: no_window_to_miss
+// TEST: the_coast_is_free
+// TEST: the_plan_is_the_motion
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"
+#include "../core/orbit_return.h"
+#include "../core/deck_plan.h"   // the oracle: the tests' own use of the crew's convex problem, and the state to start draws from
 
 #include <cmath>
 #include <cstdio>
@@ -62,6 +73,8 @@ double get(int i) { return oc_out()[i]; }
 double dk(int i) { return oc_deck_out()[i]; }
 int idk(int i) { return (int)oc_deck_out()[i]; }
 double dock(int i) { return oc_dock_out()[i]; }
+double ret(int i) { return oc_return_out()[i]; }
+double norm3(oc::V3 a) { return std::sqrt(a.x * a.x + a.y * a.y + a.z * a.z); }
 
 bool finite() {
     for (int i = 0; i < oc_out_len(); ++i)
@@ -190,17 +203,20 @@ bool landed() {
     return L.took > 0 && get(OC_CRASHED) == 0;
 }
 
-// Over the pad in the crew's hover, then the pilot takes it in the deck hold, the throttle at its centre.
+// Over the pad at the crew's gate, then the pilot takes it in the deck hold: up to the hover's height,
+// OC_DECK_HOVER_M, and the throttle at its centre there.
 bool hoverByHand() {
     if (!toHold()) return false;
     oc_auto(OC_AUTO_DECK);
     const double t0 = get(OC_T);
     while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) != OC_DECK_PH_DESCEND) oc_step(1);
-    if (idk(OC_DECK_PHASE) != OC_DECK_PH_DESCEND) { CHECK(false, "no hover: phase %d", idk(OC_DECK_PHASE)); return false; }
-    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    if (idk(OC_DECK_PHASE) != OC_DECK_PH_DESCEND) { CHECK(false, "not at the gate: phase %d", idk(OC_DECK_PHASE)); return false; }
+    oc_controls(0, 0, 0, 0.7, 0, 0, 0, 1, 0);
     oc_auto(OC_AUTO_OFF);
     oc_sas(OC_SAS_DECK);
-    oc_step(250);
+    for (int i = 0; i < 2000 && get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < OC_DECK_HOVER_M - 1; ++i) oc_step(1);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    oc_step(400);
     return get(OC_CRASHED) == 0;
 }
 
@@ -231,8 +247,8 @@ void readoutsBlock() {
 }
 
 // Hovering still in the Ring's turning frame takes thrust toward its axis of m w^2 r: by the flight's own
-// readouts, the felt acceleration is w^2 r and points from the craft to the axis. Over the pad in the crew's
-// hover, 20 m up; and lifted by hand to 150 m.
+// readouts, the felt acceleration is w^2 r and points from the craft to the axis. Over the pad 20 m up in the
+// deck hold; and lifted by hand to 150 m.
 void hoverTakesW2r() {
     if (!hoverByHand()) return;
     for (int leg = 0; leg < 2; ++leg) {
@@ -272,14 +288,15 @@ void hoverTakesW2r() {
     CHECK(get(OC_CRASHED) == 0 && finite(), "crashed %.0f", get(OC_CRASHED));
 }
 
-// From the hold point the crew lands on a pad at zero-zero: out into the Ring, the glide, the hover and the
-// descent, inside every tolerance and in under six minutes. Then the pilot has it, held on the deck.
+// From the hold point the crew lands on a pad at zero-zero: a burn out into the Ring, a coast, the final burn down
+// through the roof's gap and the descent from the gate, inside every tolerance and in under six minutes, within a
+// metre of the pad's centre. Then the pilot has it, held on the deck.
 void crewLandsFromHold() {
     if (!toHold()) return;
     const double prop0 = get(OC_PROP);
     const Landing L = crewLands(900);
-    std::printf("  out at %.0f s, the glide at %.0f s, the hover at %.0f s, down at %.0f s, at rest on the deck at %.0f s\n", L.phaseAt[OC_DECK_PH_DEPART],
-                L.phaseAt[OC_DECK_PH_GLIDE], L.phaseAt[OC_DECK_PH_HOVER], L.phaseAt[OC_DECK_PH_DESCEND], L.took);
+    std::printf("  out at %.0f s, the coast at %.0f s, the final burn at %.0f s, the gate at %.0f s, at rest on the deck at %.0f s%s\n", L.phaseAt[OC_DECK_PH_DEPART],
+                L.phaseAt[OC_DECK_PH_WAIT], L.phaseAt[OC_DECK_PH_GLIDE], L.phaseAt[OC_DECK_PH_DESCEND], L.took, L.phaseAt[OC_DECK_PH_HOVER] > 0 ? " (a hover on the way)" : "");
     std::printf("  touchdown on pad %d: sink %.3f m/s, drift %.3f m/s, %.2f m from the centre, %.2f deg off level; %.0f kg of propellant\n", L.pad, L.sink, L.drift,
                 L.off, L.tilt, L.prop);
     CHECK(L.took > 0 && L.took < 360, "took %.0f s", L.took);
@@ -295,9 +312,10 @@ void crewLandsFromHold() {
     CHECK(finite(), "finite");
 }
 
-// The glide is the airliner's part: the speed against the deck bleeds from the deck's own (the craft at rest
-// among the stars) to nothing, the weight the motion gives grows from nothing to one g, and the swivel turns
-// from near aft toward straight down as it does; all the while on the deck's approach path.
+// The final burn (OC_DECK_PH_GLIDE) is the airliner's part become the F-35's: the speed against the deck bleeds from
+// the deck's own (the craft at rest among the stars) to nothing, the weight the motion gives grows from nothing to
+// one g, and the swivel turns from near aft toward straight down as it does; all the while on the crew's plan, the
+// deck's approach path.
 void glideBleedsTheDeckSpeed() {
     if (!toHold()) return;
     oc_auto(OC_AUTO_DECK);
@@ -342,55 +360,12 @@ void crewLandsFromOrbit() {
     CHECK(inTolerance(L), "verdict %d: sink %.3f, drift %.3f, off %.2f, tilt %.2f", L.verdict, L.sink, L.drift, L.off, L.tilt);
 }
 
-// A spread of starting offsets round the hold point, each by seeded thruster pulses, a coast and a turn of
-// the stick: every one lands inside the tolerances. The worst of each number is printed.
+// The tests' own generator: a 64-bit linear congruential one, its top 53 bits a draw in [0, 1).
 struct Rng {
     unsigned long long x;
     double next() { x = x * 6364136223846793005ULL + 1442695040888963407ULL; return (double)(x >> 11) / 9007199254740992.0; }
     double pm() { return next() * 2 - 1; }
 };
-
-void monteCarlo() {
-    const int N = 24;
-    int good = 0, pads[OC_DECK_PADS] = {0};
-    double worstSink = 0, worstDrift = 0, worstOff = 0, worstTilt = 0, worstTook = 0, worstProp = 0, worstLoc = 0, worstGs = 0, bestTook = 1e9;
-    double reach = 0, speed = 0;
-    for (int seed = 1; seed <= N; ++seed) {
-        Rng r{0x9e3779b97f4a7c15ULL * (unsigned long long)seed};
-        if (!toHold()) return;
-        oc_auto(OC_AUTO_OFF);
-        oc_sas(OC_SAS_HOLD);
-        oc_controls(0, 0, 0, 0, r.pm(), r.pm(), r.pm(), 1, 0);   // up to 0.5 m/s2 a side for two seconds
-        oc_step(100);
-        oc_controls(r.pm(), r.pm(), r.pm(), 0, 0, 0, 0, 1, 0);   // a turn of the stick
-        oc_step(25 + (int)(r.next() * 100));
-        oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 0);
-        oc_step(50 * (int)(r.next() * 100));                       // and a coast of up to 100 s
-        reach = std::fmax(reach, get(OC_PORT_RANGE));
-        speed = std::fmax(speed, std::hypot(std::hypot(get(OC_VREL_E), get(OC_VREL_N)), get(OC_VREL_U)));
-        const double from = get(OC_PORT_RANGE);
-        const Landing L = crewLands(1200, true);
-        const bool ok = L.took > 0 && inTolerance(L) && get(OC_CRASHED) == 0;
-        std::printf("  seed %2d: from %5.1f m off the hold point: %s on pad %d in %.0f s, sink %.3f, drift %.3f, %.2f m off, %.2f deg, %.0f kg; off the path %.1f, %.1f m\n", seed,
-                    from, ok ? "landed" : get(OC_CRASHED) > 0 ? "CRASHED" : "NOT LANDED", L.pad, L.took, L.sink, L.drift, L.off, L.tilt, L.prop, L.worstLoc, L.worstGs);
-        if (ok) {
-            ++good;
-            ++pads[L.pad];
-            worstSink = std::fmax(worstSink, L.sink);
-            worstDrift = std::fmax(worstDrift, L.drift);
-            worstOff = std::fmax(worstOff, L.off);
-            worstTilt = std::fmax(worstTilt, L.tilt);
-            worstTook = std::fmax(worstTook, L.took);
-            bestTook = std::fmin(bestTook, L.took);
-            worstProp = std::fmax(worstProp, L.prop);
-            worstLoc = std::fmax(worstLoc, L.worstLoc);
-            worstGs = std::fmax(worstGs, L.worstGs);
-        }
-    }
-    std::printf("  %d of %d landed, on pads %d, %d, %d; starting up to %.0f m off the hold point and %.2f m/s; the worst: sink %.3f m/s, drift %.3f m/s, %.2f m off the centre, %.2f deg off level, %.0f to %.0f s, %.0f kg, off the path %.1f m across and %.1f m in height\n",
-                good, N, pads[0], pads[1], pads[2], reach, speed, worstSink, worstDrift, worstOff, worstTilt, bestTook, worstTook, worstProp, worstLoc, worstGs);
-    CHECK(good == N, "%d of %d landed", good, N);
-}
 
 // On a pad, the drive idle and the brakes on, the craft stays put for ten minutes: the deck carries it round
 // at w r, the gear takes its weight, one g less the Earth's tide (here up to 6e-4 g), and nothing in it creeps.
@@ -546,15 +521,17 @@ void bulkheadIsSolid() {
     CHECK(last > OC_DECK_ARC_M / 2 - 30 && last < OC_DECK_ARC_M / 2, "%.1f m along", last);
 }
 
-// Over the roof outside the open sector, at the height the crew waits at, the craft let down onto the roof
-// meets it: the roof is solid there, as everywhere but the sector.
+// Over the roof outside the open sector, flown there by hand 35 m above it and held, the craft let down onto the
+// roof meets it: the roof is solid there, as everywhere but the sector.
 void roofOutsideIsSolid() {
-    if (!toHold()) return;
-    oc_auto(OC_AUTO_DECK);
-    const double t0 = get(OC_T);
-    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) < OC_DECK_PH_WAIT) oc_step(1);
-    // wait until the craft is over the roof well clear of the sector, then let it down with the small thrusters
-    while (get(OC_CRASHED) == 0 && std::fabs(dk(OC_DECK_SECTOR_S)) < 3000) oc_step(1);
+    if (!hoverByHand()) return;
+    oc_controls(0, 0, 0, 1.0, 0, 0, 0, 1, 0);
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < 335) oc_step(1);
+    oc_controls(-1, 0, 0, 0.5, 0, 0, 0, 1, 0);   // spinward at the stop until, let go, the hold would stop it 1.9 km out, short of the spoke
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_SECTOR_S) + std::pow(std::fmax(dk(OC_DECK_ALONG) - 10, 0.0), 2) / 4 < 1900) oc_step(1);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    for (int i = 0; i < 3000 && std::fabs(dk(OC_DECK_ALONG)) > 0.05; ++i) oc_step(1);
+    // there the plain hold, the drive shut, and down with the small thrusters
     oc_auto(OC_AUTO_OFF);
     oc_sas(OC_SAS_HOLD);
     oc_controls(0, 0, 0, 0, 0, 0, 1, 1, 0);   // down: along the body's z, outward
@@ -575,8 +552,8 @@ void openRoofLetsThrough() {
     if (!toHold()) return;
     oc_auto(OC_AUTO_DECK);
     const double t0 = get(OC_T);
-    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) < OC_DECK_PH_HOVER) oc_step(1);
-    CHECK(idk(OC_DECK_PHASE) == OC_DECK_PH_HOVER, "no hover: phase %d", idk(OC_DECK_PHASE));
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) != OC_DECK_PH_DESCEND) oc_step(1);
+    CHECK(idk(OC_DECK_PHASE) == OC_DECK_PH_DESCEND, "not at the gate: phase %d", idk(OC_DECK_PHASE));
     // up to 380 m by hand, the gear up, then down on the small thrusters past the roof's height
     oc_controls(0, 0, 0, 1.0, 0, 0, 0, 0, 0);
     oc_auto(OC_AUTO_OFF);
@@ -597,14 +574,14 @@ void openRoofLetsThrough() {
 }
 
 // The swivel turns at OC_DECK_SWIVEL_DPS and no further than straight down, and a law that does not ask for
-// it brings it aft: the crew's landing to the hover, then out in the Ring again, where the crew waits, the
-// plain hold takes over from the crew.
+// it brings it aft: the crew's landing to the deck, then hovering by hand 400 m over the pad, the swivel straight
+// down, the plain hold takes over; the craft falls, and is far from the deck when the swivel is aft.
 void swivelAtItsRate() {
     if (!toHold()) return;
     oc_auto(OC_AUTO_DECK);
     double fastest = 0, last = dk(OC_DECK_NOZZLE_DEG), top = 0;
     const double t0 = get(OC_T);
-    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) != OC_DECK_PH_DESCEND) {
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && !(idk(OC_DECK_PHASE) == OC_DECK_PH_LANDED && get(OC_AUTO) == OC_AUTO_OFF)) {
         oc_step(1);
         fastest = std::fmax(fastest, std::fabs(dk(OC_DECK_NOZZLE_DEG) - last) / OC_DT);
         last = dk(OC_DECK_NOZZLE_DEG);
@@ -613,11 +590,12 @@ void swivelAtItsRate() {
     std::printf("  the swivel at most %.2f deg/s (its rate %.1f), down to %.3f deg\n", fastest, OC_DECK_SWIVEL_DPS, top);
     CHECK(fastest <= OC_DECK_SWIVEL_DPS * (1 + 1e-9) && fastest > 0.9 * OC_DECK_SWIVEL_DPS, "%.3f deg/s", fastest);
     CHECK(top <= 90 + 1e-9 && top > 89, "down to %.3f deg", top);
-    // again from the hold point, as far as the wait, and there the plain hold
-    if (!toHold()) return;
-    oc_auto(OC_AUTO_DECK);
-    while (get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) == OC_DECK_PH_DEPART && dk(OC_DECK_HEIGHT) > 1000) oc_step(1);
-    while (get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) == OC_DECK_PH_DEPART && dk(OC_DECK_NOZZLE_DEG) < 60) oc_step(1);   // braking, the swivel down
+    // up by hand to 400 m, and there the plain hold
+    if (!hoverByHand()) return;
+    oc_controls(0, 0, 0, 1.0, 0, 0, 0, 1, 0);
+    while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < 390) oc_step(1);
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+    oc_step(600);
     const double from = dk(OC_DECK_NOZZLE_DEG);
     oc_auto(OC_AUTO_OFF);
     oc_sas(OC_SAS_HOLD);
@@ -717,10 +695,11 @@ void propellantBudget() {
         if (p != phase) { atPhase[p] = get(OC_PROP); phase = p; }
     }
     const double used = prop0 - get(OC_PROP), dv = ISP * G0 * std::log(mass0 / get(OC_MASS));
-    std::printf("  from the hold point at %.0f kg: %.0f kg of %.0f, %.0f m/s of delta-v (w r is %.1f): out and the wait %.0f, the glide %.0f, the hover %.0f, the descent %.0f; %.0f kg left\n",
-                mass0, used, prop0, dv, W * R, atPhase[OC_DECK_PH_DEPART] - atPhase[OC_DECK_PH_GLIDE], atPhase[OC_DECK_PH_GLIDE] - atPhase[OC_DECK_PH_HOVER],
-                atPhase[OC_DECK_PH_HOVER] - atPhase[OC_DECK_PH_DESCEND], atPhase[OC_DECK_PH_DESCEND] - get(OC_PROP), get(OC_PROP));
+    std::printf("  from the hold point at %.0f kg: %.0f kg of %.0f, %.0f m/s of delta-v (w r is %.1f): the burn out %.0f, the coast %.0f, the final burn %.0f, the descent from the gate %.0f; %.0f kg left\n",
+                mass0, used, prop0, dv, W * R, atPhase[OC_DECK_PH_DEPART] - atPhase[OC_DECK_PH_WAIT], atPhase[OC_DECK_PH_WAIT] - atPhase[OC_DECK_PH_GLIDE],
+                atPhase[OC_DECK_PH_GLIDE] - atPhase[OC_DECK_PH_DESCEND], atPhase[OC_DECK_PH_DESCEND] - get(OC_PROP), get(OC_PROP));
     CHECK(get(OC_CRASHED) == 0 && dk(OC_DECK_PHASE) == OC_DECK_PH_LANDED, "no landing");
+    CHECK(atPhase[OC_DECK_PH_HOVER] == prop0, "a hover on the way: the gate missed");
     CHECK(dv > W * R, "%.0f m/s, under the deck's own speed", dv);
     CHECK(used < 0.95 * OC_DECK_PROP_MIN && get(OC_PROP) > 0, "used %.0f kg against the %.0f the landing asks to start", used, OC_DECK_PROP_MIN);
 }
@@ -729,14 +708,14 @@ void propellantBudget() {
 
 // The crew picks a landing up from how the craft moves, not only from where it is. Riding with the deck the
 // craft needs about a g of thrust to stay up; a crew that took it as if it were at rest among the stars would
-// fly it on the small thrusters toward the hold point, and it would fall. Taken from the crew in its final,
-// below the glide's height over the centreline, and given back two seconds later, the crew lands it.
+// fly it on the small thrusters toward the hold point, and it would fall. Taken from the crew in its final, at
+// half a g, under the roof's height over the sector, and given back two seconds later, the crew lands it.
 void crewTakesBackInTheFinal() {
     if (!toHold()) return;
     oc_auto(OC_AUTO_DECK);
     const double t0 = get(OC_T);
     while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 &&
-           !(dk(OC_DECK_APPARENT_G) > 0.5 && std::fabs(dk(OC_DECK_C)) < 5 && dk(OC_DECK_HEIGHT) < 380 && std::fabs(dk(OC_DECK_SECTOR_S)) < OC_DECK_ARC_M))
+           !(dk(OC_DECK_APPARENT_G) > 0.5 && dk(OC_DECK_HEIGHT) < R - OC_RING_ROOF_M && std::fabs(dk(OC_DECK_SECTOR_S)) < OC_DECK_ARC_M / 2))
         oc_step(1);
     const double h0 = dk(OC_DECK_HEIGHT), u0 = dk(OC_DECK_ALONG), g0 = dk(OC_DECK_APPARENT_G);
     CHECK(get(OC_CRASHED) == 0 && g0 > 0.5, "the crew's final: crashed %.0f, %.2f g", get(OC_CRASHED), g0);
@@ -909,24 +888,528 @@ void driftAndTiltLimits() {
     }
 }
 
-// Over the deck the rim walls and the bulkheads are as solid as the rest of the Ring, and the craft strikes them
-// where its shape meets them: flown across at 8 m/s, the right wingtip (7.6 m out, 1.6 m round) meets the rim
-// wall's face with the centre of mass 9.2 m from it; flown tail first along the deck, the fin (15 m behind,
-// 3.2 m round) meets the bulkhead's face with the centre of mass 18.2 m from it.
+// Over the deck the rim walls, the bulkheads and the roof's edges are as solid as the rest of the Ring, and the
+// craft strikes them where its shape meets them: flown across at 8 m/s, the right wingtip (7.6 m out, 1.6 m round)
+// meets the rim wall's face with the centre of mass 9.2 m from it; flown tail first along the deck, the fin (15 m
+// behind, 3.2 m round) meets the bulkhead's face with the centre of mass 18.2 m from it; flown nose first along it
+// with the centre of mass 1.5 m over the roof's height, the nose (13 m ahead, 2 m round, its centre 0.2 m under the
+// craft's) meets the roof's edge, the bulkhead's top, with the centre of mass 13 + sqrt(2^2 - d^2) m short of the
+// sector's end, d the nose's centre over the roof's height: before the nose's centre passes the end.
 void struckWhereItsShapeMeets() {
-    for (int leg = 0; leg < 2; ++leg) {
+    for (int leg = 0; leg < 3; ++leg) {
         if (!hoverByHand()) return;
-        oc_controls(leg == 0 ? 0 : 0.8, leg == 0 ? 0.8 : 0, 0, 0.5, 0, 0, 0, 1, 0);
-        double c = 0, s = 0;
-        for (int i = 0; i < 20000 && get(OC_CRASHED) == 0; ++i) { c = dk(OC_DECK_C); s = dk(OC_DECK_SECTOR_S); oc_step(1); }
-        const double gap = leg == 0 ? OC_RING_WIDTH_M / 2 - dk(OC_DECK_C) : OC_DECK_ARC_M / 2 + dk(OC_DECK_SECTOR_S), want = leg == 0 ? 9.2 : 18.2;
-        std::printf("  flown %s: hit %s with %s, the centre of mass %.2f m from the face (its shape reaches %.1f)\n", leg == 0 ? "across" : "tail first",
-                    hitName((int)dock(OC_DOCK_HIT)), partName((int)dock(OC_DOCK_HIT_PART)), gap, want);
-        (void)c;
-        (void)s;
-        CHECK(get(OC_CRASHED) == 1 && dock(OC_DOCK_HIT) == (leg == 0 ? OC_DOCK_HIT_RIM : OC_DOCK_HIT_BULKHEAD), "hit %s", hitName((int)dock(OC_DOCK_HIT)));
-        CHECK(std::fabs(gap - want) < 0.3, "%.2f m from the face, its shape reaches %.1f", gap, want);
+        if (leg == 2) {   // up slowly to 1.5 m over the roof's height, and held
+            oc_controls(0, 0, 0, 1.0, 0, 0, 0, 1, 0);
+            while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < R - OC_RING_ROOF_M - 20) oc_step(1);
+            oc_controls(0, 0, 0, 0.57, 0, 0, 0, 1, 0);   // 0.2 m/s, and the hold takes the height with little overshoot
+            while (get(OC_CRASHED) == 0 && dk(OC_DECK_HEIGHT) < R - OC_RING_ROOF_M + 1.5) oc_step(1);
+            oc_controls(0, 0, 0, 0.5, 0, 0, 0, 1, 0);
+            oc_step(1500);
+        }
+        oc_controls(leg == 0 ? 0 : leg == 1 ? 0.8 : -0.8, leg == 0 ? 0.8 : 0, 0, 0.5, 0, 0, 0, 1, 0);
+        double h = 0;
+        for (int i = 0; i < 20000 && get(OC_CRASHED) == 0; ++i) { h = dk(OC_DECK_HEIGHT); oc_step(1); }
+        const double over = h - 0.2 - (R - OC_RING_ROOF_M);   // the nose's centre over the roof's height
+        // along the deck the sector's end is a plane through the axis: the floor's arc to it, taken at the craft's own
+        // distance from the axis (300 m up, 6 % short of the floor's)
+        const double arc = leg == 1 ? OC_DECK_ARC_M / 2 + dk(OC_DECK_SECTOR_S) : OC_DECK_ARC_M / 2 - dk(OC_DECK_SECTOR_S);
+        const double gap = leg == 0 ? OC_RING_WIDTH_M / 2 - dk(OC_DECK_C) : arc * (R - h) / R;
+        const double want = leg == 0 ? 9.2 : leg == 1 ? 18.2 : 13.0 + std::sqrt(std::fmax(0.0, 4.0 - over * over));
+        const int wantHit = leg == 0 ? OC_DOCK_HIT_RIM : leg == 1 ? OC_DOCK_HIT_BULKHEAD : OC_DOCK_HIT_ROOF;
+        std::printf("  flown %s: hit %s with %s, the centre of mass %.2f m from the face (its shape reaches %.2f)\n",
+                    leg == 0 ? "across" : leg == 1 ? "tail first" : "nose first over the roof's height", hitName((int)dock(OC_DOCK_HIT)),
+                    partName((int)dock(OC_DOCK_HIT_PART)), gap, want);
+        CHECK(get(OC_CRASHED) == 1 && dock(OC_DOCK_HIT) == wantHit, "hit %s", hitName((int)dock(OC_DOCK_HIT)));
+        CHECK(leg < 2 || (over > 0.5 && over < 1.9 && dock(OC_DOCK_HIT_PART) == OC_DOCK_PART_NOSE), "the nose %.2f m over the roof's height, part %s", over,
+              partName((int)dock(OC_DOCK_HIT_PART)));
+        CHECK(std::fabs(gap - want) < 0.3, "%.2f m from the face, its shape reaches %.2f", gap, want);
     }
+}
+
+// ---- the oracle: the least propellant any guidance could land with ---------------------------------------
+
+// The least propellant that lands the craft from where it is (deck_plan.h, solved by socp.h): the touch, the centre
+// of mass 3 m over pad k's centre (the legs on the deck) sinking at 0.3 m/s, inside the crew's own approach cone
+// (40 m clear of the bulkheads' and rim walls' tops, the craft's half-span in from the walls) and to its side of the
+// Ring's plane among the spokes until its last 15 s, level for its last 3 s; the drive anywhere from shut to full:
+// no share kept back for tracking, no limit on how fast the thrust changes, no lit drive, no other rule of the
+// crew's. Any guidance that keeps to the same cone and spokes uses at least this much. The intervals crowd at the
+// plan's ends as the crew's do; n of them.
+struct Oracle { double tf = 0, dv = 0, prop = 0, lossless = 0; int status = -1, solves = 0; oc::PlanResult plan; };
+
+oc::PlanSpec oracleSpec(int pad, double tf, int n) {
+    const double t = oc::timeOf(oc::g);
+    const oc::RingFrame f = oc::ringFrameAt(t);
+    const oc::V3 d = oc::g.r - f.c, u = oc::g.v - f.vc;
+    const oc::V3 r0{oc::dot(d, f.x), oc::dot(d, f.y), oc::dot(d, f.z)};
+    const oc::V3 v0 = oc::V3{oc::dot(u, f.x), oc::dot(u, f.y), oc::dot(u, f.z)} - oc::V3{r0.z, 0, -r0.x} * W;
+    const double a = padAngle(pad), A0 = OC_DECK_ANGLE_DEG * D2R, BETA = OC_DECK_ARC_M / 2 / R;
+    const oc::V3 out{std::sin(a), 0, std::cos(a)}, up = out * -1.0, spin{std::cos(a), 0, -std::sin(a)}, at = out * R;
+    auto slope = [&](double edge) {   // the cone's edge 40 m over the roof's edge at a bulkhead
+        const oc::V3 e = oc::V3{std::sin(edge), 0, std::cos(edge)} * (OC_RING_ROOF_M - 40) - at;
+        return oc::dot(e, up) / std::fabs(oc::dot(e, spin));
+    };
+    oc::PlanSpec sp;
+    sp.t0 = t;
+    sp.r0 = r0;
+    sp.v0 = v0;
+    sp.m0 = oc::M_DRY + oc::g.prop;
+    sp.tf = tf;
+    sp.n = n;
+    sp.rN = at + up * 3.0;
+    sp.vN = up * -0.3;
+    sp.thrustMax = oc::T_MAX;
+    sp.padAt = at;
+    sp.padUp = up;
+    sp.padSpin = spin;
+    sp.tanS = slope(A0 + BETA);
+    sp.tanA = slope(A0 - BETA);
+    sp.tanC = (R - OC_RING_RIM_M + 40) / (OC_RING_WIDTH_M / 2 - 9);
+    sp.side = r0.y < 0 ? -1 : 1;
+    sp.ySide = OC_DECK_SIDE_M;
+    sp.sideFrom = 0;
+    sp.sideTo = tf - 15;
+    sp.cosLast = std::cos(10 * D2R);
+    sp.tLast = 3;
+    sp.grid = 0.75;
+    return sp;
+}
+
+// The oracle's plan of length tf, n intervals, from where the craft is now.
+bool oracleAt(int pad, double tf, int n, Oracle& o) {
+    const oc::PlanSpec sp = oracleSpec(pad, tf, n);
+    ++o.solves;
+    const bool ok = oc::planLanding(sp, o.plan);
+    o.status = o.plan.status;
+    if (!ok) return false;
+    o.tf = tf;
+    o.dv = o.plan.cost;
+    o.prop = sp.m0 * (1 - std::exp(-o.dv / (ISP * G0)));
+    o.lossless = o.plan.lossless;
+    return true;
+}
+
+// The free final time: golden section on the delta-v over [lo, hi], each length's plan solved afresh.
+Oracle oracleFree(int pad, double lo, double hi, int n, int iterations) {
+    Oracle best, o;
+    best.dv = 1e300;
+    auto J = [&](double tf) {
+        if (!oracleAt(pad, tf, n, o)) { best.solves = o.solves; return 1e300; }
+        if (o.dv < best.dv) { const int solves = o.solves; best = o; best.solves = solves; }
+        best.solves = o.solves;
+        return o.dv;
+    };
+    const double phi = (std::sqrt(5.0) - 1) / 2;
+    double a = lo, b = hi, c = b - phi * (b - a), d = a + phi * (b - a), jc = J(c), jd = J(d);
+    for (int i = 0; i < iterations; ++i) {
+        if (jc < jd) { b = d; d = c; jd = jc; c = b - phi * (b - a); jc = J(c); }
+        else { a = c; c = d; jc = jd; d = a + phi * (b - a); jd = J(d); }
+    }
+    return best;
+}
+
+// The crew's landing from where the craft is, to the touch: the propellant and the time it took.
+struct Touch { double prop = -1, took = -1; int pad = -1; bool landed = false; };
+Touch crewToTheTouch() {
+    Touch T;
+    const double t0 = get(OC_T), p0 = get(OC_PROP);
+    oc_auto(OC_AUTO_DECK);
+    T.pad = idk(OC_DECK_PAD);
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0) {
+        oc_step(1);
+        if (T.took < 0 && dk(OC_DECK_ON_DECK) > 0) { T.took = get(OC_T) - t0; T.prop = p0 - get(OC_PROP); }
+        if (idk(OC_DECK_PHASE) == OC_DECK_PH_LANDED && get(OC_AUTO) == OC_AUTO_OFF) break;
+    }
+    T.landed = get(OC_CRASHED) == 0 && idk(OC_DECK_TD_VERDICT) == OC_DECK_V_LANDED;
+    return T;
+}
+
+// The solver's least propellant from the hold point to the touch on the crew's pad, its plan's length free: burns at
+// full thrust and coasts between them (out, a trim, the braking burn down the cone, and a last one at the floor),
+// the relaxation exact (|u| = sigma wherever the drive burns). The crew, from the same start, uses more, and not more than two fifths again: what its
+// rules cost (a plan's length priced at 0.5 m/s a second, 15 % of the drive kept back to track by, the
+// thrust's rate limited, the drive lit through the last 20 s, the gate 6 m up and a steady descent from it).
+// The optimum is a lower bound: no guidance keeping the same cone and spokes can beat it, and the crew does not.
+// At the crew's own length the oracle shows what the price of time alone costs.
+void oracleAgainstTheCrew() {
+    if (!toHold()) return;
+    const oc::State start = oc::g;
+    const int pad = 1;   // the nearest from the hold point, as the crew picks (crew_lands_from_hold)
+    const Oracle o = oracleFree(pad, 40, 400, 80, 22);
+    std::printf("  the oracle from the hold point to pad %d: %.1f m/s, %.0f kg, the plan %.1f s long (%d solves, status %d); |u| short of sigma by %.1e m/s2 at most\n",
+                pad + 1, o.dv, o.prop, o.tf, o.solves, o.status, o.lossless);
+    CHECK(o.status == 0 && o.lossless < 1e-4, "status %d, lossless %.2e", o.status, o.lossless);
+    // the optimum's shape, as the minimum principle has it for a fuel-optimal thrust: bang-off-bang, the drive shut
+    // or at full thrust but for the intervals a burn starts or ends in, which the held thrust spreads over
+    int burns = 0, full = 0, between = 0;
+    std::printf("  its thrust, %% of full:");
+    for (size_t i = 0; i < o.plan.sigma.size(); ++i) {
+        const double share = o.plan.sigma[i] * std::exp(o.plan.z[i]) / oc::T_MAX;
+        const bool on = share > 0.02, was = i > 0 && o.plan.sigma[i - 1] * std::exp(o.plan.z[i - 1]) / oc::T_MAX > 0.02;
+        if (on && !was) ++burns;
+        if (share > 0.98) ++full;
+        else if (on) ++between;
+        if (on) std::printf(" %.0f", 100 * share);
+        else if (was) std::printf(" |");
+    }
+    std::printf("\n  %d burns, %d of %d intervals at full thrust, %d between\n", burns, full, (int)o.plan.sigma.size(), between);
+    CHECK(burns >= 2 && full > 0 && between <= 2 * burns, "%d burns, %d at full thrust, %d between", burns, full, between);
+    // the crew from the same start
+    const Touch T = crewToTheTouch();
+    oc::g = start;   // the oracle reads the state, not the readouts
+    Oracle atCrew;
+    const bool same = T.took > 0 && oracleAt(pad, T.took, 80, atCrew);
+    std::printf("  the crew: %.0f kg to the touch in %.1f s, %.0f %% over the optimum; the oracle at the crew's length %.0f kg (status %d)\n", T.prop, T.took,
+                100 * (T.prop / o.prop - 1), same ? atCrew.prop : -1.0, atCrew.status);
+    CHECK(T.landed && T.pad == pad, "landed %d on pad %d", T.landed, T.pad);
+    CHECK(T.prop >= o.prop && T.prop < 1.4 * o.prop, "%.0f kg against the optimum %.0f", T.prop, o.prop);
+    CHECK(same && atCrew.prop >= o.prop - 1 && atCrew.prop <= T.prop, "at the crew's length: %.0f kg", atCrew.prop);
+}
+
+// The discretization converges: the optimum's delta-v at 40, 80 and 160 intervals, each length's best, agrees to a
+// fraction of a percent, from above (the held thrust of a coarser plan can only do worse); and a plan that must keep
+// the drive lit at a quarter of its thrust through its last 40 s, at the same length, is still lossless where that
+// least thrust holds it: the relaxation of the non-convex lower bound is exact (Acikmese and Ploen's theorem), the
+// thrust per kilogram exactly sigma on every interval, sigma at its floor on some.
+void oracleConvergesAndIsLossless() {
+    if (!toHold()) return;
+    const int pad = 1;
+    Oracle o[3];
+    const int ns[3] = {40, 80, 160};
+    for (int i = 0; i < 3; ++i) o[i] = oracleFree(pad, 40, 400, ns[i], 18);
+    std::printf("  the optimum at 40, 80, 160 intervals: %.2f, %.2f, %.2f m/s (%.1f, %.1f, %.1f s)\n", o[0].dv, o[1].dv, o[2].dv, o[0].tf, o[1].tf, o[2].tf);
+    CHECK(o[0].status == 0 && o[1].status == 0 && o[2].status == 0, "status %d %d %d", o[0].status, o[1].status, o[2].status);
+    CHECK(o[0].dv >= o[2].dv - 0.5 && o[1].dv >= o[2].dv - 0.5, "the coarser plans cheaper: %.2f %.2f %.2f", o[0].dv, o[1].dv, o[2].dv);
+    CHECK(std::fabs(o[1].dv - o[2].dv) < 0.005 * o[2].dv && std::fabs(o[0].dv - o[2].dv) < 0.02 * o[2].dv, "%.2f %.2f %.2f", o[0].dv, o[1].dv, o[2].dv);
+    // lit through the last 40 s at a quarter of the drive
+    oc::PlanSpec sp = oracleSpec(pad, o[1].tf, 80);
+    sp.thrustMin = 0.25 * oc::T_MAX;
+    sp.minFrom = o[1].tf - 40;
+    sp.minTo = o[1].tf;
+    oc::PlanResult lit;
+    const bool ok = oc::planLanding(sp, lit);
+    int atFloor = 0, inWindow = 0;
+    double worst = 0;
+    for (size_t k = 0; k < lit.sigma.size(); ++k) {
+        if (lit.t[k] - lit.t[0] < sp.minFrom - 1e-9) continue;
+        ++inWindow;
+        const double floor = sp.thrustMin / std::exp(lit.z[k]);
+        if (lit.sigma[k] < 1.01 * floor) ++atFloor;
+        worst = std::fmax(worst, std::fabs(lit.sigma[k] - norm3(lit.u[k])));
+    }
+    std::printf("  lit through its last 40 s: %.2f m/s (status %d); of its %d intervals there, %d at the floor; |u| against sigma within %.1e m/s2\n", lit.cost,
+                lit.status, inWindow, atFloor, worst);
+    CHECK(ok && lit.status == 0 && atFloor > 0 && worst < 1e-4, "ok %d, status %d, %d at the floor, %.2e", ok, lit.status, atFloor, worst);
+    CHECK(lit.cost >= o[1].dv - 1e-3, "lit %.2f against free %.2f", lit.cost, o[1].dv);
+}
+
+// ---- the Monte Carlo ------------------------------------------------------------------------------------
+
+// The draws' own generator: splitmix64 (Steele, Lea and Flood, 2014), each output a strong mix of a counter that
+// starts at the draw's number mixed, so that draws numbered 1, 2, 3 are as unlike as any. (The linear congruential
+// generator above, seeded by multiples of one number, gives streams that agree in their fifth output.)
+struct Mix {
+    unsigned long long x;
+    static unsigned long long mix(unsigned long long z) {
+        z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+        z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+        return z ^ (z >> 31);
+    }
+    explicit Mix(unsigned seed) : x(mix(0x9e3779b97f4a7c15ULL * (seed + 1ULL))) {}
+    double next() { x += 0x9e3779b97f4a7c15ULL; return (double)(mix(x) >> 11) / 9007199254740992.0; }
+    double pm() { return next() * 2 - 1; }
+};
+
+// One draw: where the craft starts from the hold point, and what the crew is told wrong (oc_deck_disturb): the
+// drive's thrust and the craft's mass each 2 % (one standard deviation, held to three), the swivel lagging its
+// command by up to 0.3 s, and the navigation's place and velocity wrong by 0.3 m and 0.05 m/s an axis (one standard
+// deviation, correlated over 2 s: a deck's landing aid, as good as a ship's); the start up to 50 m and 0.5 m/s off
+// the hold point. Normal draws by Box and Muller from the draws' generator, seeded by the draw's number.
+struct Draw { double thrust, mass, lag, dr[3], dv[3]; };
+const double NAV_POS = 0.3, NAV_VEL = 0.05;
+Draw drawOf(unsigned seed) {
+    Mix r(seed);
+    auto normal = [&]() { const double u1 = 1 - r.next(), u2 = r.next(); return std::sqrt(-2 * std::log(u1)) * std::cos(2 * PI * u2); };
+    auto held = [&](double s) { return std::fmax(-3 * s, std::fmin(3 * s, s * normal())); };
+    Draw d;
+    d.thrust = held(0.02);
+    d.mass = held(0.02);
+    d.lag = 0.3 * r.next();
+    for (int i = 0; i < 3; ++i) { d.dr[i] = 50 * r.pm(); d.dv[i] = 0.5 * r.pm(); }
+    return d;
+}
+
+struct Pool {
+    int n = 0, good = 0, crashed = 0, pads[OC_DECK_PADS] = {0};
+    double sink = 0, drift = 0, off = 0, tilt = 0, tookLo = 1e9, tookHi = 0, propLo = 1e9, propHi = 0, propSum = 0;
+};
+
+// The Wilson score interval for k of n at 95 % (z = 1.96): the interval a binomial rate is stated with here.
+void wilson(int k, int n, double* lo, double* hi) {
+    const double z = 1.959964, p = (double)k / n, d = 1 + z * z / n, c = p + z * z / (2 * n), h = z * std::sqrt(p * (1 - p) / n + z * z / (4.0 * n * n));
+    *lo = (c - h) / d;
+    *hi = (c + h) / d;
+}
+
+// The draws from..to, each from the hold point as the snapshot `hold` has it.
+Pool flyPool(const oc::State& hold, unsigned from, unsigned to, bool quiet) {
+    Pool P;
+    for (unsigned seed = from; seed <= to; ++seed) {
+        const Draw d = drawOf(seed);
+        oc::g = hold;
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 0);
+        oc_step(1);   // the readouts, the snapshot's own
+        const oc::RingFrame f = oc::ringFrameAt(oc::timeOf(oc::g));
+        oc::g.r = oc::g.r + f.x * d.dr[0] + f.y * d.dr[1] + f.z * d.dr[2];
+        oc::g.v = oc::g.v + f.x * d.dv[0] + f.y * d.dv[1] + f.z * d.dv[2];
+        oc_deck_disturb(d.thrust, d.mass, d.lag, NAV_POS, NAV_VEL, seed);
+        const Landing L = crewLands(600, true);
+        const bool ok = L.took > 0 && inTolerance(L) && get(OC_CRASHED) == 0;
+        ++P.n;
+        if (get(OC_CRASHED) > 0) ++P.crashed;
+        if (!quiet || !ok)
+            std::printf("    draw %u: thrust %+.3f, mass %+.3f, lag %.2f s: %s on pad %d in %.0f s, sink %.3f, drift %.3f, %.2f m off, %.2f deg, %.0f kg\n", seed, d.thrust,
+                        d.mass, d.lag, ok ? "landed" : get(OC_CRASHED) > 0 ? "CRASHED" : "NOT LANDED", L.pad + 1, L.took, L.sink, L.drift, L.off, L.tilt, L.prop);
+        if (!ok) continue;
+        ++P.good;
+        ++P.pads[L.pad];
+        P.sink = std::fmax(P.sink, L.sink);
+        P.drift = std::fmax(P.drift, L.drift);
+        P.off = std::fmax(P.off, L.off);
+        P.tilt = std::fmax(P.tilt, L.tilt);
+        P.tookLo = std::fmin(P.tookLo, L.took);
+        P.tookHi = std::fmax(P.tookHi, L.took);
+        P.propLo = std::fmin(P.propLo, L.prop);
+        P.propHi = std::fmax(P.propHi, L.prop);
+        P.propSum += L.prop;
+    }
+    return P;
+}
+
+void printPool(const char* name, const Pool& P) {
+    double lo, hi;
+    wilson(P.good, P.n, &lo, &hi);
+    std::printf("  %s: %d of %d landed inside every tolerance (%.1f %%; Wilson 95 %%: %.1f to %.1f %%), %d crashed; on pads 1, 2, 3: %d, %d, %d\n", name, P.good, P.n,
+                100.0 * P.good / P.n, 100 * lo, 100 * hi, P.crashed, P.pads[0], P.pads[1], P.pads[2]);
+    std::printf("    the envelope: sink to %.3f m/s, drift to %.3f m/s, %.2f m off the centre, %.2f deg off level; %.0f to %.0f s; %.0f to %.0f kg (mean %.0f)\n", P.sink,
+                P.drift, P.off, P.tilt, P.tookLo, P.tookHi, P.propLo, P.propHi, P.good ? P.propSum / P.good : 0.0);
+}
+
+// The crew's landing with the world and its own picture of it wrong, from 100 draws. Each lands inside every
+// touchdown tolerance; the rate is stated with its Wilson interval, its lower bound over 95 %, and no draw crashes.
+// Two pools of draws: the development pool (1 to 100), on which the guidance was tuned; and the held-out pool
+// (9001 to 9100), flown once, after the guidance was settled, and reported as it came (README.md). A change to the
+// guidance that is tuned against the held-out pool spends it: the README says so, and a new pool is drawn.
+void monteCarloPool(const char* name, unsigned from, unsigned to) {
+    if (!toHold()) return;
+    const oc::State hold = oc::g;
+    const Pool P = flyPool(hold, from, to, true);
+    printPool(name, P);
+    double lo, hi;
+    wilson(P.good, P.n, &lo, &hi);
+    CHECK(lo > 0.95 && P.crashed == 0, "%d of %d, Wilson from %.3f, %d crashed", P.good, P.n, lo, P.crashed);
+}
+void monteCarloDevelopment() { monteCarloPool("development, draws 1 to 100", 1, 100); }
+void monteCarloHeldOut() { monteCarloPool("held out, draws 9001 to 9100", 9001, 9100); }
+
+// ---- the take-off, and on home ------------------------------------------------------------------------------
+
+// What a take-off came to, as the readouts recorded it.
+struct Climb {
+    double took = -1;              // s from asking to the approach's crew holding the craft at the hold point
+    double prop = 0;               // kg
+    double phaseAt[12];            // s from asking to each phase's start; -1 never
+    double swivelTop = 0, swivelAfter = 90;   // the swivel's angle at its highest in the lift, and its lowest after
+    double roofS = 1e9;            // m from the sector's centre where the craft rose through the roof's height
+    double lowest = 1e9;           // m: the least height over the floor once past the roof
+    double holdRange = 1e9;        // m off the hold point 20 s after the approach's crew took it
+};
+
+// The crew's take-off, from wherever the craft is.
+Climb crewTakesOff(double limit) {
+    Climb C;
+    for (double& a : C.phaseAt) a = -1;
+    const double t0 = get(OC_T), p0 = get(OC_PROP);
+    oc_auto(OC_AUTO_TAKEOFF);
+    if (get(OC_AUTO) != OC_AUTO_TAKEOFF) return C;
+    int phase = -1;
+    double lastH = dk(OC_DECK_HEIGHT);
+    bool past = false;
+    while (get(OC_T) - t0 < limit && get(OC_CRASHED) == 0 && get(OC_AUTO) == OC_AUTO_TAKEOFF) {
+        oc_step(1);
+        const int p = idk(OC_DECK_PHASE);
+        if (p != phase && p >= 0 && p < 12) { C.phaseAt[p] = get(OC_T) - t0; phase = p; }
+        if (p == OC_DECK_PH_LIFT) C.swivelTop = std::fmax(C.swivelTop, dk(OC_DECK_NOZZLE_DEG));
+        if (p == OC_DECK_PH_CLIMB) C.swivelAfter = std::fmin(C.swivelAfter, dk(OC_DECK_NOZZLE_DEG));
+        const double h = dk(OC_DECK_HEIGHT);
+        if (lastH < R - OC_RING_ROOF_M && h >= R - OC_RING_ROOF_M && C.roofS > 1e8) { C.roofS = dk(OC_DECK_SECTOR_S); past = true; }
+        if (past) C.lowest = std::fmin(C.lowest, h);
+        lastH = h;
+    }
+    if (get(OC_AUTO) == OC_AUTO_APPROACH && get(OC_CRASHED) == 0) {
+        C.took = get(OC_T) - t0;
+        C.prop = p0 - get(OC_PROP);
+        oc_step(1000);
+        C.holdRange = get(OC_PORT_RANGE);
+    }
+    return C;
+}
+
+// From the pad the crew takes off as the F-35B does and leaves as the landing came, turned round: straight up 30 m,
+// the swivel down; then its plan, nose antispinward, the swivel going aft as the drive pushes the craft out through
+// the roof's gap shedding the deck's speed (it rises through the roof's height over the sector, and never comes
+// back under it); a coast in, weightless; and a gentle burn that stops it at the approach's hold point, where the
+// approach's crew holds it, inside 10 m. All in under three minutes and 800 kg.
+void takeoffToTheHoldPoint() {
+    if (!landed()) return;
+    oc_step(500);
+    const Climb C = crewTakesOff(600);
+    std::printf("  lift %.1f s, climb %.1f s, coast %.1f s, arrive %.1f s; at the hold point at %.1f s, %.0f kg; the swivel %.0f deg in the lift, %.0f deg in the climb\n",
+                C.phaseAt[OC_DECK_PH_LIFT], C.phaseAt[OC_DECK_PH_CLIMB], C.phaseAt[OC_DECK_PH_COAST], C.phaseAt[OC_DECK_PH_ARRIVE], C.took, C.prop, C.swivelTop,
+                C.swivelAfter);
+    std::printf("  through the roof's height %.0f m from the sector's centre, never under it again (lowest %.0f m over the floor); held %.1f m off the hold point 20 s on\n",
+                C.roofS, C.lowest, C.holdRange);
+    CHECK(get(OC_CRASHED) == 0 && C.took > 0 && C.took < 180, "crashed %.0f, took %.0f s", get(OC_CRASHED), C.took);
+    CHECK(C.phaseAt[OC_DECK_PH_LIFT] >= 0 && C.phaseAt[OC_DECK_PH_LIFT] < 0.1 && C.phaseAt[OC_DECK_PH_CLIMB] > 0 && C.phaseAt[OC_DECK_PH_COAST] > C.phaseAt[OC_DECK_PH_CLIMB] &&
+              C.phaseAt[OC_DECK_PH_ARRIVE] > C.phaseAt[OC_DECK_PH_COAST], "the phases in order: %.1f %.1f %.1f %.1f", C.phaseAt[OC_DECK_PH_LIFT],
+          C.phaseAt[OC_DECK_PH_CLIMB], C.phaseAt[OC_DECK_PH_COAST], C.phaseAt[OC_DECK_PH_ARRIVE]);
+    CHECK(C.swivelTop > 85 && C.swivelAfter < 10, "the swivel %.1f then %.1f", C.swivelTop, C.swivelAfter);
+    CHECK(std::fabs(C.roofS) < OC_DECK_ARC_M / 2 && C.lowest >= R - OC_RING_ROOF_M, "through the roof at %.0f m, lowest %.0f m", C.roofS, C.lowest);
+    CHECK(C.prop < 800 && C.holdRange < 10, "%.0f kg, %.1f m off the hold point", C.prop, C.holdRange);
+}
+
+// The take-off is refused where it makes no sense, says why, and leaves whoever was flying in charge: in orbit (not
+// on the deck nor riding low over it), docked, with too little propellant.
+void takeoffRefused() {
+    if (!toOrbit()) return;
+    oc_auto(OC_AUTO_TAKEOFF);
+    CHECK(dk(OC_DECK_REFUSED) == OC_DECK_NO_NOT_DOWN && get(OC_AUTO) == OC_AUTO_CREW, "in orbit: refused %.0f, auto %.0f", dk(OC_DECK_REFUSED), get(OC_AUTO));
+    if (!landed()) return;
+    oc::g.prop = OC_DECK_TAKEOFF_PROP_MIN - 1;
+    oc_auto(OC_AUTO_TAKEOFF);
+    CHECK(dk(OC_DECK_REFUSED) == OC_DECK_NO_PROP && get(OC_AUTO) == OC_AUTO_OFF, "short of propellant: refused %.0f, auto %.0f", dk(OC_DECK_REFUSED), get(OC_AUTO));
+    oc_step(250);
+    CHECK(get(OC_CRASHED) == 0 && dk(OC_DECK_ON_DECK) == 1, "still on the deck");
+}
+
+// From the pad to a stop on the runway: the crew lands on the deck, takes off to the hold point, and RETURN (the
+// flight home, return.cpp, through its own API and nothing else) flies home from there to a stop on KDFW 17C
+// inside every one of its own limits.
+void padToTheRunway() {
+    if (!landed()) return;
+    oc_step(500);
+    const Climb C = crewTakesOff(600);
+    CHECK(C.took > 0, "no take-off");
+    if (C.took < 0) return;
+    const double t0 = get(OC_T), p0 = get(OC_PROP);
+    oc_auto(OC_AUTO_RETURN);
+    CHECK(get(OC_AUTO) == OC_AUTO_RETURN, "RETURN refused at the hold point");
+    double maxG = 0;
+    while (get(OC_T) - t0 < 200000 && get(OC_CRASHED) == 0 && ret(OC_RET_PHASE) != OC_RET_PH_STOPPED && get(OC_AUTO) == OC_AUTO_RETURN) {
+        oc_step(10);
+        if (get(OC_ON_GROUND) < 0.5) maxG = std::fmax(maxG, get(OC_G));
+    }
+    std::printf("  off the pad to the hold point in %.0f s (%.0f kg); home %.2f h later: down %.0f m past the threshold, %.2f m off the centreline, sinking %.2f m/s; stopped %.0f m along, %.2f m off; heat %.0f kW/m2, load %.2f g; %.0f kg for the flight home\n",
+                C.took, C.prop, (get(OC_T) - t0) / 3600, ret(OC_RET_TD_ALONG), ret(OC_RET_TD_OFF), ret(OC_RET_TD_SINK), ret(OC_RET_STOP_ALONG), ret(OC_RET_STOP_OFF),
+                ret(OC_RET_HEAT_PEAK) / 1000, ret(OC_RET_LOAD_PEAK), p0 - get(OC_PROP));
+    CHECK(get(OC_CRASHED) == 0 && ret(OC_RET_TOUCHED) > 0 && ret(OC_RET_STOPPED) > 0, "crashed %.0f, touched %.0f, stopped %.0f", get(OC_CRASHED), ret(OC_RET_TOUCHED),
+          ret(OC_RET_STOPPED));
+    CHECK(ret(OC_RET_TD_ALONG) > 0 && ret(OC_RET_TD_ALONG) < OC_RET_ZONE_M && std::fabs(ret(OC_RET_TD_OFF)) < 3.0 && ret(OC_RET_TD_SINK) < 2.0,
+          "the touchdown: %.0f m, %.2f m off, %.2f m/s", ret(OC_RET_TD_ALONG), ret(OC_RET_TD_OFF), ret(OC_RET_TD_SINK));
+    CHECK(ret(OC_RET_STOP_ALONG) > 0 && ret(OC_RET_STOP_ALONG) < OC_RET_RUNWAY_M && std::fabs(ret(OC_RET_STOP_OFF)) < OC_RET_RUNWAY_HALF_M, "stopped %.0f m along, %.2f m off",
+          ret(OC_RET_STOP_ALONG), ret(OC_RET_STOP_OFF));
+    CHECK(ret(OC_RET_HEAT_PEAK) < OC_RET_HEAT_LIMIT && ret(OC_RET_LOAD_PEAK) < OC_RET_LOAD_LIMIT && maxG < OC_RET_LOAD_LIMIT && ret(OC_RET_QBAR_PEAK) < OC_RET_QBAR_LIMIT &&
+              ret(OC_RET_OVER) == 0, "a limit passed: heat %.0f, load %.2f (felt %.2f), q %.0f, over %.0f", ret(OC_RET_HEAT_PEAK), ret(OC_RET_LOAD_PEAK), maxG,
+          ret(OC_RET_QBAR_PEAK), ret(OC_RET_OVER));
+}
+
+// The crew's landing has no window to miss (the audit of 599e051, its sixth point). The first build waited in the
+// Ring at rest among the stars for the pad to come round, placed for its window's close, so that any delay over
+// about 20 s cost a whole turn of the Ring, 142 s. The plan's length is now chosen for the start as it is, and
+// from the hold point, on the Ring's axis, the start is the same in the Ring's frame at every moment of its turn:
+// engaged at six moments a sixth of a turn apart, the crew lands every time, in the same time to a second and
+// with the same propellant to 3 % (the Earth's tide on the Ring, turning with it, is what differs).
+void noWindowToMiss() {
+    if (!toHold()) return;
+    const oc::State hold = oc::g;
+    const double turn = 2 * PI / W;
+    double lo = 1e9, hi = 0, propLo = 1e9, propHi = 0;
+    bool all = true;
+    for (int k = 0; k < 6; ++k) {
+        oc::g = hold;
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 1, 0);
+        oc_step(1 + (int)std::lround(k * turn / 6 / OC_DT));   // the approach's crew holds the craft there meanwhile
+        const Landing L = crewLands(600, true);
+        const bool ok = L.took > 0 && inTolerance(L) && get(OC_CRASHED) == 0;
+        all = all && ok;
+        std::printf("  engaged %.1f s into the turn: %s on pad %d in %.1f s, %.0f kg\n", k * turn / 6, ok ? "landed" : "NOT LANDED", L.pad + 1, L.took, L.prop);
+        if (!ok) continue;
+        lo = std::fmin(lo, L.took);
+        hi = std::fmax(hi, L.took);
+        propLo = std::fmin(propLo, L.prop);
+        propHi = std::fmax(propHi, L.prop);
+    }
+    std::printf("  six moments a sixth of the Ring's %.1f s turn apart: %.1f to %.1f s, %.0f to %.0f kg\n", turn, lo, hi, propLo, propHi);
+    CHECK(all && hi - lo < 1.0 && propHi - propLo < 0.03 * propLo, "%.1f to %.1f s, %.0f to %.0f kg", lo, hi, propLo, propHi);
+}
+
+// The plan is the craft's own motion: in the Ring's frame, which turns, the centrifugal and Coriolis pulls and the
+// Earth's tide (deck_plan.h's model, the tide to its first order in the craft's offset) carry the craft through the
+// coast between its burns as the plan says, with nothing pushing: from 10 s into the coast (the first burn's
+// tracking settled) until a second before the final burn (into which the throttle is led), the craft, by the
+// flight's own state, is never 5 cm from the plan's place as the plan carries it (flownAt). Left out of the plan, the tide alone, a hundredth of a metre a second squared at the
+// deck, puts it half a metre off between the crew's plans.
+void theCoastIsFree() {
+    if (!toHold()) return;
+    oc_auto(OC_AUTO_DECK);
+    const double t0 = get(OC_T);
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) != OC_DECK_PH_WAIT) oc_step(1);
+    const double c0 = get(OC_T);
+    double worst = 0;
+    while (get(OC_T) - t0 < 900 && get(OC_CRASHED) == 0 && idk(OC_DECK_PHASE) == OC_DECK_PH_WAIT) {
+        oc_step(1);
+        if (get(OC_T) - c0 < 10) continue;
+        const double t = oc::timeOf(oc::g);
+        const oc::RingFrame f = oc::ringFrameAt(t);
+        const oc::V3 d = oc::g.r - f.c;
+        const oc::V3 p{oc::dot(d, f.x), oc::dot(d, f.y), oc::dot(d, f.z)};
+        oc::V3 rr, vr, ur, r1, v1, u1;
+        oc::flownAt(oc::g.deck.plan, t, &rr, &vr, &ur);
+        oc::flownAt(oc::g.deck.plan, std::fmin(t + 1, oc::g.deck.plan.t0 + oc::g.deck.plan.tf), &r1, &v1, &u1);
+        if (norm3(u1) > 0.1) continue;   // the burn ahead, which the throttle is led into 0.4 s early
+        worst = std::fmax(worst, norm3(p - rr));
+    }
+    const double took = get(OC_T) - c0;
+    std::printf("  the coast, %.0f s: from 10 s on, at most %.3f m off the plan's place\n", took, worst);
+    CHECK(took > 30 && idk(OC_DECK_PHASE) == OC_DECK_PH_GLIDE, "the coast %.0f s, then phase %d", took, idk(OC_DECK_PHASE));
+    CHECK(worst < 0.05, "%.3f m", worst);
+}
+
+// A plan's steps are the motion itself: each interval's transition (deck_plan.cpp: the turning frame's pulls and
+// the tide held at the interval's middle, integrated to the exact transition of the held thrust) carries one node to
+// the next as the equations of motion do, integrated afresh in quarter-second steps (flownAt): over a plan from the
+// hold point to the pad, 40 intervals of up to 5 s from 650 m off the axis to the floor, node k carried through its
+// interval lands on node k + 1 to a tenth of a millimetre and a hundredth of a millimetre a second. (Without the
+// tide in the transitions, 0.01 m/s2 at the deck, they part by centimetres.)
+void thePlanIsTheMotion() {
+    if (!toHold()) return;
+    oc::PlanSpec sp = oracleSpec(1, 120, oc::PLAN_MAX);
+    oc::PlanResult res;
+    const bool ok = oc::planLanding(sp, res);
+    oc::Flown plan;
+    CHECK(ok && oc::storePlan(res, plan), "no plan: status %d", res.status);
+    if (!ok) return;
+    double dr = 0, dv = 0, longest = 0;
+    for (int k = 0; k < plan.n; ++k) {
+        oc::V3 r, v, u;
+        const double t1 = plan.t[k + 1] - 1e-9;   // the interval's end, still within it
+        oc::flownAt(plan, t1, &r, &v, &u);
+        dr = std::fmax(dr, norm3(r - oc::V3{plan.r[k + 1][0], plan.r[k + 1][1], plan.r[k + 1][2]}));
+        dv = std::fmax(dv, norm3(v - oc::V3{plan.v[k + 1][0], plan.v[k + 1][1], plan.v[k + 1][2]}));
+        longest = std::fmax(longest, plan.t[k + 1] - plan.t[k]);
+    }
+    std::printf("  %d intervals, the longest %.2f s: each node carried through its interval lands %.2e m and %.2e m/s from the next\n", plan.n, longest, dr, dv);
+    CHECK(dr < 1e-4 && dv < 1e-5, "%.2e m, %.2e m/s", dr, dv);
 }
 
 struct Test { const char* name; void (*fn)(); };
@@ -936,7 +1419,8 @@ const Test tests[] = {
     {"crew_lands_from_hold", crewLandsFromHold},
     {"glide_bleeds_the_deck_speed", glideBleedsTheDeckSpeed},
     {"crew_lands_from_orbit", crewLandsFromOrbit},
-    {"monte_carlo", monteCarlo},
+    {"monte_carlo_development", monteCarloDevelopment},
+    {"monte_carlo_held_out", monteCarloHeldOut},
     {"parked_stays_put", parkedStaysPut},
     {"pilot_lands_by_hand", pilotLandsByHand},
     {"lift_off_and_hold", liftOffAndHold},
@@ -957,6 +1441,14 @@ const Test tests[] = {
     {"deck_hold_flies_true", deckHoldFliesTrue},
     {"drift_and_tilt_limits", driftAndTiltLimits},
     {"struck_where_its_shape_meets", struckWhereItsShapeMeets},
+    {"oracle_against_the_crew", oracleAgainstTheCrew},
+    {"oracle_converges_and_is_lossless", oracleConvergesAndIsLossless},
+    {"takeoff_to_the_hold_point", takeoffToTheHoldPoint},
+    {"takeoff_refused", takeoffRefused},
+    {"pad_to_the_runway", padToTheRunway},
+    {"no_window_to_miss", noWindowToMiss},
+    {"the_coast_is_free", theCoastIsFree},
+    {"the_plan_is_the_motion", thePlanIsTheMotion},
 };
 
 }   // namespace

@@ -254,7 +254,7 @@ Deriv deriv(const State& s, double t, V3 r, V3 v, Q q, V3 w, double prop) {
         }
     }
     // the drive and the small thrusters
-    const double thrust = prop > 0 ? s.thr * T_MAX : 0;
+    const double thrust = prop > 0 ? s.thr * T_MAX * (1 + s.deck.dThrust) : 0;   // the drive as it is, not as asked (oc_deck_disturb; 0 unless a test says)
     fBody = fBody + (s.nozzle != 0 ? thrustAxis(s.nozzle) * thrust : V3{thrust, 0, 0}) + s.rcs * mass;
     acc = acc + rot(q, fBody) * (1.0 / mass);
 
@@ -563,11 +563,12 @@ void stepOnce(State& s) {
     else if (s.autoMode == OC_AUTO_APPROACH) approach(s, L, &throttle);
     else if (s.autoMode == OC_AUTO_RETURN) returnCrew(s, L, &throttle);   // return.cpp
     else if (s.autoMode == OC_AUTO_DOCK) dockCrew(s, L, &throttle);       // dock.cpp
-    else if (s.autoMode == OC_AUTO_DECK) deckCrew(s, L, &throttle);       // deck.cpp
+    else if (s.autoMode == OC_AUTO_DECK || s.autoMode == OC_AUTO_TAKEOFF) deckCrew(s, L, &throttle);   // deck.cpp
     else pilot(s, L, &throttle);
     s.thr += (throttle - s.thr) * (OC_DT / 0.4);
     if ((throttle == 0 && s.thr < 1e-3) || s.prop <= 0) s.thr = 0;   // shut down, not idling forever
-    s.nozzle += clampd(clampd(s.nozzleCmd, 0, NOZZLE_MAX) - s.nozzle, -NOZZLE_RATE * OC_DT, NOZZLE_RATE * OC_DT);   // the swivel at its rate
+    const double swivelTo = s.deck.dLag > 0 ? (s.deck.lagged += (clampd(s.nozzleCmd, 0, NOZZLE_MAX) - s.deck.lagged) * std::fmin(1.0, OC_DT / s.deck.dLag)) : s.nozzleCmd;
+    s.nozzle += clampd(clampd(swivelTo, 0, NOZZLE_MAX) - s.nozzle, -NOZZLE_RATE * OC_DT, NOZZLE_RATE * OC_DT);   // the swivel at its rate, after its lag if a test gives it one
     const double vsBefore = L.vs;
     integrate(s);
     ++s.n;
@@ -727,13 +728,19 @@ void oc_auto(int mode) {
         const V3 d = g.r - ringPos(t), passing = g.v - ringVel(t) - cross(ring.normal * ring.rate, d);
         if (!ring.valid || orbitOf(g).peri < 150000 || norm(d) > OC_DOCK_ENGAGE_M || norm(passing) > OC_DOCK_ENGAGE_SPEED) return;
     }
-    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK;
+    // The flight home starts from an orbit, not from the deck: on it, or riding with it inside the Ring, the craft's
+    // own orbit is the deck's swing, and the return's departure flies into the structure (found by the audit of
+    // 599e051: engaged parked on the pad, the body met the deck in 0.6 s). The crew's take-off goes first, to the
+    // hold point, from which RETURN flies home. Refused, the call changes nothing.
+    if (mode == OC_AUTO_RETURN && deckHoldsTheCraft(g)) return;
+    const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK || mode == OC_AUTO_TAKEOFF;
     g.autoMode = known ? mode : OC_AUTO_OFF;
     g.atmoLaw = 0;
     g.holdValid = 0;
     if (g.autoMode == OC_AUTO_RETURN) returnEngage(g);
     if (g.autoMode == OC_AUTO_DOCK) dockEngage(g);
     if (g.autoMode == OC_AUTO_DECK) deckEngage(g);
+    if (g.autoMode == OC_AUTO_TAKEOFF) deckTakeoff(g);
     if (g.autoMode != OC_AUTO_CREW) { writeOut(); return; }
     // The crew picks up where the craft is, not where it last left off.
     const Local L = localOf(g);
