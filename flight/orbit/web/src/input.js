@@ -31,6 +31,47 @@ export const HELP = [
   ['Backspace', 'start again'],
 ];
 
+// The same on a touch screen, by what is under the thumbs and the buttons' names.
+export const HELP_TOUCH = [
+  ['TOUR', 'the whole loop flown by the crew, with words; any button takes over'],
+  ['CREW', 'the crew on / take the controls'],
+  ['the stick', 'left thumb: pitch and bank'],
+  ['THR', 'right thumb: the throttle, slid up and down'],
+  ['TO ORBIT', 'skip ahead to orbit (the crew)'],
+  ['VIEW', 'chase, cockpit, from the Ring'],
+  ['TIME + −', 'time faster / slower'],
+  ['MORE', 'the rest of the buttons; any of them closes it'],
+  ['APPROACH', 'in orbit: the crew flies the approach'],
+  ['DOCK', 'the crew docks at the hub; docked: let go'],
+  ['LAND DECK', 'the crew lands on the Ring\'s flight deck'],
+  ['WALK', 'docked: go aboard the Ring and walk'],
+  ['RETURN', 'the crew flies home to KDFW; again: skip the wait'],
+  ['HOLD', 'attitude hold, prograde, retrograde, the Ring, the hub\'s port, the deck (hover), in turn'],
+  ['GEAR, BRAKES', 'the gear; the brakes'],
+  ['GFX', 'graphics: auto, low, medium, high'],
+  ['MAP', 'the orbit, the Ring close up, the ground track'],
+  ['SOUND', 'sound off / on'],
+  ['drag', 'look around the craft'],
+  ['RESTART', 'start again'],
+  ['', 'a tap on this help puts it away'],
+];
+
+// The help's rows as the panel shows them: a key, and what it does.
+export function helpHtml(rows) {
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return rows.map(([k, v]) => `<div><b>${esc(k)}</b><span>${esc(v)}</span></div>`).join('');
+}
+
+// The command keys (key()'s map) by the physical key, for when Shift, held for the throttle, makes them another
+// character: Shift-. is >, Shift-1 is !.
+const SHIFTED = {
+  Comma: ',', Period: '.', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Digit6: '6', Digit8: '8', Digit9: '9',
+};
+// The page's letter keys. Ctrl is the throttle's key, held while the others fly, and with it the browser would
+// take them for its own shortcuts (Ctrl-S saves the page, Ctrl-D bookmarks it): those a page may refuse are
+// refused. Ctrl-W, Ctrl-T and Ctrl-N the browser keeps for itself, whatever the page asks.
+const LETTERS = new Set(['w', 'a', 's', 'd', 'q', 'e', 'i', 'k', 'j', 'l', 'u', 'm', 'z', 'x', 'g', 'b', 'c', 'p', 'r', 't', 'o', 'v', 'h', 'f', 'n', 'y']);
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
 export class Input {
@@ -68,6 +109,9 @@ export class Input {
 
   key(e, down) {
     if (e.target && e.target.tagName === 'INPUT') return;
+    // a button with the keyboard's focus (reached by Tab) takes Enter and Space itself, as a click; a button
+    // clicked by a mouse or a finger keeps no focus (hud.js), so for them these stay the page's keys
+    if (down && e.target && e.target.tagName === 'BUTTON' && (e.key === 'Enter' || e.key === ' ')) return;
     const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
     if (down && !e.repeat) {
       const map = {
@@ -75,11 +119,13 @@ export class Input {
         1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', 5: 'sas4', 6: 'sas5', c: 'deck', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
         f: 'moon', 9: 'quality', 8: 'fd',
       };
-      if (map[k] !== undefined) this.commands.push(map[k]);
+      const c = map[k] ?? (e.shiftKey && SHIFTED[e.code] ? map[SHIFTED[e.code]] : undefined);   // Shift held for the throttle
+      if (c !== undefined) this.commands.push(c);
     }
     if (down) this.held.add(k);
     else this.held.delete(k);
     if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace'].includes(k)) e.preventDefault();
+    if (down && e.ctrlKey && !e.metaKey && LETTERS.has(k)) e.preventDefault();   // Ctrl held for the throttle: not the browser's shortcut
   }
 
   // The screen's controls: a stick under the left thumb, a throttle under the right, buttons.
@@ -128,7 +174,8 @@ export class Input {
       throttleRate += 0.8 * ((pad.buttons[7]?.value || 0) - (pad.buttons[6]?.value || 0));
       tx += (pad.buttons[12]?.pressed ? 1 : 0) - (pad.buttons[13]?.pressed ? 1 : 0);
       ty += (pad.buttons[15]?.pressed ? 1 : 0) - (pad.buttons[14]?.pressed ? 1 : 0);
-      const edges = [[0, 'crew'], [1, 'view'], [2, 'sas-next'], [3, 'gear'], [4, 'slower'], [5, 'faster'], [9, 'orbit']];
+      // Back (8) is the brakes: without it a pad's pilot, handed the craft parked, could never roll
+      const edges = [[0, 'crew'], [1, 'view'], [2, 'sas-next'], [3, 'gear'], [4, 'slower'], [5, 'faster'], [8, 'brake'], [9, 'orbit']];
       const was = this.pads[pad.index] || [];
       for (const [i, cmd] of edges) if (pad.buttons[i]?.pressed && !was[i]) this.commands.push(cmd);
       this.pads[pad.index] = pad.buttons.map((b) => b.pressed);

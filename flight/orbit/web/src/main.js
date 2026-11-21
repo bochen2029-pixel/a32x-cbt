@@ -11,6 +11,7 @@ import { origin } from '../../../web/src/scene-math.js';
 import KDFW from '../../../web/data/kdfw.json' with { type: 'json' };
 import { AUTO, DT, HUB_PORT_M, PH, SAS, START, loadCore } from './core.js';
 import { Craft } from './craft.js';
+import { ridingDeck } from './dock-hud.js';
 import { FEATURES } from './features.js';
 import * as frames from './frames.js';
 import { Earth, Stars } from './earth.js';
@@ -18,7 +19,7 @@ import {
   RE, add, bodyAxes, cross, dot, ecefToThree, heightOf, inSight, inertialToEcef, length, scale, siteAxes, sub, three, threeToEcef, unit,
 } from './frames.js';
 import { Hud } from './hud.js';
-import { HELP, Input } from './input.js';
+import { HELP, HELP_TOUCH, Input, helpHtml } from './input.js';
 import { Pipeline } from './pipeline.js';
 import { PROBE, SETTINGS, nextChoice, pixelRatioFor, probeVerdict, resolveTier } from './quality.js';
 import { Ring } from './ring.js';
@@ -166,8 +167,18 @@ async function main() {
   input.bindTouch(document.getElementById('stick'), document.getElementById('knob'), document.getElementById('throttle'),
     document.getElementById('throttle-fill'), document.querySelectorAll('#buttons button'));
   const help = document.getElementById('help');
-  help.innerHTML = HELP.map(([k, v]) => `<div><b>${k}</b><span>${v}</span></div>`).join('');
-  if (!phone) help.classList.add('shown');
+  const touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  help.innerHTML = helpHtml(touch ? HELP_TOUCH : HELP);
+  // On a desktop the help shows at the start where it fits beside the view: whole, and clear of the craft in the
+  // screen's middle (its wings, 70 m behind them, reach a tenth of the screen's height either side). Elsewhere
+  // the status line's hint names H. Taking the controls puts it away (flying wants the instruments it would
+  // cover); H, or HELP, brings it back. On a touch screen a tap on it puts it away.
+  if (!phone) {
+    help.classList.add('shown');
+    const r = help.getBoundingClientRect();
+    if (r.left < window.innerWidth / 2 + 0.1 * window.innerHeight || help.scrollHeight > help.clientHeight + 1) help.classList.remove('shown');
+  }
+  help.addEventListener('click', () => { if (touch) help.classList.remove('shown'); });
   const sayEl = document.getElementById('say');
   let sayUntil = 0;
   const say = (text, now) => { sayEl.textContent = text; sayUntil = now + 3500; };
@@ -248,6 +259,13 @@ async function main() {
     h.brake = s.onGround > 0.5 && s.tas < 1 ? 1 : 0;
     core.auto(AUTO.off);
     core.sas(SAS.hold);
+    help.classList.remove('shown');   // the instruments it would cover are wanted now
+  };
+  // What the hands set while the crew flies is not flown: say so, rather than nothing.
+  const crewFlies = (now) => {
+    if (Math.round(s.auto) === AUTO.off) return false;
+    say(`The crew has the controls: ${touch ? 'CREW' : 'Space'} takes them`, now);
+    return true;
   };
 
   function command(c, now) {
@@ -264,14 +282,28 @@ async function main() {
         else say('The approach starts in orbit, within 50 km of the Ring and passing it under 50 m/s', now);
         break;
       case 'orbit':
+        // On the Ring's deck, or riding with it, the crew to orbit would let go of it: the deck sweeps on at 221
+        // m/s and the craft meets a wall (2026-11-21's play-test: O on a pad, a crash in the skip's first step).
+        if (ridingDeck(s, core.deck)) {
+          say('Riding with the Ring\'s deck: the crew to orbit would let go of it. Lift off and clear the Ring first', now);
+          break;
+        }
         if (s.phase < PH.orbit || auto !== AUTO.crew) {
           if (auto !== AUTO.crew) core.auto(AUTO.crew);
           state.skipping = true;
           say('Skipping ahead to orbit…', now);
-        }
+        } else say('In orbit already: the crew holds it there', now);
         break;
-      case 'gear': input.hands.gear = !input.hands.gear; break;
-      case 'brake': input.hands.brake = input.hands.brake > 0 ? 0 : 1; break;
+      case 'gear':
+        if (crewFlies(now)) break;
+        input.hands.gear = !input.hands.gear;
+        say(input.hands.gear ? 'Gear down' : 'Gear up', now);
+        break;
+      case 'brake':
+        if (crewFlies(now)) break;
+        input.hands.brake = input.hands.brake > 0 ? 0 : 1;
+        say(input.hands.brake > 0 ? 'Brakes on' : 'Brakes off', now);
+        break;
       case 'view': state.view = (state.view + 1) % VIEWS.length; input.look.az = 0; break;
       case 'help': help.classList.toggle('shown'); break;
       case 'quality': {
@@ -283,15 +315,16 @@ async function main() {
         say(`Graphics: ${quality.settings.label.toLowerCase()}${choice === 'auto' ? ` (auto: ${next.why})` : ''}${pipeline.note ? `; ${pipeline.note}` : ''}`, now);
         break;
       }
-      case 'full': input.hands.throttle = 1; break;
-      case 'cut': input.hands.throttle = 0; break;
+      case 'full': if (!crewFlies(now)) input.hands.throttle = 1; break;
+      case 'cut': if (!crewFlies(now)) input.hands.throttle = 0; break;
       case 'slower': state.warp = WARPS[Math.max(0, WARPS.indexOf(state.warp) - 1)]; break;
       case 'faster': state.warp = WARPS[Math.min(WARPS.length - 1, WARPS.indexOf(state.warp) + 1)]; break;
       case 'sas-next': core.sas((Math.round(s.sas) + 1) % 4); say(`Hold: ${['attitude', 'prograde', 'retrograde', 'the Ring'][Math.round(core.s.sas)]}`, now); break;
-      case 'reset':
+      case 'reset':   // the start again: the flight, the time, and the camera as it starts (chase, undragged)
         s = core.reset(START);
         Object.assign(input.hands, { throttle: 0, gear: true, brake: 1 });
-        Object.assign(state, { warp: 1, skipping: false, debt: 0 });
+        Object.assign(state, { warp: 1, skipping: false, debt: 0, view: 0, heading: null });
+        Object.assign(input.look, { az: 0, el: 0.2, dist: 70 });
         say('Back on 17C', now);
         break;
       default:
@@ -483,7 +516,7 @@ async function main() {
       if (s.qbar < AIR_LAW_PA) vel = inertialVelocity(scale(vel, s.tas), P, START.lat);
     }
     const moving = length(vel) > 0.5 && (s.tas > 5 || s.ringRange < 2e5);
-    hud.draw(s, { warp: state.skipping ? 'MAX' : state.warp, view: VIEWS[state.view] }, {
+    hud.draw(s, { warp: state.skipping ? 'MAX' : state.warp, view: VIEWS[state.view], hands: input.hands }, {
       velocity: moving ? screenOf(scale(three(unit(vel)), 1e4)) : null,
       ring: screenOf(ringRel),
     }, now, {
