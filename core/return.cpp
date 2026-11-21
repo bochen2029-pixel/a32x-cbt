@@ -951,7 +951,12 @@ void depart(State& s, const Local& L) {
     const V3 body = irot(s.q, (want - vrel) * 0.5);
     s.rcs = {clampd(body.x, -RCS_ACC, RCS_ACC), clampd(body.y, -RCS_ACC, RCS_ACC), clampd(body.z, -RCS_ACC, RCS_ACC)};
     rateLoop(s, L, point(s, L, ringPos(t) - s.r, 1.0, 0.15));   // watching it go
-    R.tEvent = t + (DEPART_CLEAR - d) / std::fmax(1.0, dot(vrel, away));
+    // when it will be clear, at the way out's own speed, which grows by 0.02 m/s a metre from 0.5 m/s at 300 m to
+    // DEPART_SPEED and holds: a readout (found playing the page: by the speed it had, at rest, "clear in 3 h 13 min")
+    const double ramp = 300.0 + (DEPART_SPEED - 0.5) / 0.02, from = std::fmax(d, 300.0);
+    const double left = (from < ramp ? std::log((0.5 + 0.02 * (ramp - 300.0)) / (0.5 + 0.02 * (from - 300.0))) / 0.02 : 0.0) +
+                        std::fmax(DEPART_CLEAR - std::fmax(from, ramp), 0.0) / DEPART_SPEED;
+    R.tEvent = t + left;
     if (d > DEPART_CLEAR) { R.phase = OC_RET_PH_WAIT; R.planned = 0; R.tPlan = 0; }
 }
 

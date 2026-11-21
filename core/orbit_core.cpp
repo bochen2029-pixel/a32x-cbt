@@ -430,7 +430,13 @@ void pegSolve(State& s, const Local& L) {
 // The phase the crew picks up from, taking the craft where it is (oc_auto; and the flight director, fd.cpp).
 int crewPhaseFor(const State& s, const Local& L) {
     if (orbitOf(s).peri > 150000) return OC_PH_ORBIT;
-    if (s.onGround) return L.tas >= 95 ? OC_PH_ROTATE : timeOf(s) < T_GO ? OC_PH_HOLD : OC_PH_ROLL;
+    if (s.onGround) {
+        // The brakes held to T_GO for a craft at rest only, judged over the ground (a wind gives a craft at rest an
+        // airspeed): one a pilot has already set rolling is taken up rolling, not stopped to wait. (Found playing the
+        // page: the flight director's shadow cued HOLD, the thrust at nought, at 96 m/s.)
+        const double ground = norm(s.v - cross(V3{0, 0, WE}, s.r));
+        return L.tas >= 95 ? OC_PH_ROTATE : timeOf(s) < T_GO && ground < 1 ? OC_PH_HOLD : OC_PH_ROLL;
+    }
     if (L.alt < 2000) return OC_PH_CLIMB;
     if (L.alt < 30000 || L.qbar > 1000) return OC_PH_ASCENT;
     return OC_PH_INSERT;
@@ -447,7 +453,9 @@ void crew(State& s, const Local& L, double* throttle) {
         s.brake = 1;
         s.thetaT = L.pitch;
         s.phiT = 0;
-        if (t >= T_GO) s.phase = OC_PH_ROLL;
+        // the window, or a craft already rolling: the brakes keep the crew's own at rest, so only another's hands
+        // (the flight director's shadow of a pilot who let them go) can have it moving, and then it is the roll
+        if (t >= T_GO || norm(s.v - cross(V3{0, 0, WE}, s.r)) > 1) s.phase = OC_PH_ROLL;
         wc = airLaw(s, L, 0);
         break;
     case OC_PH_ROLL: {
@@ -776,6 +784,10 @@ void oc_auto(int mode) {
         g.ret.refused = returnRefusal(g);
         if (g.ret.refused) { writeOut(); return; }
     }
+    // The crew to orbit flies from a runway or the air: on the Ring's deck, or riding with the Ring as the flight
+    // home is refused there, it is refused too, and whoever was flying flies on. (Found playing the page: on a pad
+    // it let go of the deck and struck a rim wall in its first step. From the deck the crew's take-off goes first.)
+    if (mode == OC_AUTO_CREW && returnRefusal(g)) { writeOut(); return; }
     const bool known = mode == OC_AUTO_CREW || mode == OC_AUTO_APPROACH || mode == OC_AUTO_RETURN || mode == OC_AUTO_DOCK || mode == OC_AUTO_DECK || mode == OC_AUTO_TAKEOFF;
     const int was = g.autoMode, atmoLaw = g.atmoLaw, holdValid = g.holdValid;
     g.autoMode = known ? mode : OC_AUTO_OFF;

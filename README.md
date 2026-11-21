@@ -466,7 +466,8 @@ point and gives them back; the crew picks the flight home up from wherever the c
 It is refused, and whoever was flying flies on, on the Ring's deck and within 9 km of the Ring's centre
 while the craft moves past it faster than 50 m/s in the frame turning with its orbit, as it does riding
 with the deck: its way out, backing away on the small thrusters, is for a craft at rest by the Ring (from
-the deck it put the belly on the deck in 0.6 s). On the Ring's far side the way out keeps 600 m from the
+the deck it put the belly on the deck in 0.6 s). The crew to orbit is refused there too: taken on a pad, it
+let go of the deck and struck a rim wall. On the Ring's far side the way out keeps 600 m from the
 axis until 1 km out along it, clear of the hub's solar mast, its arrays and its radiators.
 
 How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the

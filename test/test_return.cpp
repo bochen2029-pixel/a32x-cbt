@@ -20,6 +20,7 @@
 // TEST: plan_says_when
 // TEST: return_refused_on_the_deck
 // TEST: departs_clear_of_the_mast
+// TEST: departure_says_when
 // TEST: blind_to_the_wind
 // TEST: lands_from_a_high_orbit
 
@@ -423,6 +424,8 @@ void returnRefusedOnTheDeck() {
             std::printf("  coming down %.0f m over the pad, %.0f m/s past the Ring: RETURN refused %.0f, the deck's crew still flying (%.0f)\n",
                         oc_deck_out()[OC_DECK_HEIGHT], past, ret(OC_RET_REFUSED), get(OC_AUTO));
             CHECK(ret(OC_RET_REFUSED) == OC_RET_NO_RIDING && get(OC_AUTO) == OC_AUTO_DECK, "coming down: refused %.0f, auto %.0f", ret(OC_RET_REFUSED), get(OC_AUTO));
+            oc_auto(OC_AUTO_CREW);   // nor the crew to orbit, which flies from a runway or the air
+            CHECK(get(OC_AUTO) == OC_AUTO_DECK, "coming down, the crew to orbit was taken: auto %.0f", get(OC_AUTO));
         }
     }
     CHECK(askedRiding, "the crew's deck landing never came down from its gate");
@@ -433,6 +436,10 @@ void returnRefusedOnTheDeck() {
     std::printf("  parked on the deck, its own orbit's lowest point reading %.0f km: RETURN refused %.0f, auto %.0f as before\n", peri / 1000,
                 ret(OC_RET_REFUSED), get(OC_AUTO));
     CHECK(ret(OC_RET_REFUSED) == OC_RET_NO_DECK && get(OC_AUTO) == auto0, "on the deck: refused %.0f, auto %.0f", ret(OC_RET_REFUSED), get(OC_AUTO));
+    // nor the crew to orbit (found playing the page: taken on a pad, it let go of the deck and struck a rim wall)
+    oc_auto(OC_AUTO_CREW);
+    std::printf("  and the crew to orbit asked for: auto %.0f as before\n", get(OC_AUTO));
+    CHECK(get(OC_AUTO) == auto0, "on the deck, the crew to orbit was taken: auto %.0f", get(OC_AUTO));
     oc_step(3000);
     std::printf("  60 s on: crashed %.0f, on the deck %.0f, gear %.0f\n", get(OC_CRASHED), oc_deck_out()[OC_DECK_ON_DECK], get(OC_GEAR));
     CHECK(get(OC_CRASHED) == 0 && oc_deck_out()[OC_DECK_ON_DECK] > 0 && get(OC_GEAR) > 0, "60 s on: crashed %.0f, on the deck %.0f, gear %.0f", get(OC_CRASHED),
@@ -469,6 +476,25 @@ void departsClearOfTheMast() {
                 "%.0f m from the axis at the nearest\n", get(OC_T) - t, farthestOut, closest);
     CHECK(ret(OC_RET_PHASE) == OC_RET_PH_WAIT && get(OC_CRASHED) == 0, "clear: phase %.0f, crashed %.0f", ret(OC_RET_PHASE), get(OC_CRASHED));
     CHECK(closest > 293, "%.0f m from the axis beside the mast and its arrays", closest);
+}
+
+// Backing away from the Ring, the readout says when the craft will be clear: from the hold point, engaged at rest,
+// within a tenth of the time it takes. (Found playing the page: worked out by the speed it had, nought at the
+// start and taken as 1 m/s, it read "clear in 3 h 13 min" for a departure of some ten minutes.)
+void departureSaysWhen() {
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(50);
+    oc_auto(OC_AUTO_APPROACH);
+    while (get(OC_PORT_RANGE) > 5 && get(OC_T) < 3000) oc_step(50);
+    oc_step(500);
+    oc_auto(OC_AUTO_RETURN);
+    oc_step(1);
+    const double t0 = get(OC_T), said = ret(OC_RET_T_EVENT);
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_DEPART, "not backing away: phase %.0f", ret(OC_RET_PHASE));
+    while (ret(OC_RET_PHASE) == OC_RET_PH_DEPART && get(OC_T) < t0 + 7200) oc_step(5);
+    const double took = get(OC_T) - t0;
+    std::printf("  from the hold point: the readout said clear in %.0f s; it took %.0f s\n", said, took);
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_WAIT && std::fabs(said - took) < 0.1 * took, "said %.0f s, took %.0f s", said, took);
 }
 
 // The crew cannot see the wind, only what its instruments measure: its commands, for a state and the air data
@@ -543,6 +569,7 @@ const Test tests[] = {
     {"plan_says_when", planSaysWhen},
     {"return_refused_on_the_deck", returnRefusedOnTheDeck},
     {"departs_clear_of_the_mast", departsClearOfTheMast},
+    {"departure_says_when", departureSaysWhen},
     {"blind_to_the_wind", blindToTheWind},
     {"lands_from_a_high_orbit", landsFromAHighOrbit},
 };
