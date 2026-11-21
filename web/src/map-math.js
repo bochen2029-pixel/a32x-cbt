@@ -159,7 +159,12 @@ export function ringState(s, t, r, v, frame, mu = MU) {
   const R = length(rr), n = Math.sqrt(mu / (R * R * R));
   const vrel = ecefToEci(frame.dir([s.vrelE, s.vrelN, s.vrelU]), t);
   const w = scale(sub(v, vrel), 1 / n);
-  let nHat = unit(cross(rr, w));
+  // v - vrel is n nHat x r, the Ring's own motion carried to the craft's place, so rr x w is nHat (rr . r):
+  // it vanishes a quarter of an orbit round from the Ring, where the craft's place is square to the Ring's.
+  // There the normal is taken as r x w, which is nHat for a craft in the Ring's plane, as the crew's is
+  // (INVARIANTS.md, G11, settled: the audit of c56d77b found it degenerate).
+  const m = cross(rr, w), ill = length(m) < 0.05 * R * length(w);
+  let nHat = unit(ill ? cross(r, w) : m);
   if (dot(cross(nHat, r), w) < 0) nHat = scale(nHat, -1);
   return {
     r: rr, v: scale(cross(nHat, rr), n), nHat, n, R,
