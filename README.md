@@ -80,7 +80,7 @@ From the tests (`test/test_orbit.cpp`), the crew's flight:
 |---|---|---|
 | the Earth | a sphere of 6,371 km, its gravity a point mass's, turning once a sidereal day; the ground level to the local plumb line, so a parked craft stays parked | ours |
 | the air | the 1976 standard atmosphere to 86 km; above it, exponentials through the standard's densities at 86, 120, 200 and 500 km (within 20 %) | the standard's, to 86 km; ours above |
-| the wind | none unless set (`oc_wind`, "The wind" below): a field of height, place and time from a seed, the mean wind of MIL-F-8785C's log law near the ground up to a jet stream 10 to 12 km up, and von Kármán's gusts at that specification's intensities and lengths | MIL-F-8785C; von Kármán; Kraichnan's random Fourier modes |
+| the wind | none unless set (`oc_wind`, "The wind" below): a field of height, place and time from a seed, the mean wind of MIL-F-8785C's log law near the ground up to a jet stream 10 to 12 km up, and von Kármán's gusts at that specification's intensities and lengths near the ground, its lengths above (the intensity there is the sketch's) | MIL-F-8785C; von Kármán; Kraichnan's random Fourier modes |
 | the craft | 60 t, half of it propellant; a delta lifting body, 150 m², 18 m span; Polhamus's lift for a slender delta, blending to Newtonian impact from Mach 1.5 to 5; static and damping derivatives; three gear legs | ours; Polhamus's method |
 | the drive | 1.2 × the take-off weight, 706 kN, at 2,000 s of specific impulse: **the one fiction**. At 450 s, the best of chemical rockets, half the craft's mass in propellant would buy 3 km/s, a third of what orbit takes. Thrust follows the throttle with a 0.4 s lag | ours |
 | control | a rate loop by dynamic inversion, inside what the surfaces (by dynamic pressure), the small thrusters and the drive's gimbal can give | ours |
@@ -426,7 +426,9 @@ else reads it, and the crews learn it from their instruments or not at all.
   the westerlies' long waves do.
 - **The gusts.** Von Kármán's isotropic turbulence, at the specification's intensities and lengths by
   height: near the ground σ_w = 0.1 W20 with L_w the height, and the level gusts stronger and longer by its
-  formulae; from 2,000 ft L = 2,500 ft and σ = 0.1 W20, fading from 15 km to nothing at 25 km. The field
+  formulae; from 2,000 ft the specification's L = 2,500 ft, and σ = 0.1 W20, which is the sketch's choice (the
+  specification gives the intensities up there by their probability of being exceeded, not from the wind at
+  20 ft), fading from 15 km to nothing at 25 km. The field
   is a sum of 120 random Fourier modes (Kraichnan's method) in 40 shells from 30 km to 25 m, each turning
   slowly in time at its eddies' rate; shorter gusts the craft's own size averages out. Sampled along any
   straight path it has von Kármán's longitudinal spectrum along the path and the transverse across it.
@@ -506,27 +508,30 @@ about 1,600 °C, the range reinforced carbon–carbon, the Shuttle's nose cap, i
 of dynamic pressure. The heat flux is Sutton and Graves's; the readouts give it, its peak, its sum, the
 skin's temperature and a glow for the page.
 
-From the tests (`test/test_return.cpp`):
+From the tests (`test/test_return.cpp`; flown again at the third audit, 2026-11-21: the instruments, the
+pass with margin and the glide without power had come in after the first table was made):
 
 | started | burn | entry interface | touchdown | heat, peak | load, peak | propellant |
 |---|---|---|---|---|---|---|
-| at insertion, 800 s | 2,675 s, 127 m/s | 4,754 s, 11,200 km out | 7,881 s, 2.0 h later | 387 kW/m², 1,683 K | 1.63 g | 1.12 t |
-| a pass just missed, 2,620 s | 2,790 s, 127 m/s | 4,869 s | 7,870 s | 412 kW/m² | 1.66 g | 1.12 t |
-| after the day's last pass, 3,700 s | 69,696 s (the runway 1,028 km off the plane) | 71,775 s | 74,679 s, 19.7 h later | 389 kW/m² | 1.65 g | 0.47 t |
-| off the Ring's hub, 1,600 s | 2,766 s, 121 m/s | 4,731 s | 7,865 s | 387 kW/m² | 1.65 g | 1.11 t |
-| the far side raised to 806 km | 71,731 s, 196 m/s | 74,198 s | 77,343 s | 387 kW/m² | 1.68 g | 1.34 t |
+| at insertion, 800 s | 2,675 s, 127 m/s | 4,754 s | 7,663 s, 1.9 h later | 387 kW/m², 1,683 K | 1.63 g | 440 kg |
+| a pass just missed, 2,620 s | 2,790 s, 127 m/s | 4,869 s | 7,653 s | 412 kW/m² | 1.66 g | 440 kg |
+| after the day's last pass, 3,700 s | 75,656 s, 127 m/s (11 passes let go; the runway 270 km off the plane) | 77,736 s | 80,640 s, 21.4 h later | 389 kW/m² | 1.64 g | 444 kg |
+| off the Ring's hub, 1,600 s | 2,766 s, 121 m/s | 4,731 s | 7,648 s | 387 kW/m² | 1.65 g | 430 kg |
+| docked, let go at 1,817 s | 2,726 s, 125 m/s | 4,738 s | 7,652 s | 387 kW/m² | 1.64 g | 436 kg |
+| the far side raised to 806 km | 71,731 s, 196 m/s | 74,198 s | 77,085 s | 387 kW/m² | 1.68 g | 562 kg |
 
-Every one touches down 429 to 437 m past the threshold, 0.07 m left of the centreline, sinking 0.74 m/s
-at 99 to 100 m/s, and stops 2.1 km down the runway on its centreline. Peak dynamic pressure 9.0 to
-9.4 kPa. The tests also start it from six times round the day, from a lowered orbit, with the pilot
+Every one touches down 436 to 437 m past the threshold, 0.02 m left of the centreline, sinking 0.73 to
+0.74 m/s at 100 to 101 m/s, and stops 2.15 to 2.16 km down the runway on its centreline. Peak dynamic
+pressure 9.2 to 9.4 kPa. The day's last pass in reach of the first table, 1,028 km off the plane, is now
+let go for margin (the plan takes the first pass the entry would still reach with lift over drag 20 %
+below its model's), and the wait is two hours longer for it. The tests also start it from six times round the day, from a lowered orbit, with the pilot
 taking the controls in the entry, the glide and on final and giving them back, and with the
 guidance's model wrong at the corners of the box below. They check that the same inputs give the same
 flight, and that the guidance's model of the craft is the core's (to 4 × 10⁻⁴ g). In still air with its
 instruments exact the guidance promises more than a landing, and these tests hold it to that: the wheels
-300 to 600 m past the threshold, sinking 0.5 to 1.0 m/s (the flare's aim and twice it), and within 0.3 m
-of the centreline (the final's lateral law, 0.012 s⁻² stiff, leaves 0.3 m for a side push of 3.6 mm/s²,
-under half the Earth's turn's 8 mm/s² it feeds forward). Looser, they let through an approach that never
-learned its coefficients (264 and 727 m, 1.57 and 0.16 m/s) and one blind to the Earth's turn (0.62 m).
+300 to 600 m past the threshold, sinking 0.5 to 1.0 m/s (the flare's aim and twice it), and within 0.1 m
+of the centreline. Looser, they let through an approach that never learned its coefficients and one blind
+to the Earth's turn (0.12 m off).
 
 **Robustness.** The guidance's model of the air and the craft made wrong while the craft flies the
 core's own (`oc_return_model_error`): the density off by a factor and a wave of 12 km in height, the
@@ -534,14 +539,17 @@ lift and drag coefficients each by a factor, all drawn at random, with the retur
 a day. A landing counts when it touches down in the first 900 m, within 3 m of the centreline, sinking
 under 2 m/s, stops on the runway and stays inside the limits. Pools 1 and 2 were flown while the
 guidance was being built, and it was changed after them; 2026 and 2027 were drawn afterwards and flown
-once, with nothing changed since.
+once, as the table's first figures. The guidance changed after that too (`642cf56`, `76a2b56`, `9546efb`:
+the instruments, the pass taken with margin, the glide round without power), so they are held out no
+longer; flown again at the third audit (2026-11-21), 2027 lands 95 of 100 (88.8–97.8 %), and 2026 is
+being flown again.
 
 | pool | the guidance's model wrong by, each drawn evenly | runs | landed | 95 % interval |
 |---|---|---|---|---|
 | 1, while building | density ×0.75 to 1.25 and a wave of up to 15 %; lift and drag each ×0.9 to 1.1 | 64 | 64 | 94.3–100 % |
 | 2026, held out | the same | 200 | **200** | **98.1–100 %** |
 | 2, while building | density ×0.6 to 1.4 and a wave of up to 25 %; lift and drag each ×0.8 to 1.2 | 64 | 60 | 85.0–97.5 % |
-| 2027, held out | the same | 100 | **91** | **83.8–95.2 %** |
+| 2027, held out | the same | 100 | **91**; again at the audit, **95** | **83.8–95.2 %**; **88.8–97.8 %** |
 
 Every landing in them touches down 424 to 437 m past the threshold, 0.07 m left of the line, sinking
 0.73 to 0.74 m/s: once the approach has learned the coefficients it flies the same. Peak heat 308 to
@@ -788,7 +796,9 @@ the craft's velocity is the wait for what a listener hears now wherever it stand
 when it first finds one. Flying the crew's return, the chase camera crosses the cone three times between
 Mach 3.3 and 3.1 as the craft banks, a faint boom each in the thin air at 34 km, and a listener at the
 threshold of 17C would hear the cone arrive when the craft is 91 km off at 25 km, at Mach 1.14 (at
-−54 dBFS). Above the air nothing comes through the air at all. Time run faster is played 3 dB quieter at
+−54 dBFS), by straight rays at one speed of sound; in a real atmosphere, whose sound runs faster in the warm
+air near the ground, rays from Mach 1.14 at that height bend back up before they reach it (the Mach cut-off),
+and the listener might hear nothing: the model cannot tell. Above the air nothing comes through the air at all. Time run faster is played 3 dB quieter at
 each doubling and not at all from 50×, and the moments only near real time.
 
 **The flight deck.** Over the deck the craft is in vacuum, the deck's roof being open, so a camera outside

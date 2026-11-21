@@ -7,6 +7,7 @@
 // TEST: projection_onto_a_plane
 // TEST: infeasible_certified
 // TEST: unbounded_certified
+// TEST: far_from_the_origin
 // TEST: minimum_energy_transfer
 // TEST: bang_off_bang_transfer
 // TEST: vertical_landing_min_max
@@ -124,6 +125,68 @@ void unboundedCertified() {
     const Result R = oc::socp::solve(P);
     std::printf("  status %d in %d iterations; the ray x = %.3g\n", R.status, R.iters, R.x[0]);
     CHECK(R.status == oc::socp::DUAL_INFEASIBLE && R.x[0] < 0, "status %d", R.status);
+}
+
+// Far from the origin the certificates are not to be had for the asking (the audit of 60e2582): an iterate near an
+// optimum at 1e8 has A'y + G'z about -c tau, small against b'y + h'z only because the cost is large, and the tests
+// that a dual or primal iterate is a ray compared those two alone. Three feasible problems whose optima lie at 1e8
+// to 7e9, each once certified impossible: min t over t >= |x|, x = 1e8 (PRIMAL_INFEASIBLE at the first iteration);
+// the nearest point of a'x = 7e9 to (1, 2, 3) (the same); min -x1 over x1 <= x2, x2 = 1e8 (DUAL_INFEASIBLE at the
+// first). An iterate now counts as a ray only when the residual is small against the ray itself, the operators'
+// scale times its own size. None of them may come back with a certificate; the solver, unscaled, may well end
+// NUMERICAL far from the origin, which says it failed rather than that there is nothing to find. And x = 1 with
+// x = 2 is still certified infeasible.
+void farFromTheOrigin() {
+    using oc::socp::PRIMAL_INFEASIBLE;
+    using oc::socp::DUAL_INFEASIBLE;
+    const char* names[] = {"SOLVED", "PRIMAL_INFEASIBLE", "DUAL_INFEASIBLE", "MAX_ITER", "NUMERICAL", "INACCURATE"};
+    auto name = [&](int st) { return st >= 0 && st <= 5 ? names[st] : "?"; };
+    {   // min t over (t, x) in Q2, x = 1e8
+        Problem P;
+        P.n = 2; P.c = {1, 0}; P.A.cols = P.G.cols = 2;
+        P.A.add(1, 1); P.A.endRow(); P.b.push_back(1e8);
+        P.G.add(0, -1); P.G.endRow(); P.h.push_back(0);
+        P.G.add(1, -1); P.G.endRow(); P.h.push_back(0);
+        P.q = {2};
+        const Result R = oc::socp::solve(P);
+        std::printf("  min t, t >= |x|, x = 1e8: %s in %d iterations, cost %.10g\n", name(R.status), R.iters, R.pcost);
+        CHECK(R.status != PRIMAL_INFEASIBLE && R.status != DUAL_INFEASIBLE, "certified %s", name(R.status));
+    }
+    {   // the nearest point of a'x = 7e9 to (1, 2, 3), a = (1, -1, 2)
+        const double x0[3] = {1, 2, 3}, a[3] = {1, -1, 2};
+        Problem P;
+        P.n = 4; P.c = {0, 0, 0, 1}; P.A.cols = P.G.cols = 4;
+        for (int i = 0; i < 3; ++i) P.A.add(i, a[i]);
+        P.A.endRow(); P.b.push_back(7e9);
+        P.G.add(3, -1); P.G.endRow(); P.h.push_back(0);
+        for (int i = 0; i < 3; ++i) { P.G.add(i, -1); P.G.endRow(); P.h.push_back(-x0[i]); }
+        P.q = {4};
+        const Result R = oc::socp::solve(P);
+        std::printf("  the nearest point of a'x = 7e9: %s in %d iterations, cost %.10g against %.10g\n", name(R.status), R.iters, R.pcost,
+                    (7e9 - 5) / std::sqrt(6.0));
+        CHECK(R.status != PRIMAL_INFEASIBLE && R.status != DUAL_INFEASIBLE, "certified %s", name(R.status));
+    }
+    {   // min -x1 over x1 <= x2, x2 = 1e8
+        Problem P;
+        P.n = 2; P.c = {-1, 0}; P.A.cols = P.G.cols = 2;
+        P.A.add(1, 1); P.A.endRow(); P.b.push_back(1e8);
+        P.G.add(0, 1); P.G.add(1, -1); P.G.endRow(); P.h.push_back(0);
+        P.l = 1;
+        const Result R = oc::socp::solve(P);
+        std::printf("  min -x1, x1 <= x2 = 1e8: %s in %d iterations, cost %.10g\n", name(R.status), R.iters, R.pcost);
+        CHECK(R.status != PRIMAL_INFEASIBLE && R.status != DUAL_INFEASIBLE, "certified %s", name(R.status));
+    }
+    {   // x = 1 and x = 2: no x at all
+        Problem P;
+        P.n = 1; P.c = {1}; P.A.cols = P.G.cols = 1;
+        P.A.add(0, 1); P.A.endRow(); P.b.push_back(1);
+        P.A.add(0, 1); P.A.endRow(); P.b.push_back(2);
+        P.G.add(0, -1); P.G.endRow(); P.h.push_back(0);
+        P.l = 1;
+        const Result R = oc::socp::solve(P);
+        std::printf("  x = 1 and x = 2: %s in %d iterations\n", name(R.status), R.iters);
+        CHECK(R.status == PRIMAL_INFEASIBLE, "%s", name(R.status));
+    }
 }
 
 // ---- trajectories ------------------------------------------------------------------------------------------
@@ -615,6 +678,7 @@ const Test tests[] = {
     {"projection_onto_a_plane", projectionOntoAPlane},
     {"infeasible_certified", infeasibleCertified},
     {"unbounded_certified", unboundedCertified},
+    {"far_from_the_origin", farFromTheOrigin},
     {"minimum_energy_transfer", minimumEnergyTransfer},
     {"bang_off_bang_transfer", bangOffBangTransfer},
     {"vertical_landing_min_max", verticalLandingMinMax},

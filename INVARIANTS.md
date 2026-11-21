@@ -125,6 +125,24 @@ The three fixes, as they were tried (`flight/orbit/core/orbit_core.cpp`):
 +                        hands.pitch, hands.roll, hands.yaw, hands.throttle, hands.tx, hands.ty, hands.tz, (double)hands.gearDown, hands.brake};
 ```
 
+From the audit of `60e2582` (the third), fixed 2026-11-21, each with a test that failed before the fix:
+
+- **D4. The solver certified feasible problems impossible** (O18). Its tests that an iterate is a ray compared
+  A'y + G'z with b'y + h'z, and Ax, Gx + s with c'x, and nothing else; with no scaling of the data, an iterate
+  near an optimum far from the origin passed them. min t over t ≥ |x|, x = 10⁸ came back PRIMAL_INFEASIBLE at
+  the first iteration, the nearest point of a'x = 7 × 10⁹ the same, and min −x₁ over x₁ ≤ x₂ = 10⁸
+  DUAL_INFEASIBLE. An iterate now counts as a ray only when the residual is also small against the ray itself,
+  the operators' scale times its own size. The deck's problems, solved in their scaled units, were never near
+  it: every crew's and oracle's plan comes out bit for bit the same. Test: `test_socp`'s `far_from_the_origin`
+  (no certificate for any of the three; the solver, unscaled, ends them NUMERICAL, which says it failed rather
+  than that there is nothing; x = 1 with x = 2 still certified infeasible).
+- **D5. A crew asked for and refused changed the flight** (the house rule: a refused write is a no-op).
+  `oc_auto` reset the pilot's air law and attitude hold, and the flight director took up the guidance afresh,
+  before docking, the deck's landing or its take-off could refuse: the pilot flying the climb, a refused DECK
+  moved the pitch a second later from 51.78° to 51.85°, and the director's cue jumped. Now only an accepted
+  crew does either. Test: `test_fd`'s `refused_changes_nothing` (DECK, TAKEOFF and DOCK, each refused far
+  from the Ring: the flight, every readout and the cue the same to the bit as when nothing was asked).
+
 ## Not yet enforced
 
 - **G1.** The page's spokes are 70 m square by a literal in `web/src/ring.js`, not by `RING.spoke`; the
@@ -134,6 +152,8 @@ The three fixes, as they were tried (`flight/orbit/core/orbit_core.cpp`):
   frame would make it the page's.
 - **G3.** Settled 2026-11-21: `web/test/builds.test.mjs` runs both builds' `orbit_run` over the crew's
   900 s and holds them to the same printed table, row for row (97 rows; only their hashes differ, O12).
+  Without either build it fails and says which, rather than skipping (the third audit: it skipped, and so
+  passed having compared nothing).
 - **G4.** Settled 2026-11-21: `web/test/builds.test.mjs` scans every file of the core for a clock read or
   an unseeded random number (and shows its check can find one): there are none (O11).
 - **G5.** The ledgers restate the force model (`forcesOn`). A force added to the core, docking's contact

@@ -574,6 +574,9 @@ Result solve(const Problem& P, const Settings& S) {
     double tau = 1, kappa = 1;
     const double nb = std::max(1.0, norm(P.b)), nh = std::max(1.0, norm(P.h)), nc = std::max(1.0, norm(P.c));
     const int deg = K.degree();
+    double ag = 1;   // the operators' scale, for the certificates' test that an iterate is a ray
+    for (double v : P.A.val) ag = std::max(ag, std::fabs(v));
+    for (double v : P.G.val) ag = std::max(ag, std::fabs(v));
 
     std::vector<double> rx(n), ry(p), rz(m), xq(n), yq(p), zq(m), xf(n), yf(p), zf(m);
     std::vector<double> dx(n), dy(p), dz(m), ds(m), dsA(m), dzA(m), t1(m), t2(m), fx(n), fy(p), fz(m), wzq(m), wzf(m), wrz(m);
@@ -621,13 +624,15 @@ Result solve(const Problem& P, const Settings& S) {
             std::vector<double> ray(n, 0.0);
             mulT(P.A, y.data(), ray.data(), 1);
             mulT(P.G, z.data(), ray.data(), 1);
-            if (norm(ray) / nc / -(by + hz) <= S.feastol) { R.status = PRIMAL_INFEASIBLE; break; }
+            const double yz = std::sqrt(dot(y.data(), y.data(), p) + dot(z.data(), z.data(), m));   // a ray: A'y + G'z small against (y, z) itself
+            if (norm(ray) / nc / -(by + hz) <= S.feastol && norm(ray) <= S.feastol * ag * yz) { R.status = PRIMAL_INFEASIBLE; break; }
         }
         if (cx < 0) {
             std::vector<double> ax(p, 0.0), gx(s);
             mul(P.A, x.data(), ax.data(), 1);
             mul(P.G, x.data(), gx.data(), 1);
-            if (std::max(norm(ax) / nb, norm(gx) / nh) / -cx <= S.feastol) { R.status = DUAL_INFEASIBLE; break; }
+            const double xs = std::sqrt(dot(x.data(), x.data(), n) + dot(s.data(), s.data(), m));   // a ray: Ax, Gx + s small against (x, s) itself
+            if (std::max(norm(ax) / nb, norm(gx) / nh) / -cx <= S.feastol && std::max(norm(ax), norm(gx)) <= S.feastol * ag * xs) { R.status = DUAL_INFEASIBLE; break; }
         }
         if (it >= S.maxIter) { R.status = MAX_ITER; break; }
 

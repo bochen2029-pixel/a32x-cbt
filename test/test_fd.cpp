@@ -8,6 +8,7 @@
 // TEST: takes_up_where_the_crew_left_off
 // TEST: takes_up_the_flight_home
 // TEST: leaves_the_flight_alone
+// TEST: refused_changes_nothing
 // TEST: quiet_where_others_show
 // TEST: flown_to_orbit
 // TEST: flown_home
@@ -303,6 +304,37 @@ void leavesTheFlightAlone() {
     CHECK(agree(a, b) == -1 && a.size() > 400, "the director changed the flight home at mark %d of %zu", agree(a, b), a.size());
 }
 
+// A crew asked for and refused changes nothing but its refusal's readout (the house rule: a refused write is a
+// no-op): the pilot flying the climb at 100 s, full power, asks for the deck's landing, its take-off and docking,
+// each refused so far from the Ring; the flight, every readout of it, and the director's cue are then what they
+// are when nothing was asked, to the bit, a second on. (The audit of 60e2582: the director took up the guidance
+// afresh before the refusal, and the pitch cue jumped from 52.675 to 51.814 degrees; the pilot's air law and the
+// attitude hold were reset too.)
+void refusedChangesNothing() {
+    const int asks[] = {-1, OC_AUTO_DECK, OC_AUTO_TAKEOFF, OC_AUTO_DOCK};
+    const char* names[] = {"nothing", "the deck's landing", "the take-off", "docking"};
+    double first[OC_COUNT];
+    double r0[3], v0[3];
+    for (int k = 0; k < 4; ++k) {
+        oc_reset(LAT, LON, HDG);
+        while (get(OC_T) < 100) oc_step(1);
+        oc_auto(OC_AUTO_OFF);
+        oc_controls(0, 0, 0, 1, 0, 0, 0, 0, 0);
+        oc_step(50);
+        if (asks[k] >= 0) oc_auto(asks[k]);
+        const double who = get(OC_AUTO);
+        oc_step(50);
+        double r[3], v[3];
+        oc_eci(r, v);
+        std::printf("  %s asked: flying %.0f after the call; a second on, the pitch cue %.4f deg, the pitch %.4f deg\n", names[k], who, get(OC_FD_PITCH_DEG),
+                    get(OC_PITCH_DEG));
+        if (k == 0) { std::memcpy(first, oc_out(), sizeof first); std::memcpy(r0, r, sizeof r0); std::memcpy(v0, v, sizeof v0); continue; }
+        CHECK(who == OC_AUTO_OFF, "%s was not refused: %.0f flies", names[k], who);
+        CHECK(std::memcmp(first, oc_out(), sizeof first) == 0 && std::memcmp(r0, r, sizeof r0) == 0 && std::memcmp(v0, v, sizeof v0) == 0,
+              "%s, refused, changed the flight: the pitch cue %.4f deg", names[k], get(OC_FD_PITCH_DEG));
+    }
+}
+
 // Where the craft has a display of its own the director says nothing: near the Ring, holding on the port or
 // over the deck, docked; and while the approach, docking or the deck landing fly.
 void quietWhereOthersShow() {
@@ -545,6 +577,7 @@ const Test tests[] = {
     {"takes_up_where_the_crew_left_off", takesUpWhereTheCrewLeftOff},
     {"takes_up_the_flight_home", takesUpTheFlightHome},
     {"leaves_the_flight_alone", leavesTheFlightAlone},
+    {"refused_changes_nothing", refusedChangesNothing},
     {"quiet_where_others_show", quietWhereOthersShow},
     {"flown_to_orbit", flownToOrbit},
     {"flown_home", flownHome},
