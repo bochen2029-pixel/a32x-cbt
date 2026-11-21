@@ -21,6 +21,7 @@
 // TEST: return_refused_on_the_deck
 // TEST: departs_clear_of_the_mast
 // TEST: departure_says_when
+// TEST: keeps_clear_while_it_waits
 // TEST: blind_to_the_wind
 // TEST: lands_from_a_high_orbit
 
@@ -497,6 +498,43 @@ void departureSaysWhen() {
     CHECK(ret(OC_RET_PHASE) == OC_RET_PH_WAIT && std::fabs(said - took) < 0.1 * took, "said %.0f s, took %.0f s", said, took);
 }
 
+// Kept clear of the Ring while it waits for its pass. As the tour flies it: docked, let go onto the deck's landing,
+// up again 8 s after landing, to the hold point, and home 30 s on. The way out leaves the craft on a loop about the
+// Ring's orbit that slides along it a little each turn; on its own the loop carried the craft back to 820 m from
+// the Ring's centre 13,000 s later, inside the wheel among the hub's fittings, and in the tour it once struck them.
+// The crew backs away again within 9 km, and goes on to its burn.
+void keepsClearWhileItWaits() {
+    oc_reset(LAT, LON, HDG);
+    while (get(OC_PHASE) != OC_PH_ORBIT && get(OC_T) < 1500) oc_step(10);
+    oc_step(400);
+    oc_auto(OC_AUTO_DOCK);
+    while (oc_dock_out()[OC_DOCK_DOCKED] < 0.5 && get(OC_CRASHED) == 0 && get(OC_T) < 5000) oc_step(10);
+    oc_step(500);
+    oc_undock();
+    oc_auto(OC_AUTO_DECK);
+    while (!(oc_deck_out()[OC_DECK_PHASE] == OC_DECK_PH_LANDED && get(OC_AUTO) == OC_AUTO_OFF) && get(OC_CRASHED) == 0 && get(OC_T) < 8000) oc_step(10);
+    oc_step(400);
+    oc_auto(OC_AUTO_TAKEOFF);
+    while (get(OC_AUTO) != OC_AUTO_APPROACH && get(OC_CRASHED) == 0 && get(OC_T) < 9000) oc_step(10);
+    oc_step(1500);
+    if (get(OC_CRASHED) > 0 || get(OC_AUTO) != OC_AUTO_APPROACH) { CHECK(false, "not at the hold point: crashed %.0f, auto %.0f", get(OC_CRASHED), get(OC_AUTO)); return; }
+    oc_auto(OC_AUTO_RETURN);
+    const double t0 = get(OC_T);
+    double nearest = 1e30, nearestAt = 0;
+    int departs = 0, was = (int)ret(OC_RET_PHASE);
+    while (get(OC_CRASHED) == 0 && get(OC_T) < t0 + 90000 && ret(OC_RET_PHASE) <= OC_RET_PH_WAIT) {
+        oc_step(50);
+        const int ph = (int)ret(OC_RET_PHASE);
+        if (ph == OC_RET_PH_DEPART && was == OC_RET_PH_WAIT) ++departs;
+        if (ph == OC_RET_PH_WAIT && get(OC_RING_RANGE) < nearest) { nearest = get(OC_RING_RANGE); nearestAt = get(OC_T); }
+        was = ph;
+    }
+    std::printf("  RETURN at %.0f s: backed away again %d times; the nearest in the wait %.0f m, at %.0f s; the burn at %.0f s\n", t0, departs, nearest, nearestAt, get(OC_T));
+    CHECK(get(OC_CRASHED) == 0, "crashed: hit %.0f with %.0f", oc_dock_out()[OC_DOCK_HIT], oc_dock_out()[OC_DOCK_HIT_PART]);
+    CHECK(nearest > OC_RET_NEAR_RING_M - 100, "the nearest in the wait %.0f m", nearest);
+    CHECK(ret(OC_RET_PHASE) == OC_RET_PH_BURN, "no burn by %.0f s: phase %.0f", get(OC_T), ret(OC_RET_PHASE));
+}
+
 // The crew cannot see the wind, only what its instruments measure: its commands, for a state and the air data
 // its probes give there, are the same to the bit whatever the wind that made those air data. Through a flight
 // home in a moderate wind, at every 2 s from the entry to the stop, the crew's step is worked out twice from
@@ -570,6 +608,7 @@ const Test tests[] = {
     {"return_refused_on_the_deck", returnRefusedOnTheDeck},
     {"departs_clear_of_the_mast", departsClearOfTheMast},
     {"departure_says_when", departureSaysWhen},
+    {"keeps_clear_while_it_waits", keepsClearWhileItWaits},
     {"blind_to_the_wind", blindToTheWind},
     {"lands_from_a_high_orbit", landsFromAHighOrbit},
 };

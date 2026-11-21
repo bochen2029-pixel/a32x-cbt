@@ -1390,6 +1390,15 @@ void flyHome(State& s, const Local& L, double* throttle) {
         depart(s, L);
         break;
     case OC_RET_PH_WAIT: {
+        // Kept clear while it waits. The way out leaves the craft on an orbit of its own about the Ring's, a loop
+        // that slides along it a little each turn, and some hours on a loop can carry the craft back through the
+        // wheel (found by the tour: let go after the deck's take-off, it passed 820 m from the Ring's centre two
+        // orbits later, and once struck it). Within DEPART_NEAR of the Ring and closing, it backs away again on
+        // the small thrusters, as it first did, and plans afresh once clear.
+        if (ring.valid && !R.lowering) {
+            const V3 rel = s.r - ringPos(t), vrel = s.v - ringVel(t);
+            if (norm(rel) < DEPART_NEAR && dot(rel, vrel) < 0) { R.phase = OC_RET_PH_DEPART; depart(s, L); break; }
+        }
         if (R.lowering) { lower(s, L, throttle); break; }
         if (t >= R.tPlan) plan(s);
         const Orbit o = orbitOf(s);
