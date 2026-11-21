@@ -22,7 +22,7 @@ export const LIMITS = { heat: 600000, load: 2.5, qbar: 20000 };   // OC_RET_HEAT
 export const NEAR_RING = 9000;   // m, OC_RET_NEAR_RING_M: nearer the Ring's centre the crew backs away first
 export const RET_NO = { none: 0, deck: 1, riding: 2 };   // OC_RET_NO_*: why RETURN was refused
 const REFUSED = {
-  [RET_NO.deck]: 'On the deck: take off and clear the Ring first',
+  [RET_NO.deck]: 'On the deck: the crew takes off first (7, TAKE OFF), then R from the hold point',
   [RET_NO.riding]: 'Riding with the Ring: the crew flies home from clear of it, or from at rest by it',
 };
 const SKIP_UNTIL = 60;   // s before the burn: the skip stops, so the turn's end and the burn are seen

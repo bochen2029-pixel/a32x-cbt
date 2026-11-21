@@ -12,8 +12,9 @@ import { AUTO, Core, PH, SAS } from '../src/core.js';
 import { DOCK_OUT } from '../src/dock-hud.js';
 import {
   DECK, DECK_NO, DECK_OUT, DECK_PH, DECK_V, LOC_FULL_M, GS_FULL_M, WITHIN_M, approachLayout, deckCommand, deckHoldMakesSense, deckLines, deckStatus, engagedText,
-  padName, touchdownText, verdictText,
+  padName, takeoffCommand, takeoffText, touchdownText, verdictText,
 } from '../src/deck-hud.js';
+import { HELP } from '../src/input.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const header = readFileSync(join(here, '..', '..', 'core', 'orbit_deck.h'), 'utf8');
@@ -35,8 +36,9 @@ const S = {
 };
 const D = Object.fromEntries(DECK_OUT.map((n) => [n, 0]));
 D.pad = -1;
+D.planTime = -1;
 const glide = { ...D, phase: DECK_PH.glide, pad: 1, s: 3210, c: -84, height: 400.4, along: -154.2, across: 3.1, vertical: -0.1, apparentG: 0.26, nozzle: 33.6, loc: 2.3, gs: -1.1,
-  fdAlong: -150.8, fdAcross: 4.0, fdVertical: 0.2, propUsed: 612 };
+  fdAlong: -150.8, fdAcross: 4.0, fdVertical: 0.2, propUsed: 612, planTime: 23.4, planDv: 181.6, planProp: 312.4, planSolves: 19 };
 
 test('the deck\'s readouts are orbit_deck.h\'s, in its order', () => {
   const body = header.slice(header.indexOf('OC_DECK_PHASE = 0'), header.indexOf('OC_DECK_COUNT')).replace(/\/\*[\s\S]*?\*\//g, '');
@@ -46,14 +48,16 @@ test('the deck\'s readouts are orbit_deck.h\'s, in its order', () => {
 
 test('the deck\'s numbers and names are the headers\'', () => {
   assert.deepEqual(DECK, {
-    swivel: define('OC_DECK_SWIVEL_DPS'), glide: define('OC_DECK_GLIDE_M'), hover: define('OC_DECK_HOVER_M'), side: define('OC_DECK_SIDE_M'),
+    swivel: define('OC_DECK_SWIVEL_DPS'), gate: define('OC_DECK_GATE_M'), hover: define('OC_DECK_HOVER_M'), side: define('OC_DECK_SIDE_M'),
     tolSink: define('OC_DECK_TOL_SINK'), tolDrift: define('OC_DECK_TOL_DRIFT'), tolOff: define('OC_DECK_TOL_OFF_M'), tolTilt: define('OC_DECK_TOL_TILT_DEG'),
     crashSink: define('OC_DECK_CRASH_SINK'), crashDrift: define('OC_DECK_CRASH_DRIFT'), crashTilt: define('OC_DECK_CRASH_TILT_DEG'), propMin: define('OC_DECK_PROP_MIN'),
+    takeoffPropMin: define('OC_DECK_TAKEOFF_PROP_MIN'),
   });
   assert.deepEqual(DECK_PH, enumOf('PH'));
   assert.deepEqual(DECK_V, enumOf('V'));
   assert.deepEqual(DECK_NO, enumOf('NO'));
   assert.equal(Number(coreHeader.match(/OC_AUTO_DECK = (\d+)/)[1]), AUTO.deck);
+  assert.equal(Number(coreHeader.match(/OC_AUTO_TAKEOFF = (\d+)/)[1]), AUTO.takeoff);
   assert.equal(Number(coreHeader.match(/OC_SAS_DECK = (\d+)/)[1]), SAS.deck);
 });
 
@@ -68,8 +72,8 @@ test('LAND DECK starts the crew where it makes sense, and says why where it does
   no({ ...S, ringRange: 80000 }, D, /80\.0 km away/);
   no({ ...S, vrelE: 60, vrelN: 30 }, D, /Passing the Ring at 67 m\/s/);
   no({ ...S, crashed: 1 }, D, /Crashed/);
-  no({ ...S, prop: 1200 }, D, /1200 kg of propellant: a deck landing wants 2,000/);
-  no({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.glide }, /landing: on the glide/);
+  no({ ...S, prop: 800 }, D, /800 kg of propellant: a deck landing wants 1,000/);
+  no({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.glide }, /landing: on the final burn/);
   no(S, { ...D, onDeck: 1 }, /On the deck already/);
   no(S, D, /let go first/, Object.fromEntries(DOCK_OUT.map((n) => [n, n === 'docked' ? 1 : 0])));
   // riding with the Ring, its own orbit low and the deck's speed past the Ring's centre: the crew still lands
@@ -78,10 +82,42 @@ test('LAND DECK starts the crew where it makes sense, and says why where it does
 
 test('once asked, the page says what the crew does first, or why the core refused', () => {
   assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.transfer, pad: -1 }), 'The crew lands on the deck: first to the hold point, 24.3 km away');
-  assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.depart, pad: 0 }), 'The crew lands on pad 1: out into the Ring, then the glide along the deck');
+  assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.depart, pad: 0 }),
+    'The crew lands on pad 1: its plan of least propellant, out into the Ring, a coast, and one burn down onto it');
+  assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.glide, pad: 1 }), 'The crew lands on pad 2: straight on, by a new plan');
   assert.equal(engagedText({ ...S, auto: AUTO.deck }, { ...D, phase: DECK_PH.hover, pad: 2 }), 'The crew lands on pad 3: over to it and down');
   assert.equal(engagedText(S, { ...D, refused: DECK_NO.landed }), 'Deck landing refused: on the deck already');
-  assert.equal(engagedText(S, { ...D, refused: DECK_NO.prop }), 'Deck landing refused: under 2,000 kg of propellant');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.prop }), 'Deck landing refused: too little propellant for it');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.riding }), 'Deck landing refused: turning with the Ring but not over the deck: fly over it first');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.stop }), 'Deck landing refused: moving along the deck too fast to stop before the bulkhead');
+  assert.equal(engagedText(S, { ...D, refused: DECK_NO.plan }), 'Deck landing refused: no plan from here');
+});
+
+test('TAKE OFF starts the crew\'s take-off from the deck, or low over it, and says why where it does not', () => {
+  const onDeck = { ...D, onDeck: 1, pad: 1, height: 2.95, sectorS: 0, c: 0, phase: DECK_PH.landed };
+  const parked = { ...S, auto: AUTO.off, sas: SAS.deck, ringRange: 4997, peri: -300000, prop: 3600 };
+  assert.equal(takeoffCommand(parked, onDeck, null).action, 'engage');
+  assert.equal(takeoffCommand(parked, { ...onDeck, onDeck: 0, height: 20, along: 0.1 }, null).action, 'engage');   // hovering low over it
+  const no = (s, d, words, dock = null) => {
+    const c = takeoffCommand(s, d, dock);
+    assert.equal(c.action, 'none');
+    assert.match(c.say, words);
+  };
+  no(S, D, /from the deck, or hovering low over it/);                                  // in orbit
+  no(parked, { ...onDeck, onDeck: 0, height: 350 }, /from the deck, or hovering low over it/);
+  no({ ...parked, prop: 400 }, onDeck, /400 kg of propellant: a take-off wants 500/);
+  no({ ...parked, crashed: 1 }, onDeck, /Crashed/);
+  no({ ...parked, auto: AUTO.takeoff }, { ...onDeck, onDeck: 0, phase: DECK_PH.climb }, /taking off: climbing out through the roof's gap/);
+  assert.equal(takeoffText({ ...parked, auto: AUTO.takeoff }, onDeck), 'The crew takes off from pad 2: straight up, then out through the roof\'s gap to the hold point');
+  assert.equal(takeoffText(parked, { ...onDeck, refused: DECK_NO.notDown }), 'Take-off refused: not on the deck, nor hovering low over it');
+  // the status line through the take-off, and the key
+  const up = { ...parked, auto: AUTO.takeoff, portRange: 2310 };
+  assert.equal(deckStatus(up, { ...onDeck, onDeck: 0, phase: DECK_PH.lift, height: 18.24 }).line, 'TAKE-OFF · LIFT · 18.2 m over pad 2');
+  assert.equal(deckStatus(up, { ...onDeck, onDeck: 0, phase: DECK_PH.climb, height: 812, nozzle: 22.4, planTime: 93.6 }).line,
+    'TAKE-OFF · CLIMB · 812 m over the floor · swivel 22° · 94 s');
+  assert.equal(deckStatus(up, { ...onDeck, onDeck: 0, phase: DECK_PH.coast, planTime: 40.2 }).line, 'TAKE-OFF · COAST · 2.31 km to the hold point · 40 s');
+  assert.match(deckStatus(parked, onDeck).hint, /7: the crew takes off/);
+  assert.ok(HELP.some(([key, words]) => key === '7' && /takes off/.test(words)), 'the help names the key');
 });
 
 test('the deck hold is for flying over the deck: within the Ring\'s reach', () => {
@@ -105,7 +141,8 @@ test('the status line follows the landing: the crew\'s phases, the deck hold, on
   assert.equal(deckStatus(S, D), null);
   const crew = { ...S, auto: AUTO.deck };
   assert.equal(deckStatus(crew, { ...D, phase: DECK_PH.transfer }).line, 'DECK · 24.3 km to the hold point');
-  assert.equal(deckStatus(crew, glide).line, 'DECK · GLIDE · pad 2 3.21 km · 154 m/s against the deck · swivel 34°');
+  assert.equal(deckStatus(crew, glide).line, 'DECK · FINAL · pad 2 3.21 km · 154 m/s against the deck · swivel 34° · 23 s');
+  assert.equal(deckStatus(crew, { ...glide, phase: DECK_PH.wait, planTime: 61.2 }).line, 'DECK · COAST · pad 2 · 61 s · the deck by at 154 m/s');
   assert.match(deckStatus(crew, glide).hint, /^Space/);
   assert.equal(deckStatus(crew, { ...glide, phase: DECK_PH.hover, height: 20.04 }).line, 'DECK · HOVER over pad 2 · 20.0 m');
   assert.equal(deckStatus(crew, { ...glide, phase: DECK_PH.descend, height: 7.5, vertical: -0.92 }).line, 'DECK · DESCENDING onto pad 2 · 4.5 m · 0.92 m/s');
@@ -123,14 +160,21 @@ test('the HUD\'s deck lines: only while the deck matters, with the numbers an ap
   assert.deepEqual(deckLines(S, D), []);
   const crew = { ...S, auto: AUTO.deck };
   const lines = deckLines(crew, glide);
-  assert.equal(lines.length, 4);
-  assert.match(lines[0], /^DECK GLIDE {10}pad 2 {2}3\.21 km along the deck {3}400 m over the floor$/);
+  assert.equal(lines.length, 5);
+  assert.match(lines[0], /^DECK FINAL {10}pad 2 {2}3\.21 km along the deck {3}400 m over the floor$/);
   assert.match(lines[1], /against the deck -154\.2 along {2}\+3\.1 across {2}-0\.1 up {2}m\/s {3}0\.26 g {3}swivel 34°/);
   assert.match(lines[2], /ILS localizer \+2\.3 m {2}glide path -1\.1 m {3}FD -150\.8 \+4\.0 \+0\.2 m\/s/);
-  assert.match(lines[3], /propellant for the landing 612 kg/);
+  assert.match(lines[3], /the plan: 23 s left, 182 m\/s, 312 kg {3}19 made/);
+  assert.match(lines[4], /propellant for the landing 612 kg/);
   assert.deepEqual(deckLines(crew, { ...glide, phase: DECK_PH.transfer }), ['DECK TO HOLD POINT  pad 2  3.21 km along the deck   400 m over the floor']);
   assert.ok(deckLines(crew, glide, true).every((l) => l.length <= 40), 'a phone\'s lines are short');
   assert.deepEqual(deckLines({ ...S, crashed: 1 }, glide), []);
+  // the propellant is the job's the crew was last given: the take-off's still once the approach's crew holds the
+  // craft at the hold point, the deck hold's lines shown there
+  const held = { ...S, auto: AUTO.approach, sas: SAS.deck, ringRange: 4900 }, after = { ...glide, phase: DECK_PH.none, planTime: -1 };
+  assert.match(deckLines({ ...S, auto: AUTO.takeoff }, { ...glide, phase: DECK_PH.climb }).at(-1), /propellant for the take-off 612 kg$/);
+  assert.match(deckLines(held, after, false, AUTO.takeoff).at(-1), /propellant for the take-off 612 kg$/);
+  assert.match(deckLines(held, after, false, AUTO.deck).at(-1), /propellant for the landing 612 kg$/);
 });
 
 test('the approach display: the needles point to the path, the plan shows the pad and the velocities nose up', () => {
@@ -181,8 +225,36 @@ test('the page\'s block reads the core\'s deck: LAND DECK in orbit lands, and th
   assert.ok(Math.abs(s.g - 1) < 0.01 && d.apparentG > 0.99, `${s.g} g felt on the deck, ${d.apparentG} apparent`);
   assert.match(deckStatus(s, d).line, /^ON THE DECK · landed on pad \d at 0\.\d\d m\/s/);
   assert.equal(deckCommand(s, d, core.dock).action, 'none');
+  // RETURN on the deck is refused by the core: the flight home starts from orbit, and the deck is not one
+  core.auto(AUTO.return);
+  s = core.read();
+  assert.equal(s.auto, AUTO.off, 'RETURN on the deck');
   // and the pilot lifts off with the throttle open
   core.controls({ pitch: 0, roll: 0, yaw: 0, throttle: 1, tx: 0, ty: 0, tz: 0, gear: true, brake: 0 });
   s = core.step(500);
   assert.ok(d.onDeck === 0 && d.height > 20, `${d.height} m up`);
+});
+
+test('the page\'s block reads the crew\'s take-off: from the pad to the hold point, where the approach\'s crew holds it', { skip: !existsSync(built) && `no module at ${built}: build it first` }, async () => {
+  const core = new Core(await createRequire(import.meta.url)(built)());
+  let s = core.reset();
+  const d = core.addBlock('deck', '_oc_deck_out', '_oc_deck_out_len', DECK_OUT);
+  core.addBlock('dock', '_oc_dock_out', '_oc_dock_out_len', DOCK_OUT);
+  while (s.phase !== PH.orbit && s.t < 1500 && !s.crashed) s = core.step(250);
+  core.auto(AUTO.deck);
+  const t0 = core.read().t;
+  while (!(d.phase === DECK_PH.landed && s.auto === AUTO.off) && s.t - t0 < 2400 && !s.crashed) s = core.step(50);
+  assert.equal(d.phase, DECK_PH.landed);
+  s = core.step(100);
+  assert.equal(takeoffCommand(s, d, core.dock).action, 'engage');
+  core.auto(AUTO.takeoff);
+  s = core.read();
+  assert.match(takeoffText(s, d), /^The crew takes off from pad \d/);
+  const t1 = s.t, seen = new Set();
+  while (s.auto === AUTO.takeoff && s.t - t1 < 600 && !s.crashed) { s = core.step(50); seen.add(d.phase); }
+  assert.equal(s.crashed, 0);
+  assert.equal(s.auto, AUTO.approach, `auto ${s.auto} after ${(s.t - t1).toFixed(0)} s`);
+  for (const p of [DECK_PH.lift, DECK_PH.climb, DECK_PH.coast, DECK_PH.arrive]) assert.ok(seen.has(p), `phase ${p} flown`);
+  s = core.step(1000);
+  assert.ok(s.portRange < 10, `${s.portRange} m off the hold point`);
 });

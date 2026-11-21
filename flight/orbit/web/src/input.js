@@ -15,6 +15,7 @@ export const HELP = [
   ['P', 'the crew docks at the hub; docked: let go'],
   ['C', 'the crew lands on the Ring\'s flight deck'],
   ['6, on the deck', 'hover: W S A D fly against the deck, let go to hold; Shift Ctrl climb, sink (the middle holds)'],
+  ['7', 'on the deck: the crew takes off, out through the roof\'s gap to the hold point (then R flies home)'],
   ['R', 'the crew flies home to KDFW'],
   ['Enter', 'docked: go aboard the Ring and walk'],
   ['O', 'skip ahead to orbit (crew)'],
@@ -72,7 +73,7 @@ export class Input {
     if (down && !e.repeat) {
       const map = {
         ' ': 'crew', g: 'gear', b: 'brake', v: 'view', h: 'help', t: 'approach', o: 'orbit', ',': 'slower', '.': 'faster',
-        1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', 5: 'sas4', 6: 'sas5', c: 'deck', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
+        1: 'sas0', 2: 'sas1', 3: 'sas2', 4: 'sas3', 5: 'sas4', 6: 'sas5', 7: 'takeoff', c: 'deck', z: 'full', x: 'cut', Backspace: 'reset', p: 'dock', r: 'return', Enter: 'walk',
         f: 'moon', 9: 'quality', 8: 'fd',
       };
       if (map[k] !== undefined) this.commands.push(map[k]);

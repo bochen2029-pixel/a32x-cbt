@@ -19,8 +19,8 @@ extern "C" {
 /* who is flying: the pilot; the scripted crew (runway to orbit); the crew's approach, which flies to
    a point on the ring's axis, OC_STANDOFF_M off the hub's port, and holds there; the crew flying home
    (orbit_return.h); the crew docking at the hub (orbit_dock.h); the crew landing on the ring's flight
-   deck (orbit_deck.h) */
-enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN = 3, OC_AUTO_DOCK = 4, OC_AUTO_DECK = 5 };
+   deck, and taking off from it to the approach's hold point (orbit_deck.h) */
+enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN = 3, OC_AUTO_DOCK = 4, OC_AUTO_DECK = 5, OC_AUTO_TAKEOFF = 6 };
 
 /* The ring's shape, one for the core and the page. Its frame: the axis, fixed among the stars, and ref,
    a unit vector in its plane that turns with it at OC_RING_SPIN about the axis. The floor and the roof

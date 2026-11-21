@@ -234,7 +234,8 @@ void dockWreck(State& s, int what, int part, double back);     // a crash on the
 // docking's contact with the ring.
 void deckReset(State& s);
 void deckEngage(State& s);                                     // oc_auto(OC_AUTO_DECK)
-void deckCrew(State& s, const Local& L, double* throttle);     // a step's commands, landing on the deck
+void deckTakeoff(State& s);                                    // oc_auto(OC_AUTO_TAKEOFF)
+void deckCrew(State& s, const Local& L, double* throttle);     // a step's commands, landing on the deck or taking off from it
 bool deckPilot(State& s, const Local& L, double* throttle);    // OC_SAS_DECK: the pilot's hold, true where it applies
 void deckAfterStep(State& s);                                  // the hard points against the deck, the touchdown
 void deckWriteOut(const State& s);

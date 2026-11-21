@@ -11,7 +11,7 @@ export const OUT = [
 ];
 
 export const DT = 0.02;
-export const AUTO = { off: 0, crew: 1, approach: 2, return: 3, dock: 4, deck: 5 };
+export const AUTO = { off: 0, crew: 1, approach: 2, return: 3, dock: 4, deck: 5, takeoff: 6 };
 export const SAS = { hold: 0, prograde: 1, retrograde: 2, target: 3, port: 4, deck: 5 };
 export const PHASES = ['HOLD', 'TAKE-OFF ROLL', 'ROTATE', 'CLIMB', 'ASCENT', 'INSERTION', 'ORBIT'];
 export const PH = { hold: 0, roll: 1, rotate: 2, climb: 3, ascent: 4, insert: 5, orbit: 6 };
