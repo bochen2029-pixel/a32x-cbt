@@ -40,12 +40,14 @@ export const STAGES = {
       if (m.wall > 0.5 && s.auto !== AUTO_CREW && !m.crewAsked) { m.crewAsked = true; return ['crew']; }
       return [];
     },
-    text(s) {
-      if (s.t < 20) return 'Sixty tonnes, half of it propellant, and one fiction: a drive of 2,000 s of specific impulse. The crew lets the brakes go at 20 s.';
+    text(s, m) {
+      if (s.t < 20 || !m.wall) return 'Sixty tonnes, half of it propellant, and one fiction: a drive of 2,000 s of specific impulse. The crew lets the brakes go at 20 s.';
       if (s.onGround) return s.tas < 90 ? `The take-off roll: ${s.tas.toFixed(0)} m/s` : 'Rotate at 95 m/s';
       return `Airborne, turning east to 090: ${km(s.alt)} km`;
     },
-    next: (s) => (!s.onGround && s.alt > 1500 ? 'climb' : null),
+    // not on the step that gives the reset: that step's state is from before it, wherever the tour was started
+    // (in orbit it is high and moving, and the tour went on to the climb with the craft parked on the runway)
+    next: (s, m) => (m.wall > 0 && !s.onGround && s.alt > 1500 ? 'climb' : null),
   },
   climb: {
     enter: { warp: 2 },

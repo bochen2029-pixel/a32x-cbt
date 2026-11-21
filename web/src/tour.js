@@ -17,7 +17,11 @@ const CSS = `
 `;
 
 // commands that only change what is shown: they leave the tour running
-const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view', 'fd']);
+const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view', 'fd', 'quality']);
+// The keys that fly the craft or walk the walker, held rather than pressed (input.js, walk-view.js): they are no
+// command, but a hand on them takes over as a command does. Looking about (a drag, the wheel) does not, nor do
+// Shift and Ctrl alone, which also change other keys (shift-N, the map's next view).
+export const HAND_KEYS = new Set(['w', 'a', 's', 'd', 'q', 'e', 'i', 'k', 'j', 'l', 'u', 'm', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 
 export const tour = {
   name: 'tour',
@@ -30,6 +34,7 @@ export const tour = {
 
   init(ctx) {
     this.ctx = ctx;
+    this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     const style = document.createElement('style');
     style.textContent = CSS;
     document.head.appendChild(style);
@@ -52,15 +57,31 @@ export const tour = {
       this.button = b;
     }
     window.addEventListener('keydown', (e) => {
-      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || (e.target && e.target.tagName === 'INPUT')) return;
-      if (e.key === '0') ctx.input.commands.push('tour');
+      if (e.repeat || (e.target && e.target.tagName === 'INPUT')) return;
+      const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+      if (this.on && HAND_KEYS.has(k)) this.takeOver(ctx, null);
+      else if (e.key === '0' && !(e.ctrlKey || e.metaKey || e.altKey)) ctx.input.commands.push('tour');
     });
+    // the screen's stick, under a thumb, is a hand on the controls too
+    const stick = document.getElementById('stick');
+    if (stick) stick.addEventListener('pointerdown', () => { if (this.on) this.takeOver(ctx, null); });
+  },
+
+  // Someone else's command, or a hand on the keys: the tour ends, time runs at one to one again (the tour may
+  // have left it at a hundred, and a pilot taking over wants it real; TIME + and − step from where it was), and
+  // the command goes on to do what it does. A hand on the keys gives no command, so the tour says what now.
+  takeOver(ctx, c) {
+    const walking = !!(ctx.walk && ctx.walk.v.on);
+    const crew = Math.round(ctx.core.s.auto) !== ctx.AUTO.off;
+    this.stop(ctx, walking ? 'The tour is over: the walk is yours'
+      : crew ? `The tour is over: the crew flies on; ${this.touch ? 'CREW' : 'Space'} takes the controls` : 'The tour is over: your controls');
+    if (c !== 'faster' && c !== 'slower') { ctx.state.warp = 1; ctx.state.debt = 0; }
   },
 
   // The tour keeps its own frame clock: the page's update hooks are not every frame's (the walk skips them
   // where the sky cannot be seen, in the hub's lobby), and the tour must not stop for that.
   start(ctx) {
-    Object.assign(this, { on: true, stage: 'runway', memory: {}, wall: 0, userView: false, last: null });
+    Object.assign(this, { on: true, stage: 'runway', memory: {}, wall: 0, userView: false, last: null, intro: true });
     const loop = (now) => {
       if (!this.on) return;
       const dt = this.last === null ? 0 : Math.min(0.25, (now - this.last) / 1000);
@@ -71,7 +92,8 @@ export const tour = {
     this.raf = requestAnimationFrame(loop);
     if (ctx.walk && ctx.walk.v.on) ctx.walk.stop('The tour starts on the runway');
     this.button?.setAttribute('aria-pressed', 'true');
-    ctx.say('The tour: the whole loop, flown by the crew. Any key or button takes over');
+    document.getElementById('help')?.classList.remove('shown');   // the view is the tour's; H shows the help again
+    // what the tour is, said once its first commands (the start on the runway) have said theirs (tick)
   },
 
   stop(ctx, why) {
@@ -87,13 +109,13 @@ export const tour = {
   // other than one that only changes what is shown, ends it and then goes on to do what it does.
   command(c, ctx) {
     if (c === 'tour') {
-      if (this.on) this.stop(ctx, 'The tour is over: your controls as they stand');
+      if (this.on) this.takeOver(ctx, c);
       else this.start(ctx);
       return true;
     }
     if (this.on && !this.issuing) {
       if (c === 'view') this.userView = true;
-      if (!LOOKING.has(c)) this.stop(ctx, null);
+      if (!LOOKING.has(c)) this.takeOver(ctx, c);   // then the command does what it does, and says so
     }
     return false;
   },
@@ -111,6 +133,10 @@ export const tour = {
     // back aboard before the flight's commands: while walking, the walk holds them
     if (out.walk === 'stop' && walking) ctx.walk.stop('Back aboard');
     for (const c of out.commands) this.give(ctx, c);
+    if (this.intro) {
+      this.intro = false;
+      ctx.say(`The tour: the whole loop, flown by the crew. Any key or button takes over${this.touch ? '' : '; 0 ends it'}`);
+    }
     if (out.walk === 'hatch') this.give(ctx, 'walk');
     else if (out.walk === 'floor' && ctx.walk) ctx.walk.start(PLACE.floor);
     if (out.warp) ctx.state.warp = out.warp;
