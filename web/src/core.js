@@ -18,13 +18,20 @@ export const PH = { hold: 0, roll: 1, rotate: 2, climb: 3, ascent: 4, insert: 5,
 export const SAS_NAMES = ['HOLD', 'PROGRADE', 'RETROGRADE', 'TARGET', 'PORT', 'DECK'];
 export const HUB_PORT_M = 350, STANDOFF_M = 300;
 
-// The ring's shape: orbit_core.h's OC_RING_*, OC_HUB_* and OC_DECK_*, held equal to them by a test. Spoke k
+// The ring's shape: orbit_core.h's OC_RING_*, OC_HUB_*, OC_DECK_*, OC_RADIATOR_*, OC_MAST_* and OC_ARRAY_*, held equal to
+// them by a test. Spoke k
 // runs along sin(2 pi k / spokes) ref + cos(2 pi k / spokes) (ref x axis); the hub's port is at -axis. The
 // flight deck is the open sector centred at deck.angle (degrees, the spokes' convention), deck.arc of the
 // floor long, its bulkheads outside its ends, its pads on the centreline.
 export const RING = {
   spin: 0.0443, floor: 5000, width: 1000, hull: 5040, roof: 4700, rim: 4620, spokes: 6, spoke: 70, hub: 160, port: HUB_PORT_M,
   deck: { angle: 30, arc: 1500, bulkhead: 20, pads: 3, padSpacing: 400, padRadius: 25 },
+  // the hub's fittings, as solid in the core as the rest (orbit_core.h): the collar, the radiators midway between the
+  // spokes on the far side, and the solar mast with its arrays, held still and square to the Sun
+  collar: { r: 200, half: 60 },
+  radiators: { r0: 168, r1: 470, y0: 95, y1: 335, thick: 2 },
+  mast: { length: 560, r: 10, footR: 30, foot: 30 },
+  arrays: { count: 3, first: 530, step: 160, span: 260, root: 24, chord: 110, thick: 1.2, spar: 3 },
 };
 
 // KDFW 17C, its end and true heading (docs/provenance.md, 1f): where every flight starts.

@@ -135,7 +135,9 @@ the axis, still turning with the port under the hold on the port; 1, the attitud
 
 Every other part of the craft is a few spheres (the probe, the nose, the body, the wingtips, the tail),
 swept along each step against the Ring: the band from the roof out to the hull, the rim walls and their
-lips, the six spokes, the hub. A touch is a crash, the status line says what hit what, and the wreck
+lips, the six spokes, the hub with its collar, the radiators standing out from it on the far side, and
+beyond the far face the solar mast and its arrays, which do not turn with the Ring but stay square to the
+Sun (the sweep meets them as they stood at each moment of the step). A touch is a crash, the status line says what hit what, and the wreck
 stays where it struck, turning with the Ring. Between the spokes, and out through the rim's opening, the
 way is free.
 
@@ -166,6 +168,7 @@ From the tests (`test/test_dock.cpp`):
 | 1 m off the centre; at 0.015 m/s; not turning with the port | not caught: off the centre; too slow, then caught at 0.1 m/s; the key out of phase |
 | into the roof, a rim wall, a spoke, the hub | a crash, and what hit: the right wing, the probe, the tail, the left wing |
 | along the axis beside the hub, between two spokes and out | nothing touched, 199 m from a spoke's line |
+| the hub's fittings: into the collar 50 m along the axis, the mast 610 m along it, an array's wing nose on; held still between two radiators | the probe on the collar 200.13 m from the axis (the hub's own wall is 40 m further in), on the mast at 10.12 m, on the wing; the next radiator round in 11.1 s; 30 m past the wing's tip, nothing |
 | 48 km behind, drifting 16 m/s in the orbit's frame | docking engages; by the plain difference of velocities it would read 52 m/s |
 
 Every number here is chosen to make a docking that can be flown from a keyboard and fails where it is
@@ -464,8 +467,7 @@ It is refused, and whoever was flying flies on, on the Ring's deck and within 9 
 while the craft moves past it faster than 50 m/s in the frame turning with its orbit, as it does riding
 with the deck: its way out, backing away on the small thrusters, is for a craft at rest by the Ring (from
 the deck it put the belly on the deck in 0.6 s). On the Ring's far side the way out keeps 600 m from the
-axis until 1 km out along it, clear of the hub's solar mast, its arrays and the radiators the page draws
-there, which the core does not collide with.
+axis until 1 km out along it, clear of the hub's solar mast, its arrays and its radiators.
 
 How it flies (`core/return.cpp`). Nothing in it writes where the craft is: it commands body rates, the
 throttle, the gear and the brakes, as the crew to orbit does, and if its guidance cannot solve the

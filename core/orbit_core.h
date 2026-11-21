@@ -40,6 +40,36 @@ enum { OC_AUTO_OFF = 0, OC_AUTO_CREW = 1, OC_AUTO_APPROACH = 2, OC_AUTO_RETURN =
 #define OC_HUB_PORT_M 350.0     /* from the ring's centre to the hub's port, along the axis */
 #define OC_STANDOFF_M 300.0
 
+/* The hub's fittings, as solid as the rest of the shape (dock.cpp). A collar where the spokes meet the hub,
+   OC_HUB_COLLAR_M in radius and twice OC_HUB_COLLAR_HALF_M long, centred on the spokes' plane. Radiators, flat
+   panels OC_RADIATOR_THICK_M thick standing out from the hub midway between the spokes, one between each two,
+   on the far side from the port: from OC_RADIATOR_R0_M to OC_RADIATOR_R1_M from the axis and OC_RADIATOR_Y0_M to
+   OC_RADIATOR_Y1_M along it. And on the axis beyond the hub's far face the solar mast, which does not turn with
+   the Ring: OC_MAST_M long and OC_MAST_RADIUS_M in radius from the face, its foot OC_MAST_FOOT_RADIUS_M in radius
+   and OC_MAST_FOOT_M long; on it OC_ARRAYS pairs of solar arrays OC_ARRAY_FIRST_M from the Ring's centre along
+   the axis and OC_ARRAY_STEP_M apart, each wing OC_ARRAY_SPAN_M long from OC_ARRAY_ROOT_M off the axis,
+   OC_ARRAY_CHORD_M wide and OC_ARRAY_THICK_M thick, on a spar OC_ARRAY_SPAR_M square from the mast to the wing's
+   tip, the whole turned and the wings tilted to face the Sun square. */
+#define OC_HUB_COLLAR_M 200.0
+#define OC_HUB_COLLAR_HALF_M 60.0
+#define OC_RADIATOR_R0_M 168.0
+#define OC_RADIATOR_R1_M 470.0
+#define OC_RADIATOR_Y0_M 95.0
+#define OC_RADIATOR_Y1_M 335.0
+#define OC_RADIATOR_THICK_M 2.0
+#define OC_MAST_M 560.0
+#define OC_MAST_RADIUS_M 10.0
+#define OC_MAST_FOOT_RADIUS_M 30.0
+#define OC_MAST_FOOT_M 30.0
+#define OC_ARRAYS 3
+#define OC_ARRAY_FIRST_M 530.0
+#define OC_ARRAY_STEP_M 160.0
+#define OC_ARRAY_SPAN_M 260.0
+#define OC_ARRAY_ROOT_M 24.0
+#define OC_ARRAY_CHORD_M 110.0
+#define OC_ARRAY_THICK_M 1.2
+#define OC_ARRAY_SPAR_M 3.0
+
 /* The flight deck (orbit_deck.h), part of the same shape: an open sector of the band, OC_DECK_ARC_M of
    arc along the floor and the band's whole width across, centred at OC_DECK_ANGLE_DEG in the spokes'
    convention (along sin(a) ref + cos(a) (ref x axis)), midway between spokes 0 and 1. The roof stops at
