@@ -110,7 +110,7 @@ test('the whole loop, stage by stage, with the commands a person would give', ()
   // the deck: fast while coasting, slow for the glide, one to one on the pad; the glide's caption says it
   assert.equal(outs[18].warp, 100, 'out over the deck at 100x');
   assert.equal(outs[20].warp, 5, 'the glide at 5x');
-  assert.match(outs[20].caption.text, /inside of a wheel, 120 m\/s against the deck, the drive swivelled 45° down/);
+  assert.match(outs[20].caption.text, /inside of a wheel: 120 m\/s against the deck, the drive swivelled 45° down/);
   assert.equal(outs[23].warp, 1, 'on the pad at one to one');
   assert.match(outs[23].caption.text, /0\.30 m\/s at the touch, 0\.9 m from its centre/);
   assert.equal(outs[25].warp, 2, 'off the deck at 2x');

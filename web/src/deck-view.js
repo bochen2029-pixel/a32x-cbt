@@ -443,7 +443,11 @@ export const deck = {
   view(ctx) {
     const s = ctx.s, d = this.d;
     const auto = Math.round(s.auto), sas = Math.round(s.sas);
-    const deckOn = (auto === AUTO.deck && Math.round(d.phase) >= DECK_PH.depart) || d.onDeck > 0.5 || (auto === AUTO.off && sas === SAS.deck && s.ringRange < WITHIN_M);
+    // the crew's landing from its first burn, its take-off until the approach's crew holds the craft at the hold point
+    // (the guide found the take-off seen with the Earth's up, the deck tilted or upside down most of the Ring's turn),
+    // on the deck, and the pilot's deck hold near the Ring
+    const deckOn = (auto === AUTO.deck && Math.round(d.phase) >= DECK_PH.depart) || auto === AUTO.takeoff || d.onDeck > 0.5 ||
+      (auto === AUTO.off && sas === SAS.deck && s.ringRange < WITHIN_M);
     if (ctx.VIEWS[ctx.state.view] !== 'chase' || !deckOn || s.crashed > 0) return;
     const P = ctx.P, R = [s.ringE, s.ringN, s.ringU], axis = [s.ringAxE, s.ringAxN, s.ringAxU];
     const rel = sub(P, R), along = scale(axis, dot(rel, axis)), out = unit(sub(rel, along));

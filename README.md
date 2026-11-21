@@ -1063,9 +1063,12 @@ first shows) and the time warp and the view set for it:
 2. The guidance above the air, and orbit.
 3. Docking at the hub, seen from the Ring for the last of it.
 4. A look round the hub's lobby, and a moment on the floor.
-5. The way home, skipping the wait for a pass, through entry, to a stop on 17C.
+5. Back aboard and let go of the port, the crew's landing on the flight deck: out over the open sector, a
+   coast while the pad comes round, the final burn down through the roof's gap, and the hover onto a pad.
+6. Off the deck again: straight up off the pad, out through the roof's gap, and on to the hold point.
+7. The way home, skipping the wait for a pass, through entry, to a stop on 17C.
 
-It takes about ten minutes on a desktop. Any command but one that only changes what is shown ends it
+It takes about twelve minutes on a desktop. Any command but one that only changes what is shown ends it
 and takes over from there. `tour-plan.js` is the plan, pure and tested on made-up states;
 `tour.js` is the button, the caption and the commands.
 
