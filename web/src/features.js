@@ -22,10 +22,11 @@ import { fd } from './fd-view.js';
 import { map } from './map.js';
 import { ret } from './return-view.js';
 import { sky } from './sky.js';
+import { perf } from './perf.js';
 import { sound } from './sound.js';
 import { tour } from './tour.js';
 import { walk } from './walk-view.js';
 
 // The tour comes first: it sees every command before the others, so anyone's command can end it. The flight
 // director comes after the deck, which may move the chase camera, so that its cue is drawn from where the eye is.
-export const FEATURES = [tour, sky, dock, ret, walk, map, deck, fd, sound];
+export const FEATURES = [tour, sky, dock, ret, walk, map, deck, fd, sound, perf];
