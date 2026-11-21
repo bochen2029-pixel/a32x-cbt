@@ -25,6 +25,7 @@ export const HELP = [
   ['Y', 'sound off / on (it starts with your first key or tap)'],
   ['8', 'the flight director: shown while you fly, while the crew flies too, off'],
   ['9', 'graphics: auto, low, medium, high (also GFX)'],
+  ['`', 'the frame meter: frame rate and time, the tier, what is drawn (to measure your machine)'],
   ['drag, wheel', 'look around the craft, zoom'],
   ['H', 'this help'],
   ['Backspace', 'start again'],

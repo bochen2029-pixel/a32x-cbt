@@ -1,0 +1,29 @@
+// The frame meter's sums: the rate from the mean interval, the 95th percentile and the worst, and lines
+// that say them. GPLv3.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { frameStats, perfLines } from '../src/perf-math.js';
+
+test('a steady 60 Hz with one long frame: the rate from the mean, the long frame the worst, the 95th percentile not it', () => {
+  const xs = [...Array(99).fill(1000 / 60), 50];
+  const st = frameStats(xs);
+  assert.equal(st.n, 100);
+  assert.ok(Math.abs(st.mean - (99 * (1000 / 60) + 50) / 100) < 1e-9);
+  assert.ok(Math.abs(st.fps - 1000 / st.mean) < 1e-9);
+  assert.equal(st.worst, 50);
+  assert.ok(Math.abs(st.p95 - 1000 / 60) < 1e-9, 'one frame in a hundred does not move the 95th percentile');
+});
+
+test('nothing measured, or nonsense, gives zeros, not NaN', () => {
+  assert.deepEqual(frameStats([]), { n: 0, fps: 0, mean: 0, p95: 0, worst: 0 });
+  const st = frameStats([NaN, -3, 0, Infinity, 20]);
+  assert.equal(st.n, 1);
+  assert.equal(st.fps, 50);
+});
+
+test('the lines say the rate, the tier, the picture and the draws', () => {
+  const lines = perfLines(frameStats([20, 20, 20]), { tier: 'medium', chosen: 'auto', calls: 120, triangles: 210000, width: 2560, height: 1440, ratio: 2, slices: 2 });
+  assert.match(lines[0], /^50 fps · 20\.0 ms a frame/);
+  assert.match(lines[1], /tier medium \(auto\) · 2560×1440 at 2\.00, 3\.69 Mpx · 2 depth slices/);
+  assert.match(lines[2], /120 draw calls · 210 k triangles a frame/);
+});
