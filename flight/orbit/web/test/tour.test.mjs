@@ -140,16 +140,39 @@ test('the skip of the wait is asked again if it was not taken, and never while i
 test('a crash ends the tour and says so', () => {
   const outs = drive([{ t: 0 }, { t: 50, crashed: true, wall: 1 }]);
   assert.equal(outs.at(-1).ended, true);
-  assert.match(outs.at(-1).caption.text, /crashed/);
+  assert.match(outs.at(-1).caption.text, /crashed: Backspace starts again/);
+  // a phone has no Backspace: the captions name its button
+  assert.match(drive([{ t: 0, touch: true }, { t: 50, crashed: true, wall: 1, touch: true }]).at(-1).caption.text, /crashed: RESTART starts again/);
+  assert.match(STAGES.done.text({ ...base, stopAlong: 2121, touch: true }), /RESTART starts again\.$/);
+});
+
+test('started anywhere, the tour starts on the runway: its reset first, and the captions the runway\'s', () => {
+  // started in orbit: the first step's state is from before the reset it gives, high and fast; the runway's
+  // next stage must wait for the state after it (2026-11-21's play-test: the tour went straight on to the
+  // climb, "Mach 0.00 at 0.0 km", with the craft parked on the runway, and at twice the time)
+  const outs = drive([
+    { onGround: false, alt: 500000, t: 2000, tas: 7600, phase: 6, wall: 0 },
+    { t: 0, wall: 0.02 },
+    { t: 5, wall: 1 },
+  ]);
+  assert.deepEqual(outs.map((o) => o.stage), ['runway', 'runway', 'runway']);
+  assert.deepEqual(outs[0].commands, ['reset']);
+  assert.equal(outs[0].warp, 1);
+  for (const o of outs) assert.match(o.caption.text, /^Sixty tonnes/);
 });
 
 test('the climb remembers Mach 1 and the most dynamic pressure', () => {
-  const outs = drive([
-    { onGround: false, alt: 1600, wall: 0 },
+  let stage = 'climb', memory = {};
+  const outs = [];
+  for (const s of [
     { onGround: false, alt: 4000, mach: 0.9, qbar: 36600, wall: 1 },
     { onGround: false, alt: 7000, mach: 1.01, qbar: 30000, wall: 2 },
     { onGround: false, alt: 12000, mach: 1.6, qbar: 20000, wall: 3 },
-  ]);
+  ]) {
+    const o = tourStep(stage, memory, { ...base, ...s });
+    outs.push(o);
+    stage = o.stage; memory = o.memory;
+  }
   const last = outs.at(-1).caption.text;
   assert.match(last, /through Mach 1 at 7\.0 km/);
   assert.match(last, /36\.6 kPa, is behind it/);

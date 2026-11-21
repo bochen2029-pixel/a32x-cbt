@@ -23,7 +23,7 @@ test('the built page starts on every tier, in flight and in the walk, and says n
       const p = await browser.newPage({ viewport: { width: 800, height: 450 } });
       const errors = [];
       p.on('pageerror', (e) => errors.push(e.message));
-      await p.goto(page.href + q);
+      await p.goto(page.href + q, { timeout: 240000 });   // the load event alone took over 30 s on a loaded machine
       const started = await p.waitForFunction(() => window.orbitSketch || /^Failed/.test((document.querySelector('#status') || {}).textContent || ''), null, { timeout: 240000 })
         .then(() => true, () => false);
       const status = await p.$eval('#status', (e) => e.textContent).catch(() => '');

@@ -15,6 +15,7 @@ const AUTO_CREW = 1;   // orbit_core.h's OC_AUTO_CREW
 export const RET_PH = { none: 0, depart: 1, wait: 2, burn: 3, coast: 4, entry: 5, terminal: 6, approach: 7, flare: 8, rollout: 9, stopped: 10 };
 
 const km = (m) => (m / 1000).toFixed(m < 100000 ? 1 : 0);
+const restart = (s) => (s.touch ? 'RESTART' : 'Backspace');   // a phone has no Backspace: its button
 
 // what the tour reads, from the page's blocks, in one flat record
 export function snapshot(core, walking, wall, extra = {}) {
@@ -28,6 +29,7 @@ export function snapshot(core, walking, wall, extra = {}) {
     deckPhase: Math.round(k.phase || 0), deckHeight: k.height ?? 0, deckG: k.apparentG ?? 0, nozzle: k.nozzle ?? 0,
     deckAlong: k.along ?? 0, deckSink: k.tdSink ?? 0, deckOff: k.tdOff ?? 0, deckVerdict: Math.round(k.tdVerdict || 0),
     walking, wall, skipping: !!extra.skipping,   // the flight home skipping ahead to its burn (return-view.js)
+    touch: !!extra.touch,                        // a touch screen: the buttons' names in the captions
   };
 }
 
@@ -43,12 +45,14 @@ export const STAGES = {
       if (m.wall > 0.5 && s.auto !== AUTO_CREW && !m.crewAsked) { m.crewAsked = true; return ['crew']; }
       return [];
     },
-    text(s) {
-      if (s.t < 20) return 'Sixty tonnes, half of it propellant, and one fiction: a drive of 2,000 s of specific impulse. The crew lets the brakes go at 20 s.';
+    text(s, m) {
+      if (s.t < 20 || !m.wall) return 'Sixty tonnes, half of it propellant, and one fiction: a drive of 2,000 s of specific impulse. The crew lets the brakes go at 20 s.';
       if (s.onGround) return s.tas < 90 ? `The take-off roll: ${s.tas.toFixed(0)} m/s` : 'Rotate at 95 m/s';
       return `Airborne, turning east to 090: ${km(s.alt)} km`;
     },
-    next: (s) => (!s.onGround && s.alt > 1500 ? 'climb' : null),
+    // not on the step that gives the reset: that step's state is from before it, wherever the tour was started
+    // (in orbit it is high and moving, and the tour went on to the climb with the craft parked on the runway)
+    next: (s, m) => (m.wall > 0 && !s.onGround && s.alt > 1500 ? 'climb' : null),
   },
   climb: {
     enter: { warp: 2 },
@@ -180,7 +184,7 @@ export const STAGES = {
   done: {
     enter: { warp: 1 },
     title: 'Home',
-    text: (s) => `Stopped on 17C, ${km(s.stopAlong)} km down the runway: from the runway to the Ring and back. Backspace starts again.`,
+    text: (s) => `Stopped on 17C, ${km(s.stopAlong)} km down the runway: from the runway to the Ring and back. ${restart(s)} starts again.`,
     next: (s, m) => (m.wall > 15 ? 'end' : null),
   },
 };
@@ -191,7 +195,7 @@ export const ORDER = Object.keys(STAGES);
 // { stage, memory, commands, warp, view, walk, caption, ended }. A crash ends the tour with the reason.
 export function tourStep(stage, memory, s) {
   const out = { stage, memory, commands: [], warp: null, view: null, walk: null, caption: null, ended: false };
-  if (s.crashed) return { ...out, ended: true, caption: { title: 'The tour ends', text: 'The craft crashed: Backspace starts again.' } };
+  if (s.crashed) return { ...out, ended: true, caption: { title: 'The tour ends', text: `The craft crashed: ${restart(s)} starts again.` } };
   let st = STAGES[stage];
   if (!memory.entered) {
     memory.entered = true;

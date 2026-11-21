@@ -120,10 +120,69 @@ test('the status line says what the crew is doing, phase by phase', { skip: noTh
   const longest = { [P.depart]: 3000, [P.wait]: 86000, [P.coast]: 3500 };
   for (let ph = 1; ph <= 10; ph++) {
     for (const ev of [E.none, E.burn, E.lower]) {
-      const st = view.returnStatus(flight(ph, { event: ev, tEvent: longest[ph] ?? 600, togo: 14614000, stopAlong: 4085 }), { mach: 26, tas: 120, alt: 30000 }, { skipping: ph === 2 });
+      const st = view.returnStatus(flight(ph, { event: ev, tEvent: longest[ph] ?? 600, togo: 14614000, stopAlong: 4085 }), { mach: 26, tas: 120, alt: 30000, ringRange: 11990, ringRate: 19.6 }, { skipping: ph === 2 });
       assert.ok(st.line.length <= 46, `a phone's status line: ${st.line}`);
     }
   }
+});
+
+test('backing away from the Ring, the line says how far and how fast, not the core\'s first guess at when', { skip: noThree }, () => {
+  const { RET_PH: P, RET_EV: E } = view;
+  // OC_RET_T_EVENT at the start of the departure: the way to go over the speed so far, at least 1 m/s, so 3 h
+  // 13 min for minutes' backing away (2026-11-21's play-test); the range and its rate are the core's own
+  const leaving = view.returnStatus(flight(P.depart, { event: E.clear, tEvent: 11631 }), { ringRange: 368, ringRate: 0.2 });
+  assert.equal(leaving.line, 'HOME · LEAVING THE RING · 368 m out');
+  assert.equal(view.returnStatus(flight(P.depart, { event: E.clear, tEvent: 400 }), { ringRange: 4210, ringRate: 19.6 }).line, 'HOME · LEAVING THE RING · 4.21 km out, 20 m/s');
+  // within a minute of the burn there is nothing left to skip: R again is not offered
+  const soon = view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 58 }), air);
+  assert.equal(soon.line, 'HOME · WAITING · the burn in 58 s');
+  assert.equal(soon.hint, 'Space: take the controls');
+});
+
+test('riding with the deck is the flight home\'s 9 km, as the page\'s TO ORBIT judges it (dock-hud.js)', { skip: noThree }, async () => {
+  const { RIDING_M } = await import('../src/dock-hud.js');
+  assert.equal(RIDING_M, view.NEAR_RING);
+  assert.equal(view.NEAR_RING, define('OC_RET_NEAR_RING_M'));
+});
+
+test('Space on the way home hands back to the crew flying home; the crew to orbit climbed away from final', { skip: noThree }, () => {
+  const said = [];
+  const core = { s: { auto: AUTO.off, t: 80700, alt: 445, onGround: 0 }, dock: { docked: 0 }, read() { return this.s; }, auto(m) { this.s.auto = m; } };
+  const ctx = { core, AUTO, say: (t) => said.push(t) };
+  const ret = view.ret;
+  Object.assign(ret, { r: { phase: 0 }, homeward: true, skipping: false });
+  assert.equal(ret.command('crew', ctx), true);
+  assert.equal(core.s.auto, AUTO.return);
+  assert.equal(said.at(-1), 'The crew has it: home to KDFW 17C from here');
+  // not on the way home: CREW is the page's own (the crew to orbit)
+  core.s.auto = AUTO.off;
+  ret.homeward = false;
+  assert.equal(ret.command('crew', ctx), false);
+  // refused by the core (the deck, riding with the Ring): CREW goes on as before
+  const stubborn = { ...core, s: { ...core.s, auto: AUTO.off }, auto() {} };
+  ret.homeward = true;
+  assert.equal(ret.command('crew', { ...ctx, core: stubborn }), false);
+  // docked again on the way home: not handed over docked (RETURN lets go of the port first, CREW is docking's)
+  const moored = { ...core, s: { ...core.s, auto: AUTO.off }, dock: { docked: 1 } };
+  assert.equal(ret.command('crew', { ...ctx, core: moored }), false);
+  assert.equal(moored.s.auto, AUTO.off);
+});
+
+test('the controls handed back on the way home go to the crew flying home, as the flight director keeps it', { skip: noThree }, () => {
+  const { RET_PH: P } = view;
+  const A = { off: 0, crew: 1, return: 3, dock: 4 };
+  let h = { home: false, phase: P.none };
+  const step = (o) => { h = view.homewardNext(h.home, { onGround: 0, alt: 500, lastT: 1, t: 2, ...o, lastPhase: h.phase }, A); return h.home; };
+  assert.equal(step({ auto: A.crew }), false);
+  assert.equal(step({ auto: A.return, phase: P.approach }), true);   // the crew flies home
+  assert.equal(step({ auto: A.off, phase: P.none }), true);          // the pilot takes it on final: still on the way home
+  assert.equal(step({ auto: A.off, phase: P.none }), true);
+  assert.equal(step({ auto: A.crew }), false);                        // the crew to orbit flies instead
+  assert.equal(step({ auto: A.return, phase: P.rollout, onGround: 1, alt: 3 }), true);
+  assert.equal(step({ auto: A.off, onGround: 1, alt: 3 }), true);     // taken on the rollout, still home
+  assert.equal(step({ auto: A.off, onGround: 0, alt: 40 }), false);   // flown off the runway again: the flight home is over
+  assert.equal(step({ auto: A.return, phase: P.entry }), true);
+  assert.equal(step({ auto: A.off, t: 0, lastT: 900 }), false);       // started again
 });
 
 test('the readouts: where the runway is, the heat and the load, the guidance, the landing', { skip: noThree }, () => {

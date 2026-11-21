@@ -16,7 +16,7 @@ const SPANS_KM = [0.5, 1, 2, 3, 5, 7.5, 10, 15, 20, 30, 40, 50, 75, 100, 150, 25
 const EVERY_MS = 100;            // ten drawings a second
 const PAST_EVERY_S = 5;          // the track flown, a point every 5 s of flight
 const PAST_MAX = 3000;
-const HUD_PARTS = ['top', 'readouts', 'buttons', 'stick', 'throttle', 'help', 'status'];
+const HUD_PARTS = ['top', 'readouts', 'buttons', 'stick', 'throttle', 'help', 'status', 'perf', 'tour-caption'];
 const ESSENTIAL = ['top', 'stick', 'throttle', 'status'];   // what the map never covers: on a small touch screen it may cover the rest
 const D2R = Math.PI / 180;
 
@@ -52,8 +52,8 @@ function obstacles(ids) {
   for (const id of ids) {
     const el = document.getElementById(id);
     if (!el || (id === 'status' && !el.textContent)) continue;   // the status line is there only while it says something
-    const r = el.getBoundingClientRect();
-    if (r.width > 1 && r.height > 1 && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden') out.push(r);
+    const r = el.getBoundingClientRect(), css = getComputedStyle(el);   // the tour's caption fades out rather than goes
+    if (r.width > 1 && r.height > 1 && css.display !== 'none' && css.visibility !== 'hidden' && Number(css.opacity) > 0) out.push(r);
   }
   return out;
 }

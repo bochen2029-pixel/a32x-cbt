@@ -90,7 +90,8 @@ export function dockCommand(s, d) {
   if (s.crashed > 0) return { action: 'none', say: 'Crashed: start again' };
   if (round(s.auto) === AUTO.dock) return { action: 'none', say: `The crew is docking: ${PHASE_WORDS[phase] || 'on its way'}` };
   if (s.peri < 150000) return { action: 'none', say: 'Docking starts in orbit, near the Ring' };
-  if (s.ringRange > DOCK.engageM) return { action: 'none', say: `The Ring is ${fmtDistance(s.ringRange)} away: the crew docks from within 50 km; its approach comes nearer` };
+  // the approach has the same reach (oc_auto), so it is no way nearer from here
+  if (s.ringRange > DOCK.engageM) return { action: 'none', say: `The Ring is ${fmtDistance(s.ringRange)} away: the crew docks, and flies the approach, from within 50 km` };
   const passing = Math.hypot(s.vrelE, s.vrelN, s.vrelU);
   if (passing > DOCK.engageSpeed) return { action: 'none', say: `Passing the Ring at ${passing.toFixed(0)} m/s: the crew docks from under 50 m/s` };
   return { action: 'engage', say: '' };
@@ -106,13 +107,27 @@ export function engagedText(s, d) {
 // The hold on the port (OC_SAS_PORT) is for docking: in orbit, within 50 km of the Ring.
 export function portHoldMakesSense(s) { return s.crashed === 0 && s.peri > 150000 && s.ringRange < DOCK.engageM; }
 
+// Docked, or caught and being drawn in: the craft is the hub's.
+export const docked = (d) => d.docked > 0.5;
+
+// What there is to do, docked: go aboard, let go, fly home.
+function dockedKeys(touch) {
+  return touch ? 'WALK: go aboard · DOCK: let go · RETURN: fly home' : 'Enter: go aboard · P: let go · R: the crew flies home';
+}
+
+// What the page says to a command that has nothing to do while docked (CREW, TO ORBIT, APPROACH).
+export function dockedText(d, touch = false) {
+  if (round(d.phase) !== DPH.docked) return 'Captured: the latches are drawing the craft in';
+  return `Docked: the craft is the hub's, and no one flies it. ${dockedKeys(touch)}`;
+}
+
 // The status line while the crew docks, while docked or captured, while a pilot flies the port hold near
 // it, and after a crash on the Ring; null leaves the flight's own line.
 export function dockStatus(s, d, touch = false) {
-  const k = touch ? { take: 'CREW: take the controls', undock: 'DOCK: let go', reset: 'RESTART' } : { take: 'Space: take the controls', undock: 'P: let go', reset: 'Backspace' };
+  const k = touch ? { take: 'CREW: take the controls', reset: 'RESTART' } : { take: 'Space: take the controls', reset: 'Backspace' };
   const phase = round(d.phase), auto = round(s.auto);
   if (s.crashed > 0) return d.hit > 0 ? { line: `CRASHED · ${hitText(d)}`, hint: `${k.reset} to start again` } : null;
-  if (phase === DPH.docked) return { line: 'DOCKED AT THE HUB · turning with the Ring', hint: k.undock };
+  if (phase === DPH.docked) return { line: 'DOCKED AT THE HUB · turning with the Ring', hint: dockedKeys(touch) };
   if (phase === DPH.captured) return { line: 'CAPTURED · the latches draw the craft in', hint: '' };
   if (auto === AUTO.dock) {
     if (phase === DPH.transfer) return { line: `DOCKING · ${fmtDistance(s.portRange)} to the hold point`, hint: k.take };
@@ -125,6 +140,20 @@ export function dockStatus(s, d, touch = false) {
   return null;
 }
 
+// The deck landing, the crew's or a pilot's on the deck hold: the port's numbers are not what is being flown
+// (2026-11-21's play-test: the docking's three lines and its reticle stood beside the deck's all the way in).
+export const onDeckBusiness = (s) => round(s.auto) === AUTO.deck || (round(s.auto) === AUTO.off && round(s.sas) === SAS.deck);
+
+// Riding with the Ring's deck: on it (deck: its readouts), or flying its business within 9 km of the Ring's
+// centre and moving past the Ring faster than docking would close, as a craft moving with the deck does (the
+// flight home's rule, orbit_return.h's OC_RET_NEAR_RING_M; return.test.mjs holds the two equal). The crew to
+// orbit handed the craft there lets go of the deck, which sweeps on at 221 m/s: a crash.
+export const RIDING_M = 9000;
+export function ridingDeck(s, deck) {
+  if (deck && deck.onDeck > 0.5) return true;
+  return onDeckBusiness(s) && s.ringRange < RIDING_M && Math.hypot(s.vrelE, s.vrelN, s.vrelU) > DOCK.engageSpeed;
+}
+
 // The HUD's docking lines, near the port or while docking: where the probe's head is against the port
 // and how it moves, in the port's turning frame (right and down are a lined-up craft's), how the craft is
 // lined up, and what the last contact came to. Far out on the way to the hold point, the first line only.
@@ -132,6 +161,7 @@ export function dockStatus(s, d, touch = false) {
 export function dockLines(s, d, narrow = false) {
   const phase = round(d.phase);
   if (s.crashed > 0 || !(d.range < 3000 || phase !== DPH.none || d.docked > 0.5)) return [];
+  if (onDeckBusiness(s)) return [];   // passing the hub on the way to the deck: the deck's lines are the ones to fly by
   const last = d.cT > 0 ? verdictText(d) : '';
   if (phase === DPH.docked) return [narrow ? 'DOCKED' : `DOCK DOCKED at the hub${last ? `, ${last}` : ''}`];
   const far = phase === DPH.transfer && d.range >= 3000;

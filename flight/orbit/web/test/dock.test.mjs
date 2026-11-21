@@ -4,13 +4,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
-import { createRequire } from 'node:module';
+import { createRequire, register } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { AUTO, Core, PH, SAS } from '../src/core.js';
 import {
-  DOCK, DOCK_OUT, DPH, HIT, PART, REFUSED, VERDICT, contactText, dockCommand, dockLines, dockStatus, engagedText, fmtNear, fmtOff, fmtSigned, fmtWay, hitText,
-  portHoldMakesSense, reticle, verdictText,
+  DOCK, DOCK_OUT, DPH, HIT, PART, REFUSED, VERDICT, contactText, dockCommand, docked, dockedText, dockLines, dockStatus, engagedText, fmtNear, fmtOff, fmtSigned,
+  fmtWay, hitText, onDeckBusiness, portHoldMakesSense, reticle, RIDING_M, ridingDeck, verdictText,
 } from '../src/dock-hud.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -77,6 +77,8 @@ test('DOCK starts the crew where it makes sense, and says why where it does not'
   };
   no({ ...S, peri: -6e6, phase: PH.hold }, D, /starts in orbit/);
   no({ ...S, ringRange: 80000 }, D, /80\.0 km away/);
+  // the approach has the same 50 km (oc_auto): it is not offered as the way nearer
+  assert.doesNotMatch(dockCommand({ ...S, ringRange: 80000 }, D).say, /approach comes nearer/);
   no({ ...S, vrelE: 60, vrelN: 30 }, D, /Passing the Ring at 67 m\/s/);
   no({ ...S, crashed: 1 }, D, /Crashed/);
   no({ ...S, auto: AUTO.dock }, { ...D, phase: DPH.close }, /docking: closing/);
@@ -84,6 +86,53 @@ test('DOCK starts the crew where it makes sense, and says why where it does not'
   const off = dockCommand(S, { ...D, docked: 1, phase: DPH.docked });
   assert.equal(off.action, 'undock');
   assert.match(off.say, /0\.15 m\/s/);
+});
+
+test('docked, a command with nothing to do says what there is to do instead', () => {
+  assert.ok(docked({ ...D, docked: 1, phase: DPH.captured }));
+  assert.ok(!docked(D));
+  assert.equal(dockedText({ ...D, docked: 1, phase: DPH.captured }), 'Captured: the latches are drawing the craft in');
+  assert.equal(dockedText({ ...D, docked: 1, phase: DPH.docked }), 'Docked: the craft is the hub\'s, and no one flies it. Enter: go aboard · P: let go · R: the crew flies home');
+  assert.match(dockedText({ ...D, docked: 1, phase: DPH.docked }, true), /WALK: go aboard/);
+});
+
+// dock-view.js draws with three.js: from flight/web's packages, as the page's build resolves 'three' (return.test.mjs)
+const threePath = join(here, '..', '..', '..', 'web', 'node_modules', 'three', 'build', 'three.module.js');
+const noThree = !existsSync(threePath) && `three.js is not at ${threePath}: npm ci in flight/web`;
+
+test('docked, CREW, TO ORBIT and APPROACH change nothing and say why; HOLD goes from the port\'s on to the deck\'s', { skip: noThree }, async () => {
+  const url = pathToFileURL(threePath).href;
+  register(`data:text/javascript,export async function resolve(s, c, next) { return s === 'three' ? { url: ${JSON.stringify(url)}, shortCircuit: true } : next(s, c); }`);
+  const { dock } = await import('../src/dock-view.js');
+  const said = [];
+  const core = {
+    s: { ...S, auto: AUTO.off, sas: SAS.port }, read() { return this.s; }, auto(m) { this.s.auto = m; }, sas(m) { this.s.sas = m; }, deck: {}, dock: { docked: 1 },
+  };
+  const ctx = { core, say: (t) => said.push(t), input: { hands: {} } };
+  Object.assign(dock, { d: { ...D, docked: 1, phase: DPH.docked }, touch: false });
+  // CREW used to hand a docked craft to the crew, and CREW again dropped the port's hold that letting go turns by
+  for (const c of ['crew', 'orbit', 'approach']) assert.equal(dock.command(c, ctx), true, c);
+  assert.equal(core.s.auto, AUTO.off);
+  assert.equal(core.s.sas, SAS.port);
+  assert.match(said[0], /^Docked: the craft is the hub's, and no one flies it\. Enter: go aboard/);
+  // let go and near the Ring, HOLD goes on to the deck's hold (deck-view.js takes it), as the keys 1 to 6 go
+  Object.assign(dock, { d: D });
+  core.dock = { docked: 0 };
+  assert.equal(dock.command('sas-next', { ...ctx, core: Object.assign(core, { s: { ...core.s, ringRange: 900 } }) }), false);
+  assert.equal(dock.command('sas-next', { ...ctx, core: Object.assign(core, { s: { ...core.s, ringRange: 30000 } }) }), true);   // far: round to attitude
+  assert.equal(core.s.sas, SAS.hold);
+});
+
+test('riding with the deck, TO ORBIT\'s crew would let go of it: on a pad, or gliding along it, not passing the hub', () => {
+  const deckDef = { onDeck: 0 };
+  assert.ok(ridingDeck({ ...S, auto: AUTO.off, sas: SAS.deck }, { onDeck: 1 }));   // on a pad: O there crashed into a rim wall
+  const glide = { ...S, auto: AUTO.deck, ringRange: 4600, vrelE: 180, vrelN: 30 };
+  assert.ok(ridingDeck(glide, deckDef));
+  assert.ok(!ridingDeck({ ...glide, vrelE: 1, vrelN: 0 }, deckDef));              // at rest by the Ring: the crew can take it
+  assert.ok(!ridingDeck({ ...glide, auto: AUTO.crew }, deckDef));                  // a fast pass, but not the deck's business
+  assert.ok(!ridingDeck({ ...glide, ringRange: 24600 }, deckDef));
+  assert.ok(!ridingDeck(S, null));
+  assert.equal(RIDING_M, 9000);
 });
 
 test('once asked, the page says what the crew does first, or why the core refused', () => {
@@ -118,7 +167,9 @@ test('the status line follows the docking: the crew\'s phases, captured, docked,
   assert.equal(dockStatus(S, { ...D, docked: 1, phase: DPH.captured }).line, 'CAPTURED · the latches draw the craft in');
   const docked = dockStatus({ ...S, auto: AUTO.off }, { ...D, docked: 1, phase: DPH.docked }, true);
   assert.equal(docked.line, 'DOCKED AT THE HUB · turning with the Ring');
-  assert.equal(docked.hint, 'DOCK: let go');
+  // docked, the way aboard comes first: the walk was named nowhere on the screen (2026-11-21's play-test)
+  assert.equal(docked.hint, 'WALK: go aboard · DOCK: let go · RETURN: fly home');
+  assert.equal(dockStatus({ ...S, auto: AUTO.off }, { ...D, docked: 1, phase: DPH.docked }).hint, 'Enter: go aboard · P: let go · R: the crew flies home');
   assert.equal(dockStatus({ ...S, auto: AUTO.off, sas: SAS.port }, near).line, 'HAND · ON THE PORT · 42.2 m, closing 1.00 m/s');
   assert.equal(dockStatus({ ...S, auto: AUTO.off, sas: SAS.port }, { ...near, gap: 1.3, closing: -0.66 }).line, 'HAND · ON THE PORT · 1.30 m, opening 0.66 m/s');
   assert.equal(dockStatus({ ...S, auto: AUTO.off, sas: SAS.port }, { ...near, range: 9000 }), null);
@@ -128,6 +179,10 @@ test('the status line follows the docking: the crew\'s phases, captured, docked,
 
 test('the HUD\'s docking lines: only near the port or while docking, with the numbers a docking pilot flies', () => {
   assert.deepEqual(dockLines(S, { ...D, range: 24000 }), []);
+  // past the hub on the way to the deck, the crew's landing or the deck hold: the deck's lines, not these
+  assert.deepEqual(dockLines({ ...S, auto: AUTO.deck }, near), []);
+  assert.deepEqual(dockLines({ ...S, auto: AUTO.off, sas: SAS.deck }, near), []);
+  assert.ok(onDeckBusiness({ ...S, auto: AUTO.deck }) && !onDeckBusiness({ ...S, auto: AUTO.off, sas: SAS.port }));
   const lines = dockLines(S, near);
   assert.equal(lines.length, 3);
   assert.match(lines[0], /^DOCK {16}port 42\.3 m {3}closing 1\.00 m\/s$/);

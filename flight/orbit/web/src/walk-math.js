@@ -314,4 +314,14 @@ export function walkLines(o, warp, sun) {
   return lines;
 }
 
+// The same lines on a phone's narrow screen: six at most, the spaces closed up. Where they are, the moment's
+// results (the lift, the last jump, the ball) come before the speed and Coriolis's push, which change each
+// frame anyway: they are what was tried, and the first five lines alone left them off the screen.
+export function walkLinesNarrow(lines, most = 6) {
+  const head = lines.slice(0, 3);
+  const results = lines.filter((l) => /^(LIFT|JUMP|BALL) /.test(l));
+  const rest = lines.filter((l) => /^(SPEED|CORIOLIS) /.test(l));
+  return [...head, ...results, ...rest].slice(0, most).map((l) => l.replace(/ {2,}/g, ' '));
+}
+
 export { clamp, length };
