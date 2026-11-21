@@ -13,16 +13,54 @@
 // What it costs is the tier's, by defines (quality.js, earth). Painted by code: the coastlines and the
 // towns are real, the land's colours, the relief and the clouds are this project's estimate
 // (docs/provenance.md, 1h).
+//
+// At a fraction of the picture's size (setResolution: the low tier's, and the frame rate's controller's at
+// medium and high), the light is worked out for a quarter of the pixels and brought to full size by a
+// composite, all but a band round the limb and a square round the Sun, which are drawn as geometry and
+// worked out in full (bandAngles says where).
 
 import * as THREE from 'three';
 import { RE } from './frames.js';
 import { maskBytes, paintLights } from './land.js';
+
+// Where the Earth is worked out at a fraction of the picture's size (resolution under 1), the band round the
+// limb that is worked out in full instead (bandAngles): where the ground's distance changes by more than
+// `ground` of itself (its logarithm, 15 %) across a sample of the small picture, where the height of the
+// sky's rays' lowest points changes by more than `sky` metres across one, while it is under the air's top,
+// and `margin` samples either side of the limb whatever; and round the Sun, `sun` radians from its centre.
+export const EARTH_UPSAMPLE = { ground: 0.15, sky: 2000, margin: 2, sun: 0.0065 };
+const RA_HEIGHT = 100000;   // m: the air's top, as the shader has it (RA)
 
 const VERTEX = /* glsl */ `
   varying vec2 vNdc;
   void main() {
     vNdc = position.xy;
     gl_Position = vec4(position.xy, 1.0, 1.0);
+  }
+`;
+
+// The band round the limb and the square round the Sun, as geometry, so that only their pixels are worked
+// out in full: a strip of directions between two cones round the direction of the Earth's centre, and four
+// directions round the Sun's. Each vertex's position: x the angle round (or the square's corner, -1 or 1),
+// y which cone (or the corner's other coordinate), z 0 for the strip, 1 for the square.
+const VERTEX_BAND = /* glsl */ `
+  uniform vec3 uCentreDir;   // toward the Earth's centre, unit
+  uniform vec3 uAxisU;       // and two directions square to it and to each other
+  uniform vec3 uAxisV;
+  uniform vec2 uStrip;       // the strip's inner and outer angles from uCentreDir, rad
+  uniform vec3 uSun;
+  uniform vec3 uSunU;
+  uniform vec3 uSunV;
+  uniform float uSunSquare;  // the square's half-side, rad
+  void main() {
+    vec3 dir;
+    if (position.z < 0.5) {
+      float th = mix(uStrip.x, uStrip.y, position.y);
+      dir = cos(th) * uCentreDir + sin(th) * (cos(position.x) * uAxisU + sin(position.x) * uAxisV);
+    } else {
+      dir = normalize(uSun + uSunSquare * (position.x * uSunU + position.y * uSunV));
+    }
+    gl_Position = projectionMatrix * viewMatrix * vec4(dir * 1.0e7, 1.0);
   }
 `;
 
@@ -51,7 +89,7 @@ const FRAGMENT = /* glsl */ `
   varying vec2 vNdc;
 
   const float RE = ${RE.toFixed(1)};
-  const float RA = ${(RE + 100000).toFixed(1)};
+  const float RA = ${(RE + RA_HEIGHT).toFixed(1)};
   const float RC = ${(RE + 3000).toFixed(1)};     // the cloud layer
   const float PI = 3.14159265;
   const vec3 BR = vec3(5.8e-6, 13.5e-6, 33.1e-6);
@@ -172,9 +210,26 @@ const FRAGMENT = /* glsl */ `
     return vec2(cover, clamp((cl - cov) * 3.0, 0.0, 1.0));
   }
 
-  void main() {
-    vec4 v = uInvProj * vec4(vNdc, 1.0, 1.0);
-    vec3 d = normalize(mat3(uCamWorld) * (v.xyz / v.w));
+  // The ray through a point of the picture (NDC), from the eye.
+  vec3 rayDir(vec2 ndc) {
+    vec4 v = uInvProj * vec4(ndc, 1.0, 1.0);
+    return normalize(mat3(uCamWorld) * (v.xyz / v.w));
+  }
+
+  // The airglow: a thin green shell 95 km up, seen edge-on at the limb, plain on the night side.
+  vec3 airglow(vec3 o, vec3 d, float b) {
+    float tc = max(-b, 0.0);
+    float hc = length(o + d * tc) - RE;
+    vec3 pt = o + d * tc;
+    return vec3(0.08, 0.32, 0.12) * 0.035 * exp(-pow((hc - 95000.0) / 6000.0, 2.0)) * smoothstep(0.05, -0.25, dot(normalize(pt), uSun));
+  }
+
+  #if EARTH_PASS != 2
+  // All the light along a ray: its colour (before the camera's gain) and alpha, the sky's transmittance,
+  // which the blending keeps of what is behind (0 on the ground); tHit: how far the ground is, or -1.
+  // SMOOTH_ONLY leaves out the sky's two sharp things, the Sun's disc and the airglow's line, for the pass
+  // at a fraction of the picture's size, whose composite works them out at full size.
+  vec4 shade(vec3 d, out float tHit) {
     vec3 o = -uEarthC;
     float b = dot(o, d);
     float cE = uAlt * (2.0 * RE + uAlt);   // |o|^2 - RE^2, from doubles
@@ -329,29 +384,144 @@ const FRAGMENT = /* glsl */ `
       if (uDebug == 3) colour = vec3(mask, land, cloud);
       if (uDebug == 4) colour = ground;
       alpha = 0.0;
-      float zv = max(tEarth * dot(d, uCamFwd), uNear);
-      gl_FragDepth = clamp(((uFar + uNear) / (uFar - uNear) - 2.0 * uFar * uNear / ((uFar - uNear) * zv)) * 0.5 + 0.5, 0.0, 1.0);
     } else {
       float mu = dot(d, uSun);
-      // the Sun's disc, darker toward its limb, and a little glare round it
-      float r = sqrt(max(0.0, 1.0 - mu * mu)) / 0.00465;
-      float disc = (1.0 - smoothstep(0.9, 1.05, r)) * (0.6 + 0.4 * sqrt(max(0.0, 1.0 - min(r, 1.0) * min(r, 1.0))));
-      colour = inscatter + T * SUN * (disc * 1800.0 * step(0.0, mu) + 0.04 * pow(max(mu, 0.0), 800.0));
-      // the airglow: a thin green shell 95 km up, seen edge-on at the limb, plain on the night side
-      float tc = max(-b, 0.0);
-      float hc = length(o + d * tc) - RE;
-      vec3 pt = o + d * tc;
-      colour += vec3(0.08, 0.32, 0.12) * 0.035 * exp(-pow((hc - 95000.0) / 6000.0, 2.0)) * smoothstep(0.05, -0.25, dot(normalize(pt), uSun));
+      #if SMOOTH_ONLY
+        colour = inscatter + T * SUN * 0.04 * pow(max(mu, 0.0), 800.0);
+      #else
+        // the Sun's disc, darker toward its limb, and a little glare round it
+        float r = sqrt(max(0.0, 1.0 - mu * mu)) / 0.00465;
+        float disc = (1.0 - smoothstep(0.9, 1.05, r)) * (0.6 + 0.4 * sqrt(max(0.0, 1.0 - min(r, 1.0) * min(r, 1.0))));
+        colour = inscatter + T * SUN * (disc * 1800.0 * step(0.0, mu) + 0.04 * pow(max(mu, 0.0), 800.0));
+        colour += airglow(o, d, b);
+      #endif
       alpha = dot(T, vec3(0.333));
-      gl_FragDepth = 1.0;
     }
-    gl_FragColor = vec4(colour * uGain, alpha);
-    #include <tonemapping_fragment>
-    #include <colorspace_fragment>
+    tHit = tEarth;
+    return vec4(colour, alpha);
+  }
+
+  #endif
+
+  // The distance to the ground along d, or -1.
+  float hitOf(vec3 d) {
+    vec3 o = -uEarthC;
+    float b = dot(o, d);
+    float cE = uAlt * (2.0 * RE + uAlt);
+    float discE = b * b - cE;
+    return cE > 0.0 && b < 0.0 && discE > 0.0 ? cE / (-b + sqrt(discE)) : -1.0;
+  }
+
+  #if EARTH_PASS >= 2
+    // The pixels worked out in full where the Earth is worked out at a fraction of the picture's size: the
+    // band round the limb, between two cones round the direction of the Earth's centre, and round the Sun.
+    // The composite (2) draws every pixel but these and the band (3) only these, each deciding by this same
+    // test of the pixel's own ray, from its place in the picture.
+    uniform vec3 uCentreDir;
+    uniform vec2 uBandCos;     // the band's inner and outer angles' cosines
+    uniform float uSunCos;
+    uniform vec4 uViewport;    // the picture's, in its own pixels: x, y, width, height
+    bool inBand(vec3 d) {
+      float c = dot(d, uCentreDir);
+      return (c <= uBandCos.x && c >= uBandCos.y) || dot(d, uSun) >= uSunCos;
+    }
+    vec3 pixelRay() { return rayDir((gl_FragCoord.xy - uViewport.xy) / uViewport.zw * 2.0 - 1.0); }
+  #endif
+
+  #if EARTH_PASS == 2
+    // The composite: the picture at its full size from the pass at a fraction of it (uLow). Which side of
+    // the limb each pixel is on and how far its ground is are worked out here for each pixel, so the limb,
+    // the horizon and the depth are as sharp as ever; away from the band round the limb the samples round a
+    // pixel all lie on its side, and are taken bilinearly, as in joint bilateral upsampling (Kopf and
+    // others, 2007) with that side as its guide. The airglow's thin line is added at full size.
+    uniform sampler2D uLow;
+  #endif
+
+  void main() {
+    #if EARTH_PASS >= 2
+      vec3 d = pixelRay();
+      bool band = inBand(d);
+    #else
+      vec3 d = rayDir(vNdc);
+    #endif
+    #if EARTH_PASS == 2
+      if (band) discard;
+      float tHit = hitOf(d);
+      vec2 uv = (gl_FragCoord.xy - uViewport.xy) / uViewport.zw;
+      vec4 c = textureLod(uLow, uv, 0.0);   // bilinear; no mipmaps, and after a discard no derivatives to choose one by
+      if (tHit > 0.0) c.a = 0.0;
+      else c.rgb += airglow(-uEarthC, d, dot(-uEarthC, d));
+      if (uDebug == 5) c = vec4(0.0, 0.0, 0.0, 0.0);   // what the band draws shows magenta; the rest black
+    #else
+      #if EARTH_PASS == 3
+        if (!band) discard;
+      #endif
+      float tHit;
+      vec4 c = shade(d, tHit);
+      #if EARTH_PASS == 3
+        if (uDebug == 5) c = vec4(1.0, 0.0, 1.0, 0.0);
+      #endif
+    #endif
+    #if EARTH_PASS == 1
+      gl_FragColor = c;   // the pass at a fraction of the size: linear, its gain and depth the composite's
+    #else
+      if (tHit > 0.0) {
+        float zv = max(tHit * dot(d, uCamFwd), uNear);
+        gl_FragDepth = clamp(((uFar + uNear) / (uFar - uNear) - 2.0 * uFar * uNear / ((uFar - uNear) * zv)) * 0.5 + 0.5, 0.0, 1.0);
+      } else {
+        gl_FragDepth = 1.0;
+      }
+      gl_FragColor = vec4(c.rgb * uGain, c.a);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+    #endif
   }
 `;
 
 const DEFAULT = { mask: 4096, cities: 4096, viewSteps: 10, sunSteps: 4, octaves: 5, cloudShadows: 1, relief: true, ozone: true, glitter: true };
+const RA = RE + RA_HEIGHT;
+
+// The band round the limb that the Earth at a fraction of the picture's size works out in full: its inner
+// and outer angles from the direction of the Earth's centre, rad, for an eye dist metres from the centre
+// and samples of the small picture texel radians apart. Rays at angle a from that direction meet the
+// ground, at t(a) = dist cos a - sqrt(RE^2 - dist^2 sin^2 a), inside the limb's angle asin(RE/dist), and pass
+// their lowest point, at dist sin a - RE, outside it. The band takes in, inside, where the ground's distance
+// changes by more than EARTH_UPSAMPLE.ground of itself across a sample, and outside, where the lowest height
+// changes by more than EARTH_UPSAMPLE.sky across one while under the air's top, and margin samples either
+// side of the limb whatever. Both changes grow toward the limb, so each edge is a single crossing.
+export function bandAngles(dist, texel, { ground = EARTH_UPSAMPLE.ground, sky = EARTH_UPSAMPLE.sky, margin = EARTH_UPSAMPLE.margin } = {}) {
+  const limb = Math.asin(Math.min(1, RE / dist));
+  // outside: the lowest height changes by dist cos a for each radian; under the top while a < asin(RA/dist)
+  const top = dist > RA ? Math.asin(RA / dist) : Math.PI / 2;
+  const steep = sky < dist * texel ? Math.acos(sky / (dist * texel)) : 0;
+  const outer = Math.max(limb + margin * texel, Math.min(top, steep, Math.PI / 2));
+  // inside: |d ln t / da| * texel over `ground`, found by halving between the nadir and the limb
+  const over = (a) => {
+    const sn = Math.sin(a), cs = Math.cos(a), q = Math.sqrt(Math.max(1e-9, RE * RE - dist * dist * sn * sn));
+    const t = Math.max(1e-6, dist * cs - q), dt = -dist * sn + (dist * dist * sn * cs) / q;
+    return Math.abs(dt / t) * texel > ground;
+  };
+  let inner = Math.max(0, limb - margin * texel);
+  if (over(inner)) {
+    let lo = 0, hi = inner;
+    if (over(lo)) hi = lo;
+    else for (let k = 0; k < 40; k++) { const mid = (lo + hi) / 2; if (over(mid)) hi = mid; else lo = mid; }
+    inner = hi;
+  }
+  return { inner, outer, limb };
+}
+
+// The band's strip and the Sun's square as geometry: positions are (angle round, which cone, 0) for the
+// strip, (corner x, corner y, 1) for the square; VERTEX_BAND makes directions of them each frame.
+function bandGeometry(n = 256) {
+  const pos = [];
+  for (let k = 0; k < n; k++) {
+    const a0 = (k / n) * 2 * Math.PI, a1 = ((k + 1) / n) * 2 * Math.PI;
+    pos.push(a0, 0, 0, a1, 0, 0, a1, 1, 0, a0, 0, 0, a1, 1, 0, a0, 1, 0);
+  }
+  pos.push(-1, -1, 1, 1, -1, 1, 1, 1, 1, -1, -1, 1, 1, 1, 1, -1, 1, 1);
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+}
 
 export class Earth {
   // maskWidth: the land mask's width, texels (the tier's earth.mask, where quality is given);
@@ -379,12 +549,11 @@ export class Earth {
       uDebug: { value: 0 },
       uSiteUp: { value: new THREE.Vector3(...siteUp) },
     };
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
-    this.material = new THREE.ShaderMaterial({
-      vertexShader: VERTEX,
+    const triangle = () => new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+    const drawn = (pass, uniforms, vertexShader = VERTEX) => new THREE.ShaderMaterial({
+      vertexShader,
       fragmentShader: FRAGMENT,
-      uniforms: this.uniforms,
+      uniforms,
       transparent: true,
       depthWrite: true,
       depthTest: true,
@@ -396,17 +565,142 @@ export class Earth {
       // the alpha it had, opaque, so the page behind the canvas never shows through the ground
       blendSrcAlpha: THREE.ZeroFactor,
       blendDstAlpha: THREE.OneFactor,
+      defines: { EARTH_PASS: pass },
     });
-    this.mesh = new THREE.Mesh(geometry, this.material);
-    this.mesh.frustumCulled = false;
+    // the Earth drawn in full, every pixel: what every tier drew before, and what it draws at its full size
+    this.material = drawn(0, this.uniforms);
+    // At a fraction of the size, three draws: the light worked out into a target of its own (linear, no
+    // blending; drawn just before the composite), the composite that brings it to the picture's size
+    // everywhere but the band round the limb and the square round the Sun, and those two in full. The
+    // composite carries none of the full shading, which a GPU that runs both sides of a branch (software GL
+    // does) would pay for at every pixel; the band is a strip of geometry, so only its pixels pay for it.
+    this.band = {
+      uCentreDir: { value: new THREE.Vector3(0, -1, 0) }, uAxisU: { value: new THREE.Vector3(1, 0, 0) }, uAxisV: { value: new THREE.Vector3(0, 0, 1) },
+      uStrip: { value: new THREE.Vector2(1, 1.1) }, uBandCos: { value: new THREE.Vector2(0.5, 0.4) }, uSunCos: { value: 1 },
+      uSunU: { value: new THREE.Vector3(1, 0, 0) }, uSunV: { value: new THREE.Vector3(0, 0, 1) }, uSunSquare: { value: 0.01 },
+      uViewport: { value: new THREE.Vector4(0, 0, 1, 1) },
+    };
+    this.composite = drawn(2, { ...this.uniforms, ...this.band, uLow: { value: null } });
+    this.bandMaterial = drawn(3, { ...this.uniforms, ...this.band }, VERTEX_BAND);
+    this.bandMaterial.side = THREE.DoubleSide;   // the strip faces the eye either way round
+    this.lowUniforms = { ...this.uniforms, uPixelAngle: { value: 0.001 } };
+    this.low = new THREE.ShaderMaterial({
+      vertexShader: VERTEX, fragmentShader: FRAGMENT, uniforms: this.lowUniforms, depthTest: false, depthWrite: false,
+      blending: THREE.NoBlending, toneMapped: false, defines: { EARTH_PASS: 1, SMOOTH_ONLY: 1 },
+    });
+    this.lowScene = new THREE.Scene();
+    this.lowMesh = new THREE.Mesh(triangle(), this.low);
+    this.lowMesh.frustumCulled = false;
+    this.lowScene.add(this.lowMesh);
+    this.lowTarget = null;
+    this.resolution = 1;
+    this.footScale = 1;   // the pass at a fraction of the size fades the ground's detail as the full picture's pixels would
+    this.viewportHeight = 1;
+    // what the page adds to its far scene: the three meshes, of which the scene's hook shows the ones each
+    // draw wants (in full for the reflected sky's cube, whatever the size)
+    this.mesh = new THREE.Group();
+    this.mesh.name = 'earth';
+    this.full = new THREE.Mesh(triangle(), this.material);
+    this.comp = new THREE.Mesh(triangle(), this.composite);
+    this.strip = new THREE.Mesh(bandGeometry(), this.bandMaterial);
+    for (const m of [this.full, this.comp, this.strip]) {
+      m.frustumCulled = false;
+      m.renderOrder = 10;
+      this.mesh.add(m);
+    }
     this.mesh.renderOrder = 10;
     // whatever camera draws it (the view's, or the six of the reflected sky's cube) sets its own rays
-    this.viewportHeight = 1;
-    this.mesh.onBeforeRender = (renderer, scene, camera) => {
-      const target = renderer.getRenderTarget();
-      this.setCamera(camera, target && target.isWebGLCubeRenderTarget ? target.height : this.viewportHeight);
+    this.full.onBeforeRender = (renderer, scene, camera) => {
+      const t = renderer.getRenderTarget();
+      this.setCamera(camera, t && t.isWebGLCubeRenderTarget ? t.height : this.viewportHeight);
     };
+    this.comp.onBeforeRender = (renderer, scene, camera) => {
+      this.setCamera(camera, this.viewportHeight);
+      this.setBand(renderer);
+      this.drawLow(renderer, camera, renderer.getRenderTarget());
+    };
+    this.strip.onBeforeRender = (renderer, scene, camera) => {
+      this.setCamera(camera, this.viewportHeight);
+      this.setBand(renderer);
+    };
+    this.mesh.addEventListener('added', () => this.hook(this.mesh.parent));
     this.setQuality(quality || { earth: { ...DEFAULT, mask: maskWidth } });
+  }
+
+  // Shows, for each draw of the scene the Earth is in, the meshes it wants: at a fraction of the size the
+  // composite and the band, but the full one for a cube's face, which has no picture of its own at a fraction.
+  hook(scene) {
+    if (!scene || !scene.isScene || scene.userData.earthHooked) return;
+    scene.userData.earthHooked = true;
+    const before = scene.onBeforeRender;
+    scene.onBeforeRender = (renderer, sc, camera, target) => {
+      before.call(scene, renderer, sc, camera, target);
+      const half = this.resolution < 1 && !(target && target.isWebGLCubeRenderTarget);
+      this.full.visible = !half;
+      this.comp.visible = this.strip.visible = half;
+    };
+  }
+
+  // The share of the picture's size, each way, at which the light is worked out: 1, every pixel, as every
+  // tier drew it before; under 1, that many and the composite (the tier's earth.resolution, and the frame
+  // rate's controller, adapt.js, at medium and high when it has had to draw fewer pixels).
+  setResolution(share) {
+    const s = Math.min(1, Math.max(0.25, Number(share) || 1));
+    this.resolution = s;
+    this.full.visible = s >= 1;
+    this.comp.visible = this.strip.visible = s < 1;
+    if (s >= 1 && this.lowTarget) { this.lowTarget.dispose(); this.lowTarget = null; }
+  }
+
+  get mode() { return this.resolution < 1 ? `composite ${this.resolution}` : 'full'; }
+
+  // The band round the limb and the square round the Sun for the view about to be drawn (bandAngles).
+  setBand(renderer) {
+    const B = this.band, u = this.uniforms, A = EARTH_UPSAMPLE;
+    const tmp = this.tmp || (this.tmp = { size: new THREE.Vector2(), cut: new THREE.Vector4(), view: new THREE.Vector4(), any: new THREE.Vector3(), sun: new THREE.Vector3() });
+    renderer.getCurrentViewport(tmp.view);
+    B.uViewport.value.copy(tmp.view);
+    const c = u.uEarthC.value;
+    const texel = u.uPixelAngle.value / this.resolution;
+    const { inner, outer } = bandAngles(c.length(), texel);
+    const square = (dir, U, V) => {
+      dir.normalize();
+      tmp.any.set(Math.abs(dir.y) < 0.9 ? 0 : 1, Math.abs(dir.y) < 0.9 ? 1 : 0, 0);
+      U.crossVectors(dir, tmp.any).normalize();
+      V.crossVectors(dir, U);
+    };
+    B.uCentreDir.value.copy(c);
+    square(B.uCentreDir.value, B.uAxisU.value, B.uAxisV.value);
+    B.uBandCos.value.set(Math.cos(inner), Math.cos(outer));
+    B.uStrip.value.set(Math.max(0, inner - texel), Math.min(Math.PI, outer + texel));   // the strip a texel wider each way
+    square(tmp.sun.copy(u.uSun.value), B.uSunU.value, B.uSunV.value);
+    B.uSunCos.value = Math.cos(A.sun);
+    B.uSunSquare.value = Math.tan(A.sun + texel);
+  }
+
+  // The light at a fraction of the size, for the view about to be drawn into `target` (null: the canvas),
+  // only within the part of it being drawn where that is cut (the walk draws its sky in a window).
+  drawLow(renderer, camera, target) {
+    const tmp = this.tmp;
+    const size = target ? tmp.size.set(target.width, target.height) : renderer.getDrawingBufferSize(tmp.size);
+    const w = Math.max(1, Math.ceil(size.x * this.resolution)), h = Math.max(1, Math.ceil(size.y * this.resolution));
+    if (!this.lowTarget) {
+      this.lowTarget = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, depthBuffer: false, stencilBuffer: false, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, generateMipmaps: false });
+      this.lowTarget.texture.name = 'orbit.earth.low';
+    } else if (this.lowTarget.width !== w || this.lowTarget.height !== h) this.lowTarget.setSize(w, h);
+    const lt = this.lowTarget;
+    const cut = target ? target.scissorTest : renderer.getScissorTest();
+    lt.scissorTest = cut;
+    if (cut) {
+      const r = target ? tmp.cut.copy(target.scissor) : renderer.getScissor(tmp.cut).multiplyScalar(renderer.getPixelRatio());
+      const k = this.resolution, x0 = Math.max(0, Math.floor(r.x * k) - 2), y0 = Math.max(0, Math.floor(r.y * k) - 2);
+      lt.scissor.set(x0, y0, Math.min(w, Math.ceil((r.x + r.z) * k) + 2) - x0, Math.min(h, Math.ceil((r.y + r.w) * k) + 2) - y0);
+    }
+    this.lowUniforms.uPixelAngle.value = this.uniforms.uPixelAngle.value * this.footScale;
+    this.composite.uniforms.uLow.value = lt.texture;
+    renderer.setRenderTarget(lt);
+    renderer.render(this.lowScene, camera);
+    renderer.setRenderTarget(target);
   }
 
   // The tier: the textures' sizes and the shader's costs. Textures are painted again only where their
@@ -431,12 +725,17 @@ export class Earth {
       this.uniforms.uCityTexel.value = (2 * Math.PI * RE) / q.cities;
       this.citiesWidth = q.cities;
     }
-    this.material.defines = {
+    const costs = {
       VIEW_STEPS: q.viewSteps, SUN_STEPS: q.sunSteps, OCTAVES: q.octaves, CLOUD_SHADOWS: q.cloudShadows ? 1 : 0,
       RELIEF: q.relief ? 1 : 0, OZONE: q.ozone ? 1 : 0, GLITTER: q.glitter ? 1 : 0,
     };
-    this.material.needsUpdate = true;
+    for (const m of [this.material, this.composite, this.bandMaterial, this.low]) {
+      const pass = m.defines.EARTH_PASS;
+      m.defines = { ...costs, EARTH_PASS: pass, SMOOTH_ONLY: pass === 1 ? 1 : 0 };
+      m.needsUpdate = true;
+    }
     this.quality = q;
+    this.setResolution(q.resolution ?? 1);
   }
 
   // The camera's part of the uniforms: its rays, its depth range, how wide a pixel is.

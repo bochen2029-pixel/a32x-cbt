@@ -331,7 +331,9 @@ Sun's side none. A fill from the roof's lamps lights the rest, and the band's ai
 it. The view leans a quarter of the way toward the felt up, so the lift's sideways push is felt.
 
 The walk follows the graphics tier (`quality.js`): it draws through the page's pipeline, so it has the tier's
-cap on the picture's size and, above low, its multisampling and the glow round what is brighter than white.
+cap on the picture's size and, above low, its multisampling and the glow round what is brighter than white;
+the frame rate's controller sizes its picture as it does the flight's, and its sky is the Earth worked out
+as the flight's is, at low from half the size, in the part of the picture where it shows.
 At low it does less: no shadow of the roof's lattice and none of the bulkheads, no light from the Earth, the
 grass in one octave, the blocks' windows as their average, the far side's roof and the small things past
 2.5 km (blocks, parapets, lock gates) left out; medium draws those to 7 km, high to the far side. Timed in
@@ -576,33 +578,70 @@ inputs come from.
 The page draws at one of three tiers: **low** for phones and integrated graphics, **medium** for a recent
 laptop or an older card, **high** for a desktop card. It places a device from what the device says of
 itself (the renderer WebGL names, its largest texture, whether it can draw into a half-float target, the
-screen, a finger for a pointer, the memory) and, left to itself, times its first frames and steps down a
-tier, or at low draws fewer pixels, when they come slowly. `?q=low|medium|high` in the address chooses a
-tier, as do **9** and **GFX** (auto, low, medium, high in turn; remembered). Changing tier rebuilds the
-Ring, the craft, the Earth's textures and the stars in place, and the flight goes on. `web/src/quality.js`
-holds every tier's settings and the placing; its tests hold each tier complete and no cost lower at a
-dearer tier.
+screen, a finger for a pointer, the memory) and then holds its frame rate, drawing fewer pixels when
+frames come slowly and stepping a tier down or up when fewer pixels are not enough or there is room
+(below). `?q=low|medium|high` in the address chooses a tier, as do **9** and **GFX** (auto, low, medium,
+high in turn; remembered). Changing tier rebuilds the Ring, the craft, the Earth's textures and the stars
+in place, and the flight goes on. `web/src/quality.js` holds every tier's settings and the placing; its
+tests hold each tier complete and no cost lower at a dearer tier.
 
 **Measuring a machine.** ` (the backquote key) shows the frame meter: frames a second and the frame
-time's mean, 95th percentile and worst over the last two seconds, the tier and whether it was chosen or
-found, the picture's size in pixels, the depth slices, and the draw calls and triangles in a frame
-(`perf.js`). Everything here was measured in software rendering, which says nothing of how fast a
-graphics card runs it; the meter is how to find out, tier by tier (9 or GFX).
+time's mean, 95th percentile and worst over the last two seconds, and the GPU's own time for a frame where
+the browser gives it (Chrome on most desktops; not Safari, nor Firefox by default); the tier and whether
+it was chosen or found, the picture's size in pixels, the depth slices, and the draw calls and triangles
+in a frame; and how the frame rate is held: the rate aimed at, the picture's share of the tier's size and
+how many rungs down it is, and the Earth's size (`perf.js`). Everything here was measured in software
+rendering, which says nothing of how fast a graphics card runs it; the meter is how to find out, tier by
+tier (9 or GFX). `?res=fixed` keeps the picture at the tier's own size, to measure the tiers by.
+
+**Holding the frame rate** (`web/src/adapt.js`). The page aims at 60 frames a second, 30 on a phone, and
+on a fast machine does nothing at all: the picture stays at the tier's own size. When frames come slowly it
+draws fewer pixels, down a ladder of rungs each with 0.8 of the pixels of the one above, to a quarter of
+the tier's at the bottom, and up again when they come quickly; the flight never notices, since the core
+steps by its fixed clock whatever the frame rate. Every half second or so of frames the law takes their
+mean, the slowest eighth and any spike left out, so a frame that waits for a shader or a collection moves
+nothing, and the first two seconds at a tier, while its shaders compile, count for nothing.
+
+- **Slow**, more than 15 % over the target: down as many rungs as the pixels' share says will bring it
+  under nine tenths of it, at most three at once. A step down that buys less than a quarter of what it
+  should is undone, and the steps down wait 4 s, then 8, up to a minute: a browser that holds the page to
+  30 frames a second to save a battery, or a slow processor, is not helped by a blurrier picture.
+- **On target** for a second and a half: up a rung, on trial, judged on its first four frames. A display's
+  refresh hides how much faster a frame could be drawn, so the only way to learn is to try; when a try
+  fails, the page steps back and that rung waits twice as long before the next, to half a minute. Where the
+  browser gives the GPU's own time, the page knows instead: it steps up as soon as the rung above fits,
+  never tries one that does not, and when it is slow while the GPU has room, it leaves the pixels alone.
+- **The tiers**, while the page chooses them (auto): a tier down when the picture is three rungs down (half
+  the pixels) and still slow for two seconds, since a tier lower at full size looks better than one higher
+  at half of it, or, by the GPU's time, when fewer pixels do not help and the GPU is still busy; a tier up,
+  on trial, after a minute at full size on target. A trial that has to come down two rungs within ten
+  seconds goes back, and that tier is not tried again, nor one the page has stepped down from. A tier
+  chosen by hand stays, and where the GPU's time shows room for the next, the page says so once.
+
+The tests (`web/test/adapt.test.mjs`) drive the law with made-up devices whose frames take a time in
+proportion to the pixels and show at the display's next refresh. A device that needs 30 ms a frame at full
+size settles half a second after its first two seconds, at 0.72 of the tier's size (rung 3), and runs at
+60 frames a second; its tries at rung 2 fail ever more rarely, 19 in ten minutes, and the frames they slow
+are 0.7 % of the time; with the GPU's time, it never tries and never misses. Four times the load for a
+minute, then none: down within half a second of the warm-up, and back at full size 30 s after the load
+goes by trying, half a second by the GPU's time. A processor that takes 40 ms, or a 30-frame cap, keeps
+the full picture 98 % of the time. A phone that needs 45 ms settles at rung 2 and holds 30 frames a
+second 99 % of the time.
 
 | | low | medium | high |
 |---|---|---|---|
-| the drawing buffer | at most 1.5 device pixels a CSS pixel and 1.3 M pixels; the canvas multisampled | 2 and 2.4 M, into a 4× multisampled half-float target | 2 and 6 M |
+| the drawing buffer | at most 1.5 device pixels a CSS pixel and 1.3 M pixels; the canvas multisampled; fewer, down to a quarter, while frames come slowly | 2 and 2.4 M, into a 4× multisampled half-float target; the same | 2 and 6 M; the same |
 | the picture | each material tone-maps itself | kept in HDR: what is brighter than white (the Sun, the lights, the plume, the glint) glows; tone-mapped once | the same, the glow at full size |
 | reflections | none | the far scene in a 64-texel cube, every 45 frames, prefiltered | 128 texels, every 15 |
 | the Sun's shadow | a soft spot under the craft on the ground | the same | a 2,048 map round the craft: on itself, on the field, on the hub |
-| the Earth | land mask 2,048 texels round, night lights 2,048; 6 samples of air, 3 toward the Sun; 3 octaves of detail | 4,096 and 4,096; 10 and 4; 5 octaves; the clouds' shadows, relief, ozone, the glint's facets | 8,192 and 4,096; 16 and 6; 6 octaves |
+| the Earth | land mask 2,048 texels round, night lights 2,048; 6 samples of air, 3 toward the Sun; 3 octaves of detail; worked out at half the picture's size each way and brought up to full | 4,096 and 4,096; 10 and 4; 5 octaves; the clouds' shadows, relief, ozone, the glint's facets; in full, and at half while the picture is drawn smaller | 8,192 and 4,096; 16 and 6; 6 octaves; the same |
 | the Ring | 192 segments round; textures 512; no relief; the spokes a painted lattice; 120 ribs a wall; 2 rings of lights; the town painted | 384; 1,024; relief; trusses in 140 m bays; 240 ribs; 4 rings; the town's buildings standing | 512; 2,048; 70 m bays; 5 rings |
 | the craft | its loft 28 × 20; textures 256; no relief; the plume in 6 samples | 44 × 32; 512; relief; 12 | 64 × 48; 1,024; 24 |
 
-What it costs, measured with Chromium drawing in software (SwiftShader) at 1,440 × 810, the GPU's own
-timer round each pass: the times compare the tiers and the passes with each other, not with a graphics
-card, and other work on the machine made them noisy (each is the lower of two runs of six frames). The
-sketch before this work drew one way only.
+What the tiers cost when they were made (12 November), measured with Chromium drawing in software
+(SwiftShader) at 1,440 × 810, the GPU's own timer round each pass: the times compare the tiers and the
+passes with each other, not with a graphics card, and other work on the machine made them noisy (each is
+the lower of two runs of six frames). The sketch before that work drew one way only.
 
 | | before | low | medium | high |
 |---|---|---|---|---|
@@ -647,6 +686,13 @@ along each ray: a hot core as wide as the bell's mouth, the shock diamonds in th
 exhaust is from the pressure round it and fading as the air thins, and above the air a broad soft glow.
 The wheels still touch where the core's contact points are; a test holds them there.
 
+**Fewer draw calls.** The Ring's and the craft's parts that stand still and share a material are merged,
+a mesh to each material and parent, each part's place baked into its copy of the geometry
+(`web/src/merge.js`; its test holds the merged meshes to the very triangles they drew before). The lift
+cars and the solar mast's wings are each one mesh drawn many times, placed each frame. The Ring went from
+67 meshes to 22, the craft from 53 to 14, and the meshes casting the Sun's shadow at high from 30 to 7.
+(The flight deck's 456 markings are batched by the deck's own part.)
+
 **The Earth** (`web/src/earth.js`) adds ozone's absorption, a twilight on the ground past the terminator,
 the sea's reflection of the sky and the Sun's glint by its waves' slopes (Cox and Munk), broken into
 facets close up; a cloud layer 3 km up, swirled, that throws its shadow and is greyer on its side away from
@@ -654,6 +700,26 @@ the Sun; a made-up relief in the great ranges; fields near enough to see; the co
 own olive grass; the airglow's green line at the night limb; and on the night side the towns' lights, from
 Natural Earth's populated places (`web/tools/places.mjs` makes `web/data/places.js`). The day stays clear
 over Texas, so the reference's cloud deck to climb through is not here.
+
+**The Earth at half the size.** Its full-screen pass is most of every frame, and most of what it works
+out (the air along each ray and toward the Sun, the ground's noise, the clouds) changes slowly across the
+picture. At low it is worked out at half the picture's size each way, a quarter of the pixels, into a
+target of its own, and two draws bring it to full size. Where the half-size samples cannot follow, a band
+round the limb and a square round the Sun's disc are worked out in full: from above the air, the band of
+sky up to the air's top; the far ground's haze, where the ground's distance changes by more than 15 %
+across a sample; and two samples either side of the limb whatever. They are drawn as geometry, a strip
+between two cones round the direction of the Earth's centre, so only their pixels, 1.5 to 5 % of them,
+pay for the full shading. Everywhere else a composite takes the four samples round each pixel bilinearly,
+all of them on its side of the limb, and works out for each pixel exactly which side that is and how far
+its ground is, so the limb, the horizon and the depth are as sharp as ever; the airglow's thin line is
+added at full size. The composite holds none of the full shading: software GL, and some GPUs, run both
+sides of a branch, and the first try, which branched to it, cost every pixel the whole price, 2.3 times
+the full pass. Against the Earth worked out in full, in the same frame (`web/test/earth-half.test.mjs`):
+the mean difference is 0.01 to 0.5 levels in 255, and under 0.6 % of the pixels differ by more than 8, at
+the softened edges of the fields close below and of a coast seen at a grazing angle. In software at
+1,440 × 810, in one session, the Earth's pass at low took 1.7 s where in full it took 5.5 s, a third. At
+medium and high it is worked out in full, as before, unless the frame rate's controller has had to draw
+fewer pixels, when it is worked out at half too: on a slow machine the sky softens before the Ring does.
 
 **The page**: on a touch screen the six buttons used most sit between the stick and the throttle, under
 the thumbs, and **MORE** opens the rest; on a desktop the buttons stand in three groups. The panels are
