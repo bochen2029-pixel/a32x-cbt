@@ -47,6 +47,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | N | | the map: the orbit, the Ring close to, the ground track; shift-N the next of them |
 | Y | | sound off, on (it starts on the first key or tap) |
 | 0 | | the tour: the whole loop flown by the crew, with words; any key or button takes over |
+| ` | | the frame meter: the frame rate and time, the tier, the picture's size and the draws in a frame; `?perf` shows it at the start |
 
 On a touch screen: a stick under the left thumb, a throttle under the right, and the buttons.
 
@@ -639,6 +640,12 @@ tier, as do **9** and **GFX** (auto, low, medium, high in turn; remembered). Cha
 Ring, the craft, the Earth's textures and the stars in place, and the flight goes on. `web/src/quality.js`
 holds every tier's settings and the placing; its tests hold each tier complete and no cost lower at a
 dearer tier.
+
+**Measuring a machine.** ` (the backquote key) shows the frame meter: frames a second and the frame
+time's mean, 95th percentile and worst over the last two seconds, the tier and whether it was chosen or
+found, the picture's size in pixels, the depth slices, and the draw calls and triangles in a frame
+(`perf.js`). Everything here was measured in software rendering, which says nothing of how fast a
+graphics card runs it; the meter is how to find out, tier by tier (9 or GFX).
 
 | | low | medium | high |
 |---|---|---|---|
