@@ -54,10 +54,14 @@ window.S = S; window.M = M;
 
 const db = (v) => (v > 0 ? 20 * Math.log10(v) : -Infinity);
 
-test('the instrument, rendered: every cue, the deck in vacuum, the hover\'s thrust, the footsteps', { skip: why || false, timeout: 180000 }, async () => {
+test('the instrument, rendered: every cue, the deck in vacuum, the hover\'s thrust, the footsteps', { skip: why || false, timeout: 300000 }, async () => {
   const { build } = require(esbuild);
   const bundle = await build({ stdin: { contents: ENTRY, resolveDir: here, loader: 'js' }, bundle: true, format: 'iife', write: false, logLevel: 'silent' });
   const browser = await chromium.launch({ headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
+  // node:test's timeout fails the test but cannot stop a render the page never finishes, and an open browser
+  // keeps the file's process alive: the suite then waits for ever (it did, on a loaded machine). Close the
+  // browser first, so the pending call rejects and the failure shows.
+  const watchdog = setTimeout(() => { browser.close().catch(() => {}); }, 290000);
   try {
     const page = await browser.newPage();
     const errors = [];
@@ -121,7 +125,8 @@ test('the instrument, rendered: every cue, the deck in vacuum, the hover\'s thru
     assert.ok(steps.paving.peak > steps.grass.peak, 'and harder');
     assert.deepEqual(errors, []);
   } finally {
-    await browser.close();
+    clearTimeout(watchdog);
+    await browser.close().catch(() => {});
   }
 });
 
