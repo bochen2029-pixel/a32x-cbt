@@ -658,6 +658,50 @@ runway, where the sky fills the screen. A phone at low draws 585 × 996 pixels f
 (0.6 M, where high may draw 6 M on a large one), 0.33, 0.38 and 0.12 s a frame in the same software,
 with an eighth of high's texture memory and no off-screen target.
 
+**What holding the frame rate bought** (21 November), measured the same way at 1,440 × 810 with the
+picture at the tier's own size (`?res=fixed`): the page before that work against the page after it, each
+the lower of two runs of five frames. A pass's time here is the wall time between one-pixel reads from a
+framebuffer of the measuring script's own, which wait for the GPU process to finish all that came before:
+Chrome's `gl.finish()` does not wait, and its GPU timer, in software, counts passes that overlap (they
+added up to more than the frame). The flight's scenes ran one after another in one page load for each
+tier, the walk in its own, the two pages side by side, while other work held the machine's load at 20
+to 40 on four cores; the deck's 456 markings are in both (the deck's own part batches them).
+
+| draw calls, before → after | low | medium | high |
+|---|---|---|---|
+| the runway | 84 → 47 | 98 → 59 | 127 → 65 |
+| the climb, 110 s | 47 → 25 | 61 → 37 | 73 → 41 |
+| orbit, the Ring 25 km ahead | 576 → 509 | 591 → 522 | 603 → 526 |
+| the hub, 300 m off | 68 → 39 | 83 → 52 | 94 → 56 |
+| over the deck | 198 → 159 | 214 → 173 | 214 → 173 |
+| the walk, on the floor | 71 → 73 | 93 → 93 | 93 → 93 |
+
+| the GPU's time a frame, s (of it the Earth's), before → after | low | medium | high |
+|---|---|---|---|
+| the runway | 3.99 (3.67) → 2.94 (1.97) | 5.95 (4.16) → 7.31 (4.75) | 7.77 (5.67) → 6.01 (4.12) |
+| the climb, 110 s | 3.02 (2.92) → 1.23 (0.99) | 7.23 (5.87) → 6.12 (4.68) | 6.87 (4.82) → 4.76 (3.43) |
+| orbit, the Ring 25 km ahead | 4.13 (3.50) → 2.45 (1.88) | 5.38 (2.89) → 5.88 (2.75) | 2.98 (1.14) → 3.03 (1.25) |
+| the hub, 300 m off | 5.09 (3.53) → 3.22 (2.15) | 6.64 (3.37) → 5.66 (2.51) | 7.41 (2.77) → 5.63 (2.22) |
+| over the deck | 8.26 (6.14) → 5.96 (2.82) | 10.09 (5.10) → 6.46 (3.06) | 4.71 (2.28) → 4.42 (2.15) |
+| the walk, on the floor | 5.98 (0.84) → 3.28 (0.27) | 6.17 (0.86) → 4.53 (0.74) | 3.14 (0.50) → 1.85 (0.29) |
+
+At low, where the Earth is now worked out from half the size, its pass fell by 39 to 68 % and the frame
+by 26 to 59 %; the draw calls by 22 to 67 a frame in flight, while the walk, where the Earth is only the
+sky's window, gains two (the half-size pass and the band). At medium and high the Earth is drawn exactly
+as before, so its own pass is the gauge of the load, and the load moved it from 40 % less to 14 % more;
+the frames moved with it (high's orbit, deck and walk are a second run, the two pages started together,
+which put orbit within 2 % and the deck within 6 %; the walk, which nothing here touches at high, still
+came out 41 % less). What changed there is the draw calls, 24 to 77 fewer a frame in flight: the
+craft's 53 meshes are 14, the Ring's 67 are 22, and at high the shadow's casters 30 are 7. Software GL
+hardly feels a draw call, at tens of microseconds; a laptop's or a phone's driver does. Triangles rose
+by 7 k at the hub and over the deck: the hub's six hoops, merged with the towers round the Ring, are no
+longer left out when out of sight, which a graphics card does not notice. Frames of each in turn in one
+session, which the load cannot tell apart, give the Earth from half the size 0.51 to 0.57 of its full
+time at low (the runway, orbit), 0.44 to 0.56 at medium and 0.42 at high: at medium and high, what the
+frame rate's controller buys when it asks for it. A phone at low, 585 × 996 for an iPhone 13's screen:
+the runway 1.09 s → 0.55 s a frame (the Earth 0.90 → 0.39), orbit 0.82 → 0.70 (0.57 → 0.41), the draw
+calls 79 → 42 and 576 → 509.
+
 The picture keeps AgX's roll-off, as the owner's booster-lander-simulator does, with a look a little
 punchier than three.js's base (`web/src/pipeline.js`). The Earth's sky, ground and clouds take the
 irradiance three.js's own Sun gives the craft and the Ring: before, the ground was lit about six times
@@ -709,7 +753,7 @@ target of its own, and two draws bring it to full size. Where the half-size samp
 round the limb and a square round the Sun's disc are worked out in full: from above the air, the band of
 sky up to the air's top; the far ground's haze, where the ground's distance changes by more than 15 %
 across a sample; and two samples either side of the limb whatever. They are drawn as geometry, a strip
-between two cones round the direction of the Earth's centre, so only their pixels, 1.5 to 5 % of them,
+between two cones round the direction of the Earth's centre, so only their pixels, 1.5 to 6 % of them,
 pay for the full shading. Everywhere else a composite takes the four samples round each pixel bilinearly,
 all of them on its side of the limb, and works out for each pixel exactly which side that is and how far
 its ground is, so the limb, the horizon and the depth are as sharp as ever; the airglow's thin line is
@@ -718,9 +762,11 @@ sides of a branch, and the first try, which branched to it, cost every pixel the
 the full pass. Against the Earth worked out in full, in the same frame (`web/test/earth-half.test.mjs`):
 the mean difference is 0.01 to 0.5 levels in 255, and under 0.6 % of the pixels differ by more than 8, at
 the softened edges of the fields close below and of a coast seen at a grazing angle. In software at
-1,440 × 810, in one session, the Earth's pass at low took 1.7 s where in full it took 5.5 s, a third. At
-medium and high it is worked out in full, as before, unless the frame rate's controller has had to draw
-fewer pixels, when it is worked out at half too: on a slow machine the sky softens before the Ring does.
+1,440 × 810, frames of each in turn in one session, the Earth from half the size took 0.51 of its full
+time from the runway at low and 0.57 in orbit, 0.44 and 0.56 at medium, and 0.42 at high in orbit; the
+composite's own share is largest at low, where it tone-maps the picture as well. At medium and high
+the Earth is worked out in full, as before, unless the frame rate's controller has had to draw fewer
+pixels, when it is worked out at half too: on a slow machine the sky softens before the Ring does.
 
 **The page**: on a touch screen the six buttons used most sit between the stick and the throttle, under
 the thumbs, and **MORE** opens the rest; on a desktop the buttons stand in three groups. The panels are
