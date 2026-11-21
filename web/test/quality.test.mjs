@@ -1,9 +1,10 @@
-// The graphics tiers: which one a device gets from what it reports, that each tier says everything,
-// and that a slow start steps down. GPLv3.
+// The graphics tiers: which one a device gets from what it reports, that each tier says everything, and
+// the drawing buffer's and the Earth's sizes under them. (How a slow page draws fewer pixels and steps
+// down, and a quick one up: adapt.test.mjs.) GPLv3.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CHOICES, INVERSE, PROBE, SETTINGS, TIERS, chooseTier, flatten, nextChoice, pixelRatioFor, probeVerdict, resolveTier,
+  CHOICES, INVERSE, SETTINGS, TIERS, chooseTier, earthResolution, flatten, nextChoice, pixelRatioFor, resolveTier,
 } from '../src/quality.js';
 
 const desk = { width: 1920, height: 1080, touch: false, cores: 12, memory: 8, maxTextureSize: 16384, halfFloat: true };
@@ -133,20 +134,14 @@ test('the drawing buffer keeps under the tier\'s pixels', () => {
   assert.ok(area <= SETTINGS.high.pixels + 1, '4K at high keeps to the budget');
   [r] = px('high', 2560, 1440, 1);
   assert.equal(r, 1);
-  assert.equal(px('low', 390, 844, 3, 0.5)[0], 0.75, 'the probe\'s scale multiplies it');
+  assert.equal(px('low', 390, 844, 3, 0.5)[0], 0.75, 'the controller\'s scale multiplies it');
   assert.equal(px('low', 4000, 4000, 1, 0.5)[0], 0.5, 'never under a half');
 });
 
-test('a slow start steps down a tier; at low it draws fewer pixels; a fast one changes nothing', () => {
-  const frames = (ms) => Array.from({ length: PROBE.frames }, (_, i) => ms + (i % 3));
-  assert.deepEqual(probeVerdict('high', frames(60)), { tier: 'medium', scale: 1, slow: true, medianMs: 61 });
-  assert.equal(probeVerdict('medium', frames(60)).tier, 'low');
-  assert.deepEqual(probeVerdict('low', frames(60)), { tier: 'low', scale: 0.75, slow: true, medianMs: 61 });
-  assert.equal(probeVerdict('low', frames(60), 0.75).scale, 0.5625);
-  assert.equal(probeVerdict('low', frames(60), 0.5).scale, 0.5, 'and no coarser than a half');
-  assert.deepEqual(probeVerdict('high', frames(16)), { tier: 'high', scale: 1, slow: false, medianMs: 17 });
-  assert.equal(probeVerdict('high', frames(33)).tier, 'high', '30 frames a second is enough');
-  // one long frame (a shader compiling, a tab coming back) is not a slow device; nor are too few frames
-  assert.equal(probeVerdict('high', [...frames(16), 900, 5000]).tier, 'high');
-  assert.equal(probeVerdict('high', [70, 70, 70]).tier, 'high');
+test('the Earth is worked out at full size above low, and at half where the tier or the frame rate asks', () => {
+  assert.equal(earthResolution(SETTINGS.low), 0.5);
+  assert.equal(earthResolution(SETTINGS.medium), 1, 'medium and high on a fast machine: every pixel, as before');
+  assert.equal(earthResolution(SETTINGS.high), 1);
+  for (const t of TIERS) assert.equal(earthResolution(SETTINGS[t], 1), 0.5, `${t}, fewer pixels: half`);
+  assert.equal(earthResolution(SETTINGS.high, 0), 1);
 });

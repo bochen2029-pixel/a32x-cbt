@@ -1,11 +1,12 @@
-// The graphics tiers: what a phone, a laptop's own graphics and a desktop card each draw, which of the
-// three a device gets from what it reports about itself, and when a slow start steps it down. No
-// three.js and no browser here, so the tests can read all of it. GPLv3.
+// The graphics tiers: what a phone, a laptop's own graphics and a desktop card each draw, and which of
+// the three a device gets from what it reports about itself. No three.js and no browser here, so the
+// tests can read all of it. GPLv3.
 //
-// A tier is chosen once from the device's report (chooseTier), overridden by ?q=low|medium|high in the
-// address or by the page's control (F, or the GFX button), which is remembered. Left to itself, the
-// page also times its first frames and steps down when they come slowly (probeVerdict): it never steps
-// up, because a display's refresh hides how much faster a device could go.
+// A tier is chosen from the device's report (chooseTier), overridden by ?q=low|medium|high in the
+// address or by the page's control (9, or the GFX button), which is remembered. Left to itself, the page
+// then holds its frame rate (adapt.js): it draws fewer pixels when frames come slowly and more again
+// when they come quickly, steps a tier down when half the pixels are not enough, and tries the tier above
+// after a minute with room.
 
 export const TIERS = ['low', 'medium', 'high'];
 export const CHOICES = ['auto', ...TIERS];
@@ -32,6 +33,8 @@ export const CHOICES = ['auto', ...TIERS];
 //   earth.relief         the land's made-up relief, shaded by the Sun
 //   earth.ozone          ozone's absorption: the blue band over an orbital sunset
 //   earth.glitter        the Sun's glint on the sea broken into wave facets
+//   earth.resolution     the share of the picture's size, each way, at which the air and the ground are
+//                        worked out, the rest brought up to full size by the composite (earth.js)
 //   ring.around          segments round the Ring
 //   ring.texture         the Ring's painted textures' longer side, texels
 //   ring.normalMaps      relief on the hull, the walls and the hub
@@ -51,7 +54,7 @@ export const SETTINGS = {
     pixelRatio: 1.5, pixels: 1.3e6,
     msaa: 0, hdr: false, bloom: 0, bloomDivide: 4,
     shadowMap: 0, envMap: 0, envEvery: 0, anisotropy: 2, stars: 2500,
-    earth: { mask: 2048, cities: 2048, viewSteps: 6, sunSteps: 3, octaves: 3, cloudShadows: 0, relief: false, ozone: false, glitter: false },
+    earth: { mask: 2048, cities: 2048, viewSteps: 6, sunSteps: 3, octaves: 3, cloudShadows: 0, relief: false, ozone: false, glitter: false, resolution: 0.5 },
     ring: { around: 192, texture: 512, normalMaps: false, struts: false, bay: 280, rimBay: 240, ribs: 120, lights: 180, lightRings: 2, city: 1 },
     craft: { stations: 28, around: 20, texture: 256, normalMaps: false, plumeSteps: 6 },
   },
@@ -60,7 +63,7 @@ export const SETTINGS = {
     pixelRatio: 2, pixels: 2.4e6,
     msaa: 4, hdr: true, bloom: 0.4, bloomDivide: 2,
     shadowMap: 0, envMap: 64, envEvery: 45, anisotropy: 8, stars: 5000,
-    earth: { mask: 4096, cities: 4096, viewSteps: 10, sunSteps: 4, octaves: 5, cloudShadows: 1, relief: true, ozone: true, glitter: true },
+    earth: { mask: 4096, cities: 4096, viewSteps: 10, sunSteps: 4, octaves: 5, cloudShadows: 1, relief: true, ozone: true, glitter: true, resolution: 1 },
     ring: { around: 384, texture: 1024, normalMaps: true, struts: true, bay: 140, rimBay: 120, ribs: 240, lights: 360, lightRings: 4, city: 2 },
     craft: { stations: 44, around: 32, texture: 512, normalMaps: true, plumeSteps: 12 },
   },
@@ -69,7 +72,7 @@ export const SETTINGS = {
     pixelRatio: 2, pixels: 6.0e6,
     msaa: 4, hdr: true, bloom: 0.5, bloomDivide: 1,
     shadowMap: 2048, envMap: 128, envEvery: 15, anisotropy: 16, stars: 9000,
-    earth: { mask: 8192, cities: 4096, viewSteps: 16, sunSteps: 6, octaves: 6, cloudShadows: 1, relief: true, ozone: true, glitter: true },
+    earth: { mask: 8192, cities: 4096, viewSteps: 16, sunSteps: 6, octaves: 6, cloudShadows: 1, relief: true, ozone: true, glitter: true, resolution: 1 },
     ring: { around: 512, texture: 2048, normalMaps: true, struts: true, bay: 70, rimBay: 60, ribs: 240, lights: 720, lightRings: 5, city: 2 },
     craft: { stations: 64, around: 48, texture: 1024, normalMaps: true, plumeSteps: 24 },
   },
@@ -95,8 +98,7 @@ const RADEON_MIDDLE = /radeon\s?pro|firepro|\b\d{3}m\b|vangogh|custom gpu|\bw\d{
 // Returns { tier, why }: why is a short phrase for the page to show.
 export function chooseTier(report = {}) {
   const r = String(report.renderer || '');
-  const short = Math.min(report.width || 0, report.height || 0);
-  const phone = Boolean(report.touch) && short > 0 && short < 700;
+  const phone = isPhone(report);
   const capped = (tier, why) => {
     // above low the page draws into a half-float target and reads a 4096 mask; high wants memory too
     if (tier !== 'low' && report.halfFloat === false) return { tier: 'low', why: `${why}, no half-float target` };
@@ -129,6 +131,13 @@ export function chooseTier(report = {}) {
   return capped('medium', 'an unnamed renderer');
 }
 
+// A phone: a finger for a pointer and a screen under 700 CSS pixels on its short side. The frame rate it
+// aims at is 30 frames a second, where a desktop's is 60 (adapt.js).
+export function isPhone(report = {}) {
+  const short = Math.min(report.width || 0, report.height || 0);
+  return Boolean(report.touch) && short > 0 && short < 700;
+}
+
 // ?q= in the address, else what the page's control saved, else the device's own tier.
 // Returns { choice, tier, why }: choice is what was asked ('auto' or a tier).
 export function resolveTier({ query = null, saved = null, report = {} } = {}) {
@@ -146,27 +155,18 @@ export function nextChoice(choice) {
   return CHOICES[(Math.max(0, CHOICES.indexOf(choice)) + 1) % CHOICES.length];
 }
 
-// The drawing buffer's device pixels per CSS pixel: the device's own, under the tier's two caps (and
-// scale, which the timing probe lowers on a device that is slow even at low).
+// The drawing buffer's device pixels per CSS pixel: the device's own, under the tier's two caps, times
+// scale, the frame rate's controller's (adapt.js), never under half a device pixel per CSS pixel.
 export function pixelRatioFor(settings, width, height, devicePixelRatio = 1, scale = 1) {
   const area = Math.max(1, width * height);
   const byArea = Math.sqrt(settings.pixels / area);
   return Math.max(0.5, Math.min(devicePixelRatio || 1, settings.pixelRatio, byArea) * scale);
 }
 
-export const PROBE = { skip: 30, frames: 60, slowMs: 40 };
-
-// After the first frames at a tier the page chose itself: frames is their times in milliseconds (the
-// first PROBE.skip, where shaders compile, already dropped). Slow, by the median, means a tier down, or
-// at low a coarser drawing buffer. Returns { tier, scale, slow, medianMs }.
-export function probeVerdict(tier, frames, scale = 1) {
-  const sorted = frames.filter((f) => f > 0 && f < 2000).sort((a, b) => a - b);
-  const medianMs = sorted.length ? sorted[sorted.length >> 1] : 0;
-  const slow = sorted.length >= PROBE.frames / 2 && medianMs > PROBE.slowMs;
-  if (!slow) return { tier, scale, slow, medianMs };
-  const at = TIERS.indexOf(tier);
-  if (at > 0) return { tier: TIERS[at - 1], scale, slow, medianMs };
-  return { tier, scale: Math.max(0.5, scale * 0.75), slow, medianMs };
+// The share of the picture's size at which the Earth is worked out (earth.js, setResolution): the tier's
+// own, and at most a half once the frame rate's controller (adapt.js) has had to draw fewer pixels.
+export function earthResolution(settings, rung = 0) {
+  return Math.min(settings.earth.resolution, rung > 0 ? 0.5 : 1);
 }
 
 // Every leaf of a tier's settings as 'a.b' -> value, for the tests and for the page's report.

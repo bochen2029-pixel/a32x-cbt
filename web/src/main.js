@@ -20,8 +20,10 @@ import {
 } from './frames.js';
 import { Hud } from './hud.js';
 import { HELP, HELP_TOUCH, Input, helpHtml } from './input.js';
+import { Governor, TARGET } from './adapt.js';
+import { GpuTime } from './gpu-time.js';
 import { Pipeline } from './pipeline.js';
-import { PROBE, SETTINGS, nextChoice, pixelRatioFor, probeVerdict, resolveTier } from './quality.js';
+import { SETTINGS, earthResolution, isPhone, nextChoice, pixelRatioFor, resolveTier } from './quality.js';
 import { Ring } from './ring.js';
 import { cornerCos, depthSlices, ringDepth } from './slices.js';
 import { AIR_LAW_PA, inertialVelocity, keepAbove } from './view-math.js';
@@ -83,9 +85,12 @@ async function main() {
   const canvas = document.getElementById('view');
   const params = new URLSearchParams(location.search);
   const report = deviceReport();
-  // the tier: quality.settings is what everything below is built from; scale is the probe's
-  const quality = { ...resolveTier({ query: params.get('q'), saved: savedChoice(), report }), scale: 1, probes: 0, frames: [], seen: 0 };
+  // the tier: quality.settings is what everything below is built from
+  const quality = { ...resolveTier({ query: params.get('q'), saved: savedChoice(), report }) };
   quality.settings = SETTINGS[quality.tier];
+  // the frame rate held (adapt.js): the picture's size from the frame times, and the tiers stepped while
+  // the page chooses them; ?res=fixed keeps the tier's own size, for measuring
+  const governor = new Governor({ target: isPhone(report) ? TARGET.phone : TARGET.desktop, tier: quality.tier, auto: quality.choice === 'auto', fixed: params.get('res') === 'fixed' });
   // The canvas's own multisampling is fixed here, once: it is what smooths edges at low, and above low
   // the scene is drawn into a multisampled target instead, so a page that starts above low and is
   // turned down draws low without it until it is loaded again.
@@ -99,6 +104,7 @@ async function main() {
   renderer.shadowMap.type = THREE.PCFShadowMap;
   const pipeline = new Pipeline(renderer);
   pipeline.setQuality(quality.settings);
+  const gpuTime = new GpuTime(renderer.getContext(), { enabled: !governor.fixed });
 
   // three scenes: far (past 300 km, the Earth and the stars), near, and mid: the Ring alone, when it lies
   // at depths of its own (slices.js)
@@ -198,8 +204,9 @@ async function main() {
 
   const resize = () => {
     const w = window.innerWidth, h = window.innerHeight;
-    const ratio = pixelRatioFor(quality.settings, w, h, window.devicePixelRatio || 1, quality.scale);
+    const ratio = pixelRatioFor(quality.settings, w, h, window.devicePixelRatio || 1, governor.scale);
     renderer.setPixelRatio(ratio);
+    earth.setResolution(earthResolution(quality.settings, governor.rung));
     renderer.setSize(w, h, false);
     pipeline.setSize(renderer.domElement.width, renderer.domElement.height);
     airport.material.uniforms.uPixelRatio.value = ratio;
@@ -210,13 +217,14 @@ async function main() {
   resize();
 
   // The tier, set: by the address or the saved choice at the start, by the control (9, or GFX), or by
-  // the probe below. Everything that depends on it is rebuilt in place, the flight untouched.
+  // the governor below. Everything that depends on it is rebuilt in place, the flight untouched.
   const gfx = document.getElementById('btn-quality');
   const showQuality = () => { if (gfx) gfx.innerHTML = `GFX ${quality.settings.label}${quality.choice === 'auto' ? '<small> · AUTO</small>' : ''}`; };
   function setQuality(tier, choice, why) {
     const was = quality.settings;
     Object.assign(quality, { tier, choice, why, settings: SETTINGS[tier] });
     const q = quality.settings;
+    governor.setTier(tier, choice === 'auto');
     pipeline.setQuality(q);
     if (was !== q) {
       ring.setQuality(q);
@@ -236,20 +244,16 @@ async function main() {
   setEnv(quality.settings);
   setShadows(quality.settings);
   showQuality();
-  // Left to itself the page times its first frames and steps down when they come slowly.
-  function probe(dtMs) {
-    if (quality.choice !== 'auto' || quality.probes >= 3 || state.skipping) return;
-    if (++quality.seen <= PROBE.skip) return;
-    quality.frames.push(dtMs);
-    if (quality.frames.length < PROBE.frames) return;
-    const v = probeVerdict(quality.tier, quality.frames, quality.scale);
-    quality.probes = v.slow ? quality.probes + 1 : 3;
-    quality.frames = [];
-    quality.seen = 0;
-    if (!v.slow) return;
-    quality.scale = v.scale;
-    setQuality(v.tier, 'auto', `${quality.why}; ${v.medianMs.toFixed(0)} ms a frame`);
-    say(`Graphics: ${quality.settings.label.toLowerCase()}${v.scale < 1 ? ', fewer pixels' : ''} (frames came slowly)`, performance.now());
+  // Each frame's time to the governor; what it changes, done. Frames skipped ahead are the core's, and
+  // count for nothing.
+  function govern(dtMs) {
+    const g = governor.frame(dtMs, { count: !state.skipping, gpuMs: gpuTime.read() });
+    if (!g) return;
+    if (g.tier) {
+      setQuality(g.tier, 'auto', `${quality.why}; ${g.why}`);
+      say(`Graphics: ${quality.settings.label.toLowerCase()} (${g.why})`, performance.now());
+    } else if (g.resize) resize();
+    if (g.offer) say(`Graphics: room for ${g.offer} here (9 or GFX)`, performance.now());
   }
 
   const handOver = () => {
@@ -310,7 +314,6 @@ async function main() {
         const choice = nextChoice(quality.choice);
         saveChoice(choice);
         const next = resolveTier({ saved: choice, report });
-        Object.assign(quality, { scale: 1, probes: 0, frames: [], seen: 0 });
         setQuality(next.tier, next.choice, next.why);
         say(`Graphics: ${quality.settings.label.toLowerCase()}${choice === 'auto' ? ` (auto: ${next.why})` : ''}${pipeline.note ? `; ${pipeline.note}` : ''}`, now);
         break;
@@ -374,8 +377,9 @@ async function main() {
 
   function frame(now) {
     const dt = Math.min(0.25, (now - state.last) / 1000);
-    probe(now - state.last);
+    govern(now - state.last);
     state.last = now;
+    gpuTime.begin();
     for (const c of input.poll(dt)) command(c, now);
     ctx.now = now;
     ctx.dt = dt;
@@ -384,6 +388,7 @@ async function main() {
       renderer.info.reset();   // the pipeline counts a frame's draws when it draws; here the feature does
       owner.frame(ctx, dt);
       s = core.s;
+      gpuTime.end();
       requestAnimationFrame(frame);
       return;
     }
@@ -533,10 +538,11 @@ async function main() {
       status: FEATURES.map((f) => (f.status ? f.status(ctx) : null)).find(Boolean) || null,
     });
     if (now > sayUntil) sayEl.textContent = '';
+    gpuTime.end();
     requestAnimationFrame(frame);
   }
 
-  window.orbitSketch = { core, renderer, earth, ring, craft, state, ctx, quality, pipeline, command: (c) => command(c, performance.now()) };   // for tests
+  window.orbitSketch = { core, renderer, earth, ring, craft, state, ctx, quality, pipeline, governor, gpuTime, command: (c) => command(c, performance.now()) };   // for tests
   statusEl.textContent = core.note || '';
   requestAnimationFrame(frame);
 }

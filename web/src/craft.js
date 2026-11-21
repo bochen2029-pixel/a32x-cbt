@@ -11,6 +11,7 @@ import {
   thrusterQuads,
 } from './craft-shape.js';
 import { lightPoints, lightsMaterial } from './glow.js';
+import { mergeStatic } from './merge.js';
 import { Paint, rng } from './paint.js';
 
 export { section } from './craft-shape.js';
@@ -395,6 +396,13 @@ export class Craft {
     this.navLights = lightPoints(navLights().map((l) => ({ ...l, size: 2.4 })), lightM);
     this.group.add(this.navLights);
     this.owned.push(this.navLights);
+
+    // fewer draw calls: the parts fixed to the body, or to the gear, that share a material and the way they
+    // are drawn, one mesh each; the plumes, which stretch with the thrust, as they are
+    const { merged, removed } = mergeStatic(this.owned, { keep: this.plumes });
+    const gone = new Set(removed);
+    for (const m of removed) if (!this.geometries.includes(m.geometry)) m.geometry.dispose();
+    this.owned = [...this.owned.filter((m) => !gone.has(m)), ...merged];
 
     if (this.envMap) this.setEnvMap(this.envMap);
   }
