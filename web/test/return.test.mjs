@@ -40,9 +40,13 @@ test('the phases, the events and the limits are the header\'s', { skip: noThree 
   const phases = enumNames('OC_RET_PH_NONE = 0', 'OC_RET_PH_STOPPED = 10', 'OC_RET_PH_').concat('OC_RET_PH_STOPPED');
   assert.deepEqual(phases.map((n) => camel(n, 'OC_RET_PH_')), Object.keys(view.RET_PH));
   assert.deepEqual(Object.values(view.RET_PH), phases.map((_, i) => i));
-  const events = enumNames('OC_RET_EV_NONE = 0', 'OC_RET_EV_TOUCHDOWN = 6', 'OC_RET_EV_').concat('OC_RET_EV_TOUCHDOWN');
+  const events = enumNames('OC_RET_EV_NONE = 0', 'OC_RET_EV_LOWER = 7', 'OC_RET_EV_').concat('OC_RET_EV_LOWER');
   assert.deepEqual(events.map((n) => camel(n, 'OC_RET_EV_')), Object.keys(view.RET_EV));
   assert.deepEqual(view.LIMITS, { heat: define('OC_RET_HEAT_LIMIT'), load: define('OC_RET_LOAD_LIMIT'), qbar: define('OC_RET_QBAR_LIMIT') });
+  assert.equal(view.NEAR_RING, define('OC_RET_NEAR_RING_M'));
+  const refusals = enumNames('OC_RET_NO_NONE = 0', 'OC_RET_NO_RIDING = 2', 'OC_RET_NO_').concat('OC_RET_NO_RIDING');
+  assert.deepEqual(refusals.map((n) => camel(n, 'OC_RET_NO_')), Object.keys(view.RET_NO));
+  assert.deepEqual(Object.values(view.RET_NO), refusals.map((_, i) => i));
 });
 
 test('waits read as a clock does, and the runway lies left or right', { skip: noThree }, () => {
@@ -66,12 +70,26 @@ test('the flight home starts in orbit or on the way down, not on the runway or t
   assert.equal(view.canReturn({ ...s, crashed: 1 }, none).ok, false);
 });
 
+test('not on the deck, nor riding with it past the Ring, as the core refuses it; clear of the Ring, or slow by it, yes', { skip: noThree }, () => {
+  // parked on a pad its own orbit's lowest point swings over 150 km for two thirds of the Ring's turn
+  const parked = { crashed: 0, peri: 300000, onGround: 0, vs: 0, alt: 500000, ringRange: 4997, vrelE: 150, vrelN: -160, vrelU: 3 };
+  const none = { phase: 0, stopped: 0 };
+  assert.equal(view.canReturn(parked, none, { onDeck: 1 }).ok, false);
+  assert.match(view.canReturn(parked, none, { onDeck: 1 }).why, /deck/);
+  assert.equal(view.canReturn(parked, none, { onDeck: 0 }).ok, false, 'hovering with the deck, 219 m/s past the Ring');
+  assert.equal(view.canReturn(parked, none).ok, false, 'riding, with no deck readouts');
+  assert.equal(view.canReturn({ ...parked, ringRange: 9500 }, none, { onDeck: 0 }).ok, true, 'flung clear of the Ring');
+  assert.equal(view.canReturn({ ...parked, ringRange: 650, vrelE: 0.7, vrelN: 0, vrelU: 0 }, none, { onDeck: 0 }).ok, true, 'held off the hub');
+});
+
 test('skipping ahead stops before the burn, or when there is nothing to wait for', { skip: noThree }, () => {
   const { RET_PH: P, RET_EV: E } = view;
   assert.equal(view.skipDone({ phase: P.wait, event: E.burn, tEvent: 5000 }, AUTO.return, AUTO), null);
   assert.equal(view.skipDone({ phase: P.depart, event: E.clear, tEvent: 300 }, AUTO.return, AUTO), null);
   assert.equal(view.skipDone({ phase: P.wait, event: E.burn, tEvent: 30 }, AUTO.return, AUTO), 'the burn is near');
   assert.equal(view.skipDone({ phase: P.wait, event: E.none, tEvent: -1 }, AUTO.return, AUTO), 'no pass in reach');
+  assert.equal(view.skipDone({ phase: P.wait, event: E.lower, tEvent: 5000 }, AUTO.return, AUTO), null, 'skipping on to the burn that rounds the orbit off');
+  assert.equal(view.skipDone({ phase: P.wait, event: E.lower, tEvent: 30 }, AUTO.return, AUTO), 'the burn is near');
   assert.equal(view.skipDone({ phase: P.burn, event: E.burnEnd, tEvent: 10 }, AUTO.return, AUTO), 'past the wait');
   assert.equal(view.skipDone({ phase: P.wait, event: E.burn, tEvent: 5000 }, AUTO.off, AUTO), 'handed back');
 });
@@ -90,6 +108,7 @@ test('the status line says what the crew is doing, phase by phase', { skip: noTh
   assert.match(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { touch: true }).hint, /^RETURN again/);
   assert.equal(view.returnStatus(flight(P.wait, { event: E.burn, tEvent: 3725 }), air, { skipping: true }).line, 'HOME · SKIPPING · the burn in 1 h 02 min');
   assert.equal(view.returnStatus(flight(P.wait), air).line, 'HOME · NO PASS WITHIN REACH YET');
+  assert.equal(view.returnStatus(flight(P.wait, { event: E.lower, tEvent: 9049 }), air).line, 'HOME · ROUNDING OFF FIRST · in 2 h 30 min');
   assert.equal(view.returnStatus(flight(P.burn), air).line, 'HOME · DE-ORBIT BURN · 127 m/s');
   assert.equal(view.returnStatus(flight(P.coast, { tEvent: 1980 }), air).line, 'HOME · FALLING TO THE AIR · entry in 33:00');
   assert.equal(view.returnStatus(flight(P.entry), air).line, 'HOME · ENTRY · Mach 24 · 1240 km to go');
@@ -100,7 +119,7 @@ test('the status line says what the crew is doing, phase by phase', { skip: noTh
   // most of an orbit, half the world to go
   const longest = { [P.depart]: 3000, [P.wait]: 86000, [P.coast]: 3500 };
   for (let ph = 1; ph <= 10; ph++) {
-    for (const ev of [E.none, E.burn]) {
+    for (const ev of [E.none, E.burn, E.lower]) {
       const st = view.returnStatus(flight(ph, { event: ev, tEvent: longest[ph] ?? 600, togo: 14614000, stopAlong: 4085 }), { mach: 26, tas: 120, alt: 30000 }, { skipping: ph === 2 });
       assert.ok(st.line.length <= 46, `a phone's status line: ${st.line}`);
     }
@@ -116,6 +135,8 @@ test('the readouts: where the runway is, the heat and the load, the guidance, th
   const landed = view.returnHud(flight(P.stopped, { touched: 1, tdAlong: 432, tdOff: -0.07, tdSink: 0.74, stopped: 1, stopAlong: 2121 }), air);
   assert.match(landed.at(-1), /^DOWN 432 m past the threshold, 0\.1 m left of the line, sinking 0\.74 m\/s\s+stopped at 2\.12 km/);
   assert.deepEqual(view.returnHud(flight(P.none, { heatPeak: 0, loadPeak: 0 }), air), []);
+  const windy = view.returnHud(flight(P.approach, { windE: 12, windN: 0 }), air);   // blowing toward the east: from the west
+  assert.ok(windy.some((l) => /^WIND 270° 12 m\/s/.test(l)), windy.join(' | '));
   const phone = [flight(P.entry), flight(P.approach), flight(P.stopped, { touched: 1, tdAlong: 432, tdOff: -0.07, tdSink: 0.74, stopped: 1, stopAlong: 2121 })];
   for (const r of phone) for (const line of view.returnHud(r, air, true)) assert.ok(line.length <= 30, `a phone's line: ${line}`);
 });

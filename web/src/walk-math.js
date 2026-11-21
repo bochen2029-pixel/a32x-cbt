@@ -8,6 +8,7 @@
 import { RING } from './core.js';
 import { add, cross, dot, length, scale } from './frames.js';
 import { fmtClock, fmtDistance } from './hud.js';
+import { DECK, DECK_A, DECK_HALF, DECK_WALL, bulkheads } from './ring-plan.js';
 import { BALL, LIFT, USE, WALK, WHERE } from './walk-core.js';
 
 export const W = RING.spin;
@@ -21,6 +22,15 @@ export const STREET = S_RIM / WALK.streets;    // from one cross street to the n
 export const G0 = 9.80665;
 export const SUN_RADIUS = 0.00465;             // rad: half the Sun's width
 export const TURN = (2 * Math.PI) / W;         // s: once round
+
+// The flight deck (orbit_core.h's OC_DECK_*, as ring-plan.js has it): an open sector of the band, a vacuum,
+// sealed from the town by a bulkhead just outside each end, from the floor past the roof's edge and across.
+export const DECK_MID = DECK_A * RF;           // m of floor from spoke 1's line to the deck's middle
+export const DECK_LEN = DECK.arc / 2;          // m of floor from its middle to its end
+export const SEALED = DECK_LEN + DECK.bulkhead;   // ... and to a bulkhead's face toward the town
+export const BULKHEADS = bulkheads();          // ring-plan.js's: each { side, a (its middle), face, r0, r1, y }
+// m of floor from the deck's middle to the arc s, spinward positive, within half a turn
+export const fromDeck = (s) => wrapPi(s / RF - DECK_A) * RF;
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
@@ -47,6 +57,16 @@ export function ringFrame(s) {
 export const ringDirToSite = (f, v) => add(add(scale(f.x, v[0]), scale(f.y, v[1])), scale(f.z, v[2]));
 export const ringToSite = (f, p) => add(f.centre, ringDirToSite(f, p));
 export const siteDirToRing = (f, v) => [dot(v, f.x), dot(v, f.y), dot(v, f.z)];
+
+// What each graphics tier (quality.js) asks of the walk: how much its shaders do (detail 0: no shadow of the
+// roof's lattice, no light from the Earth, the grass in one octave, the blocks' windows as their average; 1: all
+// of it), and how far away the small things (blocks, parapets, lock gates) are still drawn, m. The tier's caps on
+// the picture's size, its multisampling and its glow the walk follows by drawing through the page's pipeline.
+export const WALK_TIERS = {
+  low: { detail: 0, smallFar: 2500 },
+  medium: { detail: 1, smallFar: 7000 },
+  high: { detail: 1, smallFar: Infinity },
+};
 
 // ---- the walker's view ------------------------------------------------------------------------
 
@@ -96,9 +116,26 @@ export function sunReach(p, d) {
   const tHull = a > 1e-12 ? (-b + Math.sqrt(Math.max(0, b * b - a * c))) / a : Infinity;
   const tSide = ((d[1] > 0 ? HALF : -HALF) - py) / d[1];
   if (tSide <= 0 || tSide >= tHull) return 0;
+  if (bulkheadAhead(p, d, tSide)) return 0;
   const r = Math.hypot(px + tSide * d[0], pz + tSide * d[2]);
   const soft = (SUN_RADIUS * tSide) / Math.max(Math.abs(d[1]), 0.2);
   return smooth(-soft, soft, RIM_R - r);
+}
+
+// Whether the line from p along d meets a bulkhead's face before it has gone tEnd: each face a half-plane
+// through the axis, from the floor to the bulkhead's top and across the band.
+export function bulkheadAhead(p, d, tEnd) {
+  for (const k of BULKHEADS) {
+    for (const f of [k.face, k.face + k.side * DECK_WALL]) {
+      const n = [Math.cos(f), 0, -Math.sin(f)], den = d[0] * n[0] + d[2] * n[2];
+      if (Math.abs(den) < 1e-12) continue;
+      const t = -(p[0] * n[0] + p[2] * n[2]) / den;
+      if (t <= 0 || t >= tEnd) continue;
+      const x = p[0] + t * d[0], y = p[1] + t * d[1], z = p[2] + t * d[2], r = Math.hypot(x, z);
+      if (x * Math.sin(f) + z * Math.cos(f) > 0 && r >= k.r0 && r <= RF && Math.abs(y) < HALF) return true;
+    }
+  }
+  return false;
 }
 
 // The same by marching along the ray, for the tests: a step at a time, blocked inside the floor or the hub or a
@@ -109,9 +146,32 @@ export function sunReachMarched(p, d, step = 0.5) {
     if (Math.abs(y) <= HALF && r >= RF) return 0;                         // the floor and the hull
     if (Math.abs(y) >= HALF && Math.abs(y) <= HALF + Math.abs(d[1]) * step && r >= RIM_R && r <= RF + 40) return 0;   // a rim wall
     if (r < RING.hub && Math.abs(y) < RING.port) return 0;                // the hub
+    const off = Math.abs(wrapPi(Math.atan2(x, z) - DECK_A));
+    if (off > DECK_HALF && off < DECK_HALF + DECK_WALL && r >= BULKHEADS[0].r0 && Math.abs(y) < HALF) return 0;   // a bulkhead
     if (Math.abs(y) > HALF + 1) return 1;                                 // out past a side
   }
   return 1;
+}
+
+// Where in the picture the sky can be seen from the eye (ring frame), looking along the camera's axes { fwd, up,
+// right } (ring frame) with this vertical field of view (degrees) and aspect: a coarse grid of rays traced as the
+// Sun's light is (sunReach: out over a rim wall's top), and the box of grid cells round those that get out, as
+// parts of the picture from its left and its bottom edges, { x0, x1, y0, y1 }; null where none does. Elsewhere
+// the ring's inside covers the sky, so the sky is drawn only in this box.
+export function skyWindow(eye, axes, fovDeg, aspect, nx = 16, ny = 10) {
+  const ty = Math.tan((fovDeg * Math.PI) / 360), tx = ty * aspect;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i <= nx; i++) {
+    for (let j = 0; j <= ny; j++) {
+      const u = (i / nx) * 2 - 1, v = (j / ny) * 2 - 1;
+      const d = [0, 1, 2].map((k) => axes.fwd[k] + axes.right[k] * u * tx + axes.up[k] * v * ty);
+      const n = Math.hypot(d[0], d[1], d[2]);
+      if (sunReach(eye, [d[0] / n, d[1] / n, d[2] / n]) <= 0) continue;
+      x0 = Math.min(x0, i - 1); x1 = Math.max(x1, i + 1); y0 = Math.min(y0, j - 1); y1 = Math.max(y1, j + 1);
+    }
+  }
+  if (x1 < x0) return null;
+  return { x0: Math.max(0, x0 / nx), x1: Math.min(1, x1 / nx), y0: Math.max(0, y0 / ny), y1: Math.min(1, y1 / ny) };
 }
 
 // Where the Sun stands for the walker: its elevation above the level of their floor, its bearing (0 spinward,
@@ -138,10 +198,13 @@ export function decked(s) {
   const { street, ds } = nearestStreet(s);
   return Math.abs(ds) < (isPlaza(street) ? WALK.plazaDeck : WALK.street);
 }
-// What the floor is at s, c: 'water', 'deck' (over the canal), 'bank' (between the parapet and the promenade),
-// 'promenade', 'street', 'plaza', 'lane', 'wallpath', 'grass'.
+// What the floor is at s, c: 'flightdeck' (the open sector, a vacuum), 'bulkhead' (under one), 'water', 'deck'
+// (over the canal), 'bank' (between the parapet and the promenade), 'promenade', 'street', 'plaza', 'lane',
+// 'wallpath', 'grass'.
 export function surfaceAt(s, c) {
-  const a = Math.abs(c), { street, ds } = nearestStreet(s);
+  const a = Math.abs(c), { street, ds } = nearestStreet(s), d = Math.abs(fromDeck(s));
+  if (d < DECK_LEN) return 'flightdeck';
+  if (d < SEALED) return 'bulkhead';
   if (a < WALK.canal) return decked(s) ? 'deck' : 'water';
   if (isPlaza(street) && Math.abs(ds) < WALK.plaza && a < WALK.plaza) return 'plaza';
   if (Math.abs(ds) < WALK.street) return 'street';
@@ -170,8 +233,10 @@ export function floorPlace(s, c) {
   const k = Math.round(s / (S_RIM / RING.spokes)) % RING.spokes;
   const ds = wrapPi(s / RF - k * SECTOR) * RF;
   const along = Math.abs(ds) < WALK.plaza ? `at spoke ${spokeName(k)}'s plaza` : `${fmtDistance(Math.abs(ds))} ${ds > 0 ? 'spinward' : 'antispinward'} of spoke ${spokeName(k)}`;
-  const what = { water: 'in the canal', deck: 'over the canal', bank: 'by the canal', promenade: 'on the canal\'s promenade', street: 'on a cross street', plaza: '', lane: 'on a lane', wallpath: 'under the rim wall', grass: '' }[surfaceAt(s, c)];
-  return `${along}, c ${signed(c)} m${what ? ` ${what}` : ''}`;
+  const what = { water: 'in the canal', deck: 'over the canal', bank: 'by the canal', promenade: 'on the canal\'s promenade', street: 'on a cross street', plaza: '', lane: 'on a lane', wallpath: 'under the rim wall', grass: '', flightdeck: 'on the flight deck', bulkhead: 'in a bulkhead' }[surfaceAt(s, c)];
+  const bulkhead = Math.abs(fromDeck(s)) - SEALED;
+  const by = bulkhead >= 0 && bulkhead < 60 ? `, ${bulkhead.toFixed(0)} m from the flight deck's bulkhead` : '';
+  return `${along}, c ${signed(c)} m${what ? ` ${what}` : ''}${by}`;
 }
 
 // What the walker could do with E, said as the key's hint.

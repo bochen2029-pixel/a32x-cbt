@@ -67,6 +67,20 @@ struct ReturnState {
     double tdSink, tdAlong, tdOff, tdSpeed, tdPitch, tdTime;
     int stopped;
     double stopAlong, stopOff;
+
+    // Kept since the first build. Each is nought as reset, and the hash folds them in only when one is not,
+    // so a flight that never used them hashes as it did before they were added.
+    int refused;              // OC_RET_NO_*: why RETURN was last refused
+    // What the crew's instruments and its knowledge of the craft get wrong (oc_return_disturb): the mass and
+    // the drive's full thrust as the guidance knows them, over the true, less 1; how strong the instruments'
+    // errors are (0: they read the state as it is), and their seed.
+    double errMass, errThrust, noise, noiseSeed;
+    double windEst[3];        // m/s: the wind the guidance has worked out, in the Earth's axes
+    double reach;             // m: the plan's pass, the entry's reach off the plane with lift over drag MARGIN_LD of the model's
+    int skipped;              // passes in reach let go for want of margin before the one taken
+    double tdCrab;            // rad: at the touch, the nose off the track over the ground, + to the right
+    int lowering;             // lowering the orbit's top first: 1 to be planned, 3 waiting for the lowest point, 2 burning
+    int lowered;              // 1 once it has been
 };
 
 }   // namespace oc

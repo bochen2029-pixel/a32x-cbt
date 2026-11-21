@@ -820,17 +820,6 @@ void deckEngage(State& s) {
     k.phase = OC_DECK_PH_TRANSFER;
 }
 
-// On the deck, or riding with it (nearer its speed than at rest among the stars) inside the band over the sector,
-// under the roof's height and 100 m more: where nothing but the deck's laws and the take-off belong.
-bool deckHoldsTheCraft(const State& s) {
-    if (!ring.valid) return false;
-    if (s.deck.onDeck) return true;
-    const Frame f = frameAt(timeOf(s));
-    const Over o = overOf(s.r, s.v, f);
-    const bool riding = std::fabs(o.us) < 0.5 * W * std::fmax(o.rho, 1.0);
-    return riding && o.h > -40 && o.h < R - OC_RING_ROOF_M + 100 && std::fabs(wrap(o.th - A0)) < BETA + 0.02 && std::fabs(o.c) < W2 + 30;
-}
-
 // The crew's take-off: from the deck, or riding with it low over the sector.
 void deckTakeoff(State& s) {
     DeckState& k = s.deck;

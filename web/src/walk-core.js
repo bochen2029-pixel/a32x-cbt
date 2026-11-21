@@ -25,7 +25,7 @@ export const WHERE = { hub: 0, lift: 1, floor: 2 };            // where the walk
 export const LIFT = { atHub: 0, down: 1, atFloor: 2, up: 3 };  // a car
 export const USE = { nothing: 0, hatch: 1, call: 2, ride: 3 }; // what use would do
 export const BALL = { none: 0, flying: 1, resting: 2 };
-export const BOX = { block: 0, parapet: 1, pylon: 2, shaft: 3 };
+export const BOX = { block: 0, parapet: 1, pylon: 2, shaft: 3, bulkhead: 4, lock: 5 };
 export const BOX_FIELDS = ['zone', 'kind', 's', 'half', 'c0', 'c1', 'h0', 'h1'];
 
 const NEEDS = ['reset', 'put', 'controls', 'ball', 'step', 'out', 'out_len', 'box_count', 'boxes', 'hash'];

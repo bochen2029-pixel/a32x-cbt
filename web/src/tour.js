@@ -3,6 +3,7 @@
 // buttons do, through the page's own dispatcher; any command from anyone else ends it, so whoever is
 // watching can take over at any moment. GPLv3.
 
+import { ret } from './return-view.js';
 import { snapshot, tourStep } from './tour-plan.js';
 import { PLACE } from './walk-core.js';
 
@@ -16,7 +17,7 @@ const CSS = `
 `;
 
 // commands that only change what is shown: they leave the tour running
-const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view']);
+const LOOKING = new Set(['help', 'map', 'moon', 'sound', 'view', 'fd']);
 
 export const tour = {
   name: 'tour',
@@ -78,6 +79,7 @@ export const tour = {
     if (this.raf) cancelAnimationFrame(this.raf);
     this.button?.setAttribute('aria-pressed', 'false');
     this.box.classList.remove('shown');
+    delete this.box.dataset.title;
     if (why) ctx.say(why);
   },
 
@@ -105,7 +107,7 @@ export const tour = {
     if (!this.on) return;
     this.wall += dt;
     const walking = !!(ctx.walk && ctx.walk.v.on);
-    const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall));
+    const out = tourStep(this.stage, this.memory, snapshot(ctx.core, walking, this.wall, { skipping: ret.skipping }));
     // back aboard before the flight's commands: while walking, the walk holds them
     if (out.walk === 'stop' && walking) ctx.walk.stop('Back aboard');
     for (const c of out.commands) this.give(ctx, c);
@@ -117,6 +119,9 @@ export const tour = {
       if (i >= 0) ctx.state.view = i;
     }
     if (out.caption) {
+      // a soft tone as each part's caption first shows; no words spoken
+      if (out.caption.title !== this.box.dataset.title && ctx.sound && ctx.sound.cue) ctx.sound.cue('chime');
+      this.box.dataset.title = out.caption.title;
       this.box.innerHTML = '';
       const b = document.createElement('b');
       b.textContent = out.caption.title;
