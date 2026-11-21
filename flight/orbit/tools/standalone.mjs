@@ -39,8 +39,9 @@ function args(argv) {
 function walk(dir, test, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name);
-    if (name === 'node_modules' || name.startsWith('build')) continue;
-    if (statSync(p).isDirectory()) walk(p, test, out);
+    if (statSync(p).isDirectory()) {
+      if (name !== 'node_modules' && !name.startsWith('build')) walk(p, test, out);   // not build outputs; build.mjs is a source
+    }
     else if (test(name)) out.push(p);
   }
   return out;
