@@ -544,25 +544,27 @@ under 2 m/s, stops on the runway and stays inside the limits. Pools 1 and 2 were
 guidance was being built, and it was changed after them; 2026 and 2027 were drawn afterwards and flown
 once, as the table's first figures. The guidance changed after that too (`642cf56`, `76a2b56`, `9546efb`:
 the instruments, the pass taken with margin, the glide round without power), so they are held out no
-longer; flown again at the third audit (2026-11-21), 2027 lands 95 of 100 (88.8–97.8 %), and 2026 is
-being flown again.
+longer; flown again at the third audit (2026-11-21), 2026 lands 200 of 200 and 2027 95 of 100.
 
 | pool | the guidance's model wrong by, each drawn evenly | runs | landed | 95 % interval |
 |---|---|---|---|---|
 | 1, while building | density ×0.75 to 1.25 and a wave of up to 15 %; lift and drag each ×0.9 to 1.1 | 64 | 64 | 94.3–100 % |
-| 2026, held out | the same | 200 | **200** | **98.1–100 %** |
+| 2026, held out | the same | 200 | **200**; again at the audit, **200** | **98.1–100 %**; **98.1–100 %** |
 | 2, while building | density ×0.6 to 1.4 and a wave of up to 25 %; lift and drag each ×0.8 to 1.2 | 64 | 60 | 85.0–97.5 % |
 | 2027, held out | the same | 100 | **91**; again at the audit, **95** | **83.8–95.2 %**; **88.8–97.8 %** |
 
-Every landing in them touches down 424 to 437 m past the threshold, 0.07 m left of the line, sinking
-0.73 to 0.74 m/s: once the approach has learned the coefficients it flies the same. Peak heat 308 to
-517 kW/m², peak load 1.49 to 2.11 g, peak dynamic pressure 10.2 kPa at most. Every run lost had a model
-whose lift over drag was off by more than a factor of 1.2 either way (×0.74 to 0.80, ×1.22 to 1.45): the
-entry's reach then fell short of where the plan, made in orbit before anything could be learned, sent
-it. In the wide pools, 118 of 118 runs with that factor within 1.2 landed; beyond it, 15 of 16 where the
-runway lay within 700 km of the plane, and 18 of 30 where it lay 1,000 km off, on the first pass of the
-day's window, the one most starts take. The plan takes the first pass in reach; preferring a nearer
-pass, one or two later, would buy margin for an hour or three of waiting.
+Flown again, every landing in 2026 touches down 436 to 438 m past the threshold, 0.02 m left of the line,
+sinking 0.73 to 0.74 m/s, with 414 to 471 kg of propellant (peak heat 322 to 456 kW/m², peak load 1.57 to
+1.85 g, peak dynamic pressure 9.5 kPa at most), and every landing in 2027 426 to 439 m past it, within
+0.02 m of the line: once the approach has learned the coefficients it flies the same. (When first flown,
+424 to 437 m, 0.07 m left; peak heat 308 to 517 kW/m², peak load 1.49 to 2.11 g, 10.2 kPa.) Every run lost had a model
+whose lift over drag was off by more than a factor of 1.2: the entry's reach then fell short of where the
+plan, made in orbit before anything could be learned, sent it, and the craft came down short. Flown
+again, the five lost in 2027 had the model's lift over drag 1.22 to 1.33 times the craft's, four of them
+on a pass 1,020 km off the plane; with the factor within 1.2, 73 of 73 landed, and beyond it 23 of 28.
+(When first flown, in both wide pools: 118 of 118 within 1.2; beyond it, 15 of 16 where the runway lay
+within 700 km of the plane and 18 of 30 where it lay 1,000 km off.) The plan now takes a pass only with
+the reach left at lift over drag 20 % below the model's, which a model 25 to 33 % optimistic outruns.
 
 Run it: `flight/orbit/build/test_return monte_carlo <first> <count> <pool> [density wave coefficients]`
 prints a line for each run and the rate with a 95 % Wilson interval; shard a pool across processes by
