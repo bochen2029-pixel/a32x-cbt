@@ -17,10 +17,14 @@ export const WALL = 30;                            // m: the end walls' thicknes
 export const INNER = HALF - WALL;                  // 470 m: the habitat, floor and roof, is |y| < INNER
 export const PORT_CLEAR = 45;                      // m: the port face, this far round the axis, is docking's to mark
 export const PORT = { torus: 45, tube: 6, mouth: 39 };   // the port's ring and dark mouth, as the sketch has always had them
-export const COLLAR = { r: 200, half: 60 };        // the hub's collar, where the spokes meet it
-export const MAST = { y0: HUB_PORT_M, y1: HUB_PORT_M + 560, r: 10 };   // the solar mast, held still to face the Sun
-export const ARRAYS = { at: [530, 690, 850], span: 260, chord: 110, root: 24 };   // its wings: y, length out, width
-export const RADIATORS = { count: 6, r0: 168, r1: 470, y0: 95, y1: 335 };
+// The hub's fittings are RING's (core.js, held equal to orbit_core.h, whose core strikes them as it does the rest):
+export const COLLAR = { ...RING.collar };           // the hub's collar, where the spokes meet it
+export const MAST = { y0: HUB_PORT_M, y1: HUB_PORT_M + RING.mast.length, r: RING.mast.r, footR: RING.mast.footR, foot: RING.mast.foot };   // the solar mast, held still to face the Sun
+export const ARRAYS = {                            // its wings: y, length out, width, thickness, the spar's section
+  at: Array.from({ length: RING.arrays.count }, (_, k) => RING.arrays.first + k * RING.arrays.step),
+  span: RING.arrays.span, chord: RING.arrays.chord, root: RING.arrays.root, thick: RING.arrays.thick, spar: RING.arrays.spar,
+};
+export const RADIATORS = { count: RING.spokes, ...RING.radiators };   // one midway between each two spokes
 export const TILES = 4;                            // the floor's town repeats this many times round
 export const TILE = (2 * Math.PI * RING.floor) / TILES;   // m of floor in one repeat
 export const SIDE_COLOURS = { [-1]: [1.0, 0.16, 0.1], 1: [0.15, 1.0, 0.35] };   // the port side's rims red, the far side's green
