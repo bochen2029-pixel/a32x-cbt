@@ -38,7 +38,9 @@ The operator's five approaches remain (`flight/README.md`, *Flying the gate*).
 The `app/` / `flight/` split is enforced: `app/` links no A32NX code and carries no GPL
 obligation; `flight/` links it and is GPLv3. Keeping them apart is cheaper than untangling later.
 
-`app/` is MIT (see `LICENSE`). `flight/` is GPLv3 (see `flight/LICENSE`).
+`app/` is MIT (see `LICENSE`). `flight/` is GPLv3 (see `flight/LICENSE`), but for `flight/orbit`, the
+spaceplane sketch outside the phases, which links neither A32NX nor JSBSim and is MIT (see
+`flight/orbit/LICENSE`).
 
 ---
 
