@@ -28,6 +28,20 @@ function round(h = 500000, incDeg = 32.84, phase = 0) {
   return { r, v: vv, R };
 }
 
+test('the Ring\'s orbit is found from the readouts anywhere round it, a quarter of an orbit away too (G11)', () => {
+  const R = RE + 500000, n = Math.sqrt(MU / (R * R * R)), nTrue = unit([0, Math.sin(0.3), Math.cos(0.3)]);
+  const rr = scale(unit(cross(nTrue, [0, 0, 1])), R);                   // the Ring, in its plane
+  const frame = { point: (p) => p, dir: (d) => d };                     // site axes as the inertial ones, at t = 0
+  for (const deg of [1, 30, 89.9, 90, 90.1, 135, 179]) {
+    const a = deg * D2R, r = rotateAbout(rr, nTrue, a), v = scale(cross(nTrue, r), n);   // co-orbiting, deg round from it
+    const vrel = sub(sub(v, scale(cross(nTrue, rr), n)), cross(scale(nTrue, n), sub(r, rr)));
+    const s = { ringE: rr[0], ringN: rr[1], ringU: rr[2], vrelE: vrel[0], vrelN: vrel[1], vrelU: vrel[2], ringAxE: 0, ringAxN: 0, ringAxU: 1 };
+    const ring = ringState(s, 0, r, v, frame);
+    assert.ok(ring.nHat.every(Number.isFinite), `${deg} deg: a finite normal`);
+    near(length(sub(ring.nHat, nTrue)), 0, 1e-9, `${deg} deg round: the Ring's normal`);
+  }
+});
+
 test('a round orbit stays round, and comes back after Kepler\'s period', () => {
   const { r, v, R } = round();
   const el = elements(r, v);
