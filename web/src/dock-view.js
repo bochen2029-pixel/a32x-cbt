@@ -8,8 +8,10 @@
 import * as THREE from 'three';
 import { AUTO, HUB_PORT_M, SAS } from './core.js';
 import { add, scale } from './frames.js';
+import { deckHoldMakesSense } from './deck-hud.js';
 import {
-  DOCK, DOCK_OUT, DPH, contactText, dockCommand, dockLines, dockStatus, engagedText, fmtNear, fmtSigned, fmtWay, hitText, portHoldMakesSense, reticle,
+  DOCK, DOCK_OUT, DPH, contactText, dockCommand, docked, dockedText, dockLines, dockStatus, engagedText, fmtNear, fmtSigned, fmtWay, hitText, onDeckBusiness,
+  portHoldMakesSense, reticle,
 } from './dock-hud.js';
 
 const PLATE_R = 18;         // m: the target plate round the port, on the hub's face
@@ -184,6 +186,10 @@ export const dock = {
 
   command(c, ctx) {
     const s = ctx.core.read(), d = this.d;
+    // Docked (or being drawn in), the craft is part of the hub: no crew flies it, and the approach and the skip to
+    // orbit have nothing to do. Taken, CREW would hand the docked craft to the crew, and CREW again the pilot the
+    // attitude hold, in place of the hold on the port that letting go turns the craft by.
+    if (docked(d) && (c === 'crew' || c === 'orbit' || c === 'approach')) { ctx.say(dockedText(d, this.touch)); return true; }
     if (c === 'dock') {
       const act = dockCommand(s, d);
       if (act.action === 'undock') {   // the pilot has it now, as when taking it from the crew: the hands start where the craft is
@@ -202,7 +208,8 @@ export const dock = {
       ctx.say('Hold: on the hub\'s port, turning with it');
       return true;
     }
-    if (c === 'sas-next' && Math.round(s.sas) === SAS.port) {
+    // HOLD from the port's: on to the deck's where that makes sense (deck-view.js takes it), else round to attitude
+    if (c === 'sas-next' && Math.round(s.sas) === SAS.port && !(ctx.core.deck && deckHoldMakesSense(s, ctx.core.dock))) {
       ctx.core.sas(SAS.hold);
       ctx.say('Hold: attitude');
       return true;
@@ -215,7 +222,7 @@ export const dock = {
     if (d.cT !== this.seen.cT) { if (d.cT > 0) ctx.say(contactText(d)); this.seen.cT = d.cT; }
     if (d.hit !== this.seen.hit) { if (d.hit > 0) ctx.say(`Crashed: ${hitText(d)}`); this.seen.hit = d.hit; }
     const phase = Math.round(d.phase);
-    const show = ctx.VIEWS[ctx.state.view] === 'cockpit' && s.crashed === 0 && (d.range < 2000 || phase === DPH.align || phase === DPH.close);
+    const show = ctx.VIEWS[ctx.state.view] === 'cockpit' && s.crashed === 0 && (d.range < 2000 || phase === DPH.align || phase === DPH.close) && !onDeckBusiness(s);
     const w = window.innerWidth, h = window.innerHeight, dpr = Math.min(window.devicePixelRatio || 1, 2);
     if (!show) {
       if (this.drawn) { this.g.setTransform(1, 0, 0, 1, 0, 0); this.g.clearRect(0, 0, this.canvas.width, this.canvas.height); this.drawn = false; }
