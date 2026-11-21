@@ -373,23 +373,29 @@ void dockAfterStep(State& s) {
     if (dot(s.r - f.c, s.r - f.c) > bound * bound) { k.contact = 0; k.released = 0; return; }
 
     // Each sphere along its path over the step, so that nothing thin is stepped over: the path is cut
-    // into pieces no longer than half the smallest sphere's radius.
+    // into pieces no longer than half the sphere's radius, and no longer than 0.8 m, half the wings'; the
+    // first touch in time is the one. (One length for every sphere, 0.8 m, let the probe's, 0.15 m in
+    // radius, step over a rim wall's lip: INVARIANTS.md, G8.)
     V3 now[NBALLS], vel[NBALLS];
     for (int i = 0; i < NBALLS; ++i) {
         const V3 p = s.r + rot(s.q, BALLS[i].at);
         now[i] = toRing(f, p);
         vel[i] = dirToRing(f, s.v + rot(s.q, cross(s.w, BALLS[i].at)) - f.vc - cross(spin, p - f.c));
     }
-    const int pieces = 1 + (int)std::fmin(4000.0, travel / 0.8);
-    for (int j = 1; j <= pieces; ++j) {
-        const double back = OC_DT * (pieces - j) / pieces;
-        for (int i = 0; i < NBALLS; ++i) {
+    int hit = OC_DOCK_HIT_NONE, by = -1;
+    double hitBack = -1;
+    for (int i = 0; i < NBALLS; ++i) {
+        const int pieces = 1 + (int)std::fmin(4000.0, travel / std::fmin(0.8, 0.5 * BALLS[i].r));
+        for (int j = 1; j <= pieces; ++j) {
+            const double back = OC_DT * (pieces - j) / pieces;
+            if (back <= hitBack) break;   // no earlier than a touch already found
             const V3 p = now[i] - vel[i] * back;
             int what = touch(p, BALLS[i].r);
             if (i == 0 && what == OC_DOCK_HIT_HUB && atFace(p)) what = OC_DOCK_HIT_NONE;   // the head at the port: below
-            if (what) { wreck(s, f, what, BALLS[i].part, back); return; }
+            if (what) { hit = what; by = i; hitBack = back; break; }
         }
     }
+    if (by >= 0) { wreck(s, f, hit, BALLS[by].part, hitBack); return; }
 
     // The head at the port's face.
     const double pen = now[0].y + OC_HUB_PORT_M;   // how far through the face

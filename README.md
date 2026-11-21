@@ -29,7 +29,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | Shift, Ctrl; Z, X | triggers | throttle up, down; full, cut |
 | I K, J L, U M | d-pad | the small thrusters: fore and aft, left and right, up and down |
 | 1 2 3 4 5 6 | X cycles | hold attitude, prograde, retrograde, the Ring, the hub's port, the deck (hover) |
-| G, B | Y | gear; brakes |
+| G, B | Y | gear (it comes up only off the ground: with weight on it, on the runway or the deck, it stays locked down); brakes |
 | T | | in orbit: the crew flies the approach to the hub |
 | P | | in orbit near the Ring: the crew docks at the hub; docked, let go |
 | Enter | | docked: go aboard the Ring and walk (WALK) |
@@ -306,6 +306,7 @@ certified in `evidence/`):
 | the final burn | from 192.7 m/s against the deck (ωr at that height 192.8) and 0.0000 g to 0.44 m/s and 0.995 g in 20 s; the swivel from 0.4° to 85.6°; under the roof's height only over the sector, 581 m from its centre; on the plan to 0.2 m across, 5.5 m in height |
 | the coast, and the plan | the craft on the plan's place to 1.6 cm through the coast; each of a plan's 40 intervals carries its node onto the next to 7.5 × 10⁻⁶ m |
 | the crew, from where it reaches orbit, 25.0 km out | at the hold point at 717 s, at rest on the pad at 836 s: 0.30 m/s, 1.00 m off |
+| the crew, the moment it is let go from the hub's port | backs off to the hold point first (from beside the hub a plan, which knows nothing of the hub, carried the right wing into it 9 s on: the tour's first run); out from the hold point at 49 s, at rest on pad 1 at 168 s: 0.30 m/s, 0.99 m off; 696 kg |
 | engaged at six moments of the Ring's turn | 118.2 to 118.8 s, 697 to 712 kg: no window to wait for (the first build's wait cost a whole turn, 142 s, for a delay over 20 s) |
 | taken from the crew at half a g 134 m up, given back 2 s later | landed in 43 s, 0.30 m/s, 0.29 m off, by a plan made at once |
 | hovering 20 m over a pad, and 155 m | the felt acceleration 0.99623 g against ω²r 0.99627 g, and 0.96937 against 0.96955 (the tides the difference); the thrust within 0.05° of the way to the axis; the drive's flow 16.66 kg/s against mω²r/(Isp g0) 16.65 |
@@ -313,6 +314,7 @@ certified in `evidence/`):
 | by hand, from the hover, on the keys | the stick right 4 s: 9.95 m/s across, the place along held to 11 cm; let go, at rest and held to 0.1 m; the throttle shut: down in 21 s at 0.31 m/s, 0.65 m from the pad's centre |
 | by hand, from the pad | the throttle open: 40 m up in 6.3 s; centred, the height held to 4 cm; the stick forward 4 s: 10.7 m/s, let go, at rest 56 m on and held there |
 | let go of the hold 12 m up, and 12 cm up | a crash at 12.0 m/s, the gear on the deck, the wreck left there; a firm touchdown at 0.71 m/s |
+| the gear asked up on the pad, and on the runway | it stays locked down under the weight, and the craft sits on it; off the deck in the hold, it comes up as asked (the tour found the page's hands holding it up from the docked craft, and the gear folded on the pad) |
 | flown at a bulkhead, let down onto the roof 2.1 km from the sector | the probe hits the bulkhead at 48 m/s; the nose hits the roof 304 m over the floor |
 | let down over the sector's middle, the gear up | through the roof's height to the deck, and the belly on it |
 | flown into the structure | the right wingtip meets a rim wall with the centre of mass 9.18 m from it (the shape reaches 9.20); the fin a bulkhead at 18.13 m (18.20); nose first 1.5 m over the roof's height, the nose the roof's edge at 14.49 m (14.52) |
