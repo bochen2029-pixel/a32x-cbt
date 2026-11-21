@@ -149,6 +149,7 @@ export const STAGES = {
     warp: (s) => (s.retPhase === RET_PH.burn ? 10 : 100),
     text(s) {
       switch (s.retPhase) {
+        case RET_PH.none: return 'The crew takes the craft home, from the Ring to 17C.';   // the stage's first frame, before RETURN has been given
         case RET_PH.depart: return 'The crew backs away from the Ring on the small thrusters.';
         case RET_PH.wait: return 'Waiting for a pass that brings it down at KDFW: skipping ahead to the burn.';
         case RET_PH.burn: return `The de-orbit burn, tail first: ${s.dv.toFixed(0)} m/s, to bring the bottom of the orbit down into the air.`;
