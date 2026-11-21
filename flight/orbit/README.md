@@ -27,7 +27,7 @@ run faster (`.` or TIME +), or **TO ORBIT** skips ahead. Take the controls whene
 | W S, ↑ ↓ | left stick | pitch down, up |
 | A D, ← → | left stick | bank left, right |
 | Q E | right stick | yaw; the nose wheel on the ground |
-| = and −, or Shift and Ctrl; Z, X | triggers | throttle up, down; full, cut (= and − leave out Ctrl, whose W the browser takes to close the tab) |
+| = and − (+ and the keypad's too); Z, X | triggers | throttle up, down, held; full, cut. Not Shift or Ctrl: Ctrl held with the flying keys gives the browser Ctrl-W, which closes the tab whatever a page asks |
 | I K, J L, U M | d-pad | the small thrusters: fore and aft, left and right, up and down |
 | 1 2 3 4 5 6 | X cycles | hold attitude, prograde, retrograde, the Ring, the hub's port, the deck (hover) |
 | G, B | Y | gear (it comes up only off the ground: with weight on it, on the runway or the deck, it stays locked down); brakes |
@@ -1185,6 +1185,33 @@ where it cannot be; `evidence/INDEX.md` says what each receipt backs and lists t
 The Ring's people, anything furnished. Terrain: the globe is smooth and the field flat. Weather but the
 wind: no cloud, rain or shear of a front, and the wind does not change the air's density or temperature. The
 Ring's orbit decaying, the Earth's oblateness. Propellant for the small thrusters. VR, failures.
+
+## What is coming
+
+On the owner's list, none of it built yet:
+
+- **Thrust vectoring, on the tilde's key** (the owner's, 2026-11-21, after DID's *F-22* of 1998, where
+  that key put the jet into a thrust-vectoring mode for near-acrobatic flying). The craft already has the
+  parts: a gimballed drive (`TVC_ANG`, 0.35 rad/s² in pitch and yaw at full thrust) and the deck's swivel,
+  0 to 90° at 15°/s. In the air the pilot's law holds a pitch and a bank, moves them at 12 and 45 °/s,
+  turns in balance and keeps the nose within 80° of the horizon. The mode would trade that for the stick
+  as body rates (about 60 °/s in pitch and yaw, 180 °/s in roll), no turn co-ordination, the gimbal
+  widened for it (TVC_ANG about 1.0) and the swivel free in pitch, so that the nose can be pointed past the
+  stall and held there on thrust: a post-stall turn, a flat spin recovered, the nose pointed at a target
+  while the craft flies on. What it needs first: the aerodynamics checked from 30° to 90° of attack at low
+  speed (Polhamus's analogy does not model the vortices bursting, which ends a real slender delta's lift
+  somewhere past 30°: the model must add it), the HUD's mode word
+  (TV) and its attack angle, an automatic return to the normal law under 0.2 throttle or on the ground,
+  and tests: the mode off changes nothing (the hashes, as O16 holds for the wind), a held 90° nose-up at
+  100 m/s that the drive holds and the normal law refuses, and a recovery from it. The key: ` (Backquote,
+  the key under Esc that also gives ~), whose frame meter moves to F2 (`?perf` still shows it).
+- **A joystick and a throttle.** The page reads game pads now (the triggers are the throttle). A HOTAS
+  shows up as a pad with more axes: the throttle's lever as the throttle's position, not its rate; the
+  stick's twist or the pedals as yaw; a button for the thrust-vectoring mode; a page to bind them. The
+  keyboard keeps = and − for the throttle (not Shift or Ctrl: Ctrl with W, a flying key, closes the tab).
+- **The open Ring's air and the autoland into it**, specified for the Unreal version
+  (`handoff/RING_AIR_SPEC.md`); its §8 builds it core first, and can show it in this page behind a flag
+  before Unreal does.
 
 ## Handoff to Unreal
 

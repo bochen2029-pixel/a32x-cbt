@@ -147,13 +147,13 @@ export function deckStatus(s, d, touch = false) {
   }
   if (phase === DECK_PH.landed || d.onDeck > 0.5) {
     const last = round(d.tdVerdict) !== DECK_V.none ? ` · ${verdictText(d)}` : '';
-    return { line: `ON THE DECK${last}`, hint: touch ? 'THR up: lift off · TAKE OFF: the crew' : 'Shift: lift off · 7: the crew takes off' };
+    return { line: `ON THE DECK${last}`, hint: touch ? 'THR up: lift off · TAKE OFF: the crew' : '=: lift off · 7: the crew takes off' };
   }
   if (auto === AUTO.off && round(s.sas) === SAS.deck && s.ringRange < WITHIN_M) {
     const speed = Math.hypot(d.along, d.across).toFixed(1);
     return {
       line: touch ? `DECK HOLD · ${d.height.toFixed(1)} m · ${speed} m/s` : `HAND · DECK HOLD · ${d.height.toFixed(1)} m over the floor · ${speed} m/s · ${sign(d.vertical, 1)} m/s`,
-      hint: touch ? 'the stick: fly against the deck; THR: climb, sink' : 'W S A D fly, let go to hold · Shift Ctrl climb, sink · Q E turn',
+      hint: touch ? 'the stick: fly against the deck; THR: climb, sink' : 'W S A D fly, let go to hold · = − climb, sink · Q E turn',
     };
   }
   return null;
