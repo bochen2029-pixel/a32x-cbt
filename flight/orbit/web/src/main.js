@@ -403,6 +403,15 @@ async function main() {
       if (n > cap) { n = cap; state.debt = 0; } else state.debt -= n * DT;
       s = core.step(n);
     }
+    // The controls come to the pilot at one to one, however they come: taken with Space, or handed over by a crew
+    // done (down on the deck, docked), which left time as it ran, up to a hundredfold (2026-11-21's play-test:
+    // "Yours, held on the deck" at 100×). TIME + speeds it again.
+    const flier = Math.round(s.auto);
+    if (flier === AUTO.off && state.flier !== undefined && state.flier !== AUTO.off && state.warp > 1) {
+      state.warp = 1;
+      state.debt = 0;
+    }
+    state.flier = flier;
 
     const P = [s.siteE, s.siteN, s.siteU];
     const up = unit(add(P, [0, 0, RE]));

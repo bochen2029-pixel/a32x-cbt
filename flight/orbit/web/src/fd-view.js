@@ -20,6 +20,7 @@ import {
   FD_MODES, FD_MODE_WORDS, FD_PH, directionAt, fdCues, fdLabel, fdLines, fdShown, fmtBank, fmtHdg, glidePathGates, ilsDeviation, ilsGeometry, ilsShown,
 } from './fd-hud.js';
 import { add, cross, scale, three } from './frames.js';
+import { fixed } from './hud.js';
 
 const D2R = Math.PI / 180;
 const MAGENTA = '#ff6ad5', INK = 'rgba(236, 242, 248, 0.92)', FAINT = 'rgba(236, 242, 248, 0.35)', AMBER = '#ffb35c', CYAN = '#7cc7ff';
@@ -144,7 +145,7 @@ function drawPfd(g, cx, cy, R, s, cue, ils, opts) {
   if (ils) g.fillText(`ILS ${opts.ilsId}${ils.loc.valid ? ` · ${(ils.distance / 1000).toFixed(1)} km` : ''}`, cx + R + 118, top + 13);
   g.textAlign = 'left';
   if (cue && opts.air) g.fillText(`BANK ${fmtBank(s.fdLiftBank)}  α ${s.fdAlpha.toFixed(0)}°`, cx - R - 12, below + 8);
-  else if (cue) g.fillText(`P ${s.fdPitch.toFixed(0)}°  B ${fmtBank(s.fdBank)}${cue.lateralIs === 'heading' ? `  HDG ${fmtHdg(s.fdHdg)}` : ''}`, cx - R - 12, below + 8);
+  else if (cue) g.fillText(`P ${fixed(s.fdPitch)}°  B ${fmtBank(s.fdBank)}${cue.lateralIs === 'heading' ? `  HDG ${fmtHdg(s.fdHdg)}` : ''}`, cx - R - 12, below + 8);
   if (cue && s.fdGear > 0.5 !== s.gear > 0.5) { g.fillStyle = AMBER; g.textAlign = 'right'; g.fillText(`GEAR ${s.fdGear > 0.5 ? 'DOWN' : 'UP'}`, cx + R + 118, below + 8); }
   g.restore();
 }

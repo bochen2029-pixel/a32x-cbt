@@ -86,6 +86,7 @@ test('the readouts: the warp while skipping, no minus nought, the brakes the pil
   assert.match(desk[6], /gear DOWN {3}BRAKES$/);
   assert.doesNotMatch(readouts(flying, { warp: 5, view: 'chase', hands: { brake: 0 } }), /BRAKES/);
   assert.match(readouts(flying, { warp: 5, view: 'chase', hands: { brake: 0 } }), /WARP 5×/);
+  assert.match(readouts(flying, { warp: 0, view: 'chase', hands: { brake: 0 } }), /WARP 0× paused {3}VIEW/);   // TIME − at one to one stops it
   const phone = readouts(flying, { warp: 'MAX', view: 'chase', hands: { brake: 1 } }, true, ['FD x']).split('\n');
   assert.match(phone[0], /^T\+21:03:24 {2}MAX {2}chase$/);
   assert.match(phone[1], /VS \+0$/);

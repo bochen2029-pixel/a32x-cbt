@@ -9,7 +9,8 @@ import { frameStats, perfLines } from './perf-math.js';
 const CSS = `
 #perf { position: fixed; left: calc(env(safe-area-inset-left, 0px) + 12px); top: calc(env(safe-area-inset-top, 0px) + 70px);
   padding: 6px 9px; border-radius: 5px; background: rgba(8, 12, 18, 0.78); color: #cfe3ff;
-  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; pointer-events: none; z-index: 6; }
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre-wrap; pointer-events: none; z-index: 6;
+  max-width: calc(100vw - 24px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)); box-sizing: border-box; }
 `;
 
 export const perf = {
@@ -73,5 +74,8 @@ export const perf = {
   draw() {
     const s = this.stats();
     this.box.textContent = perfLines(s, s).join('\n');
+    // on a touch screen the readouts stand at the top, where the meter would cover them: it goes under them
+    const r = document.getElementById('readouts')?.getBoundingClientRect();
+    this.box.style.top = r && r.height > 0 && r.top < window.innerHeight / 3 && r.left < 100 ? `${Math.round(r.bottom + 8)}px` : '';
   },
 };

@@ -202,6 +202,9 @@ test('the HUD says what the director asks, and where the craft is on the ILS', (
   assert.deepEqual([fmtBank(-0.2), fmtBank(0.49), fmtBank(-12.4), fmtBank(45)], ['0°', '0°', 'L 12°', 'R 45°']);
   assert.deepEqual([fmtHdg(0.3), fmtHdg(359.7), fmtHdg(-90), fmtHdg(450)], ['000', '000', '270', '090']);
   assert.match(fdLines(s, true, ils, '17C', true).join('\n'), /^FD CLIMB {2}P 28° B L 30° {2}THR 90%\nILS LOC/);
+  // on the runway the director's pitch is a hair under level: it reads nought, not "-0" (2026-11-21's play-test)
+  assert.match(fdLines(craft({ fdPitch: -0.2 }), true, null, '17C', true)[0], / P 0° /);
+  assert.match(fdLines(craft({ fdPitch: -0.04 }), true, null)[0], / pitch 0\.0° /);
 });
 
 test('the crew flying home comes down the middle of the ILS, and the director reads out its approach',

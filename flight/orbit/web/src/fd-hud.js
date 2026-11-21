@@ -6,7 +6,7 @@
 import { GLIDE } from '../../../web/src/airport-layout.js';
 import { localMetres, origin } from '../../../web/src/scene-math.js';
 import { AUTO } from './core.js';
-import { fmtDistance } from './hud.js';
+import { fixed, fmtDistance } from './hud.js';
 
 const D2R = Math.PI / 180, R2D = 180 / Math.PI, FT = 0.3048, NM = 1852;
 
@@ -164,11 +164,11 @@ export function fdLines(s, shown, ils, id = '17C', narrow = false) {
     const phase = Math.round(s.fdPhase);
     const air = phase >= FD_PH.coast && phase <= FD_PH.flare;
     const gear = s.fdGear > 0.5 ? 'down' : 'up';
-    if (narrow) lines.push(`FD ${fdLabel(phase)}  P ${s.fdPitch.toFixed(0)}° B ${fmtBank(s.fdBank)}  THR ${(s.fdThrottle * 100).toFixed(0)}%`);
+    if (narrow) lines.push(`FD ${fdLabel(phase)}  P ${fixed(s.fdPitch)}° B ${fmtBank(s.fdBank)}  THR ${(s.fdThrottle * 100).toFixed(0)}%`);
     else if (air) {
-      lines.push(`FD   ${fdLabel(phase).padEnd(14)} bank ${fmtBank(s.fdLiftBank)} about the air, α ${s.fdAlpha.toFixed(1)}°   so pitch ${s.fdPitch.toFixed(1)}°, bank ${fmtBank(s.fdBank)}   thrust ${(s.fdThrottle * 100).toFixed(0)}%   gear ${gear}`);
+      lines.push(`FD   ${fdLabel(phase).padEnd(14)} bank ${fmtBank(s.fdLiftBank)} about the air, α ${fixed(s.fdAlpha, 1)}°   so pitch ${fixed(s.fdPitch, 1)}°, bank ${fmtBank(s.fdBank)}   thrust ${(s.fdThrottle * 100).toFixed(0)}%   gear ${gear}`);
     } else {
-      lines.push(`FD   ${fdLabel(phase).padEnd(14)} pitch ${s.fdPitch.toFixed(1)}°   bank ${fmtBank(s.fdBank)}   hdg ${fmtHdg(s.fdHdg)}°   thrust ${(s.fdThrottle * 100).toFixed(0)}%   gear ${gear}`);
+      lines.push(`FD   ${fdLabel(phase).padEnd(14)} pitch ${fixed(s.fdPitch, 1)}°   bank ${fmtBank(s.fdBank)}   hdg ${fmtHdg(s.fdHdg)}°   thrust ${(s.fdThrottle * 100).toFixed(0)}%   gear ${gear}`);
     }
   }
   if (ils) {   // where the craft is: right of the course or left, above the path or below

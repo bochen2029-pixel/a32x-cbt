@@ -112,7 +112,8 @@ export class Hud {
     const st = more.status || status(s, view.warp, this.touch, view.hands);
     const extra = more.extra || [];
     this.top.textContent = st.line;
-    this.hint.textContent = st.hint;
+    // TIME − at one to one stops time: nothing moves, and the hint says why and how to go on
+    this.hint.textContent = view.warp === 0 ? `paused · ${this.touch ? 'TIME +' : '.'}: time runs again` : st.hint;
     this.lines.textContent = readouts(s, view, window.innerWidth < 560, extra);
   }
 
@@ -127,7 +128,7 @@ export class Hud {
 // brakes are the pilot's own, shown while they hold the craft on the ground, as the gear is the core's.
 export function readouts(s, view, narrow = false, extra = []) {
   const vs = Number(fixed(s.vs)) >= 0 ? `+${fixed(s.vs)}` : fixed(s.vs);
-  const warp = typeof view.warp === 'number' ? `${view.warp}×` : view.warp;
+  const warp = typeof view.warp !== 'number' ? view.warp : view.warp === 0 ? '0× paused' : `${view.warp}×`;
   const brakes = view.hands && view.hands.brake > 0 && s.onGround > 0.5 && Math.round(s.auto) === AUTO.off;
   const peri = s.peri < -1e5 ? 'below ground' : fmtDistance(s.peri);
   const apo = s.apo > 1e9 ? 'escape' : fmtDistance(s.apo);
