@@ -292,8 +292,9 @@ interval at 95 %.
 | development, 1 to 100 | 100 of 100 (96.3 to 100 %), none crashed; pads 1, 2, 3: 39, 24, 37 | sink 0.426 m/s, drift 0.175 m/s, 1.72 m off the centre, 0.29° off level | 105 to 155 s; 632 to 869 kg, mean 713 |
 | held out, 9001 to 9100, flown once | 100 of 100 (96.3 to 100 %), none crashed; pads 1, 2, 3: 34, 30, 36 | sink 0.441 m/s, drift 0.145 m/s, 1.79 m off the centre, 0.24° off level | 106 to 154 s; 623 to 897 kg, mean 719 |
 
-A plan is made in a step of its own, one at most: 19 ms on average in WebAssembly under node, 33 ms at
-the most, 15 ms natively; the other steps take 0.01 ms.
+A plan is made in a step of its own, one at most: through a landing and a take-off, 63 plans, 17 ms on
+average in WebAssembly under node (19 ms at the 95th percentile, 34 ms at the most), 15 ms natively; the
+other steps take 0.01 ms. On a slow machine a plan's step can cost the page a frame.
 
 From the tests (`test/test_deck.cpp`, `test_socp.cpp`; these numbers are the tests' own and are not yet
 certified in `evidence/`):
