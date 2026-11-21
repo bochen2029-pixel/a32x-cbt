@@ -3,6 +3,7 @@
 //
 // TEST: atmosphere
 // TEST: ground_settles
+// TEST: gear_locked_on_the_ground
 // TEST: deterministic
 // TEST: crew_reaches_orbit
 // TEST: kepler_holds
@@ -125,6 +126,22 @@ void groundSettles() {
     CHECK(std::fabs(get(OC_TAS)) < 0.01, "airspeed %.4f", get(OC_TAS));
     CHECK(std::fabs(get(OC_G) - 1) < 0.01, "felt %.4f g standing", get(OC_G));
     CHECK(finite(), "finite");
+}
+
+// The gear does not come up under the craft's weight: on the runway, the pilot's hands asking for it up leave it
+// down, and the craft stands on it, as at rest (ground_settles); the squat switches lock it, as an airliner's do.
+void gearLockedOnTheGround() {
+    oc_reset(LAT, LON, HDG);
+    oc_auto(OC_AUTO_OFF);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 1);   // the gear asked up, the brakes on
+    oc_step(250);
+    const double u0 = get(OC_SITE_U);
+    oc_step(1500);
+    std::printf("  30 s with the gear asked up: gear %.0f, on the ground %.0f, crashed %.0f, sank %.4f m\n", get(OC_GEAR), get(OC_ON_GROUND), get(OC_CRASHED),
+                u0 - get(OC_SITE_U));
+    CHECK(get(OC_GEAR) == 1 && get(OC_ON_GROUND) > 0 && get(OC_CRASHED) == 0, "gear %.0f, on the ground %.0f, crashed %.0f", get(OC_GEAR), get(OC_ON_GROUND),
+          get(OC_CRASHED));
+    CHECK(std::fabs(get(OC_SITE_U) - u0) < 0.002, "sank %.4f m", u0 - get(OC_SITE_U));
 }
 
 // The same inputs give the same state, step for step; a different input gives a different one.
@@ -372,7 +389,7 @@ void crewTakesOver() {
 
 struct Test { const char* name; void (*fn)(); };
 const Test tests[] = {
-    {"atmosphere", atmosphere},         {"ground_settles", groundSettles},  {"deterministic", deterministic},
+    {"atmosphere", atmosphere},         {"ground_settles", groundSettles}, {"gear_locked_on_the_ground", gearLockedOnTheGround},  {"deterministic", deterministic},
     {"crew_reaches_orbit", crewReachesOrbit}, {"kepler_holds", keplerHolds}, {"rocket_equation", rocketEquation},
     {"attitude_hold", attitudeHold},    {"hand_flown_takeoff", handFlownTakeoff}, {"thrusters_translate", thrustersTranslate},
     {"approach_holds", approachHolds},  {"crew_takes_over", crewTakesOver},

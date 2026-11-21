@@ -19,6 +19,8 @@
 // TEST: frames_round_trip
 // TEST: readouts_are_derived
 // TEST: replay_and_resume
+// TEST: replay_through_the_ring
+// TEST: replay_the_flight_home
 // TEST: crew_flight_finite
 // TEST: abuse_finite
 // TEST: ring_shape
@@ -28,6 +30,8 @@
 // TEST: lift_from_the_windward_face
 // TEST: peg_plan_is_its_own
 // TEST: hash_covers_the_deck
+// TEST: hash_covers_the_return
+// TEST: hash_covers_the_fd
 // TEST: deck_flight_finite
 // TEST: windy_ledger
 // TEST: wind_finite
@@ -36,6 +40,7 @@
 #include "../core/orbit_deck.h"
 #include "../core/orbit_dock.h"
 #include "../core/orbit_return.h"
+#include "../core/orbit_sky.h"
 #include "../core/orbit_walk.h"
 #include "../core/orbit_wind.h"
 #include "../core/internal.h"
@@ -755,50 +760,88 @@ void readoutsAreDerived() {
 // ---- replay ---------------------------------------------------------------------------------------
 
 // A digest of every field of the state and of the pilot's hands, which persist from one step to the
-// next: what replay must reproduce, a superset of what oc_hash folds in.
+// next: what replay must reproduce, a superset of what oc_hash folds in. The flight's own fields and the
+// dock's are listed here; the deck's, the flight home's, the flight director's and the wind's are folded in
+// by the parts' own hashes, which hash_covers_the_deck, hash_covers_the_return, hash_covers_the_fd and
+// test_wind's hash_covers_the_wind prove cover every field of theirs, one changed at a time.
 unsigned digest() {
     const oc::State& s = oc::g;
     const oc::Controls& c = oc::hands;
     const double d[] = {(double)s.n, s.r.x, s.r.y, s.r.z, s.v.x, s.v.y, s.v.z, s.q.w, s.q.x, s.q.y, s.q.z, s.w.x, s.w.y, s.w.z, s.prop, s.thr,
                         (double)s.gear, (double)s.onGround, (double)s.crashed, (double)s.autoMode, (double)s.sas, (double)s.phase, (double)s.atmoLaw,
                         s.thetaT, s.phiT, s.pegF0, s.pegF1, s.pegT, s.pegAt, (double)s.pegValid, s.hold.w, s.hold.x, s.hold.y, s.hold.z,
-                        (double)s.holdValid, s.torque.x, s.torque.y, s.torque.z, s.rcs.x, s.rcs.y, s.rcs.z, s.steer, s.brake, (double)s.ret.phase,
+                        (double)s.holdValid, s.torque.x, s.torque.y, s.torque.z, s.rcs.x, s.rcs.y, s.rcs.z, s.steer, s.brake, s.nozzle, s.nozzleCmd,
                         (double)s.dock.held, (double)s.dock.phase, (double)s.dock.contact, (double)s.dock.released, (double)s.dock.verdict,
                         (double)s.dock.hit, (double)s.dock.hitPart, (double)s.dock.refused, (double)s.dock.autoBefore, (double)s.dock.heldAt,
                         s.dock.p0.x, s.dock.p0.y, s.dock.p0.z, s.dock.q0.w, s.dock.q0.x, s.dock.q0.y, s.dock.q0.z, s.dock.gHold, s.dock.cT,
                         s.dock.cSpeed, s.dock.cOffset, s.dock.cSlide, s.dock.cAngle, s.dock.cRoll, s.dock.cRollRate, c.pitch, c.roll, c.yaw, c.throttle, c.tx, c.ty, c.tz, (double)c.gearDown, c.brake};
     unsigned h = 2166136261u;
     oc::hashDoubles(h, d, (int)(sizeof d / sizeof d[0]));
-    if (s.wind.strength > 0) {   // the wind, when there is one (with none, the digest is what it was before the wind)
-        const double w[] = {(double)s.wind.seed, s.wind.strength};
-        oc::hashDoubles(h, w, 2);
-    }
+    const double w[] = {(double)s.wind.seed, s.wind.strength};
+    oc::hashDoubles(h, w, 2);
+    oc::returnHash(s, h);
+    oc::deckHash(s, h);
+    oc::fdHash(s, h);
     return h;
 }
 
-// What a page sends, step by step: at a step, before it, the controls, a crew mode or a hold mode.
-struct Act { long at; int what; double a[9]; };   // what: 0 controls, 1 oc_auto, 2 oc_sas
+// What a page sends, step by step: at a step, before it, the controls, a crew mode, a hold mode, the port let
+// go, the flight director switched, or the day's wind.
+enum { ACT_CONTROLS, ACT_AUTO, ACT_SAS, ACT_UNDOCK, ACT_FD, ACT_WIND };
+struct Act { long at; int what; double a[9]; };
 
 const Act SCRIPT[] = {
-    {16000, 1, {OC_AUTO_OFF}},
-    {16000, 0, {0.2, -0.3, 0.1, 1, 0, 0, 0, 0, 0}},   // the pilot takes it at 320 s and pulls
-    {16500, 2, {OC_SAS_PROGRADE}},
-    {16500, 0, {0, 0, 0, 1, 0, 0, 0, 0, 0}},
-    {17000, 1, {OC_AUTO_CREW}},                       // the crew picks it up where it is
-    {45000, 1, {OC_AUTO_APPROACH}},
-    {60000, 1, {OC_AUTO_OFF}},
-    {60000, 2, {OC_SAS_TARGET}},
-    {60000, 0, {0, 0, 0, 0, 1, 0, 0, 0, 0}},
-    {60500, 0, {0, 0.4, 0, 0, 0, 0.5, -0.5, 0, 0}},
-    {61000, 0, {0, 0, 0, 0, 0, 0, 0, 0, 0}},
+    {16000, ACT_AUTO, {OC_AUTO_OFF}},
+    {16000, ACT_CONTROLS, {0.2, -0.3, 0.1, 1, 0, 0, 0, 0, 0}},   // the pilot takes it at 320 s and pulls
+    {16500, ACT_SAS, {OC_SAS_PROGRADE}},
+    {16500, ACT_CONTROLS, {0, 0, 0, 1, 0, 0, 0, 0, 0}},
+    {17000, ACT_AUTO, {OC_AUTO_CREW}},                       // the crew picks it up where it is
+    {45000, ACT_AUTO, {OC_AUTO_APPROACH}},
+    {60000, ACT_AUTO, {OC_AUTO_OFF}},
+    {60000, ACT_SAS, {OC_SAS_TARGET}},
+    {60000, ACT_CONTROLS, {0, 0, 0, 0, 1, 0, 0, 0, 0}},
+    {60500, ACT_CONTROLS, {0, 0.4, 0, 0, 0, 0.5, -0.5, 0, 0}},
+    {61000, ACT_CONTROLS, {0, 0, 0, 0, 0, 0, 0, 0, 0}},
 };
-const int SCRIPT_LEN = sizeof SCRIPT / sizeof SCRIPT[0];
-const long REPLAY_END = 64000, REPLAY_EVERY = 4000;
+
+// The crews at the Ring (G13): docked at the hub's port, let go, down on the deck and up again to the hold
+// point, and away home, as the tour flies them, the flight director switched off and on along the way.
+const Act RING[] = {
+    {45000, ACT_AUTO, {OC_AUTO_DOCK}},
+    {46000, ACT_FD, {0}},
+    {100000, ACT_UNDOCK, {0}},                    // docked by 97,600
+    {100000, ACT_AUTO, {OC_AUTO_DECK}},
+    {101000, ACT_FD, {1}},
+    {112000, ACT_AUTO, {OC_AUTO_TAKEOFF}},        // landed by 108,400
+    {121000, ACT_WIND, {3, 0.8}},
+    {122000, ACT_AUTO, {OC_AUTO_RETURN}},         // at the hold point by 118,200; away, then the wait for the pass
+};
+
+// The flight home from the crew's orbit, through a windy day to a stop on the runway (G13), the flight
+// director switched off in the glide and on again.
+const Act HOME[] = {
+    {44000, ACT_WIND, {7, 1.0}},
+    {45000, ACT_AUTO, {OC_AUTO_RETURN}},
+    {300000, ACT_FD, {0}},
+    {320000, ACT_FD, {1}},                        // its shadow picks the flight home up where it is
+};
+
+const long REPLAY_EVERY = 4000;
+
+// A script, the step it ends at and the mark it is stopped at and resumed from; and one act changed a little,
+// to show that the comparison can fail: act `act`'s a[index] (or its step, index -1) made `to`.
+struct Script {
+    const Act* acts;
+    int len;
+    long end, stopAt;
+    int act, index;
+    double to;
+};
 
 struct Mark {
     long at;
     unsigned hash, digest;
-    double out[OC_COUNT], r[3], v[3];
+    double out[OC_COUNT], dock[OC_DOCK_COUNT], deck[OC_DECK_COUNT], ret[OC_RET_COUNT], wind[OC_WIND_COUNT], r[3], v[3];
 };
 
 Mark markNow(long at) {
@@ -807,26 +850,39 @@ Mark markNow(long at) {
     m.hash = oc_hash();
     m.digest = digest();
     std::memcpy(m.out, oc_out(), sizeof m.out);
+    std::memcpy(m.dock, oc_dock_out(), sizeof m.dock);
+    std::memcpy(m.deck, oc_deck_out(), sizeof m.deck);
+    std::memcpy(m.ret, oc_return_out(), sizeof m.ret);
+    std::memcpy(m.wind, oc_wind_out(), sizeof m.wind);
     oc_eci(m.r, m.v);
     return m;
 }
 
 bool sameMark(const Mark& a, const Mark& b) {
-    return a.at == b.at && a.hash == b.hash && a.digest == b.digest && std::memcmp(a.out, b.out, sizeof a.out) == 0 && std::memcmp(a.r, b.r, sizeof a.r) == 0 &&
-           std::memcmp(a.v, b.v, sizeof a.v) == 0;
+    return a.at == b.at && a.hash == b.hash && a.digest == b.digest && std::memcmp(a.out, b.out, sizeof a.out) == 0 &&
+           std::memcmp(a.dock, b.dock, sizeof a.dock) == 0 && std::memcmp(a.deck, b.deck, sizeof a.deck) == 0 &&
+           std::memcmp(a.ret, b.ret, sizeof a.ret) == 0 && std::memcmp(a.wind, b.wind, sizeof a.wind) == 0 &&
+           std::memcmp(a.r, b.r, sizeof a.r) == 0 && std::memcmp(a.v, b.v, sizeof a.v) == 0;
 }
 
 void apply(const Act& a) {
-    if (a.what == 0) oc_controls(a.a[0], a.a[1], a.a[2], a.a[3], a.a[4], a.a[5], a.a[6], (int)a.a[7], a.a[8]);
-    else if (a.what == 1) oc_auto((int)a.a[0]);
-    else oc_sas((int)a.a[0]);
+    switch (a.what) {
+        case ACT_CONTROLS: oc_controls(a.a[0], a.a[1], a.a[2], a.a[3], a.a[4], a.a[5], a.a[6], (int)a.a[7], a.a[8]); break;
+        case ACT_AUTO: oc_auto((int)a.a[0]); break;
+        case ACT_SAS: oc_sas((int)a.a[0]); break;
+        case ACT_UNDOCK: oc_undock(); break;
+        case ACT_FD: oc_fd((int)a.a[0]); break;
+        default: oc_wind((unsigned)a.a[0], a.a[1]); break;
+    }
 }
 
 // Everything a page may read between steps; none of it may change the flight.
 void readEverything() {
-    double r[3], v[3], rho, p, t, a;
-    (void)oc_out(); (void)oc_out_len(); (void)oc_hash(); oc_eci(r, v); oc_atmosphere(7777, &rho, &p, &t, &a);
-    (void)oc_dock_out(); (void)oc_return_out(); oc_step(0); oc_walk_step(3); (void)oc_walk_hash();
+    double r[3], v[3], rho, p, t, a, mean[3], gust[3];
+    (void)oc_out(); (void)oc_out_len(); (void)oc_hash(); (void)oc_flight_hash(); oc_eci(r, v); oc_atmosphere(7777, &rho, &p, &t, &a);
+    (void)oc_dock_out(); (void)oc_return_out(); (void)oc_deck_out(); (void)oc_wind_out(); (void)oc_sky_out();
+    oc_wind_at(32.9, -97.0, 3000, 600, mean, gust);
+    oc_step(0); oc_walk_step(3); (void)oc_walk_hash();
 }
 
 // Fly the script from step `from` (the core already there) to `until`, marking each multiple of
@@ -855,35 +911,35 @@ void fly(const Act* script, int len, long from, long until, std::vector<Mark>& m
     }
 }
 
-// The same inputs give the same flight, bit for bit, however it is stepped: in one call between inputs,
-// in pieces with everything read between them, or stopped part way, the core used for another flight,
-// and resumed by re-stepping the inputs from the start. Compared at every mark: the hash, a digest of
-// every field of the state, every readout and the inertial state. The comparison can fail: one throttle
-// setting of 0.999 for 1 parts the flights.
-void replayAndResume() {
+// The same inputs give the same flight, bit for bit, however it is stepped: in one call between inputs, in
+// pieces with everything read between them, or stopped part way, the core used for another flight, and resumed
+// by re-stepping the inputs from the start. Compared at every mark: the hash, a digest of every field of the
+// state, every readout of the flight, the dock, the deck, the flight home and the wind, and the inertial state.
+// Then the script with one act changed a little: the comparison can fail. The straight flight's marks are
+// returned for the script's own checks, and where the changed one first parts from it.
+std::vector<Mark> replay(const Script& sc, long* changedApart) {
     std::vector<Mark> straight, pieces, before, resumed, prefix, other;
     oc_reset(LAT, LON, HDG);
-    fly(SCRIPT, SCRIPT_LEN, 0, REPLAY_END, straight, false, 0);
+    fly(sc.acts, sc.len, 0, sc.end, straight, false, 0);
     oc_reset(LAT, LON, HDG);
-    fly(SCRIPT, SCRIPT_LEN, 0, REPLAY_END, pieces, true, 12345);
-    const long K = 7 * REPLAY_EVERY;   // stop here, at a mark, in the middle of the burn to orbit
+    fly(sc.acts, sc.len, 0, sc.end, pieces, true, 12345);
     oc_reset(LAT, LON, HDG);
-    fly(SCRIPT, SCRIPT_LEN, 0, K, before, false, 0);
+    fly(sc.acts, sc.len, 0, sc.stopAt, before, false, 0);
     oc_reset(0, 0, 90);   // the core flies something else meanwhile
     oc_auto(OC_AUTO_OFF);
     oc_controls(1, 1, 1, 1, 1, 1, 1, 0, 1);
+    oc_wind(99, 2.0);
     oc_step(3000);
     oc_reset(LAT, LON, HDG);   // and the flight resumes by re-stepping
-    fly(SCRIPT, SCRIPT_LEN, 0, K, prefix, false, 0);
-    resumed.clear();
-    fly(SCRIPT, SCRIPT_LEN, K, REPLAY_END, resumed, false, 0);
+    fly(sc.acts, sc.len, 0, sc.stopAt, prefix, false, 0);
+    fly(sc.acts, sc.len, sc.stopAt, sc.end, resumed, false, 0);
     resumed.erase(resumed.begin());   // its first mark is the prefix's last
     resumed.insert(resumed.begin(), prefix.begin(), prefix.end());
-    Act changed[SCRIPT_LEN];
-    std::memcpy(changed, SCRIPT, sizeof changed);
-    changed[1].a[3] = 0.999;
+    std::vector<Act> changed(sc.acts, sc.acts + sc.len);
+    if (sc.index < 0) changed[sc.act].at = (long)sc.to;
+    else changed[sc.act].a[sc.index] = sc.to;
     oc_reset(LAT, LON, HDG);
-    fly(changed, SCRIPT_LEN, 0, REPLAY_END, other, false, 0);
+    fly(changed.data(), sc.len, 0, sc.end, other, false, 0);
     auto agree = [](const std::vector<Mark>& a, const std::vector<Mark>& b, long* firstApart) {
         *firstApart = -1;
         if (a.size() != b.size()) return false;
@@ -892,14 +948,60 @@ void replayAndResume() {
         return true;
     };
     long apart = -1;
-    std::printf("  %zu marks to step %ld (t %.0f s, phase %.0f, %s): final hash %08x, digest %08x\n", straight.size(), REPLAY_END, straight.back().out[OC_T],
-                straight.back().out[OC_PHASE], straight.back().out[OC_CRASHED] > 0 ? "crashed" : "flying", straight.back().hash, straight.back().digest);
-    CHECK(straight.size() == (size_t)(REPLAY_END / REPLAY_EVERY + 1) && straight.back().out[OC_CRASHED] == 0, "the script's flight: %zu marks", straight.size());
+    const Mark& last = straight.back();
+    std::printf("  %zu marks to step %ld (t %.0f s, phase %.0f, %s): final hash %08x, digest %08x\n", straight.size(), sc.end, last.out[OC_T],
+                last.out[OC_PHASE], last.out[OC_CRASHED] > 0 ? "crashed" : "flying", last.hash, last.digest);
+    CHECK(straight.size() == (size_t)(sc.end / REPLAY_EVERY + 1) && last.out[OC_CRASHED] == 0, "the script's flight: %zu marks", straight.size());
     CHECK(agree(straight, pieces, &apart), "stepped in pieces, with reads between, the flight parts at step %ld", apart);
     CHECK(before.size() == prefix.size() && agree(before, prefix, &apart), "re-stepped to the stop, the flight parts at step %ld", apart);
-    CHECK(agree(straight, resumed, &apart), "stopped and resumed, the flight parts at step %ld", apart);
-    CHECK(!agree(straight, other, &apart) && apart > 16000 && apart <= 20000, "a throttle of 0.999 for 1 parts the flight at step %ld", apart);
+    CHECK(agree(straight, resumed, &apart), "stopped at step %ld and resumed, the flight parts at step %ld", sc.stopAt, apart);
+    CHECK(!agree(straight, other, changedApart), "one act changed, the flights do not part");
+    return straight;
+}
+
+// The mark of a step, from a flight's marks.
+const Mark& markAt(const std::vector<Mark>& marks, long at) { return marks[(size_t)(at / REPLAY_EVERY)]; }
+
+// The pilot's flight to orbit and to the hold point, stopped in the burn to orbit.
+void replayAndResume() {
+    long apart = -1;
+    replay({SCRIPT, (int)(sizeof SCRIPT / sizeof SCRIPT[0]), 64000, 7 * REPLAY_EVERY, 1, 3, 0.999}, &apart);
+    CHECK(apart > 16000 && apart <= 20000, "a throttle of 0.999 for 1 parts the flight at step %ld", apart);
     std::printf("  a throttle of 0.999 for 1 at step 16000 parts the flights at the mark of step %ld\n", apart);
+}
+
+// The crews at the Ring, stopped in the deck's final burn: the crew's plan, made again as it flies, and the
+// search for the take-off's must come back the same from a resumed run as from the straight one.
+void replayThroughTheRing() {
+    long apart = -1;
+    const std::vector<Mark> m = replay({RING, (int)(sizeof RING / sizeof RING[0]), 140000, 108000, 5, -1, 112001}, &apart);
+    if (m.size() != 140000 / REPLAY_EVERY + 1) return;
+    const Mark &docked = markAt(m, 100000), &final = markAt(m, 108000), &landed = markAt(m, 112000), &held = markAt(m, 120000), &away = m.back();
+    std::printf("  docked at step 100000: %.0f; at step 108000 deck phase %.0f; at step 112000 on the deck %.0f, phase %.0f; at step 120000 auto %.0f; "
+                "at the end the return's phase %.0f\n", docked.dock[OC_DOCK_DOCKED], final.deck[OC_DECK_PHASE], landed.deck[OC_DECK_ON_DECK],
+                landed.deck[OC_DECK_PHASE], held.out[OC_AUTO], away.ret[OC_RET_PHASE]);
+    CHECK(docked.dock[OC_DOCK_DOCKED] == 1, "not docked by step 100000");
+    CHECK(final.deck[OC_DECK_PHASE] == OC_DECK_PH_GLIDE, "the stop is not in the deck's final burn: phase %.0f", final.deck[OC_DECK_PHASE]);
+    CHECK(landed.deck[OC_DECK_ON_DECK] == 1 && landed.deck[OC_DECK_PHASE] == OC_DECK_PH_LANDED, "not on the deck by step 112000");
+    CHECK(held.out[OC_AUTO] == OC_AUTO_APPROACH, "not at the hold point by step 120000: auto %.0f", held.out[OC_AUTO]);
+    CHECK(away.ret[OC_RET_PHASE] == OC_RET_PH_DEPART || away.ret[OC_RET_PHASE] == OC_RET_PH_WAIT, "the return's phase %.0f", away.ret[OC_RET_PHASE]);
+    CHECK(apart > 112000 && apart <= 116000, "the take-off a step later parts the flights at step %ld", apart);
+    std::printf("  the take-off asked for a step later parts the flights at the mark of step %ld\n", apart);
+}
+
+// The flight home, stopped in the entry: the guidance's bank, what it has learnt of its model and of the wind,
+// and the flight director's shadow of it all must come back the same.
+void replayTheFlightHome() {
+    long apart = -1;
+    const std::vector<Mark> m = replay({HOME, (int)(sizeof HOME / sizeof HOME[0]), 384000, 240000, 0, 1, 0.999}, &apart);
+    if (m.size() != 384000 / REPLAY_EVERY + 1) return;
+    const Mark &entry = markAt(m, 240000), &end = m.back();
+    std::printf("  at step 240000 the return's phase %.0f; at the end %.0f, %.0f m along the runway\n", entry.ret[OC_RET_PHASE], end.ret[OC_RET_PHASE],
+                end.ret[OC_RET_STOP_ALONG]);
+    CHECK(entry.ret[OC_RET_PHASE] == OC_RET_PH_ENTRY, "the stop is not in the entry: phase %.0f", entry.ret[OC_RET_PHASE]);
+    CHECK(end.ret[OC_RET_PHASE] == OC_RET_PH_STOPPED, "not stopped on the runway by step 384000: phase %.0f", end.ret[OC_RET_PHASE]);
+    CHECK(apart > 44000 && apart <= 48000, "a wind of 0.999 for 1 parts the flights at step %ld", apart);
+    std::printf("  a wind of 0.999 for 1 at step 44000 parts the flights at the mark of step %ld (in the hash at once; in the motion only in the air)\n", apart);
 }
 
 // ---- finiteness ---------------------------------------------------------------------------------------
@@ -1338,6 +1440,95 @@ void hashCoversTheDeck() {
     CHECK(missed == 0 && oc_hash() == h0, "%d fields not in the hash", missed);
 }
 
+// One field of the state, changed alone by the least that changes it, for the hash_covers tests.
+struct HashField { const char* name; double* d; int* i; };
+
+// How many of the fields leave oc_hash as it was when each is changed alone by its least step (a double by
+// one unit in its last place, an int in its lowest bit), each put back after; and the names of those.
+int notInTheHash(const std::vector<HashField>& fields) {
+    const unsigned h0 = oc_hash();
+    int missed = 0;
+    for (const HashField& f : fields) {
+        unsigned h;
+        if (f.d) { const double v = *f.d; *f.d = std::nextafter(v, 1e300); h = oc_hash(); *f.d = v; }
+        else { const int v = *f.i; *f.i = v ^ 1; h = oc_hash(); *f.i = v; }
+        if (h == h0) { std::printf("  %s is not in the hash\n", f.name); ++missed; }
+    }
+    CHECK(oc_hash() == h0, "the fields were not put back");
+    return missed;
+}
+
+// Every field of a ReturnState (return_state.h), named.
+void returnFields(oc::ReturnState& R, std::vector<HashField>& f) {
+    auto D = [&](const char* n, double* p) { f.push_back({n, p, nullptr}); };
+    auto I = [&](const char* n, int* p) { f.push_back({n, nullptr, p}); };
+    I("phase", &R.phase); D("heat", &R.heat); D("heatPeak", &R.heatPeak); D("heatLoad", &R.heatLoad); D("load", &R.load); D("loadPeak", &R.loadPeak);
+    D("qbarPeak", &R.qbarPeak); I("over", &R.over); D("propAtEngage", &R.propAtEngage);
+    I("planned", &R.planned); D("tBurn", &R.tBurn); D("dv", &R.dv); D("tInterface", &R.tInterface); D("tGate", &R.tGate); D("crossPlan", &R.crossPlan);
+    I("passes", &R.passes); D("tPlan", &R.tPlan); D("tEvent", &R.tEvent);
+    D("bank0", &R.bank0); D("vRef", &R.vRef); D("slope", &R.slope); I("bankSide", &R.bankSide); D("bankCmd", &R.bankCmd); D("alphaCmd", &R.alphaCmd);
+    D("miss", &R.miss); D("tGuide", &R.tGuide); I("cycle", &R.cycle); I("reversals", &R.reversals);
+    I("side", &R.side); I("leg", &R.leg); I("laps", &R.laps); D("arc", &R.arc); D("togo", &R.togo); D("thrust", &R.thrust); D("glideDev", &R.glideDev);
+    D("errRho", &R.errRho); D("errWave", &R.errWave); D("errPhase", &R.errPhase); D("errLift", &R.errLift); D("errDrag", &R.errDrag);
+    D("kLift", &R.kLift); D("kDrag", &R.kDrag); D("cLift", &R.cLift); D("cDrag", &R.cDrag); I("sensed", &R.sensed);
+    for (int k = 0; k < 3; ++k) { D("rPrev", &R.rPrev[k]); D("vPrev", &R.vPrev[k]); D("windEst", &R.windEst[k]); }
+    I("airborne", &R.airborne); D("sinkLast", &R.sinkLast); I("touched", &R.touched); D("tdSink", &R.tdSink); D("tdAlong", &R.tdAlong);
+    D("tdOff", &R.tdOff); D("tdSpeed", &R.tdSpeed); D("tdPitch", &R.tdPitch); D("tdTime", &R.tdTime); I("stopped", &R.stopped);
+    D("stopAlong", &R.stopAlong); D("stopOff", &R.stopOff);
+    I("refused", &R.refused); D("errMass", &R.errMass); D("errThrust", &R.errThrust); D("noise", &R.noise); D("noiseSeed", &R.noiseSeed);
+    D("reach", &R.reach); I("skipped", &R.skipped); D("tdCrab", &R.tdCrab); I("lowering", &R.lowering); I("lowered", &R.lowered);
+}
+
+// The flight home in its entry, a wind blowing, the flight director's shadow flying it alongside.
+bool homeInTheEntry() {
+    if (!crewToOrbit()) return false;
+    oc_step(500);
+    oc_wind(7, 1.0);
+    oc_auto(OC_AUTO_RETURN);
+    for (int i = 0; i < 4000 && oc_return_out()[OC_RET_PHASE] != OC_RET_PH_ENTRY && get(OC_CRASHED) == 0; ++i) oc_step(100);
+    oc_step(2000);
+    return oc_return_out()[OC_RET_PHASE] == OC_RET_PH_ENTRY && get(OC_CRASHED) == 0;
+}
+
+// The hash covers the flight home's state (O6), every field of return_state.h, as hash_covers_the_deck shows for
+// the deck's: in the entry, each changed alone by the least that changes it changes the hash. The replay's digest
+// folds the flight home in by this hash (G13).
+void hashCoversTheReturn() {
+    static_assert(sizeof(oc::ReturnState) == 584, "return_state.h has changed: list its fields in returnFields");
+    if (!homeInTheEntry()) { CHECK(false, "not in the entry"); return; }
+    std::vector<HashField> fields;
+    returnFields(oc::g.ret, fields);
+    const int missed = notInTheHash(fields);
+    std::printf("  %d of the flight home's fields changed alone, each by its least step: %d left the hash as it was\n", (int)fields.size(), missed);
+    CHECK(missed == 0, "%d fields not in the hash", missed);
+}
+
+// And the flight director's (fd_state.h): its switch and who flew, the guidance's memory it carries on while the
+// pilot flies, the flight home's whole state in its shadow, and the step's command. oc_hash holds it; the
+// flight's hash, oc_flight_hash, leaves it out, and the flight director changes nothing it holds.
+void hashCoversTheFd() {
+    static_assert(sizeof(oc::FdState) == 728, "fd_state.h has changed: list its fields below");
+    if (!homeInTheEntry()) { CHECK(false, "not in the entry"); return; }
+    oc::FdState& F = oc::g.fd;
+    CHECK(F.on == 1 && F.source == 2 && F.valid == 1, "the flight director is not shadowing the flight home: on %d, source %d, valid %d", F.on, F.source, F.valid);
+    std::vector<HashField> fields = {
+        {"on", nullptr, &F.on}, {"last", nullptr, &F.last}, {"handed", nullptr, &F.handed}, {"from", nullptr, &F.from}, {"home", nullptr, &F.home},
+        {"source", nullptr, &F.source}, {"phase", nullptr, &F.phase}, {"thetaT", &F.thetaT, nullptr}, {"phiT", &F.phiT, nullptr},
+        {"pegF0", &F.pegF0, nullptr}, {"pegF1", &F.pegF1, nullptr}, {"pegT", &F.pegT, nullptr}, {"pegAt", &F.pegAt, nullptr},
+        {"pegValid", nullptr, &F.pegValid}, {"gear", nullptr, &F.gear}, {"valid", nullptr, &F.valid}, {"fdPhase", nullptr, &F.fdPhase},
+        {"pitch", &F.pitch, nullptr}, {"heading", &F.heading, nullptr}, {"bank", &F.bank, nullptr}, {"throttle", &F.throttle, nullptr},
+        {"alpha", &F.alpha, nullptr}, {"liftBank", &F.liftBank, nullptr},
+    };
+    const size_t own = fields.size();
+    returnFields(F.ret, fields);
+    const unsigned flight = oc_flight_hash();
+    const int missed = notInTheHash(fields);
+    std::printf("  %zu of the flight director's own fields and %zu of its shadow's flight home changed alone: %d left the hash as it was\n", own,
+                fields.size() - own, missed);
+    CHECK(missed == 0, "%d fields not in the hash", missed);
+    CHECK(oc_flight_hash() == flight, "the flight's hash moved");
+}
+
 // No readout of any block is NaN or infinite over the deck (O7): the crew's landing from the hold point to the
 // deck and ten minutes parked there, every step scanned. (abuse_finite flies the deck hold hard as well.)
 void deckFlightFinite() {
@@ -1371,6 +1562,8 @@ const Test tests[] = {
     {"frames_round_trip", framesRoundTrip, false},
     {"readouts_are_derived", readoutsAreDerived, false},
     {"replay_and_resume", replayAndResume, false},
+    {"replay_through_the_ring", replayThroughTheRing, false},
+    {"replay_the_flight_home", replayTheFlightHome, false},
     {"crew_flight_finite", crewFlightFinite, false},
     {"abuse_finite", abuseFinite, false},
     {"ring_shape", ringShape, false},
@@ -1380,6 +1573,8 @@ const Test tests[] = {
     {"lift_from_the_windward_face", liftFromTheWindwardFace, false},
     {"peg_plan_is_its_own", pegPlanIsItsOwn, false},
     {"hash_covers_the_deck", hashCoversTheDeck, false},          // found by the audit of 599e051
+    {"hash_covers_the_return", hashCoversTheReturn, false},
+    {"hash_covers_the_fd", hashCoversTheFd, false},
     {"deck_flight_finite", deckFlightFinite, false},
     {"windy_ledger", windyLedger, false},
     {"wind_finite", windFinite, false},

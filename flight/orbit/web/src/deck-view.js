@@ -380,6 +380,7 @@ export const deck = {
       if (phase === DECK_PH.landed && auto === AUTO.off) {
         ctx.input.hands.throttle = 0.5;   // the deck hold's middle: stay down until the pilot opens it
         ctx.input.hands.brake = 1;
+        ctx.input.hands.gear = true;      // the crew landed on the gear: the hands start where the craft is
         ctx.say(`On ${padName(Math.round(d.pad))}: the drive idle, the brakes on. Yours, held on the deck`);
       }
       this.seen.phase = phase;

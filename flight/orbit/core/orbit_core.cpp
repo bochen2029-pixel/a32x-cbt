@@ -531,7 +531,10 @@ void approach(State& s, const Local& L, double* throttle) {
 
 void pilot(State& s, const Local& L, double* throttle) {
     *throttle = clampd(hands.throttle, 0, 1);
-    s.gear = hands.gearDown ? 1 : 0;
+    // The gear comes up only with no weight on it: on the runway or the deck its squat switches lock it down,
+    // as an airliner's do. (Found by the tour: the deck's crew handed the craft over on the pad to a page whose
+    // hands still held the gear up from the docked craft, and the gear folded under it.)
+    s.gear = hands.gearDown || (s.gear && (s.onGround || s.deck.onDeck)) ? 1 : 0;
     s.brake = clampd(hands.brake, 0, 1);
     s.steer = clampd(hands.yaw, -1, 1) * 30 * D2R / (1 + L.tas / 15);
     if (s.sas == OC_SAS_DECK && deckPilot(s, L, throttle)) return;   // jet-borne, on the deck's terms (deck.cpp)

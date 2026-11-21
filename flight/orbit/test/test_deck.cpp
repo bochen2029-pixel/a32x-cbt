@@ -8,11 +8,13 @@
 // TEST: crew_lands_from_hold
 // TEST: glide_bleeds_the_deck_speed
 // TEST: crew_lands_from_orbit
+// TEST: crew_lands_after_undocking
 // TEST: monte_carlo_development
 // TEST: monte_carlo_held_out
 // TEST: parked_stays_put
 // TEST: pilot_lands_by_hand
 // TEST: lift_off_and_hold
+// TEST: gear_locked_under_weight
 // TEST: hard_touchdown_crashes
 // TEST: firm_touchdown_is_not_a_crash
 // TEST: bulkhead_is_solid
@@ -360,6 +362,30 @@ void crewLandsFromOrbit() {
     CHECK(inTolerance(L), "verdict %d: sink %.3f, drift %.3f, off %.2f, tilt %.2f", L.verdict, L.sink, L.drift, L.off, L.tilt);
 }
 
+// From the port, as the tour does it: the crew docks, lets go ten seconds later, and the deck's crew takes the craft
+// at once. A plan keeps to its side of the Ring's plane but knows nothing of the hub; from beside its face the plan's
+// first turn and burn carried the craft into it (the tour's first run: the right wing struck the hub 9 s after the
+// crew took over). Beside the hub the crew backs off to the hold point first, as the approach's crew does, and lands
+// from there.
+void crewLandsAfterUndocking() {
+    if (!toOrbit()) return;
+    oc_auto(OC_AUTO_DOCK);
+    while (dock(OC_DOCK_DOCKED) < 0.5 && get(OC_CRASHED) == 0 && get(OC_T) < 4000) oc_step(50);
+    if (dock(OC_DOCK_DOCKED) < 0.5) { CHECK(false, "not docked by 4000 s"); return; }
+    oc_step(500);
+    oc_undock();
+    const double range0 = get(OC_PORT_RANGE);
+    oc_auto(OC_AUTO_DECK);
+    CHECK(dk(OC_DECK_PHASE) == OC_DECK_PH_TRANSFER, "%.0f m from the hold point, beside the hub, the crew backs off to it first: phase %.0f", range0,
+          dk(OC_DECK_PHASE));
+    const Landing L = crewLands(1200);
+    std::printf("  let go %.0f m from the hold point: out from it at %.0f s, at rest on pad %d at %.0f s; sink %.3f m/s, drift %.3f m/s, %.2f m off, %.2f deg; %.0f kg\n",
+                range0, L.phaseAt[OC_DECK_PH_DEPART], L.pad, L.took, L.sink, L.drift, L.off, L.tilt, L.prop);
+    CHECK(get(OC_CRASHED) == 0, "crashed: %s hit %s", partName((int)dock(OC_DOCK_HIT_PART)), hitName((int)dock(OC_DOCK_HIT)));
+    CHECK(L.took > 0 && L.took < 600, "took %.0f s", L.took);
+    CHECK(inTolerance(L), "verdict %d: sink %.3f, drift %.3f, off %.2f, tilt %.2f", L.verdict, L.sink, L.drift, L.off, L.tilt);
+}
+
 // The tests' own generator: a 64-bit linear congruential one, its top 53 bits a draw in [0, 1).
 struct Rng {
     unsigned long long x;
@@ -433,6 +459,28 @@ void pilotLandsByHand() {
           "sink %.3f, drift %.3f, off %.2f", dk(OC_DECK_TD_SINK), dk(OC_DECK_TD_DRIFT), dk(OC_DECK_TD_OFF));
     CHECK(idk(OC_DECK_TD_VERDICT) == OC_DECK_V_LANDED, "verdict %d", idk(OC_DECK_TD_VERDICT));
     CHECK(get(OC_THROTTLE) == 0, "on the deck, the throttle shut: the drive idle (%.3f)", get(OC_THROTTLE));
+}
+
+// The gear does not come up under the craft's weight: its squat switches lock it down, as an airliner's do.
+// Handed the craft on the pad, a pilot's hands that ask for the gear up (as the page's did, set from the docked
+// craft before the crew landed it) leave it down, and the craft sits on it ten seconds; lifted off in the deck
+// hold, off the deck, the gear comes up as the hands ask. (Found by the tour: the gear folded under the craft
+// on the pad, and the craft fell onto the deck.)
+void gearLockedUnderWeight() {
+    if (!landed()) return;
+    oc_controls(0, 0, 0, 0.5, 0, 0, 0, 0, 1);   // the gear asked up, the brakes on, the throttle at the hold's middle
+    oc_step(500);
+    std::printf("  on the pad, the gear asked up for 10 s: gear %.0f, on the deck %.0f, crashed %.0f\n", get(OC_GEAR), dk(OC_DECK_ON_DECK), get(OC_CRASHED));
+    CHECK(get(OC_CRASHED) == 0 && get(OC_GEAR) == 1 && dk(OC_DECK_ON_DECK) == 1, "on the pad: gear %.0f, on the deck %.0f, crashed %.0f", get(OC_GEAR),
+          dk(OC_DECK_ON_DECK), get(OC_CRASHED));
+    oc_controls(0, 0, 0, 1.0, 0, 0, 0, 0, 0);   // the throttle open, the brakes off: up
+    const double t0 = get(OC_T);
+    while (get(OC_T) - t0 < 60 && get(OC_CRASHED) == 0 && dk(OC_DECK_ON_DECK) == 1) oc_step(1);
+    const double off = get(OC_T) - t0;
+    oc_step(25);
+    std::printf("  the throttle open: off the deck in %.2f s; half a second later the gear %.0f, %.1f m up\n", off, get(OC_GEAR), dk(OC_DECK_HEIGHT));
+    CHECK(get(OC_CRASHED) == 0 && dk(OC_DECK_ON_DECK) == 0 && get(OC_GEAR) == 0, "off the deck: gear %.0f, on the deck %.0f, crashed %.0f", get(OC_GEAR),
+          dk(OC_DECK_ON_DECK), get(OC_CRASHED));
 }
 
 // Landed, the pilot opens the throttle: the craft lifts off, and with the throttle back at its centre it
@@ -1419,11 +1467,13 @@ const Test tests[] = {
     {"crew_lands_from_hold", crewLandsFromHold},
     {"glide_bleeds_the_deck_speed", glideBleedsTheDeckSpeed},
     {"crew_lands_from_orbit", crewLandsFromOrbit},
+    {"crew_lands_after_undocking", crewLandsAfterUndocking},
     {"monte_carlo_development", monteCarloDevelopment},
     {"monte_carlo_held_out", monteCarloHeldOut},
     {"parked_stays_put", parkedStaysPut},
     {"pilot_lands_by_hand", pilotLandsByHand},
     {"lift_off_and_hold", liftOffAndHold},
+    {"gear_locked_under_weight", gearLockedUnderWeight},
     {"hard_touchdown_crashes", hardTouchdownCrashes},
     {"firm_touchdown_is_not_a_crash", firmTouchdownIsNotACrash},
     {"bulkhead_is_solid", bulkheadIsSolid},

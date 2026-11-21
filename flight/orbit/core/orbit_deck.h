@@ -15,7 +15,8 @@
 // The crew's deck landing (oc_auto(OC_AUTO_DECK)) picks the nearest pad and flies to it by a plan that is
 // the least propellant the drive can land with (deck_plan.h: a convex program in the Ring's turning frame,
 // its length chosen at a price of time), made again at a low rate from where the craft is: to the
-// approach's hold point first if the craft is not near it; then a short burn out into the Ring; a coast,
+// approach's hold point first if the craft is not near it, or is beside the hub (let go from its port, say);
+// then a short burn out into the Ring; a coast,
 // weightless, while the pad comes round to meet the craft; and one burn (the airliner's approach turned
 // into the F-35's slam) that takes up the deck's 221.5 m/s coming down through the roof's gap inside the
 // approach's cone, to a gate OC_DECK_GATE_M over the pad's centre, sinking; then a steady descent to the

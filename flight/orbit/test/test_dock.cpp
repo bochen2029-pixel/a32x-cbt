@@ -23,6 +23,7 @@
 // TEST: spin_must_match
 // TEST: roof_is_solid
 // TEST: rim_wall_is_solid
+// TEST: probe_grazes_a_lip
 // TEST: spoke_is_solid
 // TEST: spoke_reaches_the_roof
 // TEST: hub_is_solid
@@ -35,11 +36,13 @@
 
 #include "../core/orbit_core.h"
 #include "../core/orbit_dock.h"
+#include "../core/internal.h"   // to place the craft to the centimetre where no flying puts it (probe_grazes_a_lip)
 
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <initializer_list>
+#include <string>
 
 namespace {
 
@@ -778,6 +781,43 @@ void rimWallIsSolid() {
           "%.0f m from the axis, %.0f m along it", w.radial, w.axial);
 }
 
+// Nothing thin is stepped over (INVARIANTS.md, G8). A rim wall is a plate of no thickness from its lip to the
+// roof, and the sweep that looks for a touch along each sphere's path over a step cut every path into pieces of
+// 0.8 m, which the probe's sphere, 0.15 m in radius, could step over. The craft at rest in the turning frame but
+// for 40 m/s along the axis, out across the band's side, its nose outward, so that only the probe's sphere
+// passes the plate: 5 cm beyond the lip, the probe strikes the rim wall; 5 cm short of its reach, inside the lip,
+// nothing touches.
+void probeGrazesALip() {
+    for (int pass = 0; pass < 2; ++pass) {
+        if (!toOrbit()) return;
+        oc_auto(OC_AUTO_OFF);
+        oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+        oc::State& g = oc::g;
+        const double t = oc::timeOf(g);
+        const oc::V3 c = oc::ringPos(t), ax = oc::ring.axis, ref = oc::ringRef(t);
+        const double a = (OC_DECK_ANGLE_DEG + 180) * D2R;   // across the Ring from the deck, between two spokes
+        const oc::V3 out = ref * std::sin(a) + oc::cross(ref, ax) * std::cos(a);
+        const double headR = pass == 0 ? OC_RING_RIM_M + 0.05 : OC_RING_RIM_M - 0.15 - 0.05;
+        const oc::V3 head = c + out * headR + ax * (-OC_RING_WIDTH_M / 2 + 1.0);   // a metre inside the band's side
+        g.q = oc::fromAxes(out, ax, oc::cross(out, ax));     // the nose outward, the wings along the axis
+        g.r = head - out * OC_DOCK_PROBE_M;
+        g.v = oc::ringVel(t) + oc::cross(ax * OC_RING_SPIN, g.r - c) - ax * 40.0;
+        g.w = oc::irot(g.q, ax * OC_RING_SPIN);
+        for (int i = 0; i < 10 && get(OC_CRASHED) == 0; ++i) oc_step(1);
+        const double along = oc::dot(g.r + oc::rot(g.q, oc::V3{OC_DOCK_PROBE_M, 0, 0}) - oc::ringPos(oc::timeOf(g)), ax);
+        std::printf("  the probe's head %+.2f m from the lip, 40 m/s along the axis: %s%s%s, the head %.2f m beyond the band's side\n", headR - OC_RING_RIM_M,
+                    get(OC_CRASHED) > 0 ? "hit " : "nothing touched", get(OC_CRASHED) > 0 ? hitName(idk(OC_DOCK_HIT)) : "",
+                    get(OC_CRASHED) > 0 ? (std::string(" with ") + partName(idk(OC_DOCK_HIT_PART))).c_str() : "", -OC_RING_WIDTH_M / 2 - along);
+        if (pass == 0) {
+            CHECK(get(OC_CRASHED) == 1 && dk(OC_DOCK_HIT) == OC_DOCK_HIT_RIM && dk(OC_DOCK_HIT_PART) == OC_DOCK_PART_PROBE,
+                  "5 cm beyond the lip the probe's sphere passed the plate: crashed %.0f, hit %s with %s", get(OC_CRASHED), hitName(idk(OC_DOCK_HIT)),
+                  partName(idk(OC_DOCK_HIT_PART)));
+        } else {
+            CHECK(get(OC_CRASHED) == 0, "5 cm short of the probe's reach: hit %s with %s", hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+        }
+    }
+}
+
 // Parked in the spokes' plane, between the hub and the rim, the craft is struck by the next spoke round.
 void spokeIsSolid() {
     if (!handsAtHold()) return;
@@ -1043,6 +1083,7 @@ const Test tests[] = {
     {"spin_must_match", spinMustMatch},
     {"roof_is_solid", roofIsSolid},
     {"rim_wall_is_solid", rimWallIsSolid},
+    {"probe_grazes_a_lip", probeGrazesALip},
     {"spoke_is_solid", spokeIsSolid},
     {"spoke_reaches_the_roof", spokeReachesTheRoof},
     {"hub_is_solid", hubIsSolid},

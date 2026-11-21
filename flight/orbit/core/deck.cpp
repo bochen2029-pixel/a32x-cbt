@@ -813,10 +813,15 @@ void deckEngage(State& s) {
         return;
     }
     // Near the axis, or inside the Ring at rest among the stars: the crew plans the landing from where the craft is.
-    // Elsewhere, and if no plan is found, it flies to the approach's hold point first.
+    // Elsewhere, and if no plan is found, it flies to the approach's hold point first. So it does from beside the
+    // hub, nearer its faces than the hold point (let go from the port, say): a plan keeps to its side of the Ring's
+    // plane but knows nothing of the hub, and from beside a face its first turn and burn carried the craft into it
+    // (the tour's first run: the right wing struck the hub 9 s after the crew took over at the port). The transfer
+    // backs straight off along the axis, as the approach's crew does.
+    const bool byHub = o.rho < OC_HUB_RADIUS_M + 150 && std::fabs(o.c) < OC_HUB_PORT_M + OC_STANDOFF_M - 50;
     const bool nearAxis = o.rho < 1500 && std::fabs(o.c) < 1500;
     const bool inside = std::fabs(o.c) < W2 - 40 && o.rho > OC_HUB_RADIUS_M + 60 && o.rho < OC_RING_RIM_M - 300;
-    if (nearAxis || inside) { beginSearch(s, t, TF_LO, TF_HI); k.phase = OC_DECK_PH_DEPART; return; }
+    if (!byHub && (nearAxis || inside)) { beginSearch(s, t, TF_LO, TF_HI); k.phase = OC_DECK_PH_DEPART; return; }
     k.phase = OC_DECK_PH_TRANSFER;
 }
 
