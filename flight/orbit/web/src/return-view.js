@@ -380,6 +380,10 @@ export const ret = {
     }
     ctx.core.auto(ctx.AUTO.return);
     ctx.core.read();
+    if (Math.round(ctx.core.s.auto) !== ctx.AUTO.return) {   // the core refuses it on the deck, or riding with it (deck.cpp)
+      ctx.say('The flight home starts from orbit: on the deck the crew takes off first (7, TAKE OFF), then R from the hold point');
+      return true;
+    }
     ctx.say(words);
     this.skipping = false;
     this.announce = Math.round(r.phase) === RET_PH.wait;   // the plan is made on the core's next step: say it then

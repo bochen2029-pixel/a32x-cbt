@@ -13,7 +13,8 @@ import * as THREE from 'three';
 import { AUTO, RING, SAS } from './core.js';
 import { add, cross, dot, scale, sub, three, unit } from './frames.js';
 import {
-  DECK, DECK_OUT, DECK_PH, DECK_V, WITHIN_M, approachLayout, deckCommand, deckHoldMakesSense, deckLines, deckStatus, engagedText, padName, touchdownText,
+  DECK, DECK_OUT, DECK_PH, DECK_V, WITHIN_M, approachLayout, deckCommand, deckHoldMakesSense, deckLines, deckStatus, engagedText, padName, takeoffCommand,
+  takeoffText, touchdownText,
 } from './deck-hud.js';
 
 const D = RING.deck;
@@ -226,7 +227,7 @@ export const deck = {
 
   init(ctx) {
     this.d = ctx.core.addBlock('deck', '_oc_deck_out', '_oc_deck_out_len', DECK_OUT);
-    this.seen = { tdT: this.d.tdT, nozzle: this.d.nozzle, moving: 0, phase: Math.round(this.d.phase) };
+    this.seen = { tdT: this.d.tdT, nozzle: this.d.nozzle, moving: 0, phase: Math.round(this.d.phase), auto: Math.round(ctx.core.s.auto) };
     this.touch = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
     this.marks = deckMarks();
     ctx.ring.spin.add(this.marks.group);
@@ -241,16 +242,25 @@ export const deck = {
     this.g = this.canvas.getContext('2d');
     this.drawn = false;
     const grid = document.getElementById('buttons');
-    if (grid) {   // LAND DECK, beside DOCK
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.id = 'btn-deck';
-      b.dataset.cmd = 'deck';
-      b.textContent = 'LAND DECK';
-      b.addEventListener('click', (e) => { ctx.input.commands.push('deck'); e.stopPropagation(); });
+    if (grid) {   // LAND DECK and TAKE OFF, beside DOCK
+      const button = (id, cmd, text) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.id = id;
+        b.dataset.cmd = cmd;
+        b.textContent = text;
+        b.addEventListener('click', (e) => { ctx.input.commands.push(cmd); e.stopPropagation(); });
+        return b;
+      };
+      const land = button('btn-deck', 'deck', 'LAND DECK'), off = button('btn-takeoff', 'takeoff', 'TAKE OFF');
       const dockButton = document.getElementById('btn-dock');
-      if (dockButton) dockButton.parentNode.insertBefore(b, dockButton.nextSibling);   // beside DOCK, in its group
-      else grid.appendChild(b);
+      if (dockButton) {   // beside DOCK, in its group
+        dockButton.parentNode.insertBefore(land, dockButton.nextSibling);
+        land.parentNode.insertBefore(off, land.nextSibling);
+      } else {
+        grid.appendChild(land);
+        grid.appendChild(off);
+      }
     }
   },
 
@@ -273,6 +283,15 @@ export const deck = {
       ctx.say(engagedText(ctx.core.s, d));
       return true;
     }
+    if (c === 'takeoff') {
+      const act = takeoffCommand(s, d, dock);
+      if (act.action !== 'engage') { ctx.say(act.say); return true; }
+      ctx.input.hands.brake = 0;
+      ctx.core.auto(AUTO.takeoff);
+      ctx.core.read();
+      ctx.say(takeoffText(ctx.core.s, d));
+      return true;
+    }
     if (c === 'sas5' || (c === 'sas-next' && sas === SAS.port && deckHoldMakesSense(s, dock))) {
       if (!deckHoldMakesSense(s, dock)) { ctx.say('The deck hold is for flying over the deck: within the Ring\'s reach'); return true; }
       this.toHold(ctx, 'Deck hold: the stick flies against the deck, the throttle climbs and sinks, the middle holds');
@@ -281,7 +300,7 @@ export const deck = {
     if (c === 'sas-next' && sas === SAS.deck) { ctx.core.sas(SAS.hold); ctx.say('Hold: attitude'); return true; }
     if (c === 'crew') {
       // over the deck, the pilot's hands go to the deck hold and the crew's to the deck landing
-      if (auto === AUTO.deck) { this.toHold(ctx, 'Your controls: the deck hold, the throttle\'s middle holds the height'); return true; }
+      if (auto === AUTO.deck || auto === AUTO.takeoff) { this.toHold(ctx, 'Your controls: the deck hold, the throttle\'s middle holds the height'); return true; }
       const near = s.ringRange < WITHIN_M && (sas === SAS.deck || d.onDeck > 0.5) && s.crashed === 0;
       if (auto === AUTO.off && near) {
         const act = deckCommand(s, d, dock);
@@ -306,7 +325,13 @@ export const deck = {
       }
       this.seen.tdT = d.tdT;
     }
+    if (auto !== this.seen.auto) {   // the take-off done: the approach's crew holds the craft at the hold point
+      if (this.seen.auto === AUTO.takeoff && auto === AUTO.approach) ctx.say('At the hold point: the approach\'s crew holds the craft there. R flies home');
+      this.seen.auto = auto;
+    }
     if (phase !== this.seen.phase) {
+      if (phase === DECK_PH.lift && auto === AUTO.takeoff) ctx.say('Lifting off: the drive straight down, the brakes off');
+      if (phase === DECK_PH.climb && auto === AUTO.takeoff) ctx.say('Climbing out through the roof\'s gap, the swivel going aft');
       if (phase === DECK_PH.landed && auto === AUTO.off) {
         ctx.input.hands.throttle = 0.5;   // the deck hold's middle: stay down until the pilot opens it
         ctx.input.hands.brake = 1;

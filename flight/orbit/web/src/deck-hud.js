@@ -11,25 +11,28 @@ const D2R = Math.PI / 180;
 // orbit_deck.h's numbers, in a pilot's units (m, m/s, degrees, kg), and its enums: a test holds them equal to
 // the header's.
 export const DECK = {
-  swivel: 15, glide: 400, hover: 20, side: 100,
+  swivel: 15, gate: 6, hover: 20, side: 60,
   tolSink: 0.5, tolDrift: 0.3, tolOff: 5, tolTilt: 2,
-  crashSink: 3, crashDrift: 2, crashTilt: 10, propMin: 2000,
+  crashSink: 3, crashDrift: 2, crashTilt: 10, propMin: 1000, takeoffPropMin: 500,
 };
 export const DECK_OUT = [
   'phase', 'pad', 'onDeck', 's', 'c', 'height', 'along', 'across', 'vertical', 'apparentG', 'nozzle', 'loc', 'gs',
   'fdAlong', 'fdAcross', 'fdVertical', 'setAlong', 'setAcross', 'setVertical',
   'tdVerdict', 'tdT', 'tdSink', 'tdDrift', 'tdOff', 'tdTilt', 'tdPad', 'propUsed', 'refused', 'sectorS', 'heading',
+  'planTime', 'planDv', 'planProp', 'planSolves', 'flownDv',
 ];
-export const DECK_PH = { none: 0, transfer: 1, depart: 2, wait: 3, glide: 4, hover: 5, descend: 6, landed: 7 };
+export const DECK_PH = {
+  none: 0, transfer: 1, depart: 2, wait: 3, glide: 4, hover: 5, descend: 6, landed: 7, lift: 8, climb: 9, coast: 10, arrive: 11,
+};
 export const DECK_V = { none: 0, landed: 1, crashed: 2, firm: 3, drifting: 4, tilted: 5, offPad: 6 };
-export const DECK_NO = { none: 0, docked: 1, crashed: 2, low: 3, far: 4, fast: 5, landed: 6, prop: 7, riding: 8, stop: 9 };
+export const DECK_NO = { none: 0, docked: 1, crashed: 2, low: 3, far: 4, fast: 5, landed: 6, prop: 7, riding: 8, stop: 9, notDown: 10, plan: 11 };
 
-const PHASE_WORDS = ['', 'to the hold point', 'out into the Ring', 'waiting for the pad to come round', 'on the glide', 'hovering over the pad',
-  'descending', 'on the deck'];
-const PHASE_LABELS = ['', 'TO HOLD POINT', 'OUT', 'WAIT', 'GLIDE', 'HOVER', 'DESCEND', 'ON DECK'];
+const PHASE_WORDS = ['', 'to the hold point', 'out into the Ring', 'coasting while the pad comes round', 'on the final burn', 'hovering over the pad',
+  'descending', 'on the deck', 'lifting off', 'climbing out through the roof\'s gap', 'coasting in to the hold point', 'stopping at the hold point'];
+const PHASE_LABELS = ['', 'TO HOLD POINT', 'OUT', 'COAST', 'FINAL', 'HOVER', 'DESCEND', 'ON DECK', 'LIFT', 'CLIMB', 'COAST IN', 'ARRIVE'];
 const REFUSED_WORDS = ['', 'docked at the hub', 'crashed', 'not in orbit', 'more than 50 km from the Ring', 'passing the Ring faster than 50 m/s',
   'on the deck already', 'too little propellant for it', 'turning with the Ring but not over the deck: fly over it first',
-  'moving along the deck too fast to stop before the bulkhead'];
+  'moving along the deck too fast to stop before the bulkhead', 'not on the deck, nor hovering low over it', 'no plan from here'];
 
 const round = (v) => Math.round(v);
 const sign = (v, digits) => { const r = Number(v.toFixed(digits)); return `${r >= 0 ? '+' : '-'}${Math.abs(r).toFixed(digits)}`; };
@@ -91,8 +94,27 @@ export function engagedText(s, d) {
   switch (round(d.phase)) {
     case DECK_PH.transfer: return `The crew lands on ${pad}: first to the hold point, ${fmtDistance(s.portRange)} away`;
     case DECK_PH.hover: return `The crew lands on ${pad}: over to it and down`;
-    default: return `The crew lands on ${pad}: out into the Ring, then the glide along the deck`;
+    case DECK_PH.glide: return `The crew lands on ${pad}: straight on, by a new plan`;
+    default: return `The crew lands on ${pad}: its plan of least propellant, out into the Ring, a coast, and one burn down onto it`;
   }
+}
+
+// What TAKE OFF does from here, and what the page says: start the crew's take-off, or nothing, saying why. The
+// core judges the same things (deckTakeoff) and refuses on its own as well.
+export function takeoffCommand(s, d, dock) {
+  if (s.crashed > 0) return { action: 'none', say: 'Crashed: start again' };
+  if (dock && dock.docked > 0.5) return { action: 'none', say: 'Docked at the hub: let go first (P)' };
+  if (round(s.auto) === AUTO.takeoff) return { action: 'none', say: `The crew is taking off: ${PHASE_WORDS[round(d.phase)] || 'on its way'}` };
+  const low = d.height < 100 && Math.abs(d.sectorS) < RING.deck.arc / 2 && Math.abs(d.c) < RING.width / 2 - 30 && s.ringRange < WITHIN_M;
+  if (!(d.onDeck > 0.5) && !(low && Math.abs(d.along) < 20)) return { action: 'none', say: 'The take-off is from the deck, or hovering low over it' };
+  if (s.prop < DECK.takeoffPropMin) return { action: 'none', say: `${s.prop.toFixed(0)} kg of propellant: a take-off wants ${DECK.takeoffPropMin}` };
+  return { action: 'engage', say: '' };
+}
+
+// What the page says once the crew's take-off has been asked for, or why the core refused it.
+export function takeoffText(s, d) {
+  if (round(s.auto) !== AUTO.takeoff) return `Take-off refused: ${REFUSED_WORDS[round(d.refused)] || 'the core gave no reason'}`;
+  return `The crew takes off from ${padName(round(d.pad))}: straight up, then out through the roof's gap to the hold point`;
 }
 
 // The status line: the crew's phases, the pilot's deck hold, on the deck; null leaves the others' lines.
@@ -101,20 +123,30 @@ export function deckStatus(s, d, touch = false) {
   const phase = round(d.phase), auto = round(s.auto);
   if (s.crashed > 0) return null;   // a crash is docking's to say: it keeps the record of what hit what
   const pad = padName(round(d.pad));
+  const left = d.planTime >= 0 ? ` · ${d.planTime.toFixed(0)} s` : '';
   if (auto === AUTO.deck) {
     switch (phase) {
       case DECK_PH.transfer: return { line: `DECK · ${fmtDistance(s.portRange)} to the hold point`, hint: k.take };
-      case DECK_PH.depart: return { line: `DECK · OUT INTO THE RING · ${fmtDistance(d.height)} over the floor`, hint: k.take };
-      case DECK_PH.wait: return { line: `DECK · WAITING · ${pad} ${fmtDistance(d.s)} ahead, the deck by at ${Math.abs(d.along).toFixed(0)} m/s`, hint: k.take };
-      case DECK_PH.glide: return { line: `DECK · GLIDE · ${pad} ${fmtDistance(d.s)} · ${Math.abs(d.along).toFixed(0)} m/s against the deck · swivel ${d.nozzle.toFixed(0)}°`, hint: k.take };
+      case DECK_PH.depart: return { line: `DECK · OUT INTO THE RING · ${pad}${left}`, hint: k.take };
+      case DECK_PH.wait: return { line: `DECK · COAST · ${pad}${left} · the deck by at ${Math.abs(d.along).toFixed(0)} m/s`, hint: k.take };
+      case DECK_PH.glide: return { line: `DECK · FINAL · ${pad} ${fmtDistance(d.s)} · ${Math.abs(d.along).toFixed(0)} m/s against the deck · swivel ${d.nozzle.toFixed(0)}°${left}`, hint: k.take };
       case DECK_PH.hover: return { line: `DECK · HOVER over ${pad} · ${d.height.toFixed(1)} m`, hint: k.take };
       case DECK_PH.descend: return { line: `DECK · DESCENDING onto ${pad} · ${(d.height - 3).toFixed(1)} m · ${Math.abs(d.vertical).toFixed(2)} m/s`, hint: k.take };
       default: return { line: `DECK · ${PHASE_LABELS[phase] || ''}`, hint: k.take };
     }
   }
+  if (auto === AUTO.takeoff) {
+    switch (phase) {
+      case DECK_PH.lift: return { line: `TAKE-OFF · LIFT · ${d.height.toFixed(1)} m over ${pad}`, hint: k.take };
+      case DECK_PH.climb: return { line: `TAKE-OFF · CLIMB · ${fmtDistance(d.height)} over the floor · swivel ${d.nozzle.toFixed(0)}°${left}`, hint: k.take };
+      case DECK_PH.coast: return { line: `TAKE-OFF · COAST · ${fmtDistance(s.portRange)} to the hold point${left}`, hint: k.take };
+      case DECK_PH.arrive: return { line: `TAKE-OFF · ARRIVE · ${fmtDistance(s.portRange)} to the hold point${left}`, hint: k.take };
+      default: return { line: `TAKE-OFF · ${PHASE_LABELS[phase] || ''}`, hint: k.take };
+    }
+  }
   if (phase === DECK_PH.landed || d.onDeck > 0.5) {
     const last = round(d.tdVerdict) !== DECK_V.none ? ` · ${verdictText(d)}` : '';
-    return { line: `ON THE DECK${last}`, hint: touch ? 'THR up: lift off' : 'Shift: lift off' };
+    return { line: `ON THE DECK${last}`, hint: touch ? 'THR up: lift off · TAKE OFF: the crew' : 'Shift: lift off · 7: the crew takes off' };
   }
   if (auto === AUTO.off && round(s.sas) === SAS.deck && s.ringRange < WITHIN_M) {
     const speed = Math.hypot(d.along, d.across).toFixed(1);
@@ -129,10 +161,11 @@ export function deckStatus(s, d, touch = false) {
 // The HUD's deck lines: while the crew lands, in the deck hold, or on the deck.
 export function deckLines(s, d, narrow = false) {
   const phase = round(d.phase), auto = round(s.auto);
-  const active = auto === AUTO.deck || d.onDeck > 0.5 || phase === DECK_PH.landed || (round(s.sas) === SAS.deck && s.ringRange < WITHIN_M);
+  const crew = auto === AUTO.deck || auto === AUTO.takeoff;
+  const active = crew || d.onDeck > 0.5 || phase === DECK_PH.landed || (round(s.sas) === SAS.deck && s.ringRange < WITHIN_M);
   if (s.crashed > 0 || !active) return [];
   const pad = padName(round(d.pad));
-  const label = auto === AUTO.deck ? PHASE_LABELS[phase] : d.onDeck > 0.5 ? 'ON DECK' : 'HOLD';
+  const label = crew ? PHASE_LABELS[phase] : d.onDeck > 0.5 ? 'ON DECK' : 'HOLD';
   const far = phase === DECK_PH.transfer;
   if (narrow) {
     const lines = [`DECK ${label} ${pad} ${fmtDistance(d.s)}`];
@@ -145,8 +178,11 @@ export function deckLines(s, d, narrow = false) {
     `     against the deck ${sign(d.along, 1)} along  ${sign(d.across, 1)} across  ${sign(d.vertical, 1)} up  m/s   ${d.apparentG.toFixed(2)} g   swivel ${d.nozzle.toFixed(0)}°`,
     `     ILS localizer ${sign(d.loc, 1)} m  glide path ${sign(d.gs, 1)} m   FD ${sign(d.fdAlong, 1)} ${sign(d.fdAcross, 1)} ${sign(d.fdVertical, 1)} m/s`,
   );
+  if (crew && d.planTime >= 0) {
+    lines.push(`     the plan: ${d.planTime.toFixed(0)} s left, ${d.planDv.toFixed(0)} m/s, ${d.planProp.toFixed(0)} kg   ${round(d.planSolves)} made`);
+  }
   if (round(d.tdVerdict) !== DECK_V.none) lines.push(`     last touchdown: ${verdictText(d)}`);
-  if (d.propUsed > 0) lines.push(`     propellant for the landing ${d.propUsed.toFixed(0)} kg`);
+  if (d.propUsed > 0) lines.push(`     propellant for the ${auto === AUTO.takeoff ? 'take-off' : 'landing'} ${d.propUsed.toFixed(0)} kg`);
   return lines;
 }
 

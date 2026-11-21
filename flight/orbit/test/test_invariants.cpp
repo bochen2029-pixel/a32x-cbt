@@ -1166,44 +1166,85 @@ bool overTheDeck(Scan& scan) {
 void overTheDeckForAbuse(Scan& scan) { overTheDeck(scan); }
 
 // The hash covers the deck's state as it covers the flight's (O6): the drive's swivel and what the law asks of it,
-// and every field the deck keeps (deck_state.h). Over the deck, each changed alone by the least that changes it
-// changes the hash. (Found by the audit of 599e051: the swivel could be dropped from the hash and no test saw it.)
+// and every field the deck keeps (deck_state.h), the crew's plan node by node and the disturbances a test sets
+// among them. Over the deck, each changed alone by the least that changes it changes the hash. (Found by the audit
+// of 599e051: the swivel could be dropped from the hash and no test saw it.)
 void hashCoversTheDeck() {
-    static_assert(sizeof(oc::DeckState) == 400, "deck_state.h has changed: list its fields below");
+    static_assert(sizeof(oc::DeckState) == 4672, "deck_state.h has changed: list its fields below");
     Scan scan;
     if (!overTheDeck(scan)) { CHECK(false, "not over the deck"); return; }
     oc_step(100);
     oc::State& g = oc::g;
     oc::DeckState& k = g.deck;
-    struct F { const char* name; double* d; int* i; };
-    const F fields[] = {
-        {"nozzle", &g.nozzle, nullptr}, {"nozzleCmd", &g.nozzleCmd, nullptr}, {"phase", nullptr, &k.phase}, {"pad", nullptr, &k.pad},
-        {"refused", nullptr, &k.refused}, {"autoBefore", nullptr, &k.autoBefore}, {"near", nullptr, &k.near}, {"onDeck", nullptr, &k.onDeck},
-        {"stuck0", nullptr, &k.stuck[0]}, {"stuck1", nullptr, &k.stuck[1]}, {"stuck2", nullptr, &k.stuck[2]},
-        {"anchor0x", &k.anchor[0].x, nullptr}, {"anchor0y", &k.anchor[0].y, nullptr}, {"anchor0z", &k.anchor[0].z, nullptr},
-        {"anchor1x", &k.anchor[1].x, nullptr}, {"anchor1y", &k.anchor[1].y, nullptr}, {"anchor1z", &k.anchor[1].z, nullptr},
-        {"anchor2x", &k.anchor[2].x, nullptr}, {"anchor2y", &k.anchor[2].y, nullptr}, {"anchor2z", &k.anchor[2].z, nullptr},
-        {"still", nullptr, &k.still}, {"calm", nullptr, &k.calm}, {"side", nullptr, &k.side},
-        {"holdAtx", &k.holdAt.x, nullptr}, {"holdAty", &k.holdAt.y, nullptr}, {"holdAtz", &k.holdAt.z, nullptr},
-        {"as", &k.as, nullptr}, {"sK", &k.sK, nullptr}, {"vK", &k.vK, nullptr}, {"aF", &k.aF, nullptr}, {"sL0", &k.sL0, nullptr}, {"sL1", &k.sL1, nullptr},
-        {"prop0", &k.prop0, nullptr}, {"holding", nullptr, &k.holding}, {"holdingC", nullptr, &k.holdingC},
-        {"holdPosx", &k.holdPos.x, nullptr}, {"holdPosy", &k.holdPos.y, nullptr}, {"holdPosz", &k.holdPos.z, nullptr},
-        {"holdingH", nullptr, &k.holdingH}, {"holdH", &k.holdH, nullptr}, {"setS", &k.setS, nullptr}, {"setC", &k.setC, nullptr},
-        {"cmdS", &k.cmdS, nullptr}, {"cmdC", &k.cmdC, nullptr}, {"setH", &k.setH, nullptr}, {"heading", &k.heading, nullptr},
-        {"armed", nullptr, &k.armed}, {"verdict", nullptr, &k.verdict}, {"tdPad", nullptr, &k.tdPad}, {"tdT", &k.tdT, nullptr},
-        {"tdSink", &k.tdSink, nullptr}, {"tdDrift", &k.tdDrift, nullptr}, {"tdOff", &k.tdOff, nullptr}, {"tdTilt", &k.tdTilt, nullptr},
-        {"lastValid", nullptr, &k.lastValid}, {"sinkLast", &k.sinkLast, nullptr}, {"sinkRate", &k.sinkRate, nullptr},
-        {"legLast", &k.legLast, nullptr}, {"driftLast", &k.driftLast, nullptr},
+    struct F { const char* name; double* d; int* i; unsigned long long* u; };
+    std::vector<F> fields = {
+        {"nozzle", &g.nozzle, nullptr, nullptr}, {"nozzleCmd", &g.nozzleCmd, nullptr, nullptr},
+        {"phase", nullptr, &k.phase, nullptr}, {"pad", nullptr, &k.pad, nullptr}, {"refused", nullptr, &k.refused, nullptr},
+        {"autoBefore", nullptr, &k.autoBefore, nullptr}, {"near", nullptr, &k.near, nullptr}, {"onDeck", nullptr, &k.onDeck, nullptr},
+        {"stuck0", nullptr, &k.stuck[0], nullptr}, {"stuck1", nullptr, &k.stuck[1], nullptr}, {"stuck2", nullptr, &k.stuck[2], nullptr},
+        {"anchor0x", &k.anchor[0].x, nullptr, nullptr}, {"anchor0y", &k.anchor[0].y, nullptr, nullptr}, {"anchor0z", &k.anchor[0].z, nullptr, nullptr},
+        {"anchor1x", &k.anchor[1].x, nullptr, nullptr}, {"anchor1y", &k.anchor[1].y, nullptr, nullptr}, {"anchor1z", &k.anchor[1].z, nullptr, nullptr},
+        {"anchor2x", &k.anchor[2].x, nullptr, nullptr}, {"anchor2y", &k.anchor[2].y, nullptr, nullptr}, {"anchor2z", &k.anchor[2].z, nullptr, nullptr},
+        {"still", nullptr, &k.still, nullptr}, {"calm", nullptr, &k.calm, nullptr}, {"side", nullptr, &k.side, nullptr},
+        {"prop0", &k.prop0, nullptr, nullptr},
+        {"plan.n", nullptr, &k.plan.n, nullptr}, {"plan.t0", &k.plan.t0, nullptr, nullptr}, {"plan.tf", &k.plan.tf, nullptr, nullptr},
+        {"plan.cost", &k.plan.cost, nullptr, nullptr},
+        {"planKind", nullptr, &k.planKind, nullptr}, {"planEnd", &k.planEnd, nullptr, nullptr}, {"planNext", &k.planNext, nullptr, nullptr},
+        {"planSolves", nullptr, &k.planSolves, nullptr}, {"planFails", nullptr, &k.planFails, nullptr},
+        {"planIters", nullptr, &k.planIters, nullptr}, {"planStatus", nullptr, &k.planStatus, nullptr},
+        {"burnt", nullptr, &k.burnt, nullptr}, {"v1", &k.v1, nullptr, nullptr},
+        {"holding", nullptr, &k.holding, nullptr}, {"holdingC", nullptr, &k.holdingC, nullptr},
+        {"holdPosx", &k.holdPos.x, nullptr, nullptr}, {"holdPosy", &k.holdPos.y, nullptr, nullptr}, {"holdPosz", &k.holdPos.z, nullptr, nullptr},
+        {"holdingH", nullptr, &k.holdingH, nullptr}, {"holdH", &k.holdH, nullptr, nullptr}, {"setS", &k.setS, nullptr, nullptr},
+        {"setC", &k.setC, nullptr, nullptr}, {"cmdS", &k.cmdS, nullptr, nullptr}, {"cmdC", &k.cmdC, nullptr, nullptr},
+        {"setH", &k.setH, nullptr, nullptr}, {"heading", &k.heading, nullptr, nullptr}, {"armed", nullptr, &k.armed, nullptr},
+        {"verdict", nullptr, &k.verdict, nullptr}, {"tdPad", nullptr, &k.tdPad, nullptr}, {"tdT", &k.tdT, nullptr, nullptr},
+        {"tdSink", &k.tdSink, nullptr, nullptr}, {"tdDrift", &k.tdDrift, nullptr, nullptr}, {"tdOff", &k.tdOff, nullptr, nullptr},
+        {"tdTilt", &k.tdTilt, nullptr, nullptr}, {"lastValid", nullptr, &k.lastValid, nullptr}, {"sinkLast", &k.sinkLast, nullptr, nullptr},
+        {"sinkRate", &k.sinkRate, nullptr, nullptr}, {"legLast", &k.legLast, nullptr, nullptr}, {"driftLast", &k.driftLast, nullptr, nullptr},
+        {"dThrust", &k.dThrust, nullptr, nullptr}, {"dMass", &k.dMass, nullptr, nullptr}, {"dLag", &k.dLag, nullptr, nullptr},
+        {"dPos", &k.dPos, nullptr, nullptr}, {"dVel", &k.dVel, nullptr, nullptr}, {"noiseSeed", nullptr, nullptr, &k.noiseSeed},
+        {"lagged", &k.lagged, nullptr, nullptr},
+        {"search", nullptr, &k.search, nullptr}, {"gsA", &k.gsA, nullptr, nullptr}, {"gsB", &k.gsB, nullptr, nullptr},
+        {"gsC", &k.gsC, nullptr, nullptr}, {"gsD", &k.gsD, nullptr, nullptr}, {"gsJc", &k.gsJc, nullptr, nullptr},
+        {"gsJd", &k.gsJd, nullptr, nullptr}, {"gsBest", &k.gsBest, nullptr, nullptr}, {"st0", &k.st0, nullptr, nullptr},
+        {"sr0x", &k.sr0.x, nullptr, nullptr}, {"sr0y", &k.sr0.y, nullptr, nullptr}, {"sr0z", &k.sr0.z, nullptr, nullptr},
+        {"sv0x", &k.sv0.x, nullptr, nullptr}, {"sv0y", &k.sv0.y, nullptr, nullptr}, {"sv0z", &k.sv0.z, nullptr, nullptr},
+        {"sm0", &k.sm0, nullptr, nullptr}, {"su0x", &k.su0.x, nullptr, nullptr}, {"su0y", &k.su0.y, nullptr, nullptr},
+        {"su0z", &k.su0.z, nullptr, nullptr}, {"tryNext", nullptr, &k.tryNext, nullptr},
+        {"kT", &k.kT, nullptr, nullptr}, {"uPrevx", &k.uPrev.x, nullptr, nullptr}, {"uPrevy", &k.uPrev.y, nullptr, nullptr},
+        {"uPrevz", &k.uPrev.z, nullptr, nullptr}, {"aPrevx", &k.aPrev.x, nullptr, nullptr}, {"aPrevy", &k.aPrev.y, nullptr, nullptr},
+        {"aPrevz", &k.aPrev.z, nullptr, nullptr}, {"dPrevx", &k.dPrev.x, nullptr, nullptr}, {"dPrevy", &k.dPrev.y, nullptr, nullptr},
+        {"dPrevz", &k.dPrev.z, nullptr, nullptr}, {"estValid", nullptr, &k.estValid, nullptr},
     };
+    for (int i = 0; i < 6; ++i) fields.push_back({"noise", &k.noise[i], nullptr, nullptr});
+    for (int i = 0; i <= oc::PLAN_MAX; ++i) {   // the plan, node by node
+        for (int j = 0; j < 3; ++j) {
+            fields.push_back({"plan.r", &k.plan.r[i][j], nullptr, nullptr});
+            fields.push_back({"plan.v", &k.plan.v[i][j], nullptr, nullptr});
+            if (i < oc::PLAN_MAX) fields.push_back({"plan.u", &k.plan.u[i][j], nullptr, nullptr});
+        }
+        fields.push_back({"plan.z", &k.plan.z[i], nullptr, nullptr});
+        fields.push_back({"plan.t", &k.plan.t[i], nullptr, nullptr});
+        if (i < oc::PLAN_MAX) fields.push_back({"plan.sigma", &k.plan.sigma[i], nullptr, nullptr});
+    }
     const unsigned h0 = oc_hash();
     int missed = 0;
     for (const F& f : fields) {
         unsigned h;
         if (f.d) { const double v = *f.d; *f.d = std::nextafter(v, 1e300); h = oc_hash(); *f.d = v; }
-        else { const int v = *f.i; *f.i = v ^ 1; h = oc_hash(); *f.i = v; }
+        else if (f.i) { const int v = *f.i; *f.i = v ^ 1; h = oc_hash(); *f.i = v; }
+        else { const unsigned long long v = *f.u; *f.u = v ^ 1; h = oc_hash(); *f.u = v; }
         if (h == h0) { std::printf("  %s is not in the hash\n", f.name); ++missed; }
     }
-    std::printf("  %d of the deck's fields changed alone, each by its least step: %d left the hash as it was\n", (int)(sizeof fields / sizeof fields[0]), missed);
+    // and the seed's high half, which a double's 53 bits would round away if it were hashed as one number
+    {
+        const unsigned long long v = k.noiseSeed;
+        k.noiseSeed = v ^ (1ULL << 62);
+        if (oc_hash() == h0) { std::printf("  noiseSeed's high bits are not in the hash\n"); ++missed; }
+        k.noiseSeed = v;
+    }
+    std::printf("  %d of the deck's fields changed alone, each by its least step: %d left the hash as it was\n", (int)fields.size() + 1, missed);
     CHECK(missed == 0 && oc_hash() == h0, "%d fields not in the hash", missed);
 }
 
