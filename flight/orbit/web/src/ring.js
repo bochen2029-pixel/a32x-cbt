@@ -255,6 +255,35 @@ function paintFloor(T, plan, seed) {
   return p;
 }
 
+// The port's mouth, painted on a canvas over CircleGeometry's UVs (the disc's centre at the middle): dark
+// plating in concentric rings, twelve seams out from the target plate (dock-view.js, 18 m), and 24 guide
+// lamps 36 m out. map: the colour; glow: the lamps alone, for the emissive map.
+function paintMouth(n = 256) {
+  const canvas = () => { const c = document.createElement('canvas'); c.width = c.height = n; return c; };
+  const a = canvas(), g = canvas(), A = a.getContext('2d'), G = g.getContext('2d'), m = n / 2, px = m / PORT.mouth;
+  A.fillStyle = '#2c3239';
+  A.fillRect(0, 0, n, n);
+  for (let r = 20; r < PORT.mouth; r += 4) {
+    A.strokeStyle = r % 8 ? '#363d45' : '#20252b';
+    A.lineWidth = 1.2;
+    A.beginPath(); A.arc(m, m, r * px, 0, 2 * Math.PI); A.stroke();
+  }
+  A.strokeStyle = '#1b1f24';
+  A.lineWidth = 2;
+  for (let k = 0; k < 12; k++) {
+    const t = (k / 12) * 2 * Math.PI, c = Math.cos(t), sn = Math.sin(t);
+    A.beginPath(); A.moveTo(m + 19 * px * c, m + 19 * px * sn); A.lineTo(m + (PORT.mouth - 1) * px * c, m + (PORT.mouth - 1) * px * sn); A.stroke();
+  }
+  G.fillStyle = '#000';
+  G.fillRect(0, 0, n, n);
+  for (let k = 0; k < 24; k++) {
+    const t = (k / 24) * 2 * Math.PI, x = m + 36 * px * Math.cos(t), y = m + 36 * px * Math.sin(t);
+    for (const C of [A, G]) { C.fillStyle = '#9fe8ff'; C.beginPath(); C.arc(x, y, 1.6, 0, 2 * Math.PI); C.fill(); }
+  }
+  const tex = (c) => { const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
+  return { map: tex(a), glow: tex(g) };
+}
+
 // The deck: dark plates in rows, their seams, wear down the middle, a painted line along each side and
 // across each end, small lights set in the plating by the edges; the centreline left plain, where the
 // pads are drawn. u along the deck (its bulkheads included), v across it: the band's whole width, HALF
@@ -722,7 +751,11 @@ export class Ring {
     add(annulus({ r0: MAST.r + 2, r1: RING.hub, y: HUB_PORT_M, segs: 96, facing: 1, uTiles: 8, vTiles: 0.8 }), hubM);
     for (const y of [-300, -200, -100, 100, 200, 300]) add(new THREE.TorusGeometry(RING.hub + 1.5, 2.5, 6, 96).rotateX(Math.PI / 2).translate(0, y, 0), plain);
     const portM = new THREE.MeshStandardMaterial({ color: 0x9fe8ff, roughness: 0.3, metalness: 0.2, emissive: 0x2a6f88, emissiveIntensity: 0.6 });
-    const mouthM = new THREE.MeshBasicMaterial({ color: 0x050608 });
+    // The port's mouth: a recessed face of dark metal, lit as the hub is, with its rings, its seams and a
+    // ring of guide lamps round the target. Drawn unlit black, as it was, it read as a hole into the hub.
+    const mouthMaps = paintMouth();
+    this.textures.push(mouthMaps.map, mouthMaps.glow);
+    const mouthM = new THREE.MeshStandardMaterial({ map: mouthMaps.map, roughness: 0.6, metalness: 0.55, emissive: 0xffffff, emissiveMap: mouthMaps.glow, emissiveIntensity: 1.5 });
     this.materials.push(portM, mouthM);
     const port = add(new THREE.TorusGeometry(PORT.torus, PORT.tube, 12, 48), portM);
     port.rotation.x = Math.PI / 2;
