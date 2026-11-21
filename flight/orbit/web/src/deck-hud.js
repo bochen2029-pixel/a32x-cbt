@@ -158,10 +158,12 @@ export function deckStatus(s, d, touch = false) {
   return null;
 }
 
-// The HUD's deck lines: while the crew lands, in the deck hold, or on the deck.
-export function deckLines(s, d, narrow = false) {
+// The HUD's deck lines: while the crew lands, in the deck hold, or on the deck. lastCrew is the deck crew's job
+// last asked (AUTO.deck or AUTO.takeoff), which names the propellant used once the crew has handed the craft on.
+export function deckLines(s, d, narrow = false, lastCrew = AUTO.deck) {
   const phase = round(d.phase), auto = round(s.auto);
   const crew = auto === AUTO.deck || auto === AUTO.takeoff;
+  const job = (crew ? auto : lastCrew) === AUTO.takeoff ? 'take-off' : 'landing';
   const active = crew || d.onDeck > 0.5 || phase === DECK_PH.landed || (round(s.sas) === SAS.deck && s.ringRange < WITHIN_M);
   if (s.crashed > 0 || !active) return [];
   const pad = padName(round(d.pad));
@@ -182,7 +184,7 @@ export function deckLines(s, d, narrow = false) {
     lines.push(`     the plan: ${d.planTime.toFixed(0)} s left, ${d.planDv.toFixed(0)} m/s, ${d.planProp.toFixed(0)} kg   ${round(d.planSolves)} made`);
   }
   if (round(d.tdVerdict) !== DECK_V.none) lines.push(`     last touchdown: ${verdictText(d)}`);
-  if (d.propUsed > 0) lines.push(`     propellant for the ${auto === AUTO.takeoff ? 'take-off' : 'landing'} ${d.propUsed.toFixed(0)} kg`);
+  if (d.propUsed > 0) lines.push(`     propellant for the ${job} ${d.propUsed.toFixed(0)} kg`);
   return lines;
 }
 

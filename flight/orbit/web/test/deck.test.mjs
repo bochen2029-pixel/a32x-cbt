@@ -169,6 +169,12 @@ test('the HUD\'s deck lines: only while the deck matters, with the numbers an ap
   assert.deepEqual(deckLines(crew, { ...glide, phase: DECK_PH.transfer }), ['DECK TO HOLD POINT  pad 2  3.21 km along the deck   400 m over the floor']);
   assert.ok(deckLines(crew, glide, true).every((l) => l.length <= 40), 'a phone\'s lines are short');
   assert.deepEqual(deckLines({ ...S, crashed: 1 }, glide), []);
+  // the propellant is the job's the crew was last given: the take-off's still once the approach's crew holds the
+  // craft at the hold point, the deck hold's lines shown there
+  const held = { ...S, auto: AUTO.approach, sas: SAS.deck, ringRange: 4900 }, after = { ...glide, phase: DECK_PH.none, planTime: -1 };
+  assert.match(deckLines({ ...S, auto: AUTO.takeoff }, { ...glide, phase: DECK_PH.climb }).at(-1), /propellant for the take-off 612 kg$/);
+  assert.match(deckLines(held, after, false, AUTO.takeoff).at(-1), /propellant for the take-off 612 kg$/);
+  assert.match(deckLines(held, after, false, AUTO.deck).at(-1), /propellant for the landing 612 kg$/);
 });
 
 test('the approach display: the needles point to the path, the plan shows the pad and the velocities nose up', () => {
