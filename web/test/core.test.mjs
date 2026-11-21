@@ -57,6 +57,13 @@ test('the ring\'s shape is the header\'s', () => {
       angle: def('OC_DECK_ANGLE_DEG'), arc: def('OC_DECK_ARC_M'), bulkhead: def('OC_DECK_BULKHEAD_M'), pads: def('OC_DECK_PADS'),
       padSpacing: def('OC_DECK_PAD_SPACING_M'), padRadius: def('OC_DECK_PAD_RADIUS_M'),
     },
+    collar: { r: def('OC_HUB_COLLAR_M'), half: def('OC_HUB_COLLAR_HALF_M') },
+    radiators: { r0: def('OC_RADIATOR_R0_M'), r1: def('OC_RADIATOR_R1_M'), y0: def('OC_RADIATOR_Y0_M'), y1: def('OC_RADIATOR_Y1_M'), thick: def('OC_RADIATOR_THICK_M') },
+    mast: { length: def('OC_MAST_M'), r: def('OC_MAST_RADIUS_M'), footR: def('OC_MAST_FOOT_RADIUS_M'), foot: def('OC_MAST_FOOT_M') },
+    arrays: {
+      count: def('OC_ARRAYS'), first: def('OC_ARRAY_FIRST_M'), step: def('OC_ARRAY_STEP_M'), span: def('OC_ARRAY_SPAN_M'), root: def('OC_ARRAY_ROOT_M'),
+      chord: def('OC_ARRAY_CHORD_M'), thick: def('OC_ARRAY_THICK_M'), spar: def('OC_ARRAY_SPAR_M'),
+    },
   });
   // the deck's pads fit inside its open sector, clear of the bulkheads, and the sector clear of the spokes
   const d = RING.deck, half = d.arc / 2;

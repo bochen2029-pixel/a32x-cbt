@@ -138,10 +138,60 @@ double outsideBox(double dx, double dy) {
     return std::hypot(std::fmax(dx, 0.0), std::fmax(dy, 0.0)) + std::fmin(std::fmax(dx, dy), 0.0);
 }
 
+// The same in space: qx, qy, qz the point's distances past the box's half-widths along its three axes.
+double outsideBox3(double qx, double qy, double qz) {
+    const double mx = std::fmax(qx, 0.0), my = std::fmax(qy, 0.0), mz = std::fmax(qz, 0.0);
+    return std::sqrt(mx * mx + my * my + mz * mz) + std::fmin(std::fmax(qx, std::fmax(qy, qz)), 0.0);
+}
+
+// The hub's fittings that turn with it (orbit_core.h): the collar, part of the hub, and the radiators midway
+// between the spokes on the far side from the port, each a flat panel standing out from the hub along its angle.
+int touchFittings(V3 p, double r, double rho) {
+    const double ay = std::fabs(p.y);
+    if (ay < OC_HUB_COLLAR_HALF_M + r && rho < OC_HUB_COLLAR_M + r && outsideBox(rho - OC_HUB_COLLAR_M, ay - OC_HUB_COLLAR_HALF_M) < r) return OC_DOCK_HIT_HUB;
+    if (p.y > OC_RADIATOR_Y0_M - r && p.y < OC_RADIATOR_Y1_M + r && rho > OC_RADIATOR_R0_M - r - 1 && rho < OC_RADIATOR_R1_M + r + 1) {
+        const double step = 2 * PI / OC_RING_SPOKES;
+        const double th = std::atan2(p.x, p.z) - step / 2;   // radiator k midway between spokes k and k + 1
+        const double off = th - std::round(th / step) * step;
+        const double along = rho * std::cos(off), across = rho * std::sin(off);
+        const double qx = std::fabs(along - (OC_RADIATOR_R0_M + OC_RADIATOR_R1_M) / 2) - (OC_RADIATOR_R1_M - OC_RADIATOR_R0_M) / 2;
+        const double qy = std::fabs(p.y - (OC_RADIATOR_Y0_M + OC_RADIATOR_Y1_M) / 2) - (OC_RADIATOR_Y1_M - OC_RADIATOR_Y0_M) / 2;
+        if (outsideBox3(qx, qy, std::fabs(across) - OC_RADIATOR_THICK_M / 2) < r) return OC_DOCK_HIT_RADIATOR;
+    }
+    return OC_DOCK_HIT_NONE;
+}
+
+// The solar mast and its arrays, which do not turn with the Ring: held still among the stars beyond the hub's far
+// face, the arrays square to the Sun. sunAz is the Sun's angle about the axis in the spokes' convention and sunEl
+// its elevation toward +y, both in the ring's frame at the moment p is for. The mast's frame as ring.js turns it:
+// z toward the Sun about the axis, y the axis, x = y cross z along the wings' span; each pair of wings tilted about
+// x by the Sun's elevation, so that its face is square to the Sun.
+int touchMast(V3 p, double r, double sunAz, double sunEl) {
+    if (p.y < OC_HUB_PORT_M - r) return OC_DOCK_HIT_NONE;
+    const double rho = std::hypot(p.x, p.z), reach = OC_ARRAY_ROOT_M + OC_ARRAY_SPAN_M, y0 = OC_HUB_PORT_M;
+    if (rho > reach + r + 1) return OC_DOCK_HIT_NONE;
+    if (outsideBox(rho - OC_MAST_RADIUS_M, std::fabs(p.y - (y0 + OC_MAST_M / 2)) - OC_MAST_M / 2) < r) return OC_DOCK_HIT_MAST;
+    if (outsideBox(rho - OC_MAST_FOOT_RADIUS_M, std::fabs(p.y - (y0 + OC_MAST_FOOT_M / 2)) - OC_MAST_FOOT_M / 2) < r) return OC_DOCK_HIT_MAST;
+    const V3 zm{std::sin(sunAz), 0, std::cos(sunAz)}, xm{std::cos(sunAz), 0, -std::sin(sunAz)}, ym{0, 1, 0};
+    const double ce = std::cos(sunEl), se = std::sin(sunEl);
+    const V3 face = zm * ce + ym * se, chord = ym * ce - zm * se;
+    for (int k = 0; k < OC_ARRAYS; ++k) {
+        const V3 d = p - ym * (OC_ARRAY_FIRST_M + k * OC_ARRAY_STEP_M);
+        const double v = std::fabs(dot(d, chord));
+        if (v > OC_ARRAY_CHORD_M / 2 + r) continue;
+        const double u = std::fabs(dot(d, xm)), w = std::fabs(dot(d, face));
+        const double wing = outsideBox3(std::fabs(u - (OC_ARRAY_ROOT_M + OC_ARRAY_SPAN_M / 2)) - OC_ARRAY_SPAN_M / 2, v - OC_ARRAY_CHORD_M / 2, w - OC_ARRAY_THICK_M / 2);
+        const double spar = outsideBox3(std::fabs(u - reach / 2) - reach / 2, v - OC_ARRAY_SPAR_M / 2, w - OC_ARRAY_SPAR_M / 2);
+        if (std::fmin(wing, spar) < r) return OC_DOCK_HIT_MAST;
+    }
+    return OC_DOCK_HIT_NONE;
+}
+
 // What a sphere of radius r at p, in the ring's frame, touches: OC_DOCK_HIT_*, or none. The ring is a
 // figure of revolution but for its spokes and its flight deck: the band a closed box in (distance from the
 // axis, distance along it), from the roof out to the hull between the rim walls; the rim walls' lips, thin,
-// inside the roof; the hub a cylinder; each spoke a square beam in the middle plane. Over the deck's open
+// inside the roof; the hub a cylinder, with its collar and radiators (touchFittings); each spoke a square beam in
+// the middle plane. The solar mast and its arrays do not turn with the rest and are touchMast's. Over the deck's open
 // sector the band is deck.cpp's to say (deckBand): no roof, the bulkheads at its ends, and the deck itself,
 // which the gear lands on and the rest of the craft crashes on, deck.cpp's own contact.
 int touch(V3 p, double r) {
@@ -153,6 +203,7 @@ int touch(V3 p, double r) {
     if (deck < 0 && outsideBox(bx, by) < r) return by > bx ? OC_DOCK_HIT_RIM : (rho > mid ? OC_DOCK_HIT_HULL : OC_DOCK_HIT_ROOF);
     if (deck < 0 && rho < OC_RING_ROOF_M && std::hypot(std::fmax(OC_RING_RIM_M - rho, 0.0), by) < r) return OC_DOCK_HIT_RIM;
     if (outsideBox(rho - OC_HUB_RADIUS_M, ay - OC_HUB_PORT_M) < r) return OC_DOCK_HIT_HUB;
+    if (const int fit = touchFittings(p, r, rho)) return fit;
     const double sh = OC_RING_SPOKE_M / 2;
     if (ay < sh + r && rho < OC_RING_ROOF_M + r) {   // a spoke runs from the hub to the roof, where the band's structure begins
         const double step = 2 * PI / OC_RING_SPOKES;
@@ -382,6 +433,11 @@ void dockAfterStep(State& s) {
         now[i] = toRing(f, p);
         vel[i] = dirToRing(f, s.v + rot(s.q, cross(s.w, BALLS[i].at)) - f.vc - cross(spin, p - f.c));
     }
+    // The mast and its arrays are held still among the stars, the arrays square to the Sun: seen from the turning
+    // frame they turn back at the spin, a still direction's angle falling at RING_SPIN, so each piece of a path
+    // meets them as they stood at its moment (orbit_core.h).
+    const V3 sl = dirToRing(f, sunEci);
+    const double sunAz = std::atan2(sl.x, sl.z), sunEl = std::atan2(sl.y, std::hypot(sl.x, sl.z));
     int hit = OC_DOCK_HIT_NONE, by = -1;
     double hitBack = -1;
     for (int i = 0; i < NBALLS; ++i) {
@@ -392,6 +448,7 @@ void dockAfterStep(State& s) {
             const V3 p = now[i] - vel[i] * back;
             int what = touch(p, BALLS[i].r);
             if (i == 0 && what == OC_DOCK_HIT_HUB && atFace(p)) what = OC_DOCK_HIT_NONE;   // the head at the port: below
+            if (!what) what = touchMast(p, BALLS[i].r, sunAz + RING_SPIN * back, sunEl);
             if (what) { hit = what; by = i; hitBack = back; break; }
         }
     }

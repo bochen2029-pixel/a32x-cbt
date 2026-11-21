@@ -70,7 +70,9 @@ enum {
     OC_DOCK_HIT_HUB = 5,
     OC_DOCK_HIT_PORT = 6,     /* the port's face, harder than the probe's stroke takes */
     OC_DOCK_HIT_DECK = 7,     /* the flight deck: with anything but the gear, or harder than the gear takes (orbit_deck.h) */
-    OC_DOCK_HIT_BULKHEAD = 8  /* a bulkhead at an end of the deck's open sector */
+    OC_DOCK_HIT_BULKHEAD = 8, /* a bulkhead at an end of the deck's open sector */
+    OC_DOCK_HIT_RADIATOR = 9, /* a radiator, standing out from the hub (orbit_core.h) */
+    OC_DOCK_HIT_MAST = 10     /* the solar mast or its arrays, held still beyond the hub (orbit_core.h) */
 };
 enum {
     OC_DOCK_PART_NONE = 0,

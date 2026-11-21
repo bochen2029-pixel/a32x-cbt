@@ -167,8 +167,16 @@ From the audit of `c56d77b`, suspected and not yet settled:
 
 From the audit of `599e051`:
 
-- **G12.** The page draws parts of the Ring the core does not collide with: the radiators, the solar
-  mast and its arrays, and the collar 200 m round the hub. A craft can fly through them.
+- **G12.** Settled 2026-11-21. The page drew parts of the Ring the core did not collide with: the
+  radiators, the solar mast and its arrays, and the collar 200 m round the hub; a craft flew through them.
+  Their sizes are now the header's (`OC_HUB_COLLAR_*`, `OC_RADIATOR_*`, `OC_MAST_*`, `OC_ARRAY_*`), which
+  the page's plan reads through `core.js`'s `RING` (held equal by `core.test.mjs`), and the core strikes
+  them (`OC_DOCK_HIT_RADIATOR`, `OC_DOCK_HIT_MAST`; the collar is the hub's). The mast and its arrays do
+  not turn with the Ring: the sweep meets them as they stood at each moment of the step, turned to the Sun
+  as `ring.js` turns them. `test_dock`'s `collar_is_solid`, `radiator_is_solid`, `mast_is_solid` and
+  `arrays_are_solid` each failed before. The crews' ways round the Ring (`dockSafeAim`) still have no eye
+  for the radiators, as they have none for the spokes, from a start inside the rim beside the hub's far
+  side; the flight home's way out keeps 600 m from the axis there.
 - **G13.** Settled 2026-11-21. The invariants did not fly all the newer parts. For the deck, at `99fa102`
   and since: `forcesOn`, the ledgers' force model, puts the drive along its swivelled axis (and its thrust
   as `oc_deck_disturb` makes it) and counts the deck's gear; `deck_flight_finite` scans the crew's deck

@@ -24,6 +24,10 @@
 // TEST: roof_is_solid
 // TEST: rim_wall_is_solid
 // TEST: probe_grazes_a_lip
+// TEST: collar_is_solid
+// TEST: radiator_is_solid
+// TEST: mast_is_solid
+// TEST: arrays_are_solid
 // TEST: spoke_is_solid
 // TEST: spoke_reaches_the_roof
 // TEST: hub_is_solid
@@ -308,8 +312,8 @@ bool waitForRoof(double flight) {
 }
 
 const char* hitName(int h) {
-    static const char* names[] = {"nothing", "the hull", "the roof", "a rim wall", "a spoke", "the hub", "the port", "the deck", "a bulkhead"};
-    return h >= 0 && h <= OC_DOCK_HIT_BULKHEAD ? names[h] : "?";
+    static const char* names[] = {"nothing", "the hull", "the roof", "a rim wall", "a spoke", "the hub", "the port", "the deck", "a bulkhead", "a radiator", "the mast"};
+    return h >= 0 && h <= OC_DOCK_HIT_MAST ? names[h] : "?";
 }
 const char* partName(int p) {
     static const char* names[] = {"nothing", "the probe", "the nose", "the body", "the left wing", "the right wing", "the tail", "the gear"};
@@ -818,6 +822,110 @@ void probeGrazesALip() {
     }
 }
 
+// ---- the hub's fittings (orbit_core.h; INVARIANTS.md, G12): drawn by the page, and as solid as the rest ----------
+
+// The craft still among the stars but for vrel, its nose along nose (and its wings along wing), its centre of mass
+// at com (ECI); then flown hands off until it touches something or `limit` s pass. The seconds it took, or -1.
+double stillThenFly(oc::V3 com, oc::V3 vrel, oc::V3 nose, oc::V3 wing, double limit) {
+    oc_auto(OC_AUTO_OFF);
+    oc_controls(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    oc::State& g = oc::g;
+    const oc::V3 x = oc::unit(nose), y = oc::unit(wing - x * oc::dot(wing, x));
+    g.q = oc::fromAxes(x, y, oc::cross(x, y));
+    g.r = com;
+    g.v = oc::ringVel(oc::timeOf(g)) + vrel;
+    g.w = {0, 0, 0};
+    const double t0 = get(OC_T);
+    while (get(OC_CRASHED) == 0 && get(OC_T) - t0 < limit) oc_step(1);
+    return get(OC_CRASHED) > 0 ? get(OC_T) - t0 : -1;
+}
+
+// The ring's axes now (ECI), and the probe's head's distance from the axis and along it.
+struct Axes { oc::V3 c, x, y, z; };
+Axes axesNow() {
+    const double t = oc::timeOf(oc::g);
+    const oc::V3 x = oc::ringRef(t), y = oc::ring.axis;
+    return {oc::ringPos(t), x, y, oc::cross(x, y)};
+}
+void headAt(double* radial, double* axial) {
+    const Axes a = axesNow();
+    const oc::V3 d = oc::g.r + oc::rot(oc::g.q, oc::V3{OC_DOCK_PROBE_M, 0, 0}) - a.c;
+    *axial = oc::dot(d, a.y);
+    *radial = oc::norm(d - a.y * *axial);
+}
+
+// The collar, 200 m round the hub where the spokes meet it: the craft, nose in, closing on the axis at 5 m/s 50 m
+// along it, beside the spokes' plane, meets the collar, not the hub 40 m further in.
+void collarIsSolid() {
+    if (!toOrbit()) return;
+    const Axes a = axesNow();
+    const oc::V3 out = a.x;   // spoke 0's way is along z; along x lies midway between spokes 1 and 2's... any way out will do
+    const oc::V3 com = a.c + a.y * 50.0 + out * (OC_HUB_COLLAR_M + 15 + OC_DOCK_PROBE_M);
+    const double took = stillThenFly(com, out * -5.0, out * -1.0, oc::cross(a.y, out), 30);
+    double radial, axial;
+    headAt(&radial, &axial);
+    std::printf("  nose in from 15 m off the collar at 5 m/s: %s after %.1f s, the head %.2f m from the axis, %.1f m along it\n",
+                took < 0 ? "nothing touched" : (std::string(hitName(idk(OC_DOCK_HIT))) + " with " + partName(idk(OC_DOCK_HIT_PART))).c_str(), took, radial, axial);
+    CHECK(took > 0 && dk(OC_DOCK_HIT) == OC_DOCK_HIT_HUB && dk(OC_DOCK_HIT_PART) == OC_DOCK_PART_PROBE, "the collar: crashed %.0f, hit %s with %s",
+          get(OC_CRASHED), hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+    CHECK(radial > OC_HUB_COLLAR_M && radial < OC_HUB_COLLAR_M + 0.5, "struck %.2f m from the axis, not at the collar's %.0f m", radial, OC_HUB_COLLAR_M);
+}
+
+// A radiator: the craft held still among the stars 300 m from the axis and 215 m along it on the far side, midway
+// between two radiators (spoke 0's way, far from the spokes' plane), is met by the next radiator round, which comes
+// at the Ring's 2.54 degrees a second: about 30 degrees, less the craft's own reach.
+void radiatorIsSolid() {
+    if (!toOrbit()) return;
+    const Axes a = axesNow();
+    const oc::V3 out = a.z;   // spoke 0: along sin(0) ref + cos(0) (ref x axis)
+    const oc::V3 com = a.c + a.y * 215.0 + out * 300.0;
+    const double took = stillThenFly(com, {0, 0, 0}, a.y, oc::cross(a.y, out), 30);
+    std::printf("  held still between two radiators: %s after %.1f s (the next one 30 degrees round, at 2.54 degrees a second)\n",
+                took < 0 ? "nothing touched" : (std::string(hitName(idk(OC_DOCK_HIT))) + " with " + partName(idk(OC_DOCK_HIT_PART))).c_str(), took);
+    CHECK(took > 5 && took < 12 && dk(OC_DOCK_HIT) == OC_DOCK_HIT_RADIATOR, "a radiator: crashed %.0f after %.1f s, hit %s", get(OC_CRASHED), took,
+          hitName(idk(OC_DOCK_HIT)));
+}
+
+// The mast, on the axis beyond the hub's far face: the craft, nose in, closing on the axis at 3 m/s 610 m along it,
+// between two pairs of arrays, meets the mast's 10 m radius with its probe.
+void mastIsSolid() {
+    if (!toOrbit()) return;
+    const Axes a = axesNow();
+    const oc::V3 out = a.x;
+    const oc::V3 com = a.c + a.y * 610.0 + out * (OC_MAST_RADIUS_M + 30 + OC_DOCK_PROBE_M);
+    const double took = stillThenFly(com, out * -3.0, out * -1.0, oc::cross(a.y, out), 30);
+    double radial, axial;
+    headAt(&radial, &axial);
+    std::printf("  nose in from 30 m off the mast at 3 m/s: %s after %.1f s, the head %.2f m from the axis\n",
+                took < 0 ? "nothing touched" : (std::string(hitName(idk(OC_DOCK_HIT))) + " with " + partName(idk(OC_DOCK_HIT_PART))).c_str(), took, radial);
+    CHECK(took > 0 && dk(OC_DOCK_HIT) == OC_DOCK_HIT_MAST && dk(OC_DOCK_HIT_PART) == OC_DOCK_PART_PROBE, "the mast: crashed %.0f, hit %s with %s",
+          get(OC_CRASHED), hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+    CHECK(radial > OC_MAST_RADIUS_M && radial < OC_MAST_RADIUS_M + 0.5, "struck %.2f m from the axis", radial);
+}
+
+// The arrays, held still and square to the Sun: the craft, nose on, closing at 3 m/s on the middle pair's wing from
+// 40 m in front of its face, halfway out along it, meets the wing with its probe; 30 m past the wing's tip it passes.
+void arraysAreSolid() {
+    for (int pass = 0; pass < 2; ++pass) {
+        if (!toOrbit()) return;
+        const Axes a = axesNow();
+        const oc::V3 sun = oc::sunEci;
+        const double az = std::atan2(oc::dot(sun, a.x), oc::dot(sun, a.z)), el = std::atan2(oc::dot(sun, a.y), std::hypot(oc::dot(sun, a.x), oc::dot(sun, a.z)));
+        const oc::V3 zm = a.x * std::sin(az) + a.z * std::cos(az), xm = a.x * std::cos(az) - a.z * std::sin(az);
+        const oc::V3 face = zm * std::cos(el) + a.y * std::sin(el);
+        const double along = pass == 0 ? OC_ARRAY_ROOT_M + OC_ARRAY_SPAN_M / 2 : OC_ARRAY_ROOT_M + OC_ARRAY_SPAN_M + 30;
+        const oc::V3 onWing = a.c + a.y * (OC_ARRAY_FIRST_M + OC_ARRAY_STEP_M) + xm * along;
+        const double took = stillThenFly(onWing + face * 40.0, face * -3.0, face * -1.0, xm, 30);
+        std::printf("  the Sun %.1f deg round and %.1f deg up; nose on at 3 m/s from 40 m, %.0f m out along the wing: %s after %.1f s\n", az * R2D, el * R2D, along,
+                    took < 0 ? "nothing touched" : (std::string(hitName(idk(OC_DOCK_HIT))) + " with " + partName(idk(OC_DOCK_HIT_PART))).c_str(), took);
+        if (pass == 0)
+            CHECK(took > 0 && dk(OC_DOCK_HIT) == OC_DOCK_HIT_MAST && dk(OC_DOCK_HIT_PART) == OC_DOCK_PART_PROBE, "the wing: crashed %.0f, hit %s with %s",
+                  get(OC_CRASHED), hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+        else
+            CHECK(took < 0, "30 m past the wing's tip: hit %s with %s", hitName(idk(OC_DOCK_HIT)), partName(idk(OC_DOCK_HIT_PART)));
+    }
+}
+
 // Parked in the spokes' plane, between the hub and the rim, the craft is struck by the next spoke round.
 void spokeIsSolid() {
     if (!handsAtHold()) return;
@@ -1084,6 +1192,10 @@ const Test tests[] = {
     {"roof_is_solid", roofIsSolid},
     {"rim_wall_is_solid", rimWallIsSolid},
     {"probe_grazes_a_lip", probeGrazesALip},
+    {"collar_is_solid", collarIsSolid},
+    {"radiator_is_solid", radiatorIsSolid},
+    {"mast_is_solid", mastIsSolid},
+    {"arrays_are_solid", arraysAreSolid},
     {"spoke_is_solid", spokeIsSolid},
     {"spoke_reaches_the_roof", spokeReachesTheRoof},
     {"hub_is_solid", hubIsSolid},
