@@ -238,6 +238,12 @@ export const sky = {
   },
 
   command(c, ctx) {
+    if (c === 'reset') { this.telescope = false; return false; }   // a start again starts with the eye, not the telescope
+    if (c === 'view' && this.telescope) {   // the telescope covers every view: VIEW puts it away, to the view it left
+      this.telescope = false;
+      ctx.say('The telescope away');
+      return true;
+    }
     if (c !== 'moon') return false;
     if (ctx.walk && ctx.walk.v.on) return false;   // walking, F drops a ball: the walk's key, not the telescope's
     this.telescope = !this.telescope;
