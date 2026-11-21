@@ -79,6 +79,10 @@ const CSS = `
   body.walking #walk-dot { display: block; }
 `;
 
+// The page's commands the walk's own keys also give (input.js): Space the crew's, F the Moon's, G the gear's; the
+// screen's throttle, hidden while walking. Taken by the walk without a word.
+const WALK_KEYS = new Set(['crew', 'moon', 'gear', 'hand-throttle']);
+
 // Where ?walk starts the walk, for a look and for the page's tests: ?walk (the hatch), ?walk=lift, ?walk=floor.
 function urlPlace() {
   try {
@@ -426,8 +430,13 @@ export const walk = {
       case 'slower': v.warp = WARPS[Math.max(0, WARPS.indexOf(v.warp) - 1)]; say(ctx, `Time ${v.warp}×`); break;
       case 'faster': v.warp = WARPS[Math.min(WARPS.length - 1, WARPS.indexOf(v.warp) + 1)]; say(ctx, `Time ${v.warp}×`); break;
       case 'reset': v.core.reset(PLACE.hatch); v.prev = { ...v.core.o }; v.cur = { ...v.core.o }; v.look = { heading: v.core.o.heading, pitch: 0 }; say(ctx, 'Back at the hatch'); break;
-      case 'help': return false;   // the page shows the help, which is the walk's while walking
-      default: break;              // the flight's commands wait until the walk is over
+      case 'help': return false;      // the page shows the help, which is the walk's while walking
+      case 'quality': return false;   // the graphics tier: the walk follows it (frame)
+      default:
+        // the flight's commands wait until the walk is over; said, rather than nothing, for those that are not
+        // also the walk's own keys (Space, Enter, F and G are its jump, use and ball)
+        if (!WALK_KEYS.has(c)) say(ctx, `Aboard the Ring: the flight's ${ctx.hud && ctx.hud.touch ? 'buttons wait' : 'keys wait'} until you are back aboard (${ctx.hud && ctx.hud.touch ? 'USE' : 'E'} at the hatch)`);
+        break;
     }
     return true;
   },
