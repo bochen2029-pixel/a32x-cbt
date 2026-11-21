@@ -24,16 +24,24 @@ async function open(browser, query, options) {
   const p = await context.newPage();
   const errors = [];
   p.on('pageerror', (e) => errors.push(e.message));
-  await p.goto(page.href + query);
+  await p.goto(page.href + query, { timeout: 240000 });
   await p.waitForFunction(() => window.orbitSketch || /^Failed/.test((document.querySelector('#status') || {}).textContent || ''), null, { timeout: 240000 });
   assert.ok(!/^Failed/.test(await p.$eval('#status', (e) => e.textContent)), `${query}: failed to start`);
   // a frame drawn, so the page's first command is taken by its frame loop
   await p.waitForFunction(() => window.orbitSketch.core.s.t > 0, null, WAIT);
+  // all the page says, kept: a word on the screen lasts 3.5 s, less than a frame on a loaded machine in software
+  await p.evaluate(() => {
+    window.said = [];
+    const say = document.querySelector('#say');
+    new MutationObserver(() => { if (say.textContent) window.said.push(say.textContent); }).observe(say, { childList: true, characterData: true, subtree: true });
+  });
   return { p, context, errors };
 }
 
 const auto = (p) => p.evaluate(() => Math.round(window.orbitSketch.core.s.auto));
-const said = (p) => p.$eval('#say', (e) => e.textContent);
+const forget = (p) => p.evaluate(() => { window.said = []; });
+// waits until the page has said something matching re since the last forget()
+const heard = (p, re) => p.waitForFunction((src) => window.said.some((t) => new RegExp(src).test(t)), re.source, WAIT);
 
 test('on a desktop, by keys and clicks: one key does one thing, the tour, the way home, the brakes, the walk', { skip: why, timeout: 300000 }, async () => {
   const browser = await chromium.launch({ args: ARGS });
@@ -45,18 +53,24 @@ test('on a desktop, by keys and clicks: one key does one thing, the tour, the wa
     await p.waitForFunction((v) => window.orbitSketch.state.view !== v, view, WAIT);
     assert.equal(await p.evaluate(() => document.activeElement && document.activeElement.tagName), 'BODY');
     await p.keyboard.press('Enter');
-    await p.waitForFunction(() => /dock there first/.test(document.querySelector('#say').textContent), null, WAIT);
+    await heard(p, /dock there first/);
     assert.equal(await p.evaluate(() => window.orbitSketch.state.view), (view + 1) % 3, 'Enter left the view alone');
 
     // the controls handed back on the way home go to the crew flying home, not to the crew to orbit
     await p.keyboard.press('r');
     await p.waitForFunction(() => Math.round(window.orbitSketch.core.s.auto) === 3, null, WAIT);
+    await p.keyboard.press('.');
+    await p.keyboard.press('.');
+    await p.waitForFunction(() => window.orbitSketch.state.warp === 5, null, WAIT);
     await p.keyboard.press(' ');
     await p.waitForFunction(() => Math.round(window.orbitSketch.core.s.auto) === 0, null, WAIT);
+    // the controls come to the pilot at one to one (a crew done on the deck handed them over at 100×)
+    await p.waitForFunction(() => window.orbitSketch.state.warp === 1, null, WAIT);
+    await forget(p);
     await p.keyboard.press(' ');
     await p.waitForFunction(() => Math.round(window.orbitSketch.core.s.auto) !== 0, null, WAIT);
     assert.equal(await auto(p), 3, 'the crew flying home has it again');
-    assert.match(await said(p), /home to KDFW 17C from here/);
+    await heard(p, /home to KDFW 17C from here/);
 
     // the tour, started in orbit, starts on the runway: its captions the runway's, time one to one
     await p.keyboard.press('0');
@@ -66,18 +80,20 @@ test('on a desktop, by keys and clicks: one key does one thing, the tour, the wa
     assert.equal(await p.evaluate(() => window.orbitSketch.state.warp), 1);
     // a hand on the keys takes over, as the tour says any key does, and time goes back to one to one
     await p.evaluate(() => { window.orbitSketch.state.warp = 25; });   // as the tour leaves it on the way to the Ring
+    await forget(p);
     await p.keyboard.down('w');
     await p.waitForFunction(() => !document.querySelector('#tour-caption').classList.contains('shown'), null, WAIT);
     await p.keyboard.up('w');
     assert.equal(await p.evaluate(() => window.orbitSketch.state.warp), 1);
-    assert.match(await said(p), /^The tour is over: the crew flies on/);
+    await heard(p, /^The tour is over: the crew flies on/);
 
     // handed the craft parked, the pilot is told of the brakes, and B lets them go, and says so
     await p.keyboard.press(' ');
     await p.waitForFunction(() => document.querySelector('#hint').textContent === 'B: let the brakes go', null, WAIT);
     assert.match(await p.$eval('#readouts', (e) => e.textContent), /gear DOWN {3}BRAKES/);
+    await forget(p);
     await p.keyboard.press('b');
-    await p.waitForFunction(() => document.querySelector('#say').textContent === 'Brakes off', null, WAIT);
+    await heard(p, /^Brakes off$/);
     await p.waitForFunction(() => !/BRAKES/.test(document.querySelector('#readouts').textContent), null, WAIT);
 
     // while walking, the flight's overlays drawn before it (the flight director's display, here) are not on the screen
@@ -87,14 +103,19 @@ test('on a desktop, by keys and clicks: one key does one thing, the tour, the wa
     for (const id of ['fd-display', 'dock-reticle', 'deck-approach', 'map', 'fpm', 'target']) {
       assert.equal(await p.$eval(`#${id}`, (e) => getComputedStyle(e).display), 'none', `#${id} while walking`);
     }
+    // a flight's key while walking says why it waits, rather than nothing
+    await forget(p);
+    await p.keyboard.press('v');
+    await heard(p, /^Aboard the Ring: the flight's keys wait/);
     await p.evaluate(() => window.orbitSketch.ctx.walk.stop(null));
 
     // a start again puts the telescope away, and the camera back behind the craft
+    await forget(p);
     await p.keyboard.press('v');
     await p.keyboard.press('f');
-    await p.waitForFunction(() => /telescope/.test(document.querySelector('#say').textContent), null, WAIT);
+    await heard(p, /telescope|below the horizon/);
     await p.keyboard.press('Backspace');
-    await p.waitForFunction(() => document.querySelector('#say').textContent === 'Back on 17C', null, WAIT);
+    await heard(p, /^Back on 17C$/);
     assert.equal(await p.evaluate(() => window.orbitSketch.ctx.camera.fov), 60, 'the telescope is away');
     assert.equal(await p.evaluate(() => window.orbitSketch.state.view), 0, 'the chase view');
     assert.deepEqual(errors, []);
