@@ -24,7 +24,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
 import { unzip, zip, ZIP_EPOCH } from '../../../../app/tools/zip.mjs';
@@ -36,17 +36,30 @@ export const KIT_DOCS = [
   'README.md', 'CANON_DELTA.md', 'UNREAL_PORT.md', 'FIRST_SLICE.md', 'LICENSING.md', 'CLAUDE.md.template',
   'BOOTSTRAP_PROMPT.md', 'SOURCES.md', 'OPEN_RING_AIR.md', 'VISION.md',
 ];
-const KIT = 'flight/orbit/handoff';
 /** The orbit sketch's parts that travel: everything git tracks under these. */
-const ORBIT = 'flight/orbit';
 const ORBIT_PARTS = ['README.md', 'INVARIANTS.md', 'CMakeLists.txt', 'core', 'test', 'tools', 'evidence', 'web'];
-/** Files from elsewhere in the repository, and where they go in the archive. */
-const EXTRA = [
-  ['docs/provenance.md', 'reference/provenance.md'],
-  ['flight/LICENSE', 'licences/GPL-3.0.txt'],
-];
-const DEFAULT_PAGE = 'flight/orbit/build-web/index.html';
-const REPOSITORY = 'a32x-cbt';
+
+/**
+ * Where the sketch lives in its repository: flight/orbit of a32x-cbt, or the root of a repository of its own
+ * (tools/standalone.mjs makes one). Every repository path the packer reads goes through this: the kit's
+ * documents, the sketch's parts, the files from elsewhere (the provenance and the licence, and where they go
+ * in the archive), the built page, the default output folder and the names the notice uses.
+ */
+export function layout(root) {
+  const nested = existsSync(join(root, 'flight', 'orbit', 'CMakeLists.txt'));
+  const orbit = nested ? 'flight/orbit' : '';
+  const at = (p) => (orbit ? `${orbit}/${p}` : p);
+  const repository = nested ? 'a32x-cbt' : basename(root);
+  return {
+    nested, orbit, at, repository,
+    kit: at('handoff'),
+    page: at('build-web/index.html'),
+    out: at('build/handoff'),
+    extra: [['docs/provenance.md', 'reference/provenance.md'], [nested ? 'flight/LICENSE' : 'LICENSE', 'licences/GPL-3.0.txt']],
+    place: nested ? `${repository}'s flight/orbit` : `${repository}, the sketch's own repository,`,
+    licensed: nested ? `${repository}'s flight/ and so are GPLv3 by that repository's rule` : `${repository} and so are GPLv3 by its licence`,
+  };
+}
 
 export class Refusal extends Error {}
 
@@ -82,23 +95,24 @@ function changedPaths(root, paths) {
 
 /** What the archive takes from the repository: [repository path, archive path] pairs, sorted. */
 function repositoryFiles(root) {
-  const pairs = KIT_DOCS.map((doc) => [`${KIT}/${doc}`, doc]);
-  const tracked = git(root, ['ls-files', '-z', '--', ...ORBIT_PARTS.map((p) => `${ORBIT}/${p}`)]).split('\0').filter(Boolean);
-  for (const path of tracked) pairs.push([path, `orbit/${path.slice(ORBIT.length + 1)}`]);
-  pairs.push(...EXTRA);
+  const L = layout(root);
+  const pairs = KIT_DOCS.map((doc) => [`${L.kit}/${doc}`, doc]);
+  const tracked = git(root, ['ls-files', '-z', '--', ...ORBIT_PARTS.map(L.at)]).split('\0').filter(Boolean);
+  for (const path of tracked) pairs.push([path, `orbit/${L.orbit ? path.slice(L.orbit.length + 1) : path}`]);
+  pairs.push(...L.extra);
   return pairs;
 }
 
-function notice(short, commit, page) {
+function notice(short, commit, page, L) {
   return [
     `orbit-handoff-${short}: what is in this archive, and under which licence.`,
     '',
     'README.md and the other documents beside it: the handoff kit, written for its owner. They sit in',
-    `${REPOSITORY}'s flight/ and so are GPLv3 by that repository's rule; LICENSING.md says what that means.`,
+    `${L.licensed}; LICENSING.md says what that means.`,
     '',
     "canon/ARCHITECTURE.md: the canon, the owner's own document.",
     '',
-    `orbit/: the orbit sketch's core, tests, tools, CMake, README, invariants, receipts and the page's sources, from ${REPOSITORY}'s flight/orbit at`,
+    `orbit/: the orbit sketch's core, tests, tools, CMake, README, invariants, receipts and the page's sources, from ${L.place} at`,
     `${commit}. GPLv3: licences/GPL-3.0.txt.`,
     '',
     page
@@ -108,7 +122,7 @@ function notice(short, commit, page) {
         'at the commit above.'
       : 'page/: absent. No built page was given to the packager.',
     '',
-    `reference/provenance.md: ${REPOSITORY}'s record of where everything in it came from.`,
+    `reference/provenance.md: ${L.repository}'s record of where everything in it came from.`,
     '',
     "This archive is for its owner's own use. Passing the core or the page to anyone else is a GPLv3",
     'distribution: give them the source with it.',
@@ -157,18 +171,19 @@ export function build({ root = repoRoot(), canon, page = undefined, worktree = f
     throw new Refusal('README.md and BOOTSTRAP_PROMPT.md must carry the same first message in a ```text block');
   }
 
-  const pagePath = page === undefined ? (existsSync(join(root, DEFAULT_PAGE)) ? join(root, DEFAULT_PAGE) : null) : page;
+  const L = layout(root);
+  const pagePath = page === undefined ? (existsSync(join(root, L.page)) ? join(root, L.page) : null) : page;
   if (pagePath && !existsSync(pagePath)) throw new Refusal(`no page at ${pagePath}`);
   const pageBytes = pagePath ? readFileSync(pagePath) : null;
   if (pageBytes) files.set('page/index.html', pageBytes);
-  files.set('NOTICE.txt', Buffer.from(notice(short, commit, Boolean(pageBytes)), 'utf8'));
+  files.set('NOTICE.txt', Buffer.from(notice(short, commit, Boolean(pageBytes), L), 'utf8'));
 
   const listed = [...files.keys()].sort();
   const manifest = {
     kit: 'orbit-handoff',
     about: "The orbit sketch's handoff kit for an Unreal Engine project; start with README.md.",
     source: {
-      repository: REPOSITORY,
+      repository: L.repository,
       commit,
       commit_date: commitDate,
       tree: changed.length ? 'working tree, with changes since the commit' : 'the commit, unchanged',
@@ -238,7 +253,7 @@ function main() {
       root, canon: args.canon && resolve(args.canon), page: args.page && resolve(args.page),
       worktree: args.worktree, allowOtherCanon: args['allow-other-canon'],
     });
-    const out = resolve(args.out ?? join(root, 'flight/orbit/build/handoff'));
+    const out = resolve(args.out ?? join(root, layout(root).out));
     mkdirSync(out, { recursive: true });
     const path = join(out, made.name);
     writeFileSync(path, made.bytes);
